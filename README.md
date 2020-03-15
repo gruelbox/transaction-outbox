@@ -136,14 +136,21 @@ is to attempt to obtain an instance of `ClassToCall` via reflection, assuming th
 
 `SpringInstantiator`, as used above, will instead use Spring's `ApplicationContext.getBean()` method to obtain the object, allowing injection into it.
 
-It is simple to use most DI mechanisms in the same way, for example Guice:
+It is trivial to use most DI mechanisms in the same way, for example Guice:
 ```
 @Provides
 @Singleton
-public TransactionOutbox transactionOutbox(Injector injector) {
+TransactionManager transactionManager(DataSource dataSource) {
+  return TransactionManager.fromDataSource(ds);
+}
+
+@Provides
+@Singleton
+TransactionOutbox transactionOutbox(Injector injector, TransactionManager transactionManager) {
   return TransactionOutbox.builder()
     .dialect(Dialect.H2)
     .instantiator(Instantiator.using(injector::getInstance))
+    .transactionManager(transactionManager)
     .build();
 }
 ```
