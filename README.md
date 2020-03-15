@@ -61,7 +61,7 @@ TransactionOutbox outbox = TransactionOutbox.builder()
 Better - use connection pooling:
 ```
 HikariConfig config = new HikariConfig();
-config.setJdbcUrl("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE");
+config.setJdbcUrl("jdbc:h2:mem:test;MV_STORE=TRUE");
 config.setUsername("test");
 config.setPassword("test");
 config.addDataSourceProperty("cachePrepStmts", "true");
