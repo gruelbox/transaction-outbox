@@ -88,6 +88,30 @@ public TransactionOutbox transactionOutbox(ApplicationContext applicationContext
     .build();
 }
 ```
+Perhaps integrate with Guice?
+```
+@Provides
+@Singleton
+TransactionManager transactionManager(DataSource dataSource) {
+  return TransactionManager.fromDataSource(ds);
+}
+
+@Provides
+Dialect dialect(DatabaseConfiguration databaseConfiguration) {
+  return databaseConfiguration.getDialect().toTxnOutboxType();
+}
+
+@Provides
+@Singleton
+TransactionOutbox transactionOutbox(Injector injector, Dialect dialect, TransactionManager transactionManager) {
+  return TransactionOutbox.builder()
+    .dialect(dialect)
+    .instantiator(Instantiator.using(injector::getInstance))
+    .transactionManager(transactionManager)
+    .build();
+}
+```
+
 ### Scheduling work
 During a transaction, you can _schedule_ work to be run at some later point in time (usually immediately, but if that fails, potentially some time later, after a number of retries). This instruction is persisted to the database in the same transaction as the rest of your work, giving guaranteed eventual consistency.
 
@@ -136,31 +160,7 @@ outbox.schedule(ClassToCall.class).methodToCall(arg1, arg2, arg3);
 ```
 is to attempt to obtain an instance of `ClassToCall` via reflection, assuming there is a no-args constructor. This obviously doesn't play well with dependency injection.
 
-`SpringInstantiator`, as used above, will instead use Spring's `ApplicationContext.getBean()` method to obtain the object, allowing injection into it.
-
-It is trivial to use most DI mechanisms in the same way, for example Guice:
-```
-@Provides
-@Singleton
-TransactionManager transactionManager(DataSource dataSource) {
-  return TransactionManager.fromDataSource(ds);
-}
-
-@Provides
-Dialect dialect(DatabaseConfiguration databaseConfiguration) {
-  return databaseConfiguration.getDialect().toTxnOutboxType();
-}
-
-@Provides
-@Singleton
-TransactionOutbox transactionOutbox(Injector injector, Dialect dialect, TransactionManager transactionManager) {
-  return TransactionOutbox.builder()
-    .dialect(dialect)
-    .instantiator(Instantiator.using(injector::getInstance))
-    .transactionManager(transactionManager)
-    .build();
-}
-```
+`SpringInstantiator`, as used above, will instead use Spring's `ApplicationContext.getBean()` method to obtain the object, allowing injection into it, and the Guice example will use `Injector.getInstance()`.
 
 ### Ensuring work is processed eventually
 
