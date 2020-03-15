@@ -22,9 +22,7 @@ public class SpringTransactionManager implements TransactionManager {
   private final ThreadLocal<ArrayList<Runnable>> postCommitHooks = new ThreadLocal<>();
   private final ThreadLocal<Map<String, PreparedStatement>> statements = new ThreadLocal<>();
 
-  /**
-   * The Hibernate entity manager.
-   */
+  /** The Hibernate entity manager. */
   @NonNull private final EntityManager entityManager;
 
   @Override
@@ -55,17 +53,6 @@ public class SpringTransactionManager implements TransactionManager {
         statements.get().values().forEach(it -> Utils.uncheck(it::executeBatch));
       }
       return result;
-    } catch (Exception e) {
-      try {
-        log.warn(
-            "Exception in transactional block ({}{}). Rolling back. See later messages for detail",
-            e.getClass().getSimpleName(),
-            e.getMessage() == null ? "" : (" - " + e.getMessage()));
-        throw e;
-      } catch (Exception ex) {
-        log.warn("Failed to roll back", ex);
-      }
-      throw e;
     } finally {
       if (statements.get() != null) {
         log.debug("Closing batch statements");

@@ -35,10 +35,18 @@
     <module>transactionoutbox-core</module>
     <module>transactionoutbox-spring</module>
     <module>transactionoutbox-spring-demo</module>
+    <module>transactionoutbox-guice</module>
+    <module>transactionoutbox-jooq</module>
   </modules>
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.h2database</groupId>
+        <artifactId>h2</artifactId>
+        <version>1.4.200</version>
+        <scope>test</scope>
+      </dependency>
       <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>

@@ -304,7 +304,7 @@ abstract class AbstractAcceptanceTest {
   }
 
   private void clearOutbox() {
-    Utils.runSql(simpleTxnManager(), "DELETE FROM TXNO_OUTBOX");
+    TestUtils.runSql(simpleTxnManager(), "DELETE FROM TXNO_OUTBOX");
   }
 
   private void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
