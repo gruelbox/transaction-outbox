@@ -127,6 +127,27 @@ public String createCustomer() {
   return "Done";
 }
 ```
+### Injecting dependencies into workers
+The default behaviour when you call as follows:
+```
+outbox.schedule(ClassToCall.class).methodToCall(arg1, arg2, arg3);
+```
+is to attempt to obtain an instance of `ClassToCall` via reflection, assuming there is a no-args constructor. This obviously doesn't play well with dependency injection.
+
+`SpringInstantiator`, as used above, will instead use Spring's `ApplicationContext.getBean()` method to obtain the object, allowing injection into it.
+
+It is simple to use most DI mechanisms in the same way, for example Guice:
+```
+@Provides
+@Singleton
+public TransactionOutbox transactionOutbox(Injector injector) {
+  return TransactionOutbox.builder()
+    .dialect(Dialect.H2)
+    .instantiator(Instantiator.using(injector::getInstance))
+    .build();
+}
+```
+
 ### Ensuring work is processed eventually
 
 To ensure that any scheduled work that fails first time is eventually retried, create a background task (which can run on multiple application instances) which repeatedly calls `TransactionOutbox.flush()`.  That's it!  Example:
