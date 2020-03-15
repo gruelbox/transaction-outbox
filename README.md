@@ -145,10 +145,15 @@ TransactionManager transactionManager(DataSource dataSource) {
 }
 
 @Provides
+Dialect dialect(DatabaseConfiguration databaseConfiguration) {
+  return databaseConfiguration.getDialect().toTxnOutboxType();
+}
+
+@Provides
 @Singleton
-TransactionOutbox transactionOutbox(Injector injector, TransactionManager transactionManager) {
+TransactionOutbox transactionOutbox(Injector injector, Dialect dialect, TransactionManager transactionManager) {
   return TransactionOutbox.builder()
-    .dialect(Dialect.H2)
+    .dialect(dialect)
     .instantiator(Instantiator.using(injector::getInstance))
     .transactionManager(transactionManager)
     .build();
