@@ -35,6 +35,15 @@ And add this dependency:
   <version>master-SNAPSHOT</version>
 </dependency>
 ```
+Plus this if you are using Spring with JPA:
+```
+<dependency>
+  <groupId>com.github.gruelbox.transaction-outbox</groupId>
+  <artifactId>transactionoutbox-spring</artifactId>
+  <version>master-SNAPSHOT</version>
+</dependency>
+```
+
 ## Usage
 Create a `TransactionOutbox` using the builder. The configuration is highly flexible and designed to allow you to integrate with any combination of relational DB and transaction management framework. Here are some examples:
 
