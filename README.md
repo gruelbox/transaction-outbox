@@ -43,6 +43,22 @@ Plus this if you are using Spring with JPA:
   <version>master-SNAPSHOT</version>
 </dependency>
 ```
+Or this if you're using Guice:
+```
+<dependency>
+  <groupId>com.github.gruelbox.transaction-outbox</groupId>
+  <artifactId>transactionoutbox-guice</artifactId>
+  <version>master-SNAPSHOT</version>
+</dependency>
+```
+Or this if you're using JOOQ's built-in transaction management:
+```
+<dependency>
+  <groupId>com.github.gruelbox.transaction-outbox</groupId>
+  <artifactId>transactionoutbox-jooq</artifactId>
+  <version>master-SNAPSHOT</version>
+</dependency>
+```
 
 ## Usage
 ### Creating a `TransactionOutbox`
@@ -88,12 +104,21 @@ public TransactionOutbox transactionOutbox(ApplicationContext applicationContext
     .build();
 }
 ```
-Perhaps integrate with Guice?
+Perhaps integrate with Guice and jOOQ's transaction management instead?
 ```
 @Provides
 @Singleton
-TransactionManager transactionManager(DataSource dataSource) {
-  return TransactionManager.fromDataSource(ds);
+DSLContext parentDsl() {
+  return DSL.using(
+    "jdbc:h2:mem:test;MV_STORE=TRUE",
+    "test",
+    "test");
+}
+
+@Provides
+@Singleton
+TransactionManager transactionManager(DSLContext dsl) {
+  return JooqTransactionManager.builder().parentDsl(dsl).build();
 }
 
 @Provides
@@ -152,6 +177,15 @@ public String createCustomer() {
 }
 ```
 See the [Spring example](https://github.com/gruelbox/transaction-outbox/tree/master/transactionoutbox-spring/src/main/java/com/gruelbox/transactionoutbox) to see this in context.
+
+Or jOOQ:
+
+```
+dsl.transaction(config -> {
+  customerService.createCustomer(config.dsl(), customer);
+  outbox.schedule(EventPublisher.class).publishEvent(NewCustomerEvent.of(customer));
+});
+```
 
 ### Injecting dependencies into workers
 The default behaviour when you call as follows:
