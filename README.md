@@ -167,12 +167,9 @@ TransactionOutbox transactionOutbox(Injector injector, Dialect dialect, Transact
 To ensure that any scheduled work that fails first time is eventually retried, create a background task (which can run on multiple application instances) which repeatedly calls `TransactionOutbox.flush()`.  That's it!  Example:
 ```
 ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-scheduler.scheduleAtFixedRate(() -> {
-    if (Thread.interrupted()) return;
-    outbox.flush();
-  },
-  2, 2, TimeUnit.MINUTES);
+scheduler.scheduleAtFixedRate(outbox::flush, 2, 2, TimeUnit.MINUTES);
 ```
+
 ### Managing the "dead letter queue"
 Work might be retried too many times and get `blacklisted`. You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
 
