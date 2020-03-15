@@ -91,6 +91,12 @@ public TransactionOutbox transactionOutbox(ApplicationContext applicationContext
 ### Scheduling work
 During a transaction, you can _schedule_ work to be run at some later point in time (usually immediately, but if that fails, potentially some time later, after a number of retries). This instruction is persisted to the database in the same transaction as the rest of your work, giving guaranteed eventual consistency.
 
+In general, this is expressed as:
+```
+outbox.schedule(ClassToCall.class).methodToCall(arg1, arg2, arg3);
+```
+This says "at the earliest opportunity, please obtain an instance of `ClassToCall` and call the `methodToCall` method on it, passing the arguments `[ arg1, arg2, arg3]`. If that call fails, try again repeatedly until the configured maximum number of retries".
+
 If using the built-in transaction manager:
 
 ```
@@ -129,6 +135,10 @@ scheduler.scheduleAtFixedRate(() -> {
   },
   2, 2, TimeUnit.MINUTES);
 ```
+## Managing the "dead letter queue"
+Work might be retried too many times and get `blacklisted`. You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
+
+TODO add APIs for this
 
 ## How it works
 
