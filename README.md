@@ -12,8 +12,8 @@
  - Spring
  - Hibernate
  - Guice
- - MySQL
- - PostgreSQL
+ - MySQL 5 & 8
+ - PostgreSQL 9, 10, 11, 12
  - H2
 
 ## Installation
