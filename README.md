@@ -127,6 +127,8 @@ public String createCustomer() {
   return "Done";
 }
 ```
+See the [Spring example](https://github.com/gruelbox/transaction-outbox/tree/master/transactionoutbox-spring/src/main/java/com/gruelbox/transactionoutbox) to see this in context.
+
 ### Injecting dependencies into workers
 The default behaviour when you call as follows:
 ```
