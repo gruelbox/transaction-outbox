@@ -45,6 +45,8 @@ Plus this if you are using Spring with JPA:
 ```
 
 ## Usage
+### Creating a `TransactionOutbox`
+
 Create a `TransactionOutbox` using the builder. The configuration is highly flexible and designed to allow you to integrate with any combination of relational DB and transaction management framework. Here are some examples:
 
 Super-simple - if you have no existing transaction management, connection pooling or dependency injection:
@@ -55,14 +57,6 @@ TransactionOutbox outbox = TransactionOutbox.builder()
   .transactionManager(transactionManager)
   .dialect(Dialect.H2)
   .build();
-transactionManager.inTransaction(() -> {
-  // Do some work within your transaction
-  customerService.createCustomer(transactionManager, customer);
-  // Schedule a transaction outbox task
-  outbox.schedule(EventPublisher.class).publishEvent(NewCustomerEvent.of(customer));
-});
-  
-  
 ```
 Better - use connection pooling:
 ```
@@ -77,12 +71,9 @@ try (HikariDataSource ds = new HikariDataSource(config)) {
     .transactionManager(transactionManager)
     .dialect(Dialect.H2)
     .build();
-  transactionManager.inTransaction(() -> {
-    // Do some work within your transaction
-    customerService.createCustomer(transactionManager, customer);
-    // Schedule a transaction outbox task
-    outbox.schedule(EventPublisher.class).publishEvent(NewCustomerEvent.of(customer));
-  });
+  
+  ...
+  ...
 }
 ```
 Or add `transactionoutbox-spring` to your POM and integrate with Spring DI, Spring Tx and JPA:
@@ -96,9 +87,22 @@ public TransactionOutbox transactionOutbox(ApplicationContext applicationContext
     .transactionManager(SpringTransactionManager.builder().entityManager(entityManager).build())
     .build();
 }
+```
+### Scheduling work
+During a transaction, you can _schedule_ work to be run at some later point in time (usually immediately, but if that fails, potentially some time later, after a number of retries). This instruction is persisted to the database in the same transaction as the rest of your work, giving guaranteed eventual consistency.
 
-...
+If using the built-in transaction manager:
 
+```
+transactionManager.inTransaction(() -> {
+  // Do some work within your transaction
+  customerService.createCustomer(transactionManager, customer);
+  // Schedule a transaction outbox task
+  outbox.schedule(EventPublisher.class).publishEvent(NewCustomerEvent.of(customer));
+});
+```
+However, you can integrate with existing transaction management mechanisms, such as with Spring (using `SpringTransactionManager` as shown above):
+```
 @Autowired private CustomerRepository customerRepository;
 @Autowired private EventRepository eventRepository;
 @Autowired @Lazy private TransactionOutbox outbox;
@@ -113,6 +117,17 @@ public String createCustomer() {
   LOGGER.info("Customers created");
   return "Done";
 }
+```
+### Ensuring work is processed eventually
+
+To ensure that any scheduled work that fails first time is eventually retried, create a background task (which can run on multiple application instances) which repeatedly calls `TransactionOutbox.flush()`.  That's it!  Example:
+```
+ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+scheduler.scheduleAtFixedRate(() -> {
+    if (Thread.interrupted()) return;
+    outbox.flush();
+  },
+  2, 2, TimeUnit.MINUTES);
 ```
 
 ## How it works
