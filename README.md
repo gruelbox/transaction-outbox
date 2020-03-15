@@ -97,17 +97,20 @@ outbox.schedule(ClassToCall.class).methodToCall(arg1, arg2, arg3);
 ```
 This says "at the earliest opportunity, please obtain an instance of `ClassToCall` and call the `methodToCall` method on it, passing the arguments `[ arg1, arg2, arg3]`. If that call fails, try again repeatedly until the configured maximum number of retries".
 
-If using the built-in transaction manager:
+You must call `TransactionOutbox.schedule()` _within an ongoing database transaction_ which the `TransactionManager` (the one you passed when building the `TransactionOutbox`) is aware of.
+
+If using the built-in transaction manager, you should start a transaction using `TransactionManager.inTransaction()`:
 
 ```
 transactionManager.inTransaction(() -> {
   // Do some work within your transaction
+  // This code MUST use the connection currently active within the `TransactionManager`.
   customerService.createCustomer(transactionManager, customer);
   // Schedule a transaction outbox task
   outbox.schedule(EventPublisher.class).publishEvent(NewCustomerEvent.of(customer));
 });
 ```
-However, you can integrate with existing transaction management mechanisms, such as with Spring (using `SpringTransactionManager` as shown above):
+However, you can integrate with existing transaction management mechanisms, such as with Spring (using `SpringTransactionManager` as shown above), and ensure all transaction management is performed via Spring's `Transactional` annotation:
 ```
 @Autowired private CustomerRepository customerRepository;
 @Autowired private EventRepository eventRepository;
