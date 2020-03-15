@@ -135,7 +135,7 @@ scheduler.scheduleAtFixedRate(() -> {
   },
   2, 2, TimeUnit.MINUTES);
 ```
-## Managing the "dead letter queue"
+### Managing the "dead letter queue"
 Work might be retried too many times and get `blacklisted`. You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
 
 TODO add APIs for this
