@@ -39,13 +39,13 @@ class TestJooqTransactionManager {
   private DSLContext dsl;
 
   @BeforeEach
-  private void beforeEach() {
+  void beforeEach() {
     dataSource = pooledDataSource();
     transactionManager = createTransactionManager();
   }
 
   @AfterEach
-  private void afterEach() {
+  void afterEach() {
     dsl.close();
     dataSource.close();
   }
@@ -72,7 +72,7 @@ class TestJooqTransactionManager {
   }
 
   @Test
-  final void testSimpleDirectInvocation() throws InterruptedException {
+  void testSimpleDirectInvocation() throws InterruptedException {
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -99,7 +99,7 @@ class TestJooqTransactionManager {
   }
 
   @Test
-  final void testSimpleViaListener() throws InterruptedException {
+  void testSimpleViaListener() throws InterruptedException {
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -126,7 +126,7 @@ class TestJooqTransactionManager {
   }
 
   @Test
-  final void retryBehaviour() throws Exception {
+  void retryBehaviour() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
     AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
@@ -151,7 +151,7 @@ class TestJooqTransactionManager {
   }
 
   @Test
-  final void highVolumeUnreliable() throws Exception {
+  void highVolumeUnreliable() throws Exception {
     int count = 10;
 
     CountDownLatch latch = new CountDownLatch(count * 10);
@@ -230,8 +230,10 @@ class TestJooqTransactionManager {
     void process(int i);
   }
 
+  @SuppressWarnings("EmptyMethod")
   static class Worker {
 
+    @SuppressWarnings("SameParameterValue")
     void process(int i) {
       // No-op
     }

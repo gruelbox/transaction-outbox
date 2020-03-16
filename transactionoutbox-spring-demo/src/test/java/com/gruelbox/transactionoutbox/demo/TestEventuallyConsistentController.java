@@ -12,7 +12,7 @@ import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.http.ResponseEntity;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-public class TestEventuallyConsistentController {
+class TestEventuallyConsistentController {
 
   @LocalServerPort private int port;
 
@@ -21,12 +21,12 @@ public class TestEventuallyConsistentController {
   @Autowired private TestRestTemplate template;
 
   @BeforeEach
-  public void setUp() throws Exception {
+  void setUp() throws Exception {
     this.base = new URL("http://localhost:" + port + "/");
   }
 
   @Test
-  public void check() throws Exception {
+  void check() throws Exception {
     ResponseEntity<String> response =
         template.getForEntity(base.toString() + "/createCustomer", String.class);
     assertThat("Done".equals(response.getBody()));

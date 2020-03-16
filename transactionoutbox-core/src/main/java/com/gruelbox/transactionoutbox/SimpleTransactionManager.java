@@ -65,7 +65,7 @@ final class SimpleTransactionManager extends BaseTransactionManager {
         .orElseThrow(NoTransactionActiveException::new);
   }
 
-  <T> T withConnection(Callable<T> callable) throws Exception {
+  private <T> T withConnection(Callable<T> callable) throws Exception {
     try (Connection conn = connectionProvider.obtainConnection()) {
       log.debug("Got connection {}", conn);
       pushConnection(conn);

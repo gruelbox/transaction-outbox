@@ -15,13 +15,12 @@ public class JooqTransactionListener implements TransactionListener {
 
   @Override
   public void beginStart(TransactionContext ctx) {
-    // No-op
+    log.debug("Transaction start");
+    jooqTransactionManager.pushLists();
   }
 
   @Override
   public void beginEnd(TransactionContext ctx) {
-    log.debug("Transaction start");
-    jooqTransactionManager.pushLists();
     ctx.dsl().connection(jooqTransactionManager::pushConnection);
     jooqTransactionManager.pushContext(ctx.dsl());
   }
@@ -29,15 +28,22 @@ public class JooqTransactionListener implements TransactionListener {
   @Override
   public void commitStart(TransactionContext ctx) {
     log.debug("Transaction commit");
-    jooqTransactionManager.flushBatches();
-    jooqTransactionManager.closeBatchStatements();
+    try {
+      jooqTransactionManager.flushBatches();
+    } finally {
+      jooqTransactionManager.closeBatchStatements();
+    }
   }
 
   @Override
   public void commitEnd(TransactionContext ctx) {
     jooqTransactionManager.popConnection();
     jooqTransactionManager.popContext();
-    jooqTransactionManager.processHooks();
+    try {
+      jooqTransactionManager.processHooks();
+    } finally {
+      jooqTransactionManager.popLists();
+    }
   }
 
   @Override

@@ -58,7 +58,7 @@ class MigrationManager {
     }
   }
 
-  static int currentVersion(Connection connection) throws SQLException {
+  private static int currentVersion(Connection connection) throws SQLException {
     createVersionTableIfNotExists(connection);
     try (Statement s = connection.createStatement();
         ResultSet rs = s.executeQuery("SELECT version FROM TXNO_VERSION FOR UPDATE")) {
@@ -69,7 +69,7 @@ class MigrationManager {
     }
   }
 
-  static void createVersionTableIfNotExists(Connection connection) throws SQLException {
+  private static void createVersionTableIfNotExists(Connection connection) throws SQLException {
     try (Statement s = connection.createStatement()) {
       // language=MySQL
       s.execute("CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");

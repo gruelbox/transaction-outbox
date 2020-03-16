@@ -25,7 +25,7 @@ class Utils {
     safelyClose(Arrays.asList(closeables));
   }
 
-  static void safelyClose(Iterable<? extends AutoCloseable> closeables) {
+  private static void safelyClose(Iterable<? extends AutoCloseable> closeables) {
     closeables.forEach(
         d -> {
           if (d == null) return;

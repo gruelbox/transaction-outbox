@@ -84,9 +84,7 @@ public interface TransactionManager {
    * start a (new) transaction, call {@code runnable} and then either commit on success or rollback
    * on failure.
    *
-   * @param runnable Code which must be called while the transaction is active.
-   * @throws TransactionAlreadyActiveException If the transaction manager can't handle stacked,
-   *     suspended transactions.
+   * @param runnable Code which must be called while the transaction is active..
    */
   default void inTransaction(Runnable runnable) {
     uncheck(() -> inTransactionReturnsThrows(Executors.callable(runnable)));
@@ -101,8 +99,6 @@ public interface TransactionManager {
    * @param <T> The type returned.
    * @param supplier Code which must be called while the transaction is active.
    * @return The result of {@code supplier}.
-   * @throws TransactionAlreadyActiveException If the transaction manager can't handle stacked,
-   *     suspended transactions.
    */
   default <T> T inTransactionReturns(Supplier<T> supplier) {
     return uncheckedly(() -> inTransactionReturnsThrows(supplier::get));
@@ -115,8 +111,6 @@ public interface TransactionManager {
    * on failure.
    *
    * @param runnable Code which must be called while the transaction is active.
-   * @throws TransactionAlreadyActiveException If the transaction manager can't handle stacked,
-   *     suspended transactions.
    * @throws Exception If any exception is thrown by {@link Runnable}.
    */
   @SuppressWarnings("SameReturnValue")
@@ -137,8 +131,6 @@ public interface TransactionManager {
    * @param <T> The type returned.
    * @param callable Code which must be called while the transaction is active.
    * @return The result of {@code supplier}.
-   * @throws TransactionAlreadyActiveException If the transaction manager can't handle stacked,
-   *     suspended transactions.
    * @throws Exception If any exception is thrown by {@link Runnable}.
    */
   <T> T inTransactionReturnsThrows(Callable<T> callable) throws Exception;
