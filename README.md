@@ -108,17 +108,31 @@ Perhaps integrate with Guice and jOOQ's transaction management instead?
 ```
 @Provides
 @Singleton
-DSLContext parentDsl() {
-  return DSL.using(
-    "jdbc:h2:mem:test;MV_STORE=TRUE",
-    "test",
-    "test");
+Configuration jooqConfig(DataSource dataSource) {
+  DefaultConfiguration jooqConfig = new DefaultConfiguration();
+  DataSourceConnectionProvider connectionProvider = new DataSourceConnectionProvider(dataSource);
+  jooqConfig.setConnectionProvider(connectionProvider);
+  jooqConfig.setSQLDialect(SQLDialect.H2);
+  jooqConfig.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider));
+  return jooqConfig;
 }
 
 @Provides
 @Singleton
-TransactionManager transactionManager(DSLContext dsl) {
-  return JooqTransactionManager.builder().parentDsl(dsl).build();
+JooqTransactionListener jooqListener(Configuration jooqConfig) {
+  return JooqTransactionManager.createListener(jooqConfig);
+}
+
+@Provides
+@Singleton
+DSLContext parentDsl(Configuration jooqConfig, JooqTransactionListener listener) {
+  return DSL.using(configuration);
+}
+
+@Provides
+@Singleton
+TransactionManager transactionManager(DSLContext dsl, JooqTransactionListener listener) {
+  return JooqTransactionManager.create(dsl, listener);
 }
 
 @Provides

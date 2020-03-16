@@ -1,99 +1,65 @@
 package com.gruelbox.transactionoutbox;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.util.ArrayList;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Map;
 import java.util.concurrent.Callable;
-import lombok.NonNull;
-import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.DSLContext;
+import org.jooq.impl.DefaultConfiguration;
 
-/** Transaction manager which uses jOOQ's transaction management. */
+/**
+ * Transaction manager which uses jOOQ's transaction management.
+ */
 @Slf4j
-@SuperBuilder
-public class JooqTransactionManager implements TransactionManager {
+public final class JooqTransactionManager extends BaseTransactionManager {
 
-  private final ThreadLocal<ArrayList<Runnable>> postCommitHooks = new ThreadLocal<>();
-  private final ThreadLocal<Map<String, PreparedStatement>> statements = new ThreadLocal<>();
-  private final ThreadLocal<Deque<DSLContext>> currentDsl = new ThreadLocal<>();
-  private final ThreadLocal<Deque<Connection>> currentConnection = new ThreadLocal<>();
+  private final ThreadLocal<Deque<DSLContext>> currentDsl = ThreadLocal.withInitial(LinkedList::new);
 
-  /** The parent jOOQ DSL context. */
-  @NonNull private final DSLContext parentDsl;
+  /**
+   * The parent jOOQ DSL context.
+   */
+  private final DSLContext parentDsl;
 
-  @Override
-  public Connection getActiveConnection() {
-    return currentConnection.get().peek();
+  public static JooqTransactionListener createListener(DefaultConfiguration configuration) {
+    var result = new JooqTransactionListener();
+    configuration.set(result);
+    return result;
+  }
+
+  public static JooqTransactionManager create(DSLContext dslContext, JooqTransactionListener listener) {
+    var result = new JooqTransactionManager(dslContext);
+    listener.setJooqTransactionManager(result);
+    return result;
+  }
+
+  private JooqTransactionManager(DSLContext parentDsl) {
+    this.parentDsl = parentDsl;
   }
 
   @Override
-  public <T> T inTransactionReturnsThrows(Callable<T> callable) {
-    try {
-      var result = transaction(callable);
-      if (postCommitHooks.get() != null) {
-        log.debug("Running post-commit hooks");
-        postCommitHooks.get().forEach(Runnable::run);
-      }
-      return result;
-    } finally {
-      postCommitHooks.remove();
-    }
+  public final <T> T inTransactionReturnsThrows(Callable<T> callable) {
+    return transaction(connection -> callable.call());
   }
 
-  private <T> T transaction(Callable<T> callable) {
-    DSLContext dsl = currentDsl.get() == null ? parentDsl : currentDsl.get().peek();
+  private <T> T transaction(ThrowingFunction<Connection, T> work) {
+    DSLContext dsl = currentDsl.get().isEmpty() ? parentDsl : currentDsl.get().peek();
     return dsl.transactionResult(
         config ->
             config
                 .dsl()
                 .connectionResult(
-                    connection -> {
-                      if (currentDsl.get() == null) {
-                        currentDsl.set(new LinkedList<>());
-                        currentConnection.set(new LinkedList<>());
-                      }
-                      currentDsl.get().push(dsl);
-                      currentConnection.get().push(connection);
-                      try {
-                        T result = callable.call();
-                        if (statements.get() != null) {
-                          log.debug("Flushing batches");
-                          statements.get().values().forEach(it -> Utils.uncheck(it::executeBatch));
-                        }
-                        return result;
-                      } finally {
-                        if (statements.get() != null) {
-                          log.debug("Closing batch statements");
-                          Utils.safelyClose(statements.get().values());
-                          statements.remove();
-                        }
-                        currentDsl.get().pop();
-                        currentConnection.get().pop();
-                        if (currentDsl.get().isEmpty()) {
-                          currentDsl.remove();
-                          currentConnection.remove();
-                        }
-                      }
-                    }));
+                    connection -> work.apply(connection)));
   }
 
-  @Override
-  public void addPostCommitHook(Runnable runnable) {
-    if (postCommitHooks.get() == null) postCommitHooks.set(new ArrayList<>());
-    postCommitHooks.get().add(runnable);
+  void pushContext(DSLContext dsl) {
+    currentDsl.get().push(dsl);
   }
 
-  @Override
-  public PreparedStatement prepareBatchStatement(String sql) {
-    if (statements.get() == null) statements.set(new HashMap<>());
-    return statements
-        .get()
-        .computeIfAbsent(
-            sql, s -> Utils.uncheckedly(() -> getActiveConnection().prepareStatement(s)));
+  void popContext() {
+    currentDsl.get().pop();
+    if (currentDsl.get().isEmpty()) {
+      currentDsl.remove();
+    }
   }
 }

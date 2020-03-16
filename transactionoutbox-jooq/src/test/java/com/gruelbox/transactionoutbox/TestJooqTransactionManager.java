@@ -4,6 +4,8 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,8 +18,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.hamcrest.MatcherAssert;
+import org.jooq.DSLContext;
+import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
+import org.jooq.impl.DataSourceConnectionProvider;
+import org.jooq.impl.DefaultConfiguration;
+import org.jooq.impl.ThreadLocalTransactionProvider;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class TestJooqTransactionManager {
@@ -25,17 +34,45 @@ class TestJooqTransactionManager {
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
-  private final TransactionManager transactionManager =
-      JooqTransactionManager.builder()
-          .parentDsl(
-              DSL.using(
-                  "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE",
-                  "test",
-                  "test"))
-          .build();
+  private HikariDataSource dataSource;
+  private TransactionManager transactionManager;
+  private DSLContext dsl;
+
+  @BeforeEach
+  private void beforeEach() {
+    dataSource = pooledDataSource();
+    transactionManager = createTransactionManager();
+  }
+
+  @AfterEach
+  private void afterEach() {
+    dsl.close();
+    dataSource.close();
+  }
+
+  private HikariDataSource pooledDataSource() {
+    HikariConfig config = new HikariConfig();
+    config.setJdbcUrl(
+        "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE");
+    config.setUsername("test");
+    config.setPassword("test");
+    config.addDataSourceProperty("cachePrepStmts", "true");
+    return new HikariDataSource(config);
+  }
+
+  private TransactionManager createTransactionManager() {
+    DataSourceConnectionProvider connectionProvider = new DataSourceConnectionProvider(dataSource);
+    DefaultConfiguration configuration = new DefaultConfiguration();
+    configuration.setConnectionProvider(connectionProvider);
+    configuration.setSQLDialect(SQLDialect.H2);
+    configuration.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider));
+    JooqTransactionListener listener = JooqTransactionManager.createListener(configuration);
+    dsl = DSL.using(configuration);
+    return JooqTransactionManager.create(dsl, listener);
+  }
 
   @Test
-  final void testSimple() throws InterruptedException {
+  final void testSimpleDirectInvocation() throws InterruptedException {
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -47,6 +84,33 @@ class TestJooqTransactionManager {
     clearOutbox(transactionManager);
 
     transactionManager.inTransaction(
+        () -> {
+          outbox.schedule(Worker.class).process(1);
+          try {
+            // Should not be fired until after commit
+            Assertions.assertFalse(latch.await(2, TimeUnit.SECONDS));
+          } catch (InterruptedException e) {
+            fail("Interrupted");
+          }
+        });
+
+    // Should be fired after commit
+    Assertions.assertTrue(latch.await(2, TimeUnit.SECONDS));
+  }
+
+  @Test
+  final void testSimpleViaListener() throws InterruptedException {
+    CountDownLatch latch = new CountDownLatch(1);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .listener(entry -> latch.countDown())
+            .dialect(Dialect.H2)
+            .build();
+
+    clearOutbox(transactionManager);
+
+    dsl.transaction(
         () -> {
           outbox.schedule(Worker.class).process(1);
           try {
@@ -161,14 +225,16 @@ class TestJooqTransactionManager {
     }
   }
 
+  interface InterfaceWorker {
+
+    void process(int i);
+  }
+
   static class Worker {
+
     void process(int i) {
       // No-op
     }
-  }
-
-  interface InterfaceWorker {
-    void process(int i);
   }
 
   private static class FailingInstantiator implements Instantiator {

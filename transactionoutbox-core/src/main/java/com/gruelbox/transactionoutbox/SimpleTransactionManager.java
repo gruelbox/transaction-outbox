@@ -1,10 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
@@ -15,34 +12,27 @@ import lombok.extern.slf4j.Slf4j;
  */
 @SuperBuilder
 @Slf4j
-final class SimpleTransactionManager extends AbstractThreadLocalTransactionManager {
+final class SimpleTransactionManager extends BaseTransactionManager {
 
-  private final ThreadLocal<ArrayList<Runnable>> postCommitHooks = new ThreadLocal<>();
-  private final ThreadLocal<Map<String, PreparedStatement>> statements = new ThreadLocal<>();
+  private final ConnectionProvider connectionProvider;
 
   @Override
   public <T> T inTransactionReturnsThrows(Callable<T> callable) throws Exception {
-    return withConnectionReturnsThrows(
+    return withConnection(
         () -> {
-          Connection conn = getActiveConnection();
+          Connection conn = peekConnection();
           if (conn.getAutoCommit()) {
             log.debug("Setting auto-commit false");
             Utils.uncheck(() -> conn.setAutoCommit(false));
           }
+          pushLists();
           try {
             T result = processAndCommitOrRollback(callable, conn);
-            if (postCommitHooks.get() != null) {
-              log.debug("Running post-commit hooks");
-              postCommitHooks.get().forEach(Runnable::run);
-            }
+            processHooks();
             return result;
           } finally {
-            if (statements.get() != null) {
-              log.debug("Closing batch statements");
-              Utils.safelyClose(statements.get().values());
-              statements.remove();
-            }
-            postCommitHooks.remove();
+            closeBatchStatements();
+            popLists();
           }
         });
   }
@@ -51,10 +41,7 @@ final class SimpleTransactionManager extends AbstractThreadLocalTransactionManag
     try {
       log.debug("Processing work");
       T result = callable.call();
-      if (statements.get() != null) {
-        log.debug("Flushing batches");
-        statements.get().values().forEach(it -> Utils.uncheck(it::executeBatch));
-      }
+      flushBatches();
       log.debug("Committing transaction");
       conn.commit();
       return result;
@@ -73,17 +60,20 @@ final class SimpleTransactionManager extends AbstractThreadLocalTransactionManag
   }
 
   @Override
-  public void addPostCommitHook(Runnable runnable) {
-    if (postCommitHooks.get() == null) postCommitHooks.set(new ArrayList<>());
-    postCommitHooks.get().add(runnable);
+  public Connection getActiveConnection() {
+    return Optional.ofNullable(peekConnection())
+        .orElseThrow(NoTransactionActiveException::new);
   }
 
-  @Override
-  public PreparedStatement prepareBatchStatement(String sql) {
-    if (statements.get() == null) statements.set(new HashMap<>());
-    return statements
-        .get()
-        .computeIfAbsent(
-            sql, s -> Utils.uncheckedly(() -> getActiveConnection().prepareStatement(s)));
+  <T> T withConnection(Callable<T> callable) throws Exception {
+    try (Connection conn = connectionProvider.obtainConnection()) {
+      log.debug("Got connection {}", conn);
+      pushConnection(conn);
+      try {
+        return callable.call();
+      } finally {
+        popConnection();
+      }
+    }
   }
 }
