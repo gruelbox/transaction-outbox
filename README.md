@@ -63,7 +63,9 @@ Or this if you're using JOOQ's built-in transaction management:
 ## Usage
 ### Creating a `TransactionOutbox`
 
-Create a `TransactionOutbox` using the builder. The configuration is highly flexible and designed to allow you to integrate with any combination of relational DB and transaction management framework. Here are some examples:
+Create a `TransactionOutbox` using the builder. Instances are thread-safe - only a single instance is required, although you can create more.
+
+The configuration is highly flexible and designed to allow you to integrate with any combination of relational DB and transaction management framework. Here are some examples:
 
 Super-simple - if you have no existing transaction management, connection pooling or dependency injection:
 ```
@@ -136,15 +138,10 @@ TransactionManager transactionManager(DSLContext dsl, JooqTransactionListener li
 }
 
 @Provides
-Dialect dialect(DatabaseConfiguration databaseConfiguration) {
-  return databaseConfiguration.getDialect().toTxnOutboxType();
-}
-
-@Provides
 @Singleton
-TransactionOutbox transactionOutbox(Injector injector, Dialect dialect, TransactionManager transactionManager) {
+TransactionOutbox transactionOutbox(Injector injector, TransactionManager transactionManager) {
   return TransactionOutbox.builder()
-    .dialect(dialect)
+    .dialect(Dialect.My_SQL8)
     .instantiator(Instantiator.using(injector::getInstance))
     .transactionManager(transactionManager)
     .build();
