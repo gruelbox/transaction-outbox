@@ -166,7 +166,7 @@ transactionManager.inTransaction(tx -> {
 ```
 
 #### Using spring-txn
-If you're usins Spring transaction management, you can use the `Transactional` annotation as normal:
+If you're using Spring transaction management, you can use the `Transactional` annotation as normal:
 ```
 @Autowired private CustomerRepository customerRepository;
 @Autowired private Provider<TransactionOutbox> outbox;
