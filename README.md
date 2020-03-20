@@ -60,8 +60,7 @@ Or this if you're using JOOQ's built-in transaction management:
 </dependency>
 ```
 
-## Usage
-### Creating a `TransactionOutbox`
+## Creating a `TransactionOutbox`
 
 Create a `TransactionOutbox` using the builder. Instances are thread-safe - only a single instance is required, although you can create more.
 
@@ -138,7 +137,7 @@ TransactionOutbox transactionOutbox(Injector injector, TransactionManager transa
 }
 ```
 
-### Scheduling work
+## Usage
 During a transaction, you can _schedule_ work to be run at some later point in time (usually immediately, but if that fails, potentially some time later, after a number of retries). This instruction is persisted to the database in the same transaction as the rest of your work, giving guaranteed eventual consistency.
 
 In general, this is expressed as:
@@ -152,7 +151,7 @@ This means:
 You must call `TransactionOutbox.schedule()` _within an ongoing database transaction_, and the `TransactionManager` 
 (the one you passed when building the `TransactionOutbox`) needs to be aware of it.
 
-#### Using built-in transaction handling
+### Using built-in transaction handling
 
 If using the built-in transaction manager, you should start a transaction using `TransactionManager.inTransaction()`:
 
@@ -165,7 +164,7 @@ transactionManager.inTransaction(tx -> {
 });
 ```
 
-#### Using spring-txn
+### Using spring-txn
 If you're using Spring transaction management, you can use the `Transactional` annotation as normal:
 ```
 @Autowired private CustomerRepository customerRepository;
@@ -184,7 +183,7 @@ public void createCustomer() {
 ```
 See the [Spring example](https://github.com/gruelbox/transaction-outbox/tree/master/transactionoutbox-spring/src/test/java/com/gruelbox/transactionoutbox/acceptance/TransactionOutboxSpringDemoApplication.class) to see this in context.
 
-#### Using j00Q's built-in transaction management
+### Using j00Q's built-in transaction management
 
 You can use `DSLContext.transaction()` as normal:
 
@@ -197,17 +196,28 @@ dsl.transaction(config -> {
 });
 ```
 
-### Injecting dependencies into workers
-The default behaviour when you call as follows:
+## Dependency injection
+The default behaviour when you schedule work as follows:
 ```
 outbox.schedule(ClassToCall.class).methodToCall(arg1, arg2, arg3);
 ```
-is to attempt to obtain an instance of `ClassToCall` via reflection, assuming there is a no-args constructor. This obviously doesn't play well with dependency injection.
+is to attempt to obtain an instance of `ClassToCall` via reflection, assuming there is a no-args constructor. This 
+obviously doesn't play well with dependency injection.
 
 `SpringInstantiator`, as used above, will instead use Spring's `ApplicationContext.getBean()` method to obtain the object,
-allowing injection into it, and the Guice example will use `Injector.getInstance()`.
+allowing injection into it, and the Guice example will use `Injector.getInstance()`. If you have some other DI mechanism,
+simply create your own implementation of `Instantiator` and pass it when building the `TransactionalOutbox`:
+```$
+TransactionOutbox.builder()
+    .dialect(Dialect.POSTRESQL_9)
+    .instantiator(new Instantiator() {
+       ...
+     })
+    .transactionManager(transactionManager)
+    .build();
+```
 
-### Ensuring work is processed eventually
+## Ensuring work is processed eventually
 
 To ensure that any scheduled work that fails first time is eventually retried, create a background task (which can run on multiple application instances) which repeatedly calls `TransactionOutbox.flush()`, e.g:
 ```
@@ -216,7 +226,7 @@ scheduler.scheduleAtFixedRate(outbox::flush, 2, 2, TimeUnit.MINUTES);
 ```
 That's it! Just make sure that this process keeps running, or schedule it repeatedly using message queues or a scheduler such as Quartz.
 
-### Managing the "dead letter queue"
+## Managing the "dead letter queue"
 Work might be retried too many times and get "blacklisted". You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
 
 TODO add APIs for this
