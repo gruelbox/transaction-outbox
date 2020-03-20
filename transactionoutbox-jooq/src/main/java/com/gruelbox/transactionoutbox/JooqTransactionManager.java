@@ -1,38 +1,42 @@
 package com.gruelbox.transactionoutbox;
 
-import java.sql.Connection;
+import com.gruelbox.transactionoutbox.AbstractThreadLocalTransactionManager.ThreadLocalTransaction;
 import java.util.Deque;
 import java.util.LinkedList;
-import java.util.concurrent.Callable;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.DSLContext;
 import org.jooq.impl.DefaultConfiguration;
 
 /**
- * Transaction manager which uses jOOQ's transaction management. In order to wire into
- * JOOQ's transaction lifecycle, a slightly convoluted construction process is required which
- * involves first creating a {@link JooqTransactionListener}, including it in the JOOQ
- * {@link org.jooq.Configuration} while constructing the root {@link DSLContext}, and then finally
- * linking the listener to the new {@link JooqTransactionManager}:
+ * Transaction manager which uses jOOQ's transaction management. In order to wire into JOOQ's
+ * transaction lifecycle, a slightly convoluted construction process is required which involves
+ * first creating a {@link JooqTransactionListener}, including it in the JOOQ {@link
+ * org.jooq.Configuration} while constructing the root {@link DSLContext}, and then finally linking
+ * the listener to the new {@link JooqTransactionManager}:
  *
- * <pre>DataSourceConnectionProvider connectionProvider = new DataSourceConnectionProvider(dataSource);
-DefaultConfiguration configuration = new DefaultConfiguration();
-configuration.setConnectionProvider(connectionProvider);
-configuration.setSQLDialect(SQLDialect.H2);
-configuration.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider));
-JooqTransactionListener listener = JooqTransactionManager.createListener(configuration);
-DSLContext dsl = DSL.using(configuration);
-return JooqTransactionManager.create(dsl, listener);</pre>
+ * <pre>
+ * DataSourceConnectionProvider connectionProvider = new DataSourceConnectionProvider(dataSource);
+ * DefaultConfiguration configuration = new DefaultConfiguration();
+ * configuration.setConnectionProvider(connectionProvider);
+ * configuration.setSQLDialect(SQLDialect.H2);
+ * configuration.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider));
+ * JooqTransactionListener listener = JooqTransactionManager.createListener(configuration);
+ * DSLContext dsl = DSL.using(configuration);
+ * return JooqTransactionManager.create(dsl, listener);</pre>
  */
 @Slf4j
-public final class JooqTransactionManager extends BaseTransactionManager {
+public final class JooqTransactionManager
+    extends AbstractThreadLocalTransactionManager<ThreadLocalTransaction> {
 
-  private final ThreadLocal<Deque<DSLContext>> currentDsl = ThreadLocal.withInitial(LinkedList::new);
+  private final ThreadLocal<Deque<DSLContext>> currentDsl =
+      ThreadLocal.withInitial(LinkedList::new);
 
-  /**
-   * The parent jOOQ DSL context.
-   */
+  /** The parent jOOQ DSL context. */
   private final DSLContext parentDsl;
+
+  private JooqTransactionManager(DSLContext parentDsl) {
+    this.parentDsl = parentDsl;
+  }
 
   /**
    * Creates the {@link org.jooq.TransactionListener} to wire into the {@link DSLContext}. See
@@ -54,29 +58,22 @@ public final class JooqTransactionManager extends BaseTransactionManager {
    * @param listener The listener, linked to the DSL context.
    * @return The transaction manager.
    */
-  public static JooqTransactionManager create(DSLContext dslContext, JooqTransactionListener listener) {
+  public static JooqTransactionManager create(
+      DSLContext dslContext, JooqTransactionListener listener) {
     var result = new JooqTransactionManager(dslContext);
     listener.setJooqTransactionManager(result);
     return result;
   }
 
-  private JooqTransactionManager(DSLContext parentDsl) {
-    this.parentDsl = parentDsl;
-  }
-
   @Override
-  public final <T> T inTransactionReturnsThrows(Callable<T> callable) {
-    return transaction(connection -> callable.call());
-  }
-
-  private <T> T transaction(ThrowingFunction<Connection, T> work) {
+  public <T, E extends Exception> T inTransactionReturnsThrows(
+      ThrowingTransactionalSupplier<T, E> work) {
     DSLContext dsl = currentDsl.get().isEmpty() ? parentDsl : currentDsl.get().peek();
     return dsl.transactionResult(
         config ->
             config
                 .dsl()
-                .connectionResult(
-                    connection -> work.apply(connection)));
+                .connectionResult(connection -> work.doWork(peekTransaction().orElseThrow())));
   }
 
   void pushContext(DSLContext dsl) {

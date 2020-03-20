@@ -1,11 +1,11 @@
-package com.gruelbox.transactionoutbox.demo;
+package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import java.time.LocalDateTime;
+import javax.inject.Provider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,10 +17,9 @@ class EventuallyConsistentController {
       LoggerFactory.getLogger(EventuallyConsistentController.class);
 
   @Autowired private CustomerRepository customerRepository;
-
+  @Autowired private Provider<TransactionOutbox> outbox;
   @Autowired private EventRepository eventRepository;
-
-  @Autowired @Lazy private TransactionOutbox outbox;
+  @Autowired private EventPublisher eventPublisher;
 
   @SuppressWarnings("SameReturnValue")
   @RequestMapping("/createCustomer")
@@ -28,16 +27,20 @@ class EventuallyConsistentController {
   public String createCustomer() {
     LOGGER.info("Creating customers");
     outbox
-        .schedule(EventRepository.class)
-        .save(new Event(1L, "Created customers", LocalDateTime.now()));
-    customerRepository.save(new Customer("Martin", "Carthy"));
-    customerRepository.save(new Customer("Dave", "Pegg"));
+        .get()
+        .schedule(eventPublisher.getClass()) // Just a trick to get autowiring to work.
+        .publish(new Event(1L, "Created customers", LocalDateTime.now()));
+    customerRepository.save(new Customer(1L, "Martin", "Carthy"));
+    customerRepository.save(new Customer(2L, "Dave", "Pegg"));
     LOGGER.info("Customers created");
     return "Done";
   }
 
-  @RequestMapping("/gotEvent")
+  @RequestMapping("/gotEventAndCustomers")
   public String gotEvent() {
-    return eventRepository.findById(1L).isPresent() ? "No" : "Yes";
+    var event = eventRepository.findById(1L);
+    var customer1 = customerRepository.findById(1L);
+    var customer2 = customerRepository.findById(2L);
+    return event.isPresent() && customer1.isPresent() && customer2.isPresent() ? "Yes" : "No";
   }
 }

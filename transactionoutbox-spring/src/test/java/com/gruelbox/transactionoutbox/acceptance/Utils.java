@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.demo;
+package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import java.util.Arrays;

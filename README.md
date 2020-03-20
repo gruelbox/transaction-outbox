@@ -78,35 +78,25 @@ TransactionOutbox outbox = TransactionOutbox.builder()
 ```
 Better - use connection pooling:
 ```
-HikariConfig config = new HikariConfig();
-config.setJdbcUrl("jdbc:h2:mem:test;MV_STORE=TRUE");
-config.setUsername("test");
-config.setPassword("test");
-config.addDataSourceProperty("cachePrepStmts", "true");
-try (HikariDataSource ds = new HikariDataSource(config)) {
+try (HikariDataSource ds = new HikariDataSource(createHikariConfig())) {
   TransactionManager transactionManager = TransactionManager.fromDataSource(ds);
   TransactionOutbox outbox = TransactionOutbox.builder()
     .transactionManager(transactionManager)
     .dialect(Dialect.H2)
     .build();
-  
-  ...
-  ...
 }
 ```
 Or add `transactionoutbox-spring` to your POM and integrate with Spring DI, Spring Tx and JPA:
 ```
 @Bean
 @Lazy
-public TransactionOutbox transactionOutbox(ApplicationContext applicationContext, EntityManager entityManager) {
-  return TransactionOutbox.builder()
-    .dialect(Dialect.H2)
-    .instantiator(SpringInstantiator.builder().applicationContext(applicationContext).build())
-    .transactionManager(SpringTransactionManager.builder().entityManager(entityManager).build())
-    .build();
+public TransactionOutbox transactionOutbox(SpringTransactionOutboxFactory factory) {
+  return factory.create()
+      .dialect(Dialect.H2)
+      .build();
 }
 ```
-Perhaps integrate with Guice and jOOQ's transaction management instead?
+Perhaps integrate with Guice and jOOQ's transaction management instead? It's designed to permit all sorts of combinations of libraries:
 ```
 @Provides
 @Singleton
@@ -155,9 +145,14 @@ In general, this is expressed as:
 ```
 outbox.schedule(ClassToCall.class).methodToCall(arg1, arg2, arg3);
 ```
-This says "at the earliest opportunity, please obtain an instance of `ClassToCall` and call the `methodToCall` method on it, passing the arguments `[ arg1, arg2, arg3]`. If that call fails, try again repeatedly until the configured maximum number of retries".
+This means:
 
-You must call `TransactionOutbox.schedule()` _within an ongoing database transaction_ which the `TransactionManager` (the one you passed when building the `TransactionOutbox`) is aware of.
+> Att the earliest opportunity, please obtain an instance of `ClassToCall` and call the `methodToCall` method on it, passing the arguments `[ arg1, arg2, arg3 ]`. If that call fails, try again repeatedly until the configured maximum number of retries".
+
+You must call `TransactionOutbox.schedule()` _within an ongoing database transaction_, and the `TransactionManager` 
+(the one you passed when building the `TransactionOutbox`) needs to be aware of it.
+
+#### Using built-in transaction handling
 
 If using the built-in transaction manager, you should start a transaction using `TransactionManager.inTransaction()`:
 
@@ -170,26 +165,32 @@ transactionManager.inTransaction(() -> {
   outbox.schedule(EventPublisher.class).publishEvent(NewCustomerEvent.of(customer));
 });
 ```
-However, you can integrate with existing transaction management mechanisms, such as with Spring (using `SpringTransactionManager` as shown above), and ensure all transaction management is performed via Spring's `Transactional` annotation:
+
+#### Using spring-txn
+If you're usins Spring transaction management, you can use the `Transactional` annotation as normal:
 ```
 @Autowired private CustomerRepository customerRepository;
+@Autowired private Provider<TransactionOutbox> outbox;
 @Autowired private EventRepository eventRepository;
-@Autowired @Lazy private TransactionOutbox outbox;
+@Autowired private EventPublisher eventPublisher;
 
+@SuppressWarnings("SameReturnValue")
 @RequestMapping("/createCustomer")
 @Transactional
 public String createCustomer() {
-  LOGGER.info("Creating customers");
-  outbox.schedule(EventRepository.class).save(new Event(1L, "Created customers", LocalDateTime.now()));
-  customerRepository.save(new Customer("Joe", "Bloggs"));
-  customerRepository.save(new Customer("Billy", "Blue"));
-  LOGGER.info("Customers created");
+  outbox.get()
+      .schedule(eventPublisher.getClass())
+      .publish(new Event(1L, "Created customers", LocalDateTime.now()));
+  customerRepository.save(new Customer(1L, "Martin", "Carthy"));
+  customerRepository.save(new Customer(2L, "Dave", "Pegg"));
   return "Done";
 }
 ```
-See the [Spring example](https://github.com/gruelbox/transaction-outbox/tree/master/transactionoutbox-spring/src/main/java/com/gruelbox/transactionoutbox) to see this in context.
+See the [Spring example](https://github.com/gruelbox/transaction-outbox/tree/master/transactionoutbox-spring/src/test/java/com/gruelbox/transactionoutbox/acceptance/TransactionOutboxSpringDemoApplication.class) to see this in context.
 
-Or jOOQ:
+#### Using j00Q's built-in transaction management
+
+You can use `DSLContext.transaction()` as normal:
 
 ```
 dsl.transaction(config -> {
@@ -205,18 +206,20 @@ outbox.schedule(ClassToCall.class).methodToCall(arg1, arg2, arg3);
 ```
 is to attempt to obtain an instance of `ClassToCall` via reflection, assuming there is a no-args constructor. This obviously doesn't play well with dependency injection.
 
-`SpringInstantiator`, as used above, will instead use Spring's `ApplicationContext.getBean()` method to obtain the object, allowing injection into it, and the Guice example will use `Injector.getInstance()`.
+`SpringInstantiator`, as used above, will instead use Spring's `ApplicationContext.getBean()` method to obtain the object,
+allowing injection into it, and the Guice example will use `Injector.getInstance()`.
 
 ### Ensuring work is processed eventually
 
-To ensure that any scheduled work that fails first time is eventually retried, create a background task (which can run on multiple application instances) which repeatedly calls `TransactionOutbox.flush()`.  That's it!  Example:
+To ensure that any scheduled work that fails first time is eventually retried, create a background task (which can run on multiple application instances) which repeatedly calls `TransactionOutbox.flush()`, e.g:
 ```
 ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 scheduler.scheduleAtFixedRate(outbox::flush, 2, 2, TimeUnit.MINUTES);
 ```
+That's it! Just make sure that this process keeps running, or schedule it repeatedly using message queues or a scheduler such as Quartz.
 
 ### Managing the "dead letter queue"
-Work might be retried too many times and get `blacklisted`. You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
+Work might be retried too many times and get "blacklisted". You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
 
 TODO add APIs for this
 

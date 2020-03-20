@@ -10,7 +10,11 @@ import static org.junit.Assert.fail;
 
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
+import com.gruelbox.transactionoutbox.NoTransactionActiveException;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
+import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
+import com.gruelbox.transactionoutbox.ThrowingTransactionalWork;
+import com.gruelbox.transactionoutbox.Transaction;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.zaxxer.hikari.HikariConfig;
@@ -24,7 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -144,15 +147,15 @@ abstract class AbstractAcceptanceTest {
       ArrayList<PreparedStatement> preparedStatements = new ArrayList<>();
       CountDownLatch latch = new CountDownLatch(1);
 
-      TransactionManager transactionManager =
-          new TransactionManager() {
+      Transaction transaction =
+          new Transaction() {
             @Override
-            public Connection getActiveConnection() {
+            public Connection connection() {
               return connection;
             }
 
-            @SneakyThrows
             @Override
+            @SneakyThrows
             public PreparedStatement prepareBatchStatement(String sql) {
               var stmt = connection.prepareStatement(sql);
               preparedStatements.add(stmt);
@@ -160,13 +163,23 @@ abstract class AbstractAcceptanceTest {
             }
 
             @Override
-            public <T> T inTransactionReturnsThrows(Callable<T> callable) throws Exception {
-              return callable.call();
+            public void addPostCommitHook(Runnable runnable) {
+              postCommitHooks.add(runnable);
+            }
+          };
+
+      TransactionManager transactionManager =
+          new TransactionManager() {
+            @Override
+            public <T, E extends Exception> T inTransactionReturnsThrows(
+                ThrowingTransactionalSupplier<T, E> work) throws E {
+              return work.doWork(transaction);
             }
 
             @Override
-            public void addPostCommitHook(Runnable runnable) {
-              postCommitHooks.add(runnable);
+            public <E extends Exception> void requireTransaction(ThrowingTransactionalWork<E> work)
+                throws E, NoTransactionActiveException {
+              work.doWork(transaction);
             }
           };
 
@@ -384,7 +397,7 @@ abstract class AbstractAcceptanceTest {
   @Value
   @Accessors(fluent = true)
   @Builder
-  protected static final class ConnectionDetails {
+  static final class ConnectionDetails {
     String driverClassName;
     String url;
     String user;

@@ -2,11 +2,14 @@ package com.gruelbox.transactionoutbox;
 
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @SuperBuilder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public abstract class AbstractFullyQualifiedNameInstantiator implements Instantiator {
 
   @Override

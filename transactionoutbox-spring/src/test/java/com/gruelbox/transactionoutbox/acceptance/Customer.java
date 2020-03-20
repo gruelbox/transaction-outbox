@@ -1,23 +1,19 @@
-package com.gruelbox.transactionoutbox.demo;
+package com.gruelbox.transactionoutbox.acceptance;
 
 import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
 import javax.persistence.Id;
 
 @Entity
 class Customer {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.AUTO)
-  private Long id;
-
+  @Id private Long id;
   private String firstName;
   private String lastName;
 
   protected Customer() {}
 
-  public Customer(String firstName, String lastName) {
+  Customer(Long id, String firstName, String lastName) {
+    this.id = id;
     this.firstName = firstName;
     this.lastName = lastName;
   }
@@ -27,15 +23,15 @@ class Customer {
     return String.format("Customer[id=%d, firstName='%s', lastName='%s']", id, firstName, lastName);
   }
 
-  public Long getId() {
+  Long getId() {
     return id;
   }
 
-  public String getFirstName() {
+  String getFirstName() {
     return firstName;
   }
 
-  public String getLastName() {
+  String getLastName() {
     return lastName;
   }
 }

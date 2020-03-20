@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.demo;
+package com.gruelbox.transactionoutbox.acceptance;
 
 import java.time.LocalDateTime;
 import javax.persistence.Entity;
@@ -14,33 +14,33 @@ class Event {
 
   protected Event() {}
 
-  public Event(long id, String description, LocalDateTime created) {
+  Event(long id, String description, LocalDateTime created) {
     this.id = id;
     this.description = description;
     this.created = created;
   }
 
-  public Long getId() {
+  Long getId() {
     return id;
   }
 
-  public void setId(Long id) {
+  void setId(Long id) {
     this.id = id;
   }
 
-  public String getDescription() {
+  String getDescription() {
     return description;
   }
 
-  public void setDescription(String description) {
+  void setDescription(String description) {
     this.description = description;
   }
 
-  public LocalDateTime getCreated() {
+  LocalDateTime getCreated() {
     return created;
   }
 
-  public void setCreated(LocalDateTime created) {
+  void setCreated(LocalDateTime created) {
     this.created = created;
   }
 }

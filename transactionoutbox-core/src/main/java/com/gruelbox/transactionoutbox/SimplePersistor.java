@@ -22,7 +22,7 @@ class SimplePersistor implements Persistor {
       "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM TXNO_OUTBOX";
 
   @Override
-  public void save(TransactionManager tx, TransactionOutboxEntry entry) throws SQLException {
+  public void save(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
     Utils.validate(entry);
     String serializedForm = X_STREAM.toXML(entry.getInvocation());
     PreparedStatement stmt =
@@ -38,11 +38,10 @@ class SimplePersistor implements Persistor {
   }
 
   @Override
-  public void delete(TransactionManager tx, TransactionOutboxEntry entry) throws Exception {
+  public void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception {
     Utils.validate(entry);
     try (PreparedStatement stmt =
-        tx.getActiveConnection()
-            .prepareStatement("DELETE FROM TXNO_OUTBOX WHERE id = ? and version = ?")) {
+        tx.connection().prepareStatement("DELETE FROM TXNO_OUTBOX WHERE id = ? and version = ?")) {
       stmt.setString(1, entry.getId());
       stmt.setInt(2, entry.getVersion());
       if (stmt.executeUpdate() != 1) {
@@ -53,10 +52,10 @@ class SimplePersistor implements Persistor {
   }
 
   @Override
-  public void update(TransactionManager tx, TransactionOutboxEntry entry) throws Exception {
+  public void update(Transaction tx, TransactionOutboxEntry entry) throws Exception {
     Utils.validate(entry);
     try (PreparedStatement stmt =
-        tx.getActiveConnection()
+        tx.connection()
             .prepareStatement(
                 "UPDATE TXNO_OUTBOX "
                     + "SET nextAttemptTime = ?, attempts = ?, blacklisted = ?, version = ? "
@@ -76,9 +75,9 @@ class SimplePersistor implements Persistor {
   }
 
   @Override
-  public boolean lock(TransactionManager tx, TransactionOutboxEntry entry) throws Exception {
+  public boolean lock(Transaction tx, TransactionOutboxEntry entry) throws Exception {
     try (PreparedStatement stmt =
-        tx.getActiveConnection()
+        tx.connection()
             .prepareStatement(
                 "SELECT id FROM TXNO_OUTBOX WHERE id = ? AND version = ? FOR UPDATE")) {
       stmt.setString(1, entry.getId());
@@ -89,10 +88,9 @@ class SimplePersistor implements Persistor {
   }
 
   @Override
-  public boolean lockSkippingLocks(TransactionManager tx, TransactionOutboxEntry entry)
-      throws Exception {
+  public boolean lockSkippingLocks(Transaction tx, TransactionOutboxEntry entry) throws Exception {
     try (PreparedStatement stmt =
-        tx.getActiveConnection()
+        tx.connection()
             .prepareStatement(
                 "SELECT id FROM TXNO_OUTBOX WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED")) {
       stmt.setString(1, entry.getId());
@@ -103,10 +101,9 @@ class SimplePersistor implements Persistor {
   }
 
   @Override
-  public List<TransactionOutboxEntry> selectBatch(TransactionManager tx, int batchSize)
-      throws Exception {
+  public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize) throws Exception {
     try (PreparedStatement stmt =
-        tx.getActiveConnection()
+        tx.connection()
             .prepareStatement(
                 // language=MySQL
                 SELECT_ALL + " WHERE nextAttemptTime <= ? AND blacklisted = false LIMIT ?")) {
@@ -118,9 +115,9 @@ class SimplePersistor implements Persistor {
 
   @Override
   public List<TransactionOutboxEntry> selectBatchSkippingLocksForUpdate(
-      TransactionManager tx, int batchSize) throws Exception {
+      Transaction tx, int batchSize) throws Exception {
     try (PreparedStatement stmt =
-        tx.getActiveConnection()
+        tx.connection()
             .prepareStatement(
                 // language=MySQL
                 SELECT_ALL + " WHERE nextAttemptTime < ? AND blacklisted = false LIMIT ?")) {

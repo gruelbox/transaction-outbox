@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 import static java.time.LocalDateTime.now;
 import static java.time.temporal.ChronoUnit.MINUTES;
 
@@ -21,12 +22,15 @@ import java.util.concurrent.TimeUnit;
 import javax.validation.ClockProvider;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
 
 /** */
 @Slf4j
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class TransactionOutbox {
 
   @NotNull private final TransactionManager transactionManager;
@@ -160,18 +164,7 @@ public class TransactionOutbox {
    * @return The proxy of {@code T}.
    */
   public <T> T schedule(Class<T> clazz) {
-    return Utils.createProxy(
-        clazz,
-        (method, args) -> {
-          Utils.uncheck(
-              () -> {
-                TransactionOutboxEntry entry = newEntry(method, args);
-                persistor.save(transactionManager, entry);
-                transactionManager.addPostCommitHook(() -> submitNow(entry));
-                log.debug("Scheduled {} for running after transaction commit", entry.description());
-              });
-          return null;
-        });
+    return Utils.createProxy(clazz, (method, args) -> uncheckedly(() -> schedule(method, args)));
   }
 
   /**
@@ -186,8 +179,8 @@ public class TransactionOutbox {
    * could block for a long time, depending on how long the scheduled work takes and how large
    * {@link #flushBatchSize} is.
    *
-   * <p>Calls {@link TransactionManager#inTransaction(Runnable)} to start a new transaction for the
-   * fetch.
+   * <p>Calls {@link TransactionManager#inTransactionReturns(TransactionalSupplier)} to start a new
+   * transaction for the fetch.
    *
    * @return true if any work was flushed.
    */
@@ -196,14 +189,14 @@ public class TransactionOutbox {
     log.info("Flushing stale tasks");
     var batch =
         transactionManager.inTransactionReturns(
-            () -> {
+            transaction -> {
               List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
-              selectBatch()
+              selectBatch(transaction)
                   .forEach(
                       entry -> {
                         log.debug("Reprocessing {}", entry.description());
                         try {
-                          pushBack(entry);
+                          pushBack(transaction, entry);
                           result.add(entry);
                         } catch (OptimisticLockException e) {
                           log.debug("Beaten to optimistic lock on {}", entry.description());
@@ -215,6 +208,17 @@ public class TransactionOutbox {
     return !batch.isEmpty();
   }
 
+  private <T> T schedule(Method method, Object[] args) throws Exception {
+    TransactionOutboxEntry entry = newEntry(method, args);
+    transactionManager.requireTransaction(
+        transaction -> {
+          persistor.save(transaction, entry);
+          transaction.addPostCommitHook(() -> submitNow(entry));
+        });
+    log.debug("Scheduled {} for running after transaction commit", entry.description());
+    return null;
+  }
+
   private void submitNow(TransactionOutboxEntry entry) {
     try {
       executorService.submit(
@@ -222,13 +226,13 @@ public class TransactionOutbox {
             try {
               var success =
                   transactionManager.inTransactionReturnsThrows(
-                      () -> {
-                        if (!lock(entry)) {
+                      transaction -> {
+                        if (!lock(transaction, entry)) {
                           return false;
                         }
                         log.info("Processing {}", entry.description());
                         invoke(entry);
-                        persistor.delete(transactionManager, entry);
+                        persistor.delete(transaction, entry);
                         return true;
                       });
               if (success) {
@@ -264,11 +268,11 @@ public class TransactionOutbox {
     }
   }
 
-  private boolean lock(TransactionOutboxEntry entry) throws Exception {
+  private boolean lock(Transaction transaction, TransactionOutboxEntry entry) throws Exception {
     if (dialect.isSupportsSkipLock()) {
-      return persistor.lockSkippingLocks(transactionManager, entry);
+      return persistor.lockSkippingLocks(transaction, entry);
     } else {
-      return persistor.lock(transactionManager, entry);
+      return persistor.lock(transaction, entry);
     }
   }
 
@@ -307,10 +311,11 @@ public class TransactionOutbox {
         .build();
   }
 
-  private void pushBack(TransactionOutboxEntry entry) throws OptimisticLockException {
+  private void pushBack(Transaction transaction, TransactionOutboxEntry entry)
+      throws OptimisticLockException {
     try {
       entry.setNextAttemptTime(now().plus(attemptFrequency));
-      persistor.update(transactionManager, entry);
+      persistor.update(transaction, entry);
     } catch (OptimisticLockException e) {
       throw e;
     } catch (Exception e) {
@@ -323,7 +328,7 @@ public class TransactionOutbox {
       entry.setAttempts(entry.getAttempts() + 1);
       entry.setBlacklisted(entry.getAttempts() >= blacklistAfterAttempts);
       entry.setNextAttemptTime(now().plus(attemptFrequency));
-      transactionManager.inTransactionThrows(() -> persistor.update(transactionManager, entry));
+      transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));
     } catch (Exception e) {
       log.error(
           "Failed to update attempt count for {}. It may be retried more times than expected.",
@@ -332,12 +337,12 @@ public class TransactionOutbox {
     }
   }
 
-  private List<TransactionOutboxEntry> selectBatch() {
+  private List<TransactionOutboxEntry> selectBatch(Transaction transaction) {
     if (dialect.isSupportsSkipLock()) {
       return Utils.uncheckedly(
-          () -> persistor.selectBatchSkippingLocksForUpdate(transactionManager, flushBatchSize));
+          () -> persistor.selectBatchSkippingLocksForUpdate(transaction, flushBatchSize));
     } else {
-      return Utils.uncheckedly(() -> persistor.selectBatch(transactionManager, flushBatchSize));
+      return Utils.uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize));
     }
   }
 }

@@ -34,13 +34,12 @@ class MigrationManager {
   @SuppressWarnings("unused")
   static void migrate(TransactionManager transactionManager, Dialect dialect) {
     transactionManager.inTransaction(
-        () -> {
+        transaction -> {
           try {
-            Connection connection = transactionManager.getActiveConnection();
-            int currentVersion = currentVersion(connection);
+            int currentVersion = currentVersion(transaction.connection());
             MIGRATIONS.stream()
                 .filter(migration -> migration.version > currentVersion)
-                .forEach(migration -> runSql(connection, migration));
+                .forEach(migration -> runSql(transaction.connection(), migration));
           } catch (Exception e) {
             throw new RuntimeException("Migrations failed", e);
           }

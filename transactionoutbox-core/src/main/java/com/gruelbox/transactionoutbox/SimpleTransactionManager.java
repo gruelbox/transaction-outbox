@@ -1,8 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.AbstractThreadLocalTransactionManager.ThreadLocalTransaction;
 import java.sql.Connection;
-import java.util.Optional;
-import java.util.concurrent.Callable;
+import java.sql.SQLException;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -12,38 +12,30 @@ import lombok.extern.slf4j.Slf4j;
  */
 @SuperBuilder
 @Slf4j
-final class SimpleTransactionManager extends BaseTransactionManager {
+final class SimpleTransactionManager
+    extends AbstractThreadLocalTransactionManager<ThreadLocalTransaction> {
 
   private final ConnectionProvider connectionProvider;
 
   @Override
-  public <T> T inTransactionReturnsThrows(Callable<T> callable) throws Exception {
-    return withConnection(
-        () -> {
-          Connection conn = peekConnection();
-          if (conn.getAutoCommit()) {
-            log.debug("Setting auto-commit false");
-            Utils.uncheck(() -> conn.setAutoCommit(false));
-          }
-          pushLists();
-          try {
-            T result = processAndCommitOrRollback(callable, conn);
-            processHooks();
-            return result;
-          } finally {
-            closeBatchStatements();
-            popLists();
-          }
+  public <T, E extends Exception> T inTransactionReturnsThrows(
+      ThrowingTransactionalSupplier<T, E> work) throws E {
+    return withTransaction(
+        atx -> {
+          T result = processAndCommitOrRollback(work, (ThreadLocalTransaction) atx);
+          ((ThreadLocalTransaction) atx).processHooks();
+          return result;
         });
   }
 
-  private <T> T processAndCommitOrRollback(Callable<T> callable, Connection conn) throws Exception {
+  private <T, E extends Exception> T processAndCommitOrRollback(
+      ThrowingTransactionalSupplier<T, E> work, ThreadLocalTransaction transaction) throws E {
     try {
       log.debug("Processing work");
-      T result = callable.call();
-      flushBatches();
+      T result = work.doWork(transaction);
+      transaction.flushBatches();
       log.debug("Committing transaction");
-      conn.commit();
+      transaction.commit();
       return result;
     } catch (Exception e) {
       try {
@@ -51,7 +43,7 @@ final class SimpleTransactionManager extends BaseTransactionManager {
             "Exception in transactional block ({}{}). Rolling back. See later messages for detail",
             e.getClass().getSimpleName(),
             e.getMessage() == null ? "" : (" - " + e.getMessage()));
-        conn.rollback();
+        transaction.rollback();
       } catch (Exception ex) {
         log.warn("Failed to roll back", ex);
       }
@@ -59,21 +51,26 @@ final class SimpleTransactionManager extends BaseTransactionManager {
     }
   }
 
-  @Override
-  public Connection getActiveConnection() {
-    return Optional.ofNullable(peekConnection())
-        .orElseThrow(NoTransactionActiveException::new);
-  }
-
-  private <T> T withConnection(Callable<T> callable) throws Exception {
-    try (Connection conn = connectionProvider.obtainConnection()) {
-      log.debug("Got connection {}", conn);
-      pushConnection(conn);
-      try {
-        return callable.call();
-      } finally {
-        popConnection();
+  private <T, E extends Exception> T withTransaction(ThrowingTransactionalSupplier<T, E> work)
+      throws E {
+    try (Connection connection = connectionProvider.obtainConnection();
+        ThreadLocalTransaction transaction =
+            pushTransaction(new ThreadLocalTransaction(connection))) {
+      log.debug("Got connection {}", connection);
+      boolean autoCommit = transaction.connection().getAutoCommit();
+      if (autoCommit) {
+        log.debug("Setting auto-commit false");
+        Utils.uncheck(() -> transaction.connection().setAutoCommit(false));
       }
+      try {
+        return work.doWork(transaction);
+      } finally {
+        connection.setAutoCommit(autoCommit);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    } finally {
+      popTransaction();
     }
   }
 }

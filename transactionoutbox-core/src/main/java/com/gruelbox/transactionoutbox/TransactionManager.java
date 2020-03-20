@@ -3,11 +3,6 @@ package com.gruelbox.transactionoutbox;
 import static com.gruelbox.transactionoutbox.Utils.uncheck;
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
-import java.util.function.Supplier;
 import javax.sql.DataSource;
 
 /**
@@ -62,84 +57,79 @@ public interface TransactionManager {
   }
 
   /**
-   * @return The connection to use on the current thread. This will be called back during a call to
-   *     {@link TransactionOutbox#schedule(Class)} and is expected to be set to {@code autoCommit =
-   *     false}. The caller is expected to commit the active transaction.
-   * @throws NoTransactionActiveException If there is no transaction active.
-   */
-  Connection getActiveConnection(); /* TODO replace with withConnection? */
-
-  /**
-   * Creates a prepared statement which will be cached and re-used within a transaction. Any batch
-   * on these statements is executed before the transaction is committed, and automatically closed.
-   *
-   * @param sql The SQL statement
-   * @return The statement.
-   */
-  PreparedStatement prepareBatchStatement(String sql);
-
-  /**
-   * Will be called back by {@link TransactionOutbox#flush()}. Should do any work necessary to
-   * obtain a connection (which must be then made available to {@link #getActiveConnection()}),
-   * start a (new) transaction, call {@code runnable} and then either commit on success or rollback
-   * on failure.
+   * Should do any work necessary to start a (new) transaction, call {@code runnable} and then
+   * either commit on success or rollback on failure, flushing and closing any prepared statements
+   * prior to a commit and firing post commit hooks immediately afterwards
    *
    * @param runnable Code which must be called while the transaction is active..
    */
   default void inTransaction(Runnable runnable) {
-    uncheck(() -> inTransactionReturnsThrows(Executors.callable(runnable)));
+    uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromRunnable(runnable)));
   }
 
   /**
-   * Will be called back by {@link TransactionOutbox#flush()}. Should do any work necessary to
-   * obtain a connection (which must be then made available to {@link #getActiveConnection()}),
-   * start a (new) transaction, call {@code runnable} and then either commit on success or rollback
-   * on failure.
+   * Should do any work necessary to start a (new) transaction, call {@code runnable} and then
+   * either commit on success or rollback on failure, flushing and closing any prepared statements
+   * prior to a commit and firing post commit hooks immediately afterwards
+   *
+   * @param work Code which must be called while the transaction is active..
+   */
+  default void inTransaction(TransactionalWork work) {
+    uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work)));
+  }
+
+  /**
+   * Should do any work necessary to start a (new) transaction, call {@code runnable} and then
+   * either commit on success or rollback on failure, flushing and closing any prepared statements
+   * prior to a commit and firing post commit hooks immediately afterwards.
    *
    * @param <T> The type returned.
    * @param supplier Code which must be called while the transaction is active.
    * @return The result of {@code supplier}.
    */
-  default <T> T inTransactionReturns(Supplier<T> supplier) {
-    return uncheckedly(() -> inTransactionReturnsThrows(supplier::get));
+  default <T> T inTransactionReturns(TransactionalSupplier<T> supplier) {
+    return uncheckedly(
+        () -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromSupplier(supplier)));
   }
 
   /**
-   * Will be called back by {@link TransactionOutbox#flush()}. Should do any work necessary to
-   * obtain a connection (which must be then made available to {@link #getActiveConnection()}),
-   * start a (new) transaction, call {@code runnable} and then either commit on success or rollback
-   * on failure.
+   * Should do any work necessary to start a (new) transaction, call {@code runnable} and then
+   * either commit on success or rollback on failure, flushing and closing any prepared statements
+   * prior to a commit and firing post commit hooks immediately afterwards.
    *
-   * @param runnable Code which must be called while the transaction is active.
-   * @throws Exception If any exception is thrown by {@link Runnable}.
+   * @param work Code which must be called while the transaction is active.
+   * @param <E> The exception type.
+   * @throws E If any exception is thrown by {@link Runnable}.
    */
   @SuppressWarnings("SameReturnValue")
-  default void inTransactionThrows(ThrowingRunnable runnable) throws Exception {
-    inTransactionReturnsThrows(
-        () -> {
-          runnable.run();
-          return null;
-        });
+  default <E extends Exception> void inTransactionThrows(ThrowingTransactionalWork<E> work)
+      throws E {
+    inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work));
   }
 
   /**
-   * Will be called back by {@link TransactionOutbox#flush()}. Should do any work necessary to
-   * obtain a connection (which must be then made available to {@link #getActiveConnection()}),
-   * start a (new) transaction, call {@code runnable} and then either commit on success or rollback
-   * on failure.
+   * Should do any work necessary to start a (new) transaction, call {@code work} and then either
+   * commit on success or rollback on failure, flushing and closing any prepared statements prior to
+   * a commit and firing post commit hooks immediately afterwards.
    *
    * @param <T> The type returned.
-   * @param callable Code which must be called while the transaction is active.
+   * @param work Code which must be called while the transaction is active.
+   * @param <E> The exception type.
    * @return The result of {@code supplier}.
-   * @throws Exception If any exception is thrown by {@link Runnable}.
+   * @throws E If any exception is thrown by {@link Runnable}.
    */
-  <T> T inTransactionReturnsThrows(Callable<T> callable) throws Exception;
+  <T, E extends Exception> T inTransactionReturnsThrows(ThrowingTransactionalSupplier<T, E> work)
+      throws E;
 
   /**
-   * Will be called to perform work immediately after the current transaction is committed. This
-   * should occur in the same thread and will generally not be long-lasting.
+   * Runs the specified work in the context of the "current" transaction (the definition of which is
+   * up to the implementation).
    *
-   * @param runnable The code to run post-commit.
+   * @param work Code which must be called while the transaction is active.
+   * @param <E> The exception type.
+   * @throws E If any exception is thrown by {@link Runnable}.
+   * @throws NoTransactionActiveException If a transaction is not currently active.
    */
-  void addPostCommitHook(Runnable runnable);
+  <E extends Exception> void requireTransaction(ThrowingTransactionalWork<E> work)
+      throws E, NoTransactionActiveException;
 }

@@ -1,9 +1,16 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.acceptance;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.Instantiator;
+import com.gruelbox.transactionoutbox.JooqTransactionListener;
+import com.gruelbox.transactionoutbox.JooqTransactionManager;
+import com.gruelbox.transactionoutbox.ThrowingRunnable;
+import com.gruelbox.transactionoutbox.TransactionManager;
+import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
@@ -27,8 +34,10 @@ import org.jooq.impl.ThreadLocalTransactionProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+@Disabled
 class TestJooqTransactionManager {
 
   private final ExecutorService unreliablePool =
@@ -99,6 +108,53 @@ class TestJooqTransactionManager {
   }
 
   @Test
+  void testNestedDirectInvocation() throws InterruptedException {
+    CountDownLatch latch1 = new CountDownLatch(1);
+    CountDownLatch latch2 = new CountDownLatch(1);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .listener(
+                entry -> {
+                  if (entry.getInvocation().getArgs()[0].equals(1)) {
+                    latch1.countDown();
+                  } else {
+                    latch2.countDown();
+                  }
+                })
+            .dialect(Dialect.H2)
+            .build();
+
+    clearOutbox(transactionManager);
+
+    transactionManager.inTransactionThrows(
+        tx1 -> {
+          outbox.schedule(Worker.class).process(1);
+
+          transactionManager.inTransactionThrows(
+              tx2 -> {
+                outbox.schedule(Worker.class).process(2);
+
+                // Should not be fired until after commit
+                Assertions.assertFalse(latch2.await(2, TimeUnit.SECONDS));
+              });
+
+          // Should be fired after commit
+          Assertions.assertTrue(latch2.await(2, TimeUnit.SECONDS));
+
+          try {
+            // Should not be fired until after commit
+            Assertions.assertFalse(latch1.await(2, TimeUnit.SECONDS));
+          } catch (InterruptedException e) {
+            fail("Interrupted");
+          }
+        });
+
+    // Should be fired after commit
+    Assertions.assertTrue(latch1.await(2, TimeUnit.SECONDS));
+  }
+
+  @Test
   void testSimpleViaListener() throws InterruptedException {
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
@@ -126,6 +182,57 @@ class TestJooqTransactionManager {
   }
 
   @Test
+  void testNestedViaListener() throws InterruptedException {
+    CountDownLatch latch1 = new CountDownLatch(1);
+    CountDownLatch latch2 = new CountDownLatch(1);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .listener(
+                entry -> {
+                  if (entry.getInvocation().getArgs()[0].equals(1)) {
+                    latch1.countDown();
+                  } else {
+                    latch2.countDown();
+                  }
+                })
+            .dialect(Dialect.H2)
+            .build();
+
+    clearOutbox(transactionManager);
+
+    dsl.transaction(
+        ctx -> {
+          outbox.schedule(Worker.class).process(1);
+
+          ctx.dsl()
+              .transaction(
+                  () -> {
+                    outbox.schedule(Worker.class).process(2);
+                    try {
+                      // Should not be fired until after commit
+                      Assertions.assertFalse(latch2.await(2, TimeUnit.SECONDS));
+                    } catch (InterruptedException e) {
+                      fail("Interrupted");
+                    }
+                  });
+
+          // Should be fired after commit
+          Assertions.assertTrue(latch2.await(2, TimeUnit.SECONDS));
+
+          try {
+            // Should not be fired until after commit
+            Assertions.assertFalse(latch1.await(2, TimeUnit.SECONDS));
+          } catch (InterruptedException e) {
+            fail("Interrupted");
+          }
+        });
+
+    // Should be fired after commit
+    Assertions.assertTrue(latch1.await(2, TimeUnit.SECONDS));
+  }
+
+  @Test
   void retryBehaviour() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
     AtomicInteger attempts = new AtomicInteger();
@@ -144,8 +251,7 @@ class TestJooqTransactionManager {
     withRunningFlusher(
         outbox,
         () -> {
-          transactionManager.inTransaction(
-              () -> outbox.schedule(InterfaceWorker.class).process(3));
+          transactionManager.inTransaction(() -> outbox.schedule(InterfaceWorker.class).process(3));
           Assertions.assertTrue(latch.await(15, TimeUnit.SECONDS));
         });
   }
@@ -183,7 +289,7 @@ class TestJooqTransactionManager {
               .parallel()
               .forEach(
                   i ->
-                      transactionManager.inTransaction(
+                      dsl.transaction(
                           () -> {
                             for (int j = 0; j < 10; j++) {
                               outbox.schedule(InterfaceWorker.class).process(i * 10 + j);
