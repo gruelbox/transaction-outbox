@@ -131,7 +131,7 @@ TransactionManager transactionManager(DSLContext dsl, JooqTransactionListener li
 @Singleton
 TransactionOutbox transactionOutbox(Injector injector, TransactionManager transactionManager) {
   return TransactionOutbox.builder()
-    .dialect(Dialect.My_SQL8)
+    .dialect(Dialect.MY_SQL_8)
     .instantiator(Instantiator.using(injector::getInstance))
     .transactionManager(transactionManager)
     .build();
@@ -147,7 +147,7 @@ outbox.schedule(ClassToCall.class).methodToCall(arg1, arg2, arg3);
 ```
 This means:
 
-> Att the earliest opportunity, please obtain an instance of `ClassToCall` and call the `methodToCall` method on it, passing the arguments `[ arg1, arg2, arg3 ]`. If that call fails, try again repeatedly until the configured maximum number of retries".
+> At the earliest opportunity, please obtain an instance of `ClassToCall` and call the `methodToCall` method on it, passing the arguments `[ arg1, arg2, arg3 ]`. If that call fails, try again repeatedly until the configured maximum number of retries".
 
 You must call `TransactionOutbox.schedule()` _within an ongoing database transaction_, and the `TransactionManager` 
 (the one you passed when building the `TransactionOutbox`) needs to be aware of it.
@@ -157,11 +157,10 @@ You must call `TransactionOutbox.schedule()` _within an ongoing database transac
 If using the built-in transaction manager, you should start a transaction using `TransactionManager.inTransaction()`:
 
 ```
-transactionManager.inTransaction(() -> {
-  // Do some work within your transaction
-  // This code MUST use the connection currently active within the `TransactionManager`.
-  customerService.createCustomer(transactionManager, customer);
-  // Schedule a transaction outbox task
+transactionManager.inTransaction(tx -> {
+  // Do some work using the transaction
+  customerService.createCustomer(tx, customer);
+  // Schedule a transaction outbox task (automatically uses the same transaction)
   outbox.schedule(EventPublisher.class).publishEvent(NewCustomerEvent.of(customer));
 });
 ```
@@ -174,16 +173,13 @@ If you're usins Spring transaction management, you can use the `Transactional` a
 @Autowired private EventRepository eventRepository;
 @Autowired private EventPublisher eventPublisher;
 
-@SuppressWarnings("SameReturnValue")
-@RequestMapping("/createCustomer")
-@Transactional
-public String createCustomer() {
-  outbox.get()
-      .schedule(eventPublisher.getClass())
-      .publish(new Event(1L, "Created customers", LocalDateTime.now()));
+@Transactional // Starts the transaction
+public void createCustomer() {
+  // Do some work using the transaction
   customerRepository.save(new Customer(1L, "Martin", "Carthy"));
   customerRepository.save(new Customer(2L, "Dave", "Pegg"));
-  return "Done";
+  // Schedule a transaction outbox task (automatically uses the same transaction)
+  outbox.get().schedule(eventPublisher.getClass()).publish(new Event(1L, "Created customers", LocalDateTime.now()));
 }
 ```
 See the [Spring example](https://github.com/gruelbox/transaction-outbox/tree/master/transactionoutbox-spring/src/test/java/com/gruelbox/transactionoutbox/acceptance/TransactionOutboxSpringDemoApplication.class) to see this in context.
@@ -194,7 +190,9 @@ You can use `DSLContext.transaction()` as normal:
 
 ```
 dsl.transaction(config -> {
+  // Do some work using the transaction
   customerService.createCustomer(config.dsl(), customer);
+  // Schedule a transaction outbox task (automatically uses the same transaction)
   outbox.schedule(EventPublisher.class).publishEvent(NewCustomerEvent.of(customer));
 });
 ```
