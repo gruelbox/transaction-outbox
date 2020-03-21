@@ -6,7 +6,24 @@ import java.util.List;
  * Saves and loads {@link TransactionOutboxEntry}s. May make this public to allow modification at
  * some point.
  */
-interface Persistor {
+public interface Persistor {
+
+  /**
+   * Uses the default relational persistor.
+   *
+   * @return The persistor.
+   */
+  static Persistor forDialect(Dialect dialect) {
+    return new DefaultPersistor(dialect);
+  }
+
+  /**
+   * Upgrades the database tables used by the persistor to the latest version. Called on creation of
+   * a {@link TransactionOutbox}.
+   *
+   * @param transactionManager The transactoin manager.
+   */
+  void migrate(TransactionManager transactionManager);
 
   /**
    * Saves a new {@link TransactionOutboxEntry}.
@@ -35,10 +52,5 @@ interface Persistor {
 
   boolean lock(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
-  boolean lockSkippingLocks(Transaction tx, TransactionOutboxEntry entry) throws Exception;
-
   List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize) throws Exception;
-
-  List<TransactionOutboxEntry> selectBatchSkippingLocksForUpdate(Transaction tx, int batchSize)
-      throws Exception;
 }

@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 
+/** Access and manipulation of a currently-active transaction. */
 public interface Transaction {
 
   /** @return The connection for the transaction. */

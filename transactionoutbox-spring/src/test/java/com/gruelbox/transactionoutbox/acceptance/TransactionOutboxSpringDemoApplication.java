@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.SpringTransactionOutboxFactory;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import org.springframework.boot.SpringApplication;
@@ -18,6 +19,6 @@ public class TransactionOutboxSpringDemoApplication {
   @Bean
   @Lazy
   public TransactionOutbox transactionOutbox(SpringTransactionOutboxFactory factory) {
-    return factory.create().dialect(Dialect.H2).build();
+    return factory.create().persistor(Persistor.forDialect(Dialect.H2)).build();
   }
 }

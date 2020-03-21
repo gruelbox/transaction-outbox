@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RejectedExecutionException;
@@ -22,26 +23,45 @@ import java.util.concurrent.TimeUnit;
 import javax.validation.ClockProvider;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
 
-/** */
+/**
+ * An implementation of the <a
+ * href="https://microservices.io/patterns/data/transactional-outbox.html">Transactional Outbox</a>
+ * pattern for Java. See <a href="https://github.com/gruelbox/transaction-outbox">README</a> for
+ * usage instructions.
+ */
 @Slf4j
-@AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class TransactionOutbox {
 
   @NotNull private final TransactionManager transactionManager;
 
+  /**
+   * The method {@link TransactionOutbox} uses to interact with the database. This encapsulates all
+   * {@link TransactionOutbox} interaction with the database outside transaction management (which
+   * is handled by the {@link TransactionManager}).
+   *
+   * <p>Defaults to a multi-platform SQL implementation that should not need to be changed in most
+   * cases. If re-implementing this interface, read the documentation on {@link Persistor}
+   * carefully.
+   */
+  @NotNull private final Persistor persistor;
+
+  /**
+   * Responsible for describing a class as a name and creating instances of that class at runtime
+   * from the name. See {@link Instantiator} for more information.
+   *
+   * <p>Defaults to {@link Instantiator#usingReflection()}.
+   */
   @NotNull private final Instantiator instantiator;
 
   /**
-   * The executor service.
+   * The executor used for scheduling background work.
    *
    * <p>Note that there are some important aspects that should be considered in the configuration of
-   * this executor service:
+   * this executor:
    *
    * <ul>
    *   <li>Should use a BOUNDED blocking queue implementation such as {@link ArrayBlockingQueue},
@@ -63,11 +83,11 @@ public class TransactionOutbox {
    *       is advised that it be so (10000+).
    * </ul>
    *
-   * <p>If no executor service is specified, {@link TransactionOutbox} will use its own pool, sized
-   * to match {@link ForkJoinPool#commonPool()} (or one thread, whichever is the larger), with a
-   * maximum queue size of 16384 before work is discarded.
+   * <p>If no executor service is specified, {@link TransactionOutbox} will use its own local {@link
+   * ExecutorService}, sized to match {@link ForkJoinPool#commonPool()} (or one thread, whichever is
+   * the larger), with a maximum queue size of 16384 before work is discarded.
    */
-  @NotNull private final ExecutorService executorService;
+  @NotNull private final Executor executor;
 
   /**
    * How often tasks should be re-attempted. This should be balanced with {@link #flushBatchSize}
@@ -91,38 +111,32 @@ public class TransactionOutbox {
   @Min(1)
   private final int flushBatchSize;
 
-  /** The {@link Clock} source. Generally best left alone except when testing. */
+  /**
+   * The {@link Clock} source. Generally best left alone except when testing. Defaults to the system
+   * clock.
+   */
   @NotNull private final ClockProvider clockProvider;
 
   /** Event listener for use in testing. */
   @NotNull private final TransactionOutboxListener listener;
 
-  /** Database dialect to use. */
-  @NotNull private final Dialect dialect;
-
-  /**
-   * Advanced. Overrides the method {@link TransactionOutbox} uses to interact with the database. If
-   * re-implementing this interface, read the documentation on {@link Persistor} carefully.
-   */
-  @NotNull private final Persistor persistor;
-
   @Builder
   private TransactionOutbox(
       TransactionManager transactionManager,
       Instantiator instantiator,
-      ExecutorService executorService,
+      Executor executor,
       Duration attemptFrequency,
       int blacklistAfterAttempts,
       int flushBatchSize,
       ClockProvider clockProvider,
       TransactionOutboxListener listener,
-      Dialect dialect) {
+      Persistor persistor) {
     this.transactionManager = transactionManager;
     this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
-    this.persistor = new SimplePersistor();
-    this.executorService =
+    this.persistor = persistor;
+    this.executor =
         Utils.firstNonNull(
-            executorService,
+            executor,
             () ->
                 new ThreadPoolExecutor(
                     1,
@@ -135,9 +149,8 @@ public class TransactionOutbox {
     this.flushBatchSize = flushBatchSize <= 1 ? 4096 : flushBatchSize;
     this.clockProvider = Utils.firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
     this.listener = Utils.firstNonNull(listener, () -> entry -> {});
-    this.dialect = dialect;
     Utils.validate(this);
-    MigrationManager.migrate(transactionManager, dialect);
+    this.persistor.migrate(transactionManager);
   }
 
   /**
@@ -155,9 +168,9 @@ public class TransactionOutbox {
    * <p>This will write a record to the database using the supplied {@link Persistor} and {@link
    * Instantiator}, using the current database transaction, which will get rolled back if the rest
    * of the transaction is, and thus never processed. However, if the transaction is committed, the
-   * real method will be called immediately afterwards using the supplied {@link #executorService}.
-   * Should that fail, the call will be reattempted whenever {@link #flush()} is called, provided at
-   * least {@link #attemptFrequency} has passed since the time the task was last attempted.
+   * real method will be called immediately afterwards using the supplied {@link #executor}. Should
+   * that fail, the call will be reattempted whenever {@link #flush()} is called, provided at least
+   * {@link #attemptFrequency} has passed since the time the task was last attempted.
    *
    * @param clazz The class to proxy.
    * @param <T> The type to proxy.
@@ -172,12 +185,12 @@ public class TransactionOutbox {
    * than {@link #attemptFrequency} ago and have been tried less than {@link
    * #blacklistAfterAttempts} times) and attempts to resubmit them.
    *
-   * <p>As long as {@link #executorService} is non-blocking (i.e. uses a bounded queue with a {@link
+   * <p>As long as {@link #executor} is non-blocking (i.e. uses a bounded queue with a {@link
    * java.util.concurrent.RejectedExecutionHandler} which throws such as {@link
    * java.util.concurrent.ThreadPoolExecutor.AbortPolicy}), this method will return quickly.
-   * However, if {@link #executorService} uses a bounded queue with a blocking policy, this method
-   * could block for a long time, depending on how long the scheduled work takes and how large
-   * {@link #flushBatchSize} is.
+   * However, if {@link #executor} uses a bounded queue with a blocking policy, this method could
+   * block for a long time, depending on how long the scheduled work takes and how large {@link
+   * #flushBatchSize} is.
    *
    * <p>Calls {@link TransactionManager#inTransactionReturns(TransactionalSupplier)} to start a new
    * transaction for the fetch.
@@ -191,7 +204,7 @@ public class TransactionOutbox {
         transactionManager.inTransactionReturns(
             transaction -> {
               List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
-              selectBatch(transaction)
+              uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize))
                   .forEach(
                       entry -> {
                         log.debug("Reprocessing {}", entry.description());
@@ -221,13 +234,13 @@ public class TransactionOutbox {
 
   private void submitNow(TransactionOutboxEntry entry) {
     try {
-      executorService.submit(
+      executor.execute(
           () -> {
             try {
               var success =
                   transactionManager.inTransactionReturnsThrows(
                       transaction -> {
-                        if (!lock(transaction, entry)) {
+                        if (!persistor.lock(transaction, entry)) {
                           return false;
                         }
                         log.info("Processing {}", entry.description());
@@ -265,14 +278,6 @@ public class TransactionOutbox {
           "Failed to submit {} for execution. It will be re-attempted later.",
           entry.description(),
           e);
-    }
-  }
-
-  private boolean lock(Transaction transaction, TransactionOutboxEntry entry) throws Exception {
-    if (dialect.isSupportsSkipLock()) {
-      return persistor.lockSkippingLocks(transaction, entry);
-    } else {
-      return persistor.lock(transaction, entry);
     }
   }
 
@@ -334,15 +339,6 @@ public class TransactionOutbox {
           "Failed to update attempt count for {}. It may be retried more times than expected.",
           entry.description(),
           e);
-    }
-  }
-
-  private List<TransactionOutboxEntry> selectBatch(Transaction transaction) {
-    if (dialect.isSupportsSkipLock()) {
-      return Utils.uncheckedly(
-          () -> persistor.selectBatchSkippingLocksForUpdate(transaction, flushBatchSize));
-    } else {
-      return Utils.uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize));
     }
   }
 }

@@ -14,7 +14,7 @@ import lombok.extern.slf4j.Slf4j;
  * minimum dependencies.
  */
 @Slf4j
-class MigrationManager {
+class DefaultMigrationManager {
 
   /** Migrations are currently the same for all dialects so no disambiguation needed. */
   private static final List<Migration> MIGRATIONS =
@@ -31,8 +31,7 @@ class MigrationManager {
                   + "    version INT\n"
                   + ")"));
 
-  @SuppressWarnings("unused")
-  static void migrate(TransactionManager transactionManager, Dialect dialect) {
+  static void migrate(TransactionManager transactionManager) {
     transactionManager.inTransaction(
         transaction -> {
           try {

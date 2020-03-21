@@ -72,7 +72,7 @@ TransactionManager transactionManager = TransactionManager.fromConnectionDetails
     "org.h2.Driver", "jdbc:h2:mem:test;MV_STORE=TRUE", "test", "test"))
 TransactionOutbox outbox = TransactionOutbox.builder()
   .transactionManager(transactionManager)
-  .dialect(Dialect.H2)
+  .persistor(Persistor.forDialect(Dialect.H2))
   .build();
 ```
 Better - use connection pooling:
@@ -81,7 +81,7 @@ try (HikariDataSource ds = new HikariDataSource(createHikariConfig())) {
   TransactionManager transactionManager = TransactionManager.fromDataSource(ds);
   TransactionOutbox outbox = TransactionOutbox.builder()
     .transactionManager(transactionManager)
-    .dialect(Dialect.H2)
+    .persistor(Persistor.forDialect(Dialect.H2))
     .build();
 }
 ```
@@ -91,7 +91,7 @@ Or add `transactionoutbox-spring` to your POM and integrate with Spring DI, Spri
 @Lazy
 public TransactionOutbox transactionOutbox(SpringTransactionOutboxFactory factory) {
   return factory.create()
-      .dialect(Dialect.H2)
+      .persistor(Persistor.forDialect(Dialect.H2))
       .build();
 }
 ```
@@ -130,9 +130,9 @@ TransactionManager transactionManager(DSLContext dsl, JooqTransactionListener li
 @Singleton
 TransactionOutbox transactionOutbox(Injector injector, TransactionManager transactionManager) {
   return TransactionOutbox.builder()
-    .dialect(Dialect.MY_SQL_8)
-    .instantiator(Instantiator.using(injector::getInstance))
     .transactionManager(transactionManager)
+    .persistor(Persistor.forDialect(Dialect.MY_SQL_8))
+    .instantiator(Instantiator.using(injector::getInstance))
     .build();
 }
 ```
@@ -209,11 +209,11 @@ allowing injection into it, and the Guice example will use `Injector.getInstance
 simply create your own implementation of `Instantiator` and pass it when building the `TransactionalOutbox`:
 ```$
 TransactionOutbox.builder()
-    .dialect(Dialect.POSTRESQL_9)
+    .transactionManager(transactionManager)
+    .persistor(Persistor.forDialect(Dialect.POSTRESQL_9))
     .instantiator(new Instantiator() {
        ...
      })
-    .transactionManager(transactionManager)
     .build();
 ```
 

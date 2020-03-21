@@ -12,6 +12,8 @@ public interface Instantiator {
    * {@code com.gruelbox.example.EnterpriseBeanProxyFactoryFactory}) and instantiates instances
    * using reflection and a no-args constructor.
    *
+   * <p>This is the default used by {@link TransactionOutbox} if nothing else is specified.
+   *
    * @return A reflection instantiator
    */
   static Instantiator usingReflection() {
@@ -43,7 +45,8 @@ public interface Instantiator {
    * be an alias of some kind. This is up to the implementer.
    *
    * <p>Not using the actual class name can be useful in avoiding a case where queued tasks end up
-   * referencing renamed classes following a refactor.
+   * referencing renamed classes following a refactor. It is also useful for DI frameworks such as
+   * Spring DI, which use named bindings by default.
    *
    * @param clazz The class to get the name of.
    * @return The class name.

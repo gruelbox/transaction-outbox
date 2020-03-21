@@ -11,6 +11,7 @@ import static org.junit.Assert.fail;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
+import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.ThrowingTransactionalWork;
@@ -73,9 +74,9 @@ abstract class AbstractAcceptanceTest {
                     clazz ->
                         (InterfaceProcessor)
                             (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
-            .executorService(unreliablePool)
+            .executor(unreliablePool)
             .listener(entry -> latch.countDown())
-            .dialect(connectionDetails().dialect())
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .build();
 
     clearOutbox();
@@ -110,8 +111,8 @@ abstract class AbstractAcceptanceTest {
       TransactionOutbox outbox =
           TransactionOutbox.builder()
               .transactionManager(transactionManager)
+              .persistor(Persistor.forDialect(connectionDetails().dialect()))
               .listener(entry -> latch.countDown())
-              .dialect(connectionDetails().dialect())
               .build();
 
       clearOutbox();
@@ -187,7 +188,7 @@ abstract class AbstractAcceptanceTest {
           TransactionOutbox.builder()
               .transactionManager(transactionManager)
               .listener(entry -> latch.countDown())
-              .dialect(connectionDetails().dialect())
+              .persistor(Persistor.forDialect(connectionDetails().dialect()))
               .build();
 
       clearOutbox();
@@ -229,11 +230,11 @@ abstract class AbstractAcceptanceTest {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .instantiator(new FailingInstantiator(attempts))
-            .executorService(unreliablePool)
+            .executor(unreliablePool)
             .attemptFrequency(Duration.ofSeconds(1))
             .listener(entry -> latch.countDown())
-            .dialect(connectionDetails().dialect())
             .build();
 
     clearOutbox();
@@ -260,8 +261,9 @@ abstract class AbstractAcceptanceTest {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .instantiator(new RandomFailingInstantiator())
-            .executorService(unreliablePool)
+            .executor(unreliablePool)
             .attemptFrequency(Duration.ofSeconds(1))
             .flushBatchSize(1000)
             .listener(
@@ -272,7 +274,6 @@ abstract class AbstractAcceptanceTest {
                   }
                   latch.countDown();
                 })
-            .dialect(connectionDetails().dialect())
             .build();
 
     withRunningFlusher(

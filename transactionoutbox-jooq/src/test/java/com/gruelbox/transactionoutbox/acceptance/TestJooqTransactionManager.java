@@ -8,6 +8,7 @@ import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.JooqTransactionListener;
 import com.gruelbox.transactionoutbox.JooqTransactionManager;
+import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
@@ -86,8 +87,8 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(Dialect.H2))
             .listener(entry -> latch.countDown())
-            .dialect(Dialect.H2)
             .build();
 
     clearOutbox(transactionManager);
@@ -114,6 +115,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(Dialect.H2))
             .listener(
                 entry -> {
                   if (entry.getInvocation().getArgs()[0].equals(1)) {
@@ -122,7 +124,6 @@ class TestJooqTransactionManager {
                     latch2.countDown();
                   }
                 })
-            .dialect(Dialect.H2)
             .build();
 
     clearOutbox(transactionManager);
@@ -160,8 +161,8 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(Dialect.H2))
             .listener(entry -> latch.countDown())
-            .dialect(Dialect.H2)
             .build();
 
     clearOutbox(transactionManager);
@@ -188,6 +189,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(Dialect.H2))
             .listener(
                 entry -> {
                   if (entry.getInvocation().getArgs()[0].equals(1)) {
@@ -196,7 +198,6 @@ class TestJooqTransactionManager {
                     latch2.countDown();
                   }
                 })
-            .dialect(Dialect.H2)
             .build();
 
     clearOutbox(transactionManager);
@@ -239,11 +240,11 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(Dialect.H2))
             .instantiator(new FailingInstantiator())
-            .executorService(unreliablePool)
+            .executor(unreliablePool)
             .attemptFrequency(Duration.ofSeconds(1))
             .listener(entry -> latch.countDown())
-            .dialect(Dialect.H2)
             .build();
 
     clearOutbox(transactionManager);
@@ -267,8 +268,9 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(Dialect.H2))
             .instantiator(new FailingInstantiator())
-            .executorService(unreliablePool)
+            .executor(unreliablePool)
             .attemptFrequency(Duration.ofSeconds(1))
             .flushBatchSize(1000)
             .listener(
@@ -279,7 +281,6 @@ class TestJooqTransactionManager {
                   }
                   latch.countDown();
                 })
-            .dialect(Dialect.H2)
             .build();
 
     withRunningFlusher(
