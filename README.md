@@ -1,5 +1,5 @@
 # transaction-outbox
-[![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continuous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
+[![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 
 [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) implementation for Java. Features:
 
