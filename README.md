@@ -18,45 +18,48 @@
 
 ## Installation
 
-It's yet quite ready for Maven Central release, so if you want to have a play, you'll need to use JitPack. Add this to your POM:
+Currently, releases are available as continuously-delivered releases via the Github Package repository. Less regular, stable releases will be performed to Maven Central soon.
+
+Add this to your POM:
 ```
 <repositories>
   <repository>
-    <id>jitpack.io</id>
-    <url>https://jitpack.io</url>
+    <id>github-transaction-outbox</id>
+    <name>Gruelbox Github Repository</name>
+    <url>https://maven.pkg.github.com/gruelbox/transaction-outbox</url>
   </repository>
 </repositories>
 ```
-And add this dependency:
+Check the [latest version](https://github.com/gruelbox/transaction-outbox/packages/159210) and add the dependency:
 ```
 <dependency>
-  <groupId>com.github.gruelbox.transaction-outbox</groupId>
+  <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
-  <version>master-SNAPSHOT</version>
+  <version>version (e.g. 0.1.4)</version>
 </dependency>
 ```
 Plus this if you are using Spring with JPA:
 ```
 <dependency>
-  <groupId>com.github.gruelbox.transaction-outbox</groupId>
+  <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-spring</artifactId>
-  <version>master-SNAPSHOT</version>
+  <version>version (e.g. 0.1.4)</version>
 </dependency>
 ```
 Or this if you're using Guice:
 ```
 <dependency>
-  <groupId>com.github.gruelbox.transaction-outbox</groupId>
+  <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-guice</artifactId>
-  <version>master-SNAPSHOT</version>
+  <version>version (e.g. 0.1.4)</version>
 </dependency>
 ```
 Or this if you're using JOOQ's built-in transaction management:
 ```
 <dependency>
-  <groupId>com.github.gruelbox.transaction-outbox</groupId>
+  <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-jooq</artifactId>
-  <version>master-SNAPSHOT</version>
+  <version>version (e.g. 0.1.4)</version>
 </dependency>
 ```
 
