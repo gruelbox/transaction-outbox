@@ -86,7 +86,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2).build())
+            .persistor(Persistor.forDialect(Dialect.H2))
             .listener(entry -> latch.countDown())
             .build();
 
@@ -115,7 +115,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2).build())
+            .persistor(Persistor.forDialect(Dialect.H2))
             .listener(
                 entry -> {
                   if (entry.getInvocation().getArgs()[0].equals(1)) {
@@ -161,7 +161,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2).build())
+            .persistor(Persistor.forDialect(Dialect.H2))
             .listener(entry -> latch.countDown())
             .build();
 
@@ -190,7 +190,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2).build())
+            .persistor(Persistor.forDialect(Dialect.H2))
             .listener(
                 entry -> {
                   if (entry.getInvocation().getArgs()[0].equals(1)) {
@@ -241,7 +241,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2).build())
+            .persistor(Persistor.forDialect(Dialect.H2))
             .instantiator(new FailingInstantiator())
             .executor(unreliablePool)
             .attemptFrequency(Duration.ofSeconds(1))
@@ -269,7 +269,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2).build())
+            .persistor(Persistor.forDialect(Dialect.H2))
             .instantiator(new FailingInstantiator())
             .executor(unreliablePool)
             .attemptFrequency(Duration.ofSeconds(1))

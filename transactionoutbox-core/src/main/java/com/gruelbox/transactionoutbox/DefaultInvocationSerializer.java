@@ -46,11 +46,12 @@ class DefaultInvocationSerializer implements InvocationSerializer {
   private final Gson gson;
 
   DefaultInvocationSerializer() {
-    this.gson = new GsonBuilder()
-        .registerTypeAdapter(Invocation.class, new InvocationJsonSerializer())
-        .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
-        .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
-        .create();
+    this.gson =
+        new GsonBuilder()
+            .registerTypeAdapter(Invocation.class, new InvocationJsonSerializer())
+            .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
+            .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
+            .create();
   }
 
   @Override
@@ -65,9 +66,8 @@ class DefaultInvocationSerializer implements InvocationSerializer {
     return gson.fromJson(reader, Invocation.class);
   }
 
-
-  private static final class InvocationJsonSerializer implements JsonSerializer<Invocation>,
-      JsonDeserializer<Invocation> {
+  private static final class InvocationJsonSerializer
+      implements JsonSerializer<Invocation>, JsonDeserializer<Invocation> {
 
     private Map<Class<?>, String> classToName = new HashMap<>();
     private Map<String, Class<?>> nameToClass = new HashMap<>();
@@ -171,8 +171,8 @@ class DefaultInvocationSerializer implements InvocationSerializer {
     }
 
     @Override
-    public Invocation deserialize(JsonElement json, Type typeOfT,
-        JsonDeserializationContext context)
+    public Invocation deserialize(
+        JsonElement json, Type typeOfT, JsonDeserializationContext context)
         throws JsonParseException {
 
       JsonObject jsonObject = json.getAsJsonObject();
@@ -189,8 +189,10 @@ class DefaultInvocationSerializer implements InvocationSerializer {
         JsonElement paramValue = param.getAsJsonObject().get("v");
         try {
           args[i] = context.deserialize(paramValue, paramClass);
-        } catch (Exception e ) {
-          throw new RuntimeException("Failed to deserialize parameter [" + paramValue + "] of type [" + paramClass + "]", e);
+        } catch (Exception e) {
+          throw new RuntimeException(
+              "Failed to deserialize parameter [" + paramValue + "] of type [" + paramClass + "]",
+              e);
         }
       }
 
@@ -214,7 +216,6 @@ class DefaultInvocationSerializer implements InvocationSerializer {
       return name;
     }
   }
-
 
   public static final class UtcDateTypeAdapter extends TypeAdapter<Date> {
     private final TimeZone UTC_TIME_ZONE = TimeZone.getTimeZone("UTC");
@@ -346,7 +347,8 @@ class DefaultInvocationSerializer implements InvocationSerializer {
         int hour = 0;
         int minutes = 0;
         int seconds = 0;
-        int milliseconds = 0; // always use 0 otherwise returned date will include millis of current time
+        int milliseconds =
+            0; // always use 0 otherwise returned date will include millis of current time
         if (checkOffset(date, offset, 'T')) {
 
           // extract hours, minutes, seconds and milliseconds
@@ -416,7 +418,8 @@ class DefaultInvocationSerializer implements InvocationSerializer {
         fail = e;
       }
       String input = (date == null) ? null : ("'" + date + "'");
-      throw new ParseException("Failed to parse date [" + input + "]: " + fail.getMessage(), pos.getIndex());
+      throw new ParseException(
+          "Failed to parse date [" + input + "]: " + fail.getMessage(), pos.getIndex());
     }
 
     /**
@@ -440,11 +443,13 @@ class DefaultInvocationSerializer implements InvocationSerializer {
      * @return the int
      * @throws NumberFormatException if the value is not a number
      */
-    private static int parseInt(String value, int beginIndex, int endIndex) throws NumberFormatException {
+    private static int parseInt(String value, int beginIndex, int endIndex)
+        throws NumberFormatException {
       if (beginIndex < 0 || endIndex > value.length() || beginIndex > endIndex) {
         throw new NumberFormatException(value);
       }
-      // use same logic as in Integer.parseInt() but less generic we're not supporting negative values
+      // use same logic as in Integer.parseInt() but less generic we're not supporting negative
+      // values
       int i = beginIndex;
       int result = 0;
       int digit;

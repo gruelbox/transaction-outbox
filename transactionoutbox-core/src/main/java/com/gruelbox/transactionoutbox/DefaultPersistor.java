@@ -11,58 +11,20 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import javax.validation.constraints.NotNull;
-import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
+/** The default {@link Persistor} for {@link TransactionOutbox}. */
 @Slf4j
-@Builder(access = AccessLevel.PUBLIC)
+@Builder
 class DefaultPersistor implements Persistor {
 
   private static final String SELECT_ALL =
       // language=MySQL
       "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM TXNO_OUTBOX";
 
-  /**
-   * The database dialect to use. Where possible, optimisations will be used to maximise performance
-   * for the database concerned, one example being the use of {@code SKIP LOCKED} on MySQL 8+ and
-   * PostgreSQL.
-   */
-  @NotNull
-  private final Dialect dialect;
+  @NotNull private final Dialect dialect;
 
-  /**
-   * {@link Invocation} is serialised to the database as JSON, since methods could take any number
-   * of arguments of a variety of parameter types. The default serializer has a number of
-   * limitations. Only the following are supported currently:
-   *
-   * <ul>
-   *   <li>Primitive types such as {@code int} or {@code double} or the boxed equivalents.</li>
-   *   <li>{@link String}</li>
-   *   <li>{@link java.util.Date}</li>
-   *   <li>The {@code java.time} classes:
-   *   <ul>
-   *     <li>{@link java.time.DayOfWeek}</li>
-   *     <li>{@link java.time.Duration}</li>
-   *     <li>{@link java.time.Instant}</li>
-   *     <li>{@link java.time.LocalDate}</li>
-   *     <li>{@link java.time.LocalDateTime}</li>
-   *     <li>{@link java.time.Month}</li>
-   *     <li>{@link java.time.MonthDay}</li>
-   *     <li>{@link java.time.Period}</li>
-   *     <li>{@link java.time.Year}</li>
-   *     <li>{@link java.time.YearMonth}</li>
-   *     <li>{@link java.time.ZoneOffset}</li>
-   *     <li>{@link java.time.DayOfWeek}</li>
-   *     <li>{@link java.time.temporal.ChronoUnit}</li>
-   *   </ul></li>
-   *   <li>Arrays specifically typed to one of the above types.</li>
-   * </ul>
-   *
-   * <p>If any of these limitations restrict your application, or if you don't need anything with
-   * such general support and want a more specific, faster implementation, you can provide your
-   * own {@link InvocationSerializer} here.</p>
-   */
   @Builder.Default
   private final InvocationSerializer serializer = new DefaultInvocationSerializer();
 

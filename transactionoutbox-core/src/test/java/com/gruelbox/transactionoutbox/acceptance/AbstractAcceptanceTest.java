@@ -76,7 +76,7 @@ abstract class AbstractAcceptanceTest {
                             (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
             .executor(unreliablePool)
             .listener(entry -> latch.countDown())
-            .persistor(Persistor.forDialect(connectionDetails().dialect()).build())
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .build();
 
     clearOutbox();
@@ -111,7 +111,7 @@ abstract class AbstractAcceptanceTest {
       TransactionOutbox outbox =
           TransactionOutbox.builder()
               .transactionManager(transactionManager)
-              .persistor(Persistor.forDialect(connectionDetails().dialect()).build())
+              .persistor(Persistor.forDialect(connectionDetails().dialect()))
               .listener(entry -> latch.countDown())
               .build();
 
@@ -188,7 +188,7 @@ abstract class AbstractAcceptanceTest {
           TransactionOutbox.builder()
               .transactionManager(transactionManager)
               .listener(entry -> latch.countDown())
-              .persistor(Persistor.forDialect(connectionDetails().dialect()).build())
+              .persistor(Persistor.forDialect(connectionDetails().dialect()))
               .build();
 
       clearOutbox();
@@ -230,7 +230,7 @@ abstract class AbstractAcceptanceTest {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(connectionDetails().dialect()).build())
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .instantiator(new FailingInstantiator(attempts))
             .executor(unreliablePool)
             .attemptFrequency(Duration.ofSeconds(1))
@@ -261,7 +261,7 @@ abstract class AbstractAcceptanceTest {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(connectionDetails().dialect()).build())
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .instantiator(new RandomFailingInstantiator())
             .executor(unreliablePool)
             .attemptFrequency(Duration.ofSeconds(1))

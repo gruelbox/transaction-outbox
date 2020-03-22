@@ -48,8 +48,7 @@ public class TransactionOutbox {
    * cases. If re-implementing this interface, read the documentation on {@link Persistor}
    * carefully.
    */
-  @Valid
-  @NotNull private final Persistor persistor;
+  @Valid @NotNull private final Persistor persistor;
 
   /**
    * Responsible for describing a class as a name and creating instances of that class at runtime
@@ -57,8 +56,7 @@ public class TransactionOutbox {
    *
    * <p>Defaults to {@link Instantiator#usingReflection()}.
    */
-  @Valid
-  @NotNull private final Instantiator instantiator;
+  @Valid @NotNull private final Instantiator instantiator;
 
   /**
    * The executor used for scheduling background work.
