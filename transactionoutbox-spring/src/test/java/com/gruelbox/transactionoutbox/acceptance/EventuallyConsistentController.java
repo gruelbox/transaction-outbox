@@ -29,7 +29,7 @@ class EventuallyConsistentController {
     outbox
         .get()
         .schedule(eventPublisher.getClass()) // Just a trick to get autowiring to work.
-        .publish(new Event(1L, "Created customers", LocalDateTime.now()));
+        .publish(1L, "Created customers", LocalDateTime.now());
     customerRepository.save(new Customer(1L, "Martin", "Carthy"));
     customerRepository.save(new Customer(2L, "Dave", "Pegg"));
     LOGGER.info("Customers created");

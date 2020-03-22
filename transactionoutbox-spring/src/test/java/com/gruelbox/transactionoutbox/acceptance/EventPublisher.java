@@ -1,5 +1,7 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -8,7 +10,7 @@ class EventPublisher {
 
   @Autowired private EventRepository eventRepository;
 
-  public void publish(Event event) {
-    eventRepository.save(event);
+  public void publish(long id, String description, LocalDateTime time) {
+    eventRepository.save(new Event(id, description, time));
   }
 }
