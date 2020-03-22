@@ -19,6 +19,9 @@ public class TransactionOutboxSpringDemoApplication {
   @Bean
   @Lazy
   public TransactionOutbox transactionOutbox(SpringTransactionOutboxFactory factory) {
-    return factory.create().persistor(Persistor.forDialect(Dialect.H2)).build();
+    return factory
+        .create()
+        .persistor(Persistor.forDialect(Dialect.H2).build())
+        .build();
   }
 }

@@ -7,13 +7,13 @@ import java.util.Arrays;
 import javax.validation.constraints.Future;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.PositiveOrZero;
-import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
+@SuppressWarnings("WeakerAccess")
 @SuperBuilder
 @EqualsAndHashCode
 @ToString
@@ -25,11 +25,11 @@ public class TransactionOutboxEntry {
 
   @Future @Getter @Setter private LocalDateTime nextAttemptTime;
 
-  @PositiveOrZero @Builder.Default @Getter @Setter private int attempts;
+  @PositiveOrZero @Getter @Setter private int attempts;
 
-  @Builder.Default @Getter @Setter private boolean blacklisted;
+  @Getter @Setter private boolean blacklisted;
 
-  @PositiveOrZero @Builder.Default @Getter @Setter private int version;
+  @PositiveOrZero @Getter @Setter private int version;
 
   private volatile boolean initialized;
   private String description;

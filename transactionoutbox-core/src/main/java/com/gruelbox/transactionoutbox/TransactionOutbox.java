@@ -21,6 +21,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.validation.ClockProvider;
+import javax.validation.Valid;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 import lombok.Builder;
@@ -47,6 +48,7 @@ public class TransactionOutbox {
    * cases. If re-implementing this interface, read the documentation on {@link Persistor}
    * carefully.
    */
+  @Valid
   @NotNull private final Persistor persistor;
 
   /**
@@ -55,6 +57,7 @@ public class TransactionOutbox {
    *
    * <p>Defaults to {@link Instantiator#usingReflection()}.
    */
+  @Valid
   @NotNull private final Instantiator instantiator;
 
   /**

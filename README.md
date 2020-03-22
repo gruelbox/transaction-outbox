@@ -72,7 +72,7 @@ TransactionManager transactionManager = TransactionManager.fromConnectionDetails
     "org.h2.Driver", "jdbc:h2:mem:test;MV_STORE=TRUE", "test", "test"))
 TransactionOutbox outbox = TransactionOutbox.builder()
   .transactionManager(transactionManager)
-  .persistor(Persistor.forDialect(Dialect.H2))
+  .persistor(Persistor.forDialect(Dialect.H2).build())
   .build();
 ```
 Better - use connection pooling:
@@ -81,7 +81,7 @@ try (HikariDataSource ds = new HikariDataSource(createHikariConfig())) {
   TransactionManager transactionManager = TransactionManager.fromDataSource(ds);
   TransactionOutbox outbox = TransactionOutbox.builder()
     .transactionManager(transactionManager)
-    .persistor(Persistor.forDialect(Dialect.H2))
+    .persistor(Persistor.forDialect(Dialect.H2).build())
     .build();
 }
 ```
@@ -91,7 +91,7 @@ Or add `transactionoutbox-spring` to your POM and integrate with Spring DI, Spri
 @Lazy
 public TransactionOutbox transactionOutbox(SpringTransactionOutboxFactory factory) {
   return factory.create()
-      .persistor(Persistor.forDialect(Dialect.H2))
+      .persistor(Persistor.forDialect(Dialect.H2).build())
       .build();
 }
 ```
@@ -210,7 +210,7 @@ simply create your own implementation of `Instantiator` and pass it when buildin
 ```$
 TransactionOutbox.builder()
     .transactionManager(transactionManager)
-    .persistor(Persistor.forDialect(Dialect.POSTRESQL_9))
+    .persistor(Persistor.forDialect(Dialect.POSTRESQL_9).build())
     .instantiator(new Instantiator() {
        ...
      })

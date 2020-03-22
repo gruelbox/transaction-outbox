@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
-import com.thoughtworks.xstream.XStream;
-import com.thoughtworks.xstream.io.xml.Xpp3Driver;
+import java.io.IOException;
+import java.io.Reader;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -10,24 +10,61 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import javax.validation.constraints.NotNull;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-@AllArgsConstructor(access = AccessLevel.PACKAGE)
+@Builder(access = AccessLevel.PUBLIC)
 class DefaultPersistor implements Persistor {
-
-  /**
-   * TODO security
-   */
-  private static final XStream X_STREAM = new XStream(new Xpp3Driver());
 
   private static final String SELECT_ALL =
       // language=MySQL
       "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM TXNO_OUTBOX";
 
+  /**
+   * The database dialect to use. Where possible, optimisations will be used to maximise performance
+   * for the database concerned, one example being the use of {@code SKIP LOCKED} on MySQL 8+ and
+   * PostgreSQL.
+   */
+  @NotNull
   private final Dialect dialect;
+
+  /**
+   * {@link Invocation} is serialised to the database as JSON, since methods could take any number
+   * of arguments of a variety of parameter types. The default serializer has a number of
+   * limitations. Only the following are supported currently:
+   *
+   * <ul>
+   *   <li>Primitive types such as {@code int} or {@code double} or the boxed equivalents.</li>
+   *   <li>{@link String}</li>
+   *   <li>{@link java.util.Date}</li>
+   *   <li>The {@code java.time} classes:
+   *   <ul>
+   *     <li>{@link java.time.DayOfWeek}</li>
+   *     <li>{@link java.time.Duration}</li>
+   *     <li>{@link java.time.Instant}</li>
+   *     <li>{@link java.time.LocalDate}</li>
+   *     <li>{@link java.time.LocalDateTime}</li>
+   *     <li>{@link java.time.Month}</li>
+   *     <li>{@link java.time.MonthDay}</li>
+   *     <li>{@link java.time.Period}</li>
+   *     <li>{@link java.time.Year}</li>
+   *     <li>{@link java.time.YearMonth}</li>
+   *     <li>{@link java.time.ZoneOffset}</li>
+   *     <li>{@link java.time.DayOfWeek}</li>
+   *     <li>{@link java.time.temporal.ChronoUnit}</li>
+   *   </ul></li>
+   *   <li>Arrays specifically typed to one of the above types.</li>
+   * </ul>
+   *
+   * <p>If any of these limitations restrict your application, or if you don't need anything with
+   * such general support and want a more specific, faster implementation, you can provide your
+   * own {@link InvocationSerializer} here.</p>
+   */
+  @Builder.Default
+  private final InvocationSerializer serializer = new DefaultInvocationSerializer();
 
   @Override
   public void migrate(TransactionManager transactionManager) {
@@ -37,11 +74,10 @@ class DefaultPersistor implements Persistor {
   @Override
   public void save(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
     Utils.validate(entry);
-    String serializedForm = X_STREAM.toXML(entry.getInvocation());
     PreparedStatement stmt =
         tx.prepareBatchStatement("INSERT INTO TXNO_OUTBOX VALUES (?, ?, ?, ?, ?, ?)");
     stmt.setString(1, entry.getId());
-    stmt.setString(2, serializedForm);
+    stmt.setString(2, serializer.serialize(entry.getInvocation()));
     stmt.setTimestamp(3, Timestamp.valueOf(entry.getNextAttemptTime()));
     stmt.setInt(4, entry.getAttempts());
     stmt.setBoolean(5, entry.isBlacklisted());
@@ -52,7 +88,6 @@ class DefaultPersistor implements Persistor {
 
   @Override
   public void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception {
-    Utils.validate(entry);
     try (PreparedStatement stmt =
         // language=MySQL
         tx.connection().prepareStatement("DELETE FROM TXNO_OUTBOX WHERE id = ? and version = ?")) {
@@ -120,7 +155,7 @@ class DefaultPersistor implements Persistor {
   }
 
   private List<TransactionOutboxEntry> gatherResults(int batchSize, PreparedStatement stmt)
-      throws SQLException {
+      throws SQLException, IOException {
     try (ResultSet rs = stmt.executeQuery()) {
       ArrayList<TransactionOutboxEntry> result = new ArrayList<>(batchSize);
       while (rs.next()) {
@@ -143,17 +178,19 @@ class DefaultPersistor implements Persistor {
     }
   }
 
-  private TransactionOutboxEntry map(ResultSet rs) throws SQLException {
-    TransactionOutboxEntry entry =
-        TransactionOutboxEntry.builder()
-            .id(rs.getString("id"))
-            .invocation((Invocation) X_STREAM.fromXML(rs.getCharacterStream("invocation")))
-            .nextAttemptTime(rs.getTimestamp("nextAttemptTime").toLocalDateTime())
-            .attempts(rs.getInt("attempts"))
-            .blacklisted(rs.getBoolean("blacklisted"))
-            .version(rs.getInt("version"))
-            .build();
-    log.debug("Found {}", entry);
-    return entry;
+  private TransactionOutboxEntry map(ResultSet rs) throws SQLException, IOException {
+    try (Reader invocationStream = rs.getCharacterStream("invocation")) {
+      TransactionOutboxEntry entry =
+          TransactionOutboxEntry.builder()
+              .id(rs.getString("id"))
+              .invocation(serializer.deserialize(invocationStream))
+              .nextAttemptTime(rs.getTimestamp("nextAttemptTime").toLocalDateTime())
+              .attempts(rs.getInt("attempts"))
+              .blacklisted(rs.getBoolean("blacklisted"))
+              .version(rs.getInt("version"))
+              .build();
+      log.debug("Found {}", entry);
+      return entry;
+    }
   }
 }

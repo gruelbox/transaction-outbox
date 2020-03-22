@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.DefaultPersistor.DefaultPersistorBuilder;
 import java.util.List;
 
 /**
@@ -11,10 +12,11 @@ public interface Persistor {
   /**
    * Uses the default relational persistor.
    *
+   * @param dialect The database dialect.
    * @return The persistor.
    */
-  static Persistor forDialect(Dialect dialect) {
-    return new DefaultPersistor(dialect);
+  static DefaultPersistorBuilder forDialect(Dialect dialect) {
+    return DefaultPersistor.builder().dialect(dialect);
   }
 
   /**

@@ -38,7 +38,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-@Disabled
 class TestJooqTransactionManager {
 
   private final ExecutorService unreliablePool =
@@ -87,7 +86,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2))
+            .persistor(Persistor.forDialect(Dialect.H2).build())
             .listener(entry -> latch.countDown())
             .build();
 
@@ -109,13 +108,14 @@ class TestJooqTransactionManager {
   }
 
   @Test
+  @Disabled // TODO support this. What's going on?
   void testNestedDirectInvocation() throws InterruptedException {
     CountDownLatch latch1 = new CountDownLatch(1);
     CountDownLatch latch2 = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2))
+            .persistor(Persistor.forDialect(Dialect.H2).build())
             .listener(
                 entry -> {
                   if (entry.getInvocation().getArgs()[0].equals(1)) {
@@ -161,7 +161,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2))
+            .persistor(Persistor.forDialect(Dialect.H2).build())
             .listener(entry -> latch.countDown())
             .build();
 
@@ -183,13 +183,14 @@ class TestJooqTransactionManager {
   }
 
   @Test
+  @Disabled // TODO support this. What's going on?
   void testNestedViaListener() throws InterruptedException {
     CountDownLatch latch1 = new CountDownLatch(1);
     CountDownLatch latch2 = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2))
+            .persistor(Persistor.forDialect(Dialect.H2).build())
             .listener(
                 entry -> {
                   if (entry.getInvocation().getArgs()[0].equals(1)) {
@@ -240,7 +241,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2))
+            .persistor(Persistor.forDialect(Dialect.H2).build())
             .instantiator(new FailingInstantiator())
             .executor(unreliablePool)
             .attemptFrequency(Duration.ofSeconds(1))
@@ -268,7 +269,7 @@ class TestJooqTransactionManager {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2))
+            .persistor(Persistor.forDialect(Dialect.H2).build())
             .instantiator(new FailingInstantiator())
             .executor(unreliablePool)
             .attemptFrequency(Duration.ofSeconds(1))
