@@ -23,13 +23,13 @@ The problem comes with trying to implement the **eventual** guarantee in "eventu
  - If we commit our database transaction _before_ sending the event, the service might die, freeze or get taken down for upgrade before it has a chance to send the message, leaving downstream services out of sync
  - If we commit our database transaction _after_ sending the event, we could fail to commit, leaving upstream services out of sync
  
-When _reading_ the message, we face the same dilemmas in reverse, but this a relatively easy problem to solve using [idempotency keys|https://stripe.com/gb/blog/idempotency], as long as we can rely on the sender repeating the message if it doesn't get confirmation from the receiver.
+When _reading_ the message, we face the same dilemmas in reverse, but this a relatively easy problem to solve using [idempotency keys](https://stripe.com/gb/blog/idempotency), as long as we can rely on the sender repeating the message if it doesn't get confirmation from the receiver.
 
 The _sending_ side is what a `TransactionOutbox` solves: it ensures that once we have committed our database transaction (e.g. when **API Gateway** has recorded its transaction and committed, or **Inventory** has decremented the inventory and committed) we _know_ that the corresponding message will eventually make it to the next system in the chain.
 
 ## How does it work?
 
-`TransactionOutbox` uses a table to your application's database (much like [Flyway|https://flywaydb.org/] or [Liquibase|https://www.liquibase.org/]) to record method calls. These are committed with the rest of your database transaction and then processed in the background, repeatedly, until the method call runs without throwing an exception.
+`TransactionOutbox` uses a table to your application's database (much like [Flyway](https://flywaydb.org/) or [Liquibase](https://www.liquibase.org/) to record method calls. These are committed with the rest of your database transaction and then processed in the background, repeatedly, until the method call runs without throwing an exception.
 
 Every aspect is highly configurable or overridable. It has direct support for the following, and is easily extended to support others:
  
