@@ -1,6 +1,21 @@
 # transaction-outbox
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 
+## Contents
+1. [What's this?](#whats-this)
+1. [Why do I need it?](#why-do-i-need-it)
+1. [How does it work?](#how-does-it-work)
+1. [Installation](#installation)
+1. [Creating a `TransactionOutbox`](#creating-a-transactionoutbox)
+1. [Usage](#usage)
+   1. [Using built-in transaction handling](#using-built-in-transaction-handling)
+   1. [Using spring-txn](#using-spring-txn)
+   1. [Using j00Q's built-in transaction management](#using-j00qs-built-in-transaction-management)
+1. [Dependency Injection](#dependency-injection)
+1. [Ensuring work is processed eventually](#ensuring-work-is-processed-eventually)
+1. [Managing the "dead letter queue"](#managing-the-dead-letter-queue)
+1. [Configuration options](#configuration-options)
+
 ## What's this?
 
 An implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. Features a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks.
@@ -258,10 +273,6 @@ That's it! Just make sure that this process keeps running, or schedule it repeat
 Work might be retried too many times and get "blacklisted". You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
 
 TODO add APIs for this
-
-## How it works
-
-TODO
 
 ## Configuration options
 
