@@ -29,7 +29,7 @@ The _sending_ side is what a `TransactionOutbox` solves: it ensures that once we
 
 ## How does it work?
 
-`TransactionOutbox` uses a table to your application's database (much like [Flyway](https://flywaydb.org/) or [Liquibase](https://www.liquibase.org/) to record method calls. These are committed with the rest of your database transaction and then processed in the background, repeatedly, until the method call runs without throwing an exception.
+`TransactionOutbox` uses a table to your application's database (much like [Flyway](https://flywaydb.org/) or [Liquibase](https://www.liquibase.org/)) to record method calls. These are committed with the rest of your database transaction and then processed in the background, repeatedly, until the method call runs without throwing an exception.
 
 Every aspect is highly configurable or overridable. It has direct support for the following, and is easily extended to support others:
  
@@ -165,6 +165,7 @@ TransactionOutbox transactionOutbox(Injector injector, TransactionManager transa
 ```
 
 ## Usage
+
 During a transaction, you can _schedule_ work to be run at some later point in time (usually immediately, but if that fails, potentially some time later, after a number of retries). This instruction is persisted to the database in the same transaction as the rest of your work, giving guaranteed eventual consistency.
 
 In general, this is expressed as:
