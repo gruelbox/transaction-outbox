@@ -1,13 +1,37 @@
 # transaction-outbox
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 
-[Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) implementation for Java. Features:
+## What's this?
 
- - Clean, extensible API
- - Very few dependencies
- - Plays nicely with a variety of database platforms, transaction management approaches and application frameworks
+An implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. Features a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks.
+
+## Why do I need it?
+
+If you are using Microservices with databases and you have use cases that span more than one service, you will soon get used to the idea of **Eventual consistency** over 100% **atomicity**. For example:
+
+ - **API gateway** records the transaction to its database and pushes a _sale_ event to SQS
+ - **Inventory** picks up the _sale_ event, decrements the inventory in its database and fires a _low inventory_ event
+ - **Supplier** picks up the _low inventory_ event, updates the supplier account balance in its database and sends an API order to the supplier.
+
+_Note that this is just an example. There are obviously "better" ways to design a system like this one in particular!_
+
+In this case, it is possible for the combined system at any time to be in a state where the transaction has been recorded, but the inventory has not been updated, or for the inventory to have been updated but the supplier order not sent. As long as you design the system to cope with this, all is well.
+
+The problem comes with trying to implement the **eventual** guarantee in "eventual consistency". How do we _make sure_ that once **API gateway** has recorded its transaction to its database, that it will _eventually_ send a message, and **Inventory** will _eventually_ handle it correctly? There are so many things that could go wrong, for example:
+
+ - SQS could be unavailable or there could be a network glitch at the time the message is sent
+ - If we commit our database transaction _before_ sending the event, the service might die, freeze or get taken down for upgrade before it has a chance to send the message, leaving downstream services out of sync
+ - If we commit our database transaction _after_ sending the event, we could fail to commit, leaving upstream services out of sync
  
- Direct support for the following, and easily extended to support others:
+When _reading_ the message, we face the same dilemmas in reverse, but this a relatively easy problem to solve using [idempotency keys|https://stripe.com/gb/blog/idempotency], as long as we can rely on the sender repeating the message if it doesn't get confirmation from the receiver.
+
+The _sending_ side is what a `TransactionOutbox` solves: it ensures that once we have committed our database transaction (e.g. when **API Gateway** has recorded its transaction and committed, or **Inventory** has decremented the inventory and committed) we _know_ that the corresponding message will eventually make it to the next system in the chain.
+
+## How does it work?
+
+`TransactionOutbox` uses a table to your application's database (much like [Flyway|https://flywaydb.org/] or [Liquibase|https://www.liquibase.org/]) to record method calls. These are committed with the rest of your database transaction and then processed in the background, repeatedly, until the method call runs without throwing an exception.
+
+Every aspect is highly configurable or overridable. It has direct support for the following, and is easily extended to support others:
  
  - Spring
  - Hibernate
