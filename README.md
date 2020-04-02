@@ -22,25 +22,17 @@ An implementation of the [Transaction Outbox Pattern](https://microservices.io/p
 
 ## Why do I need it?
 
-If you are using Microservices with databases and you have use cases that span more than one service, you will soon get used to the idea of **Eventual consistency** over 100% **atomicity**. For example:
+Unless you are using [event sourcing](https://martinfowler.com/eaaDev/EventSourcing.html), if you are using Microservices with databases and you have use cases that span more than one service, you will encounter the situation where one service updates its database and then either calls or sends a message to another service. During this process, there are many things that could go wrong, for example:
 
- - **API gateway** records the transaction to its database and pushes a _sale_ event to SQS
- - **Inventory** picks up the _sale_ event, decrements the inventory in its database and fires a _low inventory_ event
- - **Supplier** picks up the _low inventory_ event, updates the supplier account balance in its database and sends an API order to the supplier.
-
-_Note that this is just an example. There are obviously "better" ways to design a system like this one in particular!_
-
-In this case, it is possible for the combined system at any time to be in a state where the transaction has been recorded, but the inventory has not been updated, or for the inventory to have been updated but the supplier order not sent. As long as you design the system to cope with this, all is well.
-
-The problem comes with trying to implement the **eventual** guarantee in "eventual consistency". How do we _make sure_ that once **API gateway** has recorded its transaction to its database, that it will _eventually_ send a message, and **Inventory** will _eventually_ handle it correctly? There are so many things that could go wrong, for example:
-
- - SQS could be unavailable or there could be a network glitch at the time the message is sent
- - If we commit our database transaction _before_ sending the event, the service might die, freeze or get taken down for upgrade before it has a chance to send the message, leaving downstream services out of sync
- - If we commit our database transaction _after_ sending the event, we could fail to commit, leaving upstream services out of sync
+ - The message queue or other service could be unavailable, or there could be a network glitch at the time the message is sent.
+ - If we commit our database transaction _before_ sending the external request, the service might die, freeze or get taken down for upgrade before it has a chance to send the request.
+ - If we commit our database transaction _after_ sending the request, the service might die, freeze or get taken down for upgrade before it has a chance to commit the transaction.
  
-When _reading_ the message, we face the same dilemmas in reverse, but this a relatively easy problem to solve using [idempotency keys](https://stripe.com/gb/blog/idempotency), as long as we can rely on the sender repeating the message if it doesn't get confirmation from the receiver.
+Naively, we would end up with an _at least once_ solution - we will send the request once or not at all. This is seldom what we want. _Exactly once_ would be ideal, but this is [really hard](https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/). What we can do easily is to is achieve _at least once_ semantics, and rely on [idempotency keys](https://stripe.com/gb/blog/idempotency) at the receiving end to "collapse" down to _exactly once_.
 
-The _sending_ side is what a `TransactionOutbox` solves: it ensures that once we have committed our database transaction (e.g. when **API Gateway** has recorded its transaction and committed, or **Inventory** has decremented the inventory and committed) we _know_ that the corresponding message will eventually make it to the next system in the chain.
+The _sending_ side is what a `TransactionOutbox` solves: it ensures that once we have committed our database transaction we _know_ that the corresponding message will either eventually make it to the next system in the chain.
+
+It solves the primary risk of the "vanilla" transactional outbox pattern by managing both the scheduling and processing of the external call, and also provides 100% flexibility regarding the nature of the external call.
 
 ## How does it work?
 
