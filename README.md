@@ -30,7 +30,7 @@ Unless you are using [event sourcing](https://martinfowler.com/eaaDev/EventSourc
  
 Naively, we would end up with an _at least once_ solution - we will send the request once or not at all. This is seldom what we want. _Exactly once_ would be ideal, but this is [really hard](https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/). What we can do easily is to is achieve _at least once_ semantics, and rely on [idempotency keys](https://stripe.com/gb/blog/idempotency) at the receiving end to "collapse" down to _exactly once_.
 
-The _sending_ side is what a `TransactionOutbox` solves: it ensures that once we have committed our database transaction we _know_ that the corresponding message will either eventually make it to the next system in the chain.
+The _sending_ side is what a `TransactionOutbox` solves: it ensures that once we have committed our database transaction we _know_ that the corresponding message will either eventually make it to the next system in the chain, or will go into a failure state from which it can be recovered and pushed through.
 
 It solves the primary risk of the "vanilla" transactional outbox pattern by managing both the scheduling and processing of the external call, and also provides 100% flexibility regarding the nature of the external call.
 
