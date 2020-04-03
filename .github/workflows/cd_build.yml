@@ -20,6 +20,6 @@ jobs:
           settings-path: ${{ github.workspace }} # location for the settings.xml file
 
       - name: Build and publish
-        run: mvn deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.patch=$GITHUB_RUN_NUMBER
+        run: mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.patch=$GITHUB_RUN_NUMBER
         env:
           GITHUB_TOKEN: ${{ github.token }}
