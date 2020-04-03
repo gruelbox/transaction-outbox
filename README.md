@@ -49,9 +49,9 @@ Every aspect is highly configurable or overridable. It has direct support for th
 
 ## Installation
 
-Currently, releases are available as continuously-delivered releases via the Github Package repository. Less regular, stable releases will be performed to Maven Central soon.
+Note that a few bits aren't quire ready, notably: (a) test coverage isn't as high as it should be, (b) it's not had any production "battle testing" and (c) recovery from blacklistings isn't yet implemented. However, please have a play and get tback to me with feedback!
 
-Add this to your POM:
+Currently, releases are available as continuously-delivered releases via the Github Package repository. Less regular, stable releases will be performed to Maven Central soon.  Add this to your POM:
 ```
 <repositories>
   <repository>
