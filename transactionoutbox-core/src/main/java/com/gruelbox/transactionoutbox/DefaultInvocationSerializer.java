@@ -12,9 +12,11 @@ import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import com.google.gson.TypeAdapter;
 import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 import java.io.IOException;
 import java.io.Reader;
+import java.io.Writer;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.text.ParseException;
@@ -55,14 +57,12 @@ class DefaultInvocationSerializer implements InvocationSerializer {
   }
 
   @Override
-  public String serialize(Invocation invocation) {
-    String json = gson.toJson(invocation);
-    log.debug("Serialized invocation:\n{}", json);
-    return json;
+  public void serializeInvocation(Invocation invocation, Writer writer) {
+    gson.toJson(invocation, writer);
   }
 
   @Override
-  public Invocation deserialize(Reader reader) {
+  public Invocation deserializeInvocation(Reader reader) {
     return gson.fromJson(reader, Invocation.class);
   }
 
@@ -233,16 +233,14 @@ class DefaultInvocationSerializer implements InvocationSerializer {
     @Override
     public Date read(JsonReader in) throws IOException {
       try {
-        switch (in.peek()) {
-          case NULL:
-            in.nextNull();
-            return null;
-          default:
-            String date = in.nextString();
-            // Instead of using iso8601Format.parse(value), we use Jackson's date parsing
-            // This is because Android doesn't support XXX because it is JDK 1.6
-            return parse(date, new ParsePosition(0));
+        if (in.peek() == JsonToken.NULL) {
+          in.nextNull();
+          return null;
         }
+        String date = in.nextString();
+        // Instead of using iso8601Format.parse(value), we use Jackson's date parsing
+        // This is because Android doesn't support XXX because it is JDK 1.6
+        return parse(date, new ParsePosition(0));
       } catch (ParseException e) {
         throw new JsonParseException(e);
       }
@@ -309,9 +307,7 @@ class DefaultInvocationSerializer implements InvocationSerializer {
      */
     private static void padInt(StringBuilder buffer, int value, int length) {
       String strValue = Integer.toString(value);
-      for (int i = length - strValue.length(); i > 0; i--) {
-        buffer.append('0');
-      }
+      buffer.append("0".repeat(Math.max(0, length - strValue.length())));
       buffer.append(strValue);
     }
 
@@ -325,7 +321,7 @@ class DefaultInvocationSerializer implements InvocationSerializer {
      * @throws ParseException if the date is not in the appropriate format
      */
     private static Date parse(String date, ParsePosition pos) throws ParseException {
-      Exception fail = null;
+      Exception fail;
       try {
         int offset = pos.getIndex();
 
@@ -410,11 +406,7 @@ class DefaultInvocationSerializer implements InvocationSerializer {
         return calendar.getTime();
         // If we get a ParseException it'll already have the right message/offset.
         // Other exception types can convert here.
-      } catch (IndexOutOfBoundsException e) {
-        fail = e;
-      } catch (NumberFormatException e) {
-        fail = e;
-      } catch (IllegalArgumentException e) {
+      } catch (IndexOutOfBoundsException | IllegalArgumentException e) {
         fail = e;
       }
       String input = (date == null) ? null : ("'" + date + "'");

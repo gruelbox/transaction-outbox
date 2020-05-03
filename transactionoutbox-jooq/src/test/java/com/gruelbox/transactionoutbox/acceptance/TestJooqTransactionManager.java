@@ -9,9 +9,12 @@ import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.JooqTransactionListener;
 import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.Persistor;
+import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
+import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
@@ -87,7 +90,12 @@ class TestJooqTransactionManager {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
-            .listener(entry -> latch.countDown())
+            .listener(new TransactionOutboxListener() {
+              @Override
+              public void success(TransactionOutboxEntry entry) {
+                latch.countDown();
+              }
+            })
             .build();
 
     clearOutbox(transactionManager);
@@ -116,14 +124,16 @@ class TestJooqTransactionManager {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
-            .listener(
-                entry -> {
-                  if (entry.getInvocation().getArgs()[0].equals(1)) {
-                    latch1.countDown();
-                  } else {
-                    latch2.countDown();
-                  }
-                })
+            .listener(new TransactionOutboxListener() {
+              @Override
+              public void success(TransactionOutboxEntry entry) {
+                if (entry.getInvocation().getArgs()[0].equals(1)) {
+                  latch1.countDown();
+                } else {
+                  latch2.countDown();
+                }
+              }
+            })
             .build();
 
     clearOutbox(transactionManager);
@@ -162,7 +172,12 @@ class TestJooqTransactionManager {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
-            .listener(entry -> latch.countDown())
+            .listener(new TransactionOutboxListener() {
+              @Override
+              public void success(TransactionOutboxEntry entry) {
+                latch.countDown();
+              }
+            })
             .build();
 
     clearOutbox(transactionManager);
@@ -191,14 +206,16 @@ class TestJooqTransactionManager {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
-            .listener(
-                entry -> {
-                  if (entry.getInvocation().getArgs()[0].equals(1)) {
-                    latch1.countDown();
-                  } else {
-                    latch2.countDown();
-                  }
-                })
+            .listener(new TransactionOutboxListener() {
+              @Override
+              public void success(TransactionOutboxEntry entry) {
+                if (entry.getInvocation().getArgs()[0].equals(1)) {
+                  latch1.countDown();
+                } else {
+                  latch2.countDown();
+                }
+              }
+            })
             .build();
 
     clearOutbox(transactionManager);
@@ -243,9 +260,14 @@ class TestJooqTransactionManager {
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
             .instantiator(new FailingInstantiator())
-            .executor(unreliablePool)
+            .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofSeconds(1))
-            .listener(entry -> latch.countDown())
+            .listener(new TransactionOutboxListener() {
+              @Override
+              public void success(TransactionOutboxEntry entry) {
+                latch.countDown();
+              }
+            })
             .build();
 
     clearOutbox(transactionManager);
@@ -271,17 +293,19 @@ class TestJooqTransactionManager {
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
             .instantiator(new FailingInstantiator())
-            .executor(unreliablePool)
+            .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofSeconds(1))
             .flushBatchSize(1000)
-            .listener(
-                entry -> {
-                  Integer i = (Integer) entry.getInvocation().getArgs()[0];
-                  if (results.putIfAbsent(i, i) != null) {
-                    duplicates.put(i, i);
-                  }
-                  latch.countDown();
-                })
+            .listener(new TransactionOutboxListener() {
+              @Override
+              public void success(TransactionOutboxEntry entry) {
+                Integer i = (Integer) entry.getInvocation().getArgs()[0];
+                if (results.putIfAbsent(i, i) != null) {
+                  duplicates.put(i, i);
+                }
+                latch.countDown();
+              }
+            })
             .build();
 
     withRunningFlusher(

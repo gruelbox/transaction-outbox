@@ -207,7 +207,7 @@ obviously doesn't play well with dependency injection.
 `SpringInstantiator`, as used above, will instead use Spring's `ApplicationContext.getBean()` method to obtain the object,
 allowing injection into it, and the Guice example will use `Injector.getInstance()`. If you have some other DI mechanism,
 simply create your own implementation of `Instantiator` and pass it when building the `TransactionalOutbox`:
-```$
+```
 TransactionOutbox.builder()
     .transactionManager(transactionManager)
     .persistor(Persistor.forDialect(Dialect.POSTRESQL_9))
@@ -228,8 +228,17 @@ That's it! Just make sure that this process keeps running, or schedule it repeat
 
 ## Managing the "dead letter queue"
 Work might be retried too many times and get "blacklisted". You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
+```
+TransactionOutbox.builder()
+    ...
+    .listener(new TransactionOutboxListener() {
+        ...
+    })
+    .build();
+```
+To mark the work for reprocessing, pass the id (provided in the `TransactionOutboxListener` callback) to `TransactionOutbox.whitelist()`. Its failure count will be marked back down to zero and it will get reprocessed on the next call to `flush()`.
 
-TODO add APIs for this
+A good approach here is to use the `TransactionOutboxListener` callback to post an [interactive Slack message](https://api.slack.com/legacy/interactive-messages) - this can operate as both the alert and the "button" allowing a support engineer to submit the work for reprocessing.
 
 ## How it works
 

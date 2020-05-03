@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
@@ -140,7 +141,8 @@ class TestDefaultInvocationSerializer {
   }
 
   Invocation serdeser(Invocation invocation) {
-    String s = serializer.serialize(invocation);
-    return serializer.deserialize(new StringReader(s));
+    var writer = new StringWriter();
+    serializer.serializeInvocation(invocation, writer);
+    return serializer.deserializeInvocation(new StringReader(writer.toString()));
   }
 }
