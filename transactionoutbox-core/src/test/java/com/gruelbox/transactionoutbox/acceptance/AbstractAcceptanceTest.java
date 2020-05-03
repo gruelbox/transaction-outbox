@@ -12,12 +12,14 @@ import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
 import com.gruelbox.transactionoutbox.Persistor;
+import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
-import com.gruelbox.transactionoutbox.ThrowingTransactionalWork;
 import com.gruelbox.transactionoutbox.Transaction;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
+import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
@@ -38,7 +40,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.experimental.Accessors;
@@ -74,8 +78,8 @@ abstract class AbstractAcceptanceTest {
                     clazz ->
                         (InterfaceProcessor)
                             (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
-            .executor(unreliablePool)
-            .listener(entry -> latch.countDown())
+            .submitter(Submitter.withExecutor(unreliablePool))
+            .listener(new LatchListener(latch))
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .build();
 
@@ -112,7 +116,7 @@ abstract class AbstractAcceptanceTest {
           TransactionOutbox.builder()
               .transactionManager(transactionManager)
               .persistor(Persistor.forDialect(connectionDetails().dialect()))
-              .listener(entry -> latch.countDown())
+              .listener(new LatchListener(latch))
               .build();
 
       clearOutbox();
@@ -178,16 +182,16 @@ abstract class AbstractAcceptanceTest {
             }
 
             @Override
-            public <E extends Exception> void requireTransaction(ThrowingTransactionalWork<E> work)
+            public <T, E extends Exception> T requireTransactionReturns(ThrowingTransactionalSupplier<T, E> work)
                 throws E, NoTransactionActiveException {
-              work.doWork(transaction);
+              return work.doWork(transaction);
             }
           };
 
       TransactionOutbox outbox =
           TransactionOutbox.builder()
               .transactionManager(transactionManager)
-              .listener(entry -> latch.countDown())
+              .listener(new LatchListener(latch))
               .persistor(Persistor.forDialect(connectionDetails().dialect()))
               .build();
 
@@ -232,9 +236,9 @@ abstract class AbstractAcceptanceTest {
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .instantiator(new FailingInstantiator(attempts))
-            .executor(unreliablePool)
-            .attemptFrequency(Duration.ofSeconds(1))
-            .listener(entry -> latch.countDown())
+            .submitter(Submitter.withExecutor(unreliablePool))
+            .attemptFrequency(Duration.ofMillis(500))
+            .listener(new LatchListener(latch))
             .build();
 
     clearOutbox();
@@ -245,6 +249,40 @@ abstract class AbstractAcceptanceTest {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
           assertTrue(latch.await(15, TimeUnit.SECONDS));
+        });
+  }
+
+  /**
+   * Runs a piece of work which will fail enough times to be blacklisted but will then pass
+   * when re-whitelisted.
+   */
+  @Test
+  final void blacklistAndWhitelist() throws Exception {
+    TransactionManager transactionManager = simpleTxnManager();
+    CountDownLatch successLatch = new CountDownLatch(1);
+    CountDownLatch blacklistLatch = new CountDownLatch(1);
+    LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
+    AtomicInteger attempts = new AtomicInteger();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .instantiator(new FailingInstantiator(attempts))
+            .attemptFrequency(Duration.ofMillis(500))
+            .listener(latchListener)
+            .blacklistAfterAttempts(2)
+            .build();
+
+    clearOutbox();
+
+    withRunningFlusher(
+        outbox,
+        () -> {
+          transactionManager.inTransaction(
+              () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
+          assertTrue(blacklistLatch.await(3, TimeUnit.SECONDS));
+          assertTrue(transactionManager.inTransactionReturns(tx -> outbox.whitelist(latchListener.getBlacklisted().getId())));
+          assertTrue(successLatch.await(3, TimeUnit.SECONDS));
         });
   }
 
@@ -263,17 +301,19 @@ abstract class AbstractAcceptanceTest {
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .instantiator(new RandomFailingInstantiator())
-            .executor(unreliablePool)
-            .attemptFrequency(Duration.ofSeconds(1))
+            .submitter(Submitter.withExecutor(unreliablePool))
+            .attemptFrequency(Duration.ofMillis(500))
             .flushBatchSize(1000)
-            .listener(
-                entry -> {
-                  Integer i = (Integer) entry.getInvocation().getArgs()[0];
-                  if (results.putIfAbsent(i, i) != null) {
-                    duplicates.put(i, i);
-                  }
-                  latch.countDown();
-                })
+            .listener(new TransactionOutboxListener() {
+              @Override
+              public void success(TransactionOutboxEntry entry) {
+                Integer i = (Integer) entry.getInvocation().getArgs()[0];
+                if (results.putIfAbsent(i, i) != null) {
+                  duplicates.put(i, i);
+                }
+                latch.countDown();
+              }
+            })
             .build();
 
     withRunningFlusher(
@@ -332,8 +372,8 @@ abstract class AbstractAcceptanceTest {
             }
             outbox.flush();
           },
-          500,
-          500,
+          250,
+          250,
           TimeUnit.MILLISECONDS);
       runnable.run();
     } finally {
@@ -392,6 +432,35 @@ abstract class AbstractAcceptanceTest {
       } else {
         throw new UnsupportedOperationException();
       }
+    }
+  }
+
+  private static final class LatchListener implements TransactionOutboxListener {
+    private final CountDownLatch successLatch;
+    private final CountDownLatch blacklistLatch;
+
+    @Getter
+    private volatile TransactionOutboxEntry blacklisted;
+
+    LatchListener(CountDownLatch successLatch, CountDownLatch blacklistLatch) {
+      this.successLatch = successLatch;
+      this.blacklistLatch = blacklistLatch;
+    }
+
+    LatchListener(CountDownLatch successLatch) {
+      this.successLatch = successLatch;
+      this.blacklistLatch = new CountDownLatch(1);
+    }
+
+    @Override
+    public void success(TransactionOutboxEntry entry) {
+      successLatch.countDown();
+    }
+
+    @Override
+    public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
+      this.blacklisted = entry;
+      blacklistLatch.countDown();
     }
   }
 

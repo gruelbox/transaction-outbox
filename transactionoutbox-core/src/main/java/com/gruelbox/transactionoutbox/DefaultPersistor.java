@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.io.StringWriter;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -12,21 +13,30 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.validation.constraints.NotNull;
 import lombok.Builder;
+import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
-/** The default {@link Persistor} for {@link TransactionOutbox}. */
+/** The default {@link Persistor} for {@link TransactionOutbox}. Most methods
+ * are open for extension, or you can modify various options through the builder. */
 @Slf4j
-@Builder
-class DefaultPersistor implements Persistor {
+@SuperBuilder
+public class DefaultPersistor implements Persistor {
 
   private static final String SELECT_ALL =
       // language=MySQL
       "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM TXNO_OUTBOX";
 
+  /**
+   * The database dialect to use. Required.
+   */
   @NotNull private final Dialect dialect;
 
+  /**
+   * The serializer to use for {@link Invocation}s. See {@link InvocationSerializer} for more
+   * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer()}.
+   */
   @Builder.Default
-  private final InvocationSerializer serializer = new DefaultInvocationSerializer();
+  private final InvocationSerializer serializer = InvocationSerializer.createDefaultJsonSerializer();
 
   @Override
   public void migrate(TransactionManager transactionManager) {
@@ -36,10 +46,12 @@ class DefaultPersistor implements Persistor {
   @Override
   public void save(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
     Utils.validate(entry);
+    var writer = new StringWriter();
+    serializer.serializeInvocation(entry.getInvocation(), writer);
     PreparedStatement stmt =
         tx.prepareBatchStatement("INSERT INTO TXNO_OUTBOX VALUES (?, ?, ?, ?, ?, ?)");
     stmt.setString(1, entry.getId());
-    stmt.setString(2, serializer.serialize(entry.getInvocation()));
+    stmt.setString(2, writer.toString());
     stmt.setTimestamp(3, Timestamp.valueOf(entry.getNextAttemptTime()));
     stmt.setInt(4, entry.getAttempts());
     stmt.setBoolean(5, entry.isBlacklisted());
@@ -104,6 +116,16 @@ class DefaultPersistor implements Persistor {
   }
 
   @Override
+  public boolean whitelist(Transaction tx, String entryId) throws Exception {
+    PreparedStatement stmt =
+        tx.prepareBatchStatement("UPDATE TXNO_OUTBOX SET attempts = 0, blacklisted = false "
+            + "WHERE blacklisted = true AND id = ?");
+    stmt.setString(1, entryId);
+    stmt.setQueryTimeout(5);
+    return stmt.executeUpdate() != 0;
+  }
+
+  @Override
   public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize) throws Exception {
     try (PreparedStatement stmt =
         tx.connection()
@@ -145,7 +167,7 @@ class DefaultPersistor implements Persistor {
       TransactionOutboxEntry entry =
           TransactionOutboxEntry.builder()
               .id(rs.getString("id"))
-              .invocation(serializer.deserialize(invocationStream))
+              .invocation(serializer.deserializeInvocation(invocationStream))
               .nextAttemptTime(rs.getTimestamp("nextAttemptTime").toLocalDateTime())
               .attempts(rs.getInt("attempts"))
               .blacklisted(rs.getBoolean("blacklisted"))

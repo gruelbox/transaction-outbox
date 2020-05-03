@@ -13,13 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import javax.validation.ClockProvider;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
@@ -29,13 +23,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
 
 /**
- * An implementation of the <a
- * href="https://microservices.io/patterns/data/transactional-outbox.html">Transactional Outbox</a>
- * pattern for Java. See <a href="https://github.com/gruelbox/transaction-outbox">README</a> for
- * usage instructions.
+ * An implementation of the <a href="https://microservices.io/patterns/data/transactional-outbox.html">Transactional
+ * Outbox</a> pattern for Java. See <a href="https://github.com/gruelbox/transaction-outbox">README</a>
+ * for usage instructions.
  */
 @Slf4j
 public class TransactionOutbox {
+
+  private static final int DEFAULT_FLUSH_BATCH_SIZE = 4096;
 
   @NotNull private final TransactionManager transactionManager;
 
@@ -48,7 +43,9 @@ public class TransactionOutbox {
    * cases. If re-implementing this interface, read the documentation on {@link Persistor}
    * carefully.
    */
-  @Valid @NotNull private final Persistor persistor;
+  @Valid
+  @NotNull
+  private final Persistor persistor;
 
   /**
    * Responsible for describing a class as a name and creating instances of that class at runtime
@@ -56,39 +53,20 @@ public class TransactionOutbox {
    *
    * <p>Defaults to {@link Instantiator#usingReflection()}.
    */
-  @Valid @NotNull private final Instantiator instantiator;
+  @Valid
+  @NotNull
+  private final Instantiator instantiator;
 
   /**
-   * The executor used for scheduling background work.
+   * Used for scheduling background work.
    *
-   * <p>Note that there are some important aspects that should be considered in the configuration of
-   * this executor:
+   * <p>If no submitter is specified, {@link TransactionOutbox} will use {@link
+   * Submitter#withDefaultExecutor()}.</p>
    *
-   * <ul>
-   *   <li>Should use a BOUNDED blocking queue implementation such as {@link ArrayBlockingQueue},
-   *       otherwise under high volume, the queue may get so large it causes out-of-memory errors.
-   *   <li>Should use a {@link java.util.concurrent.RejectedExecutionHandler} which either throws
-   *       (such as {@link java.util.concurrent.ThreadPoolExecutor.AbortPolicy}), silently fails
-   *       (such as {@link java.util.concurrent.ThreadPoolExecutor.DiscardPolicy}) or blocks the
-   *       calling thread until a thread is available. It should <strong>not</strong> execute the
-   *       work in the calling thread (e.g. {@link
-   *       java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy}, since this could result in
-   *       unpredictable effects with tasks assuming they will be run in a different thread context
-   *       corrupting thread state. Generally, throwing or silently failing are preferred since this
-   *       allows the database to absorb all backpressure, but if you have a strong reason to choose
-   *       a blocking policy to enforce upstream backpressure, be aware that {@link #flush()} can
-   *       potentially block for a long period of time too, so design any background processing
-   *       which calls it accordingly (e.g. avoid calling from a timed scheduled job; perhaps
-   *       instead simply loop it).
-   *   <li>The queue can afford to be quite large in most realistic production deployments, and it
-   *       is advised that it be so (10000+).
-   * </ul>
-   *
-   * <p>If no executor service is specified, {@link TransactionOutbox} will use its own local {@link
-   * ExecutorService}, sized to match {@link ForkJoinPool#commonPool()} (or one thread, whichever is
-   * the larger), with a maximum queue size of 16384 before work is discarded.
+   * <p>See {@link Submitter#withExecutor(Executor)} for more information on designing bespoke
+   * submitters for remoting.</p>
    */
-  @NotNull private final Executor executor;
+  @NotNull private final Submitter submitter;
 
   /**
    * How often tasks should be re-attempted. This should be balanced with {@link #flushBatchSize}
@@ -98,7 +76,9 @@ public class TransactionOutbox {
    */
   @NotNull private final Duration attemptFrequency;
 
-  /** After now many attempts a task should be blacklisted. Defaults to 5. */
+  /**
+   * After now many attempts a task should be blacklisted. Defaults to 5.
+   */
   @Min(1)
   private final int blacklistAfterAttempts;
 
@@ -118,14 +98,16 @@ public class TransactionOutbox {
    */
   @NotNull private final ClockProvider clockProvider;
 
-  /** Event listener for use in testing. */
+  /**
+   * Event listener for use in testing.
+   */
   @NotNull private final TransactionOutboxListener listener;
 
   @Builder
   private TransactionOutbox(
       TransactionManager transactionManager,
       Instantiator instantiator,
-      Executor executor,
+      Submitter submitter,
       Duration attemptFrequency,
       int blacklistAfterAttempts,
       int flushBatchSize,
@@ -135,21 +117,13 @@ public class TransactionOutbox {
     this.transactionManager = transactionManager;
     this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
     this.persistor = persistor;
-    this.executor =
-        Utils.firstNonNull(
-            executor,
-            () ->
-                new ThreadPoolExecutor(
-                    1,
-                    Math.min(1, ForkJoinPool.commonPool().getParallelism()),
-                    0L,
-                    TimeUnit.MILLISECONDS,
-                    new ArrayBlockingQueue<Runnable>(16384)));
+    this.submitter = Utils.firstNonNull(submitter, Submitter::withDefaultExecutor);
     this.attemptFrequency = Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
     this.blacklistAfterAttempts = blacklistAfterAttempts <= 1 ? 5 : blacklistAfterAttempts;
-    this.flushBatchSize = flushBatchSize <= 1 ? 4096 : flushBatchSize;
+    this.flushBatchSize = flushBatchSize <= 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
     this.clockProvider = Utils.firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
-    this.listener = Utils.firstNonNull(listener, () -> entry -> {});
+    this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {
+    });
     Utils.validate(this);
     this.persistor.migrate(transactionManager);
   }
@@ -169,12 +143,12 @@ public class TransactionOutbox {
    * <p>This will write a record to the database using the supplied {@link Persistor} and {@link
    * Instantiator}, using the current database transaction, which will get rolled back if the rest
    * of the transaction is, and thus never processed. However, if the transaction is committed, the
-   * real method will be called immediately afterwards using the supplied {@link #executor}. Should
+   * real method will be called immediately afterwards using the supplied {@link #submitter}. Should
    * that fail, the call will be reattempted whenever {@link #flush()} is called, provided at least
    * {@link #attemptFrequency} has passed since the time the task was last attempted.
    *
    * @param clazz The class to proxy.
-   * @param <T> The type to proxy.
+   * @param <T>   The type to proxy.
    * @return The proxy of {@code T}.
    */
   public <T> T schedule(Class<T> clazz) {
@@ -186,10 +160,10 @@ public class TransactionOutbox {
    * than {@link #attemptFrequency} ago and have been tried less than {@link
    * #blacklistAfterAttempts} times) and attempts to resubmit them.
    *
-   * <p>As long as {@link #executor} is non-blocking (i.e. uses a bounded queue with a {@link
+   * <p>As long as {@link #submitter} is non-blocking (e.g. uses a bounded queue with a {@link
    * java.util.concurrent.RejectedExecutionHandler} which throws such as {@link
    * java.util.concurrent.ThreadPoolExecutor.AbortPolicy}), this method will return quickly.
-   * However, if {@link #executor} uses a bounded queue with a blocking policy, this method could
+   * However, if {@link #submitter} uses a bounded queue with a blocking policy, this method could
    * block for a long time, depending on how long the scheduled work takes and how large {@link
    * #flushBatchSize} is.
    *
@@ -222,6 +196,25 @@ public class TransactionOutbox {
     return !batch.isEmpty();
   }
 
+  /**
+   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
+   * active transaction.
+   *
+   * @param entryId The entry id.
+   * @return True if the whitelisting request was successful. May return false if another thread
+   * whitelisted the entry first.
+   */
+  public boolean whitelist(String entryId) {
+    log.info("Whitelisting entry {}", entryId);
+    try {
+      return transactionManager.requireTransactionReturns(tx ->
+        persistor.whitelist(tx, entryId)
+      );
+    } catch (Exception e) {
+      throw (RuntimeException) Utils.uncheckAndThrow(e);
+    }
+  }
+
   private <T> T schedule(Method method, Object[] args) throws Exception {
     TransactionOutboxEntry entry = newEntry(method, args);
     transactionManager.requireTransaction(
@@ -234,51 +227,37 @@ public class TransactionOutbox {
   }
 
   private void submitNow(TransactionOutboxEntry entry) {
+    submitter.submit(entry, this::processNow);
+  }
+
+  /**
+   * Processes an entry immediately in the current thread. Intended for use in custom
+   * implementations of {@link Submitter} and should not generally otherwise be called.
+   * @param entry The entry.
+   */
+  public void processNow(TransactionOutboxEntry entry) {
     try {
-      executor.execute(
-          () -> {
-            try {
-              var success =
-                  transactionManager.inTransactionReturnsThrows(
-                      transaction -> {
-                        if (!persistor.lock(transaction, entry)) {
-                          return false;
-                        }
-                        log.info("Processing {}", entry.description());
-                        invoke(entry);
-                        persistor.delete(transaction, entry);
-                        return true;
-                      });
-              if (success) {
-                log.info("Processed {}", entry.description());
-                listener.success(entry);
-              } else {
-                log.debug("Skipped task {} - may be locked or already processed", entry.getId());
-              }
-            } catch (InvocationTargetException e) {
-              log.warn(
-                  "Temporarily failed to process {}: {}",
-                  entry.description(),
-                  entry.description(),
-                  e.getCause());
-              updateAttemptCount(entry);
-            } catch (Exception e) {
-              log.warn(
-                  "Temporarily failed to process {}: {}",
-                  entry.description(),
-                  entry.description(),
-                  e);
-              updateAttemptCount(entry);
-            }
-          });
-      log.debug("Submitted {} for immediate processing", entry.description());
-    } catch (RejectedExecutionException e) {
-      log.debug("Queued {} for processing when executor is available", entry.description());
+      var success =
+          transactionManager.inTransactionReturnsThrows(
+              transaction -> {
+                if (!persistor.lock(transaction, entry)) {
+                  return false;
+                }
+                log.info("Processing {}", entry.description());
+                invoke(entry);
+                persistor.delete(transaction, entry);
+                return true;
+              });
+      if (success) {
+        log.info("Processed {}", entry.description());
+        listener.success(entry);
+      } else {
+        log.debug("Skipped task {} - may be locked or already processed", entry.getId());
+      }
+    } catch (InvocationTargetException e) {
+      updateAttemptCount(entry, e.getCause());
     } catch (Exception e) {
-      log.warn(
-          "Failed to submit {} for execution. It will be re-attempted later.",
-          entry.description(),
-          e);
+      updateAttemptCount(entry, e);
     }
   }
 
@@ -312,7 +291,7 @@ public class TransactionOutbox {
                 args))
         .nextAttemptTime(
             LocalDateTime.ofInstant(
-                    clockProvider.getClock().instant(), clockProvider.getClock().getZone())
+                clockProvider.getClock().instant(), clockProvider.getClock().getZone())
                 .plus(attemptFrequency))
         .build();
   }
@@ -329,12 +308,22 @@ public class TransactionOutbox {
     }
   }
 
-  private void updateAttemptCount(TransactionOutboxEntry entry) {
+  private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
-      entry.setBlacklisted(entry.getAttempts() >= blacklistAfterAttempts);
+      var blacklisted = entry.getAttempts() >= blacklistAfterAttempts;
+      entry.setBlacklisted(blacklisted);
       entry.setNextAttemptTime(now().plus(attemptFrequency));
       transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));
+      if (blacklisted) {
+        log.error("Blacklisting failing process after {} attempts: {}",
+            entry.getAttempts(),
+            entry.description(),
+            cause);
+        listener.blacklisted(entry, cause);
+      } else {
+        log.warn("Temporarily failed to process: {}", entry.description(), cause);
+      }
     } catch (Exception e) {
       log.error(
           "Failed to update attempt count for {}. It may be retried more times than expected.",

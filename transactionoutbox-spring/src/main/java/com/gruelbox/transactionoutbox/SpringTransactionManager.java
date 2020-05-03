@@ -32,10 +32,9 @@ public class SpringTransactionManager implements TransactionManager {
   }
 
   @Override
-  @Transactional(propagation = Propagation.MANDATORY)
-  public <E extends Exception> void requireTransaction(ThrowingTransactionalWork<E> work)
-      throws E, NoTransactionActiveException {
-    work.doWork(transactionInstance);
+  public <T, E extends Exception> T requireTransactionReturns(
+      ThrowingTransactionalSupplier<T, E> work) throws E, NoTransactionActiveException {
+    return work.doWork(transactionInstance);
   }
 
   private final class SpringTransaction implements Transaction {

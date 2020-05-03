@@ -50,9 +50,9 @@ abstract class AbstractThreadLocalTransactionManager<TX extends ThreadLocalTrans
   }
 
   @Override
-  public final <E extends Exception> void requireTransaction(ThrowingTransactionalWork<E> work)
-      throws E {
-    work.doWork(peekTransaction().orElseThrow(NoTransactionActiveException::new));
+  public <T, E extends Exception> T requireTransactionReturns(
+      ThrowingTransactionalSupplier<T, E> work) throws E, NoTransactionActiveException {
+    return work.doWork(peekTransaction().orElseThrow(NoTransactionActiveException::new));
   }
 
   final TX pushTransaction(TX transaction) {
