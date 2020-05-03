@@ -40,6 +40,7 @@ public interface Submitter {
    *       is advised that it be so (10000+).
    * </ul>
    *
+   * @param executor The executor.
    * @return The submitter.
    */
   static Submitter withExecutor(Executor executor) {
@@ -81,7 +82,7 @@ public interface Submitter {
    *   this can get overwhelmed and direct multi-instance queuing can help balance the load
    *   at source. <strong>Note:</strong> it is recommended that the {@code invocation} property
    *   of the {@link TransactionOutboxEntry} be serialized using
-   *   {@link InvocationSerializer#}</li>
+   *   {@link InvocationSerializer#createDefaultJsonSerializer()}</li>
    *   <li>Pass the {@code entry} directly to the {@code localExecutor}. This will run the
    *   work immediately in the calling thread and is therefore generally not recommended;
    *   the calling thread will be either the thread calling

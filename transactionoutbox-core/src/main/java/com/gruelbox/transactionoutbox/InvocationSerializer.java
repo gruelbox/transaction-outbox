@@ -21,7 +21,7 @@ public interface InvocationSerializer {
    * JDK value types. Only the following are supported currently:
    *
    * <ul>
-   *   <li>{@link Invocation} itself</i>
+   *   <li>{@link Invocation} itself</li>
    *   <li>Primitive types such as {@code int} or {@code double} or the boxed equivalents
    *   <li>{@link String}
    *   <li>{@link java.util.Date}

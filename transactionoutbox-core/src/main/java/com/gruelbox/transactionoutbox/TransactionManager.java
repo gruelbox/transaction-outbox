@@ -140,6 +140,7 @@ public interface TransactionManager {
    * up to the implementation).
    *
    * @param work Code which must be called while the transaction is active.
+   * @param <T> The type returned.
    * @param <E> The exception type.
    * @throws E If any exception is thrown by {@link Runnable}.
    * @throws NoTransactionActiveException If a transaction is not currently active.

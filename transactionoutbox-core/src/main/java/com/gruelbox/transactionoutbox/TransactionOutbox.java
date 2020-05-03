@@ -197,10 +197,12 @@ public class TransactionOutbox {
   }
 
   /**
-   * Marks a blacklisted entry back to not blacklisted and resets the attempt count.
-   * Requires an active transaction.
+   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
+   * active transaction.
    *
    * @param entryId The entry id.
+   * @return True if the whitelisting request was successful. May return false if another thread
+   * whitelisted the entry first.
    */
   public boolean whitelist(String entryId) {
     log.info("Whitelisting entry {}", entryId);
