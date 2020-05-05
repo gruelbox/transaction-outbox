@@ -267,12 +267,18 @@ Work might be retried too many times and get "blacklisted". You should set up an
 TransactionOutbox.builder()
     ...
     .listener(new TransactionOutboxListener() {
-        ...
+        @Override
+        public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
+           // Spring example
+           applicationEventPublisher.publishEvent(new TransactionOutboxBlacklistEvent(entry.getId(), cause);
+        }
     })
     .build();
 ```
-To mark the work for reprocessing, pass the id (provided in the `TransactionOutboxListener` callback) to `TransactionOutbox.whitelist()`. Its failure count will be marked back down to zero and it will get reprocessed on the next call to `flush()`.
-
+To mark the work for reprocessing, just use `TransactionOutbox.whitelist()`. Its failure count will be marked back down to zero and it will get reprocessed on the next call to `flush()`:
+```
+transactionOutboxEntry.whitelist(entryId);
+```
 A good approach here is to use the `TransactionOutboxListener` callback to post an [interactive Slack message](https://api.slack.com/legacy/interactive-messages) - this can operate as both the alert and the "button" allowing a support engineer to submit the work for reprocessing.
 
 ## Configuration options
