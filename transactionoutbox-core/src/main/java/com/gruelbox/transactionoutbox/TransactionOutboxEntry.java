@@ -44,7 +44,11 @@ public class TransactionOutboxEntry {
                   invocation.getClassName(),
                   invocation.getMethodName(),
                   Arrays.stream(invocation.getArgs())
-                      .map(it -> it instanceof String ? ("\"" + it + "\"") : it.toString())
+                      .map(
+                          it ->
+                              it == null
+                                  ? "<null>"
+                                  : it instanceof String ? ("\"" + it + "\"") : it.toString())
                       .collect(joining(", ")),
                   id);
           this.description = description;
