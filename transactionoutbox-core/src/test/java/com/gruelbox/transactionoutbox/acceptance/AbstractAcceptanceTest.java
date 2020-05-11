@@ -40,7 +40,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.SneakyThrows;
@@ -182,8 +181,8 @@ abstract class AbstractAcceptanceTest {
             }
 
             @Override
-            public <T, E extends Exception> T requireTransactionReturns(ThrowingTransactionalSupplier<T, E> work)
-                throws E, NoTransactionActiveException {
+            public <T, E extends Exception> T requireTransactionReturns(
+                ThrowingTransactionalSupplier<T, E> work) throws E, NoTransactionActiveException {
               return work.doWork(transaction);
             }
           };
@@ -253,8 +252,8 @@ abstract class AbstractAcceptanceTest {
   }
 
   /**
-   * Runs a piece of work which will fail enough times to be blacklisted but will then pass
-   * when re-whitelisted.
+   * Runs a piece of work which will fail enough times to be blacklisted but will then pass when
+   * re-whitelisted.
    */
   @Test
   final void blacklistAndWhitelist() throws Exception {
@@ -281,7 +280,9 @@ abstract class AbstractAcceptanceTest {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
           assertTrue(blacklistLatch.await(3, TimeUnit.SECONDS));
-          assertTrue(transactionManager.inTransactionReturns(tx -> outbox.whitelist(latchListener.getBlacklisted().getId())));
+          assertTrue(
+              transactionManager.inTransactionReturns(
+                  tx -> outbox.whitelist(latchListener.getBlacklisted().getId())));
           assertTrue(successLatch.await(3, TimeUnit.SECONDS));
         });
   }
@@ -304,16 +305,17 @@ abstract class AbstractAcceptanceTest {
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
             .flushBatchSize(1000)
-            .listener(new TransactionOutboxListener() {
-              @Override
-              public void success(TransactionOutboxEntry entry) {
-                Integer i = (Integer) entry.getInvocation().getArgs()[0];
-                if (results.putIfAbsent(i, i) != null) {
-                  duplicates.put(i, i);
-                }
-                latch.countDown();
-              }
-            })
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    Integer i = (Integer) entry.getInvocation().getArgs()[0];
+                    if (results.putIfAbsent(i, i) != null) {
+                      duplicates.put(i, i);
+                    }
+                    latch.countDown();
+                  }
+                })
             .build();
 
     withRunningFlusher(
@@ -439,8 +441,7 @@ abstract class AbstractAcceptanceTest {
     private final CountDownLatch successLatch;
     private final CountDownLatch blacklistLatch;
 
-    @Getter
-    private volatile TransactionOutboxEntry blacklisted;
+    @Getter private volatile TransactionOutboxEntry blacklisted;
 
     LatchListener(CountDownLatch successLatch, CountDownLatch blacklistLatch) {
       this.successLatch = successLatch;
@@ -467,7 +468,7 @@ abstract class AbstractAcceptanceTest {
   @Value
   @Accessors(fluent = true)
   @Builder
-  static final class ConnectionDetails {
+  static class ConnectionDetails {
     String driverClassName;
     String url;
     String user;

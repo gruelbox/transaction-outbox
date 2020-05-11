@@ -16,8 +16,10 @@ import lombok.Builder;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
-/** The default {@link Persistor} for {@link TransactionOutbox}. Most methods
- * are open for extension, or you can modify various options through the builder. */
+/**
+ * The default {@link Persistor} for {@link TransactionOutbox}. Most methods are open for extension,
+ * or you can modify various options through the builder.
+ */
 @Slf4j
 @SuperBuilder
 public class DefaultPersistor implements Persistor {
@@ -26,9 +28,7 @@ public class DefaultPersistor implements Persistor {
       // language=MySQL
       "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM TXNO_OUTBOX";
 
-  /**
-   * The database dialect to use. Required.
-   */
+  /** The database dialect to use. Required. */
   @NotNull private final Dialect dialect;
 
   /**
@@ -36,7 +36,8 @@ public class DefaultPersistor implements Persistor {
    * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer()}.
    */
   @Builder.Default
-  private final InvocationSerializer serializer = InvocationSerializer.createDefaultJsonSerializer();
+  private final InvocationSerializer serializer =
+      InvocationSerializer.createDefaultJsonSerializer();
 
   @Override
   public void migrate(TransactionManager transactionManager) {
@@ -118,8 +119,9 @@ public class DefaultPersistor implements Persistor {
   @Override
   public boolean whitelist(Transaction tx, String entryId) throws Exception {
     PreparedStatement stmt =
-        tx.prepareBatchStatement("UPDATE TXNO_OUTBOX SET attempts = 0, blacklisted = false "
-            + "WHERE blacklisted = true AND id = ?");
+        tx.prepareBatchStatement(
+            "UPDATE TXNO_OUTBOX SET attempts = 0, blacklisted = false "
+                + "WHERE blacklisted = true AND id = ?");
     stmt.setString(1, entryId);
     stmt.setQueryTimeout(5);
     return stmt.executeUpdate() != 0;

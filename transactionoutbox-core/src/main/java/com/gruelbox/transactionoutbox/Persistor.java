@@ -9,9 +9,8 @@ import java.util.List;
 public interface Persistor {
 
   /**
-   * Uses the default relational persistor. Shortcut for:
-   *
-   * <code>DefaultPersistor.builder().dialect(dialect).build();</code>
+   * Uses the default relational persistor. Shortcut for: <code>
+   * DefaultPersistor.builder().dialect(dialect).build();</code>
    *
    * @param dialect The database dialect.
    * @return The persistor.

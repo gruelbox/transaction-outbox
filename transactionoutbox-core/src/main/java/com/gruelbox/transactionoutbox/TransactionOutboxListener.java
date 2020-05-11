@@ -22,6 +22,20 @@ public interface TransactionOutboxListener {
   }
 
   /**
+   * Fired when a transaction outbox task fails. This may occur multiple times until the maximum
+   * number of retries, at which point this will be fired <em>and then</em> {@link
+   * #blacklisted(TransactionOutboxEntry, Throwable)}. This event is not guaranteed to fire in the
+   * event of a JVM failure or power loss. It is fired <em>after</em> the commit to the database
+   * marking the task as failed.
+   *
+   * @param entry The outbox entry failed.
+   * @param cause The cause of the most recent failure.
+   */
+  default void failure(TransactionOutboxEntry entry, Throwable cause) {
+    // No-op
+  }
+
+  /**
    * Fired when a transaction outbox task has passed the maximum number of retries and has been
    * blacklisted. This event is not guaranteed to fire in the event of a JVM failure or power loss.
    * It is fired <em>after</em> the commit to the database marking the task as blacklisted.

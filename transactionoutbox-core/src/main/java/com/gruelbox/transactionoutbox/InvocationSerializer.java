@@ -5,8 +5,8 @@ import java.io.Writer;
 
 /**
  * {@link Invocation} objects are inherently difficult to serialize safely since they are
- * unpredictably polymorphic. Allowing them to contain <em>any</em> type reference opens you
- * up to a host of code injection attacks. At the same time, allowing possibly-unstable types into
+ * unpredictably polymorphic. Allowing them to contain <em>any</em> type reference opens you up to a
+ * host of code injection attacks. At the same time, allowing possibly-unstable types into
  * serialized {@link Invocation}s can result in compatibility issues, with still unprocessed entries
  * in the database containing older versions of your classes. To avoid this, it makes sense to
  * whitelist the types supported and restrict this whitelist to known-stable types such as
@@ -17,11 +17,11 @@ import java.io.Writer;
 public interface InvocationSerializer {
 
   /**
-   * Creates a locked-down serializer which supports a limited list of primitives and simple
-   * JDK value types. Only the following are supported currently:
+   * Creates a locked-down serializer which supports a limited list of primitives and simple JDK
+   * value types. Only the following are supported currently:
    *
    * <ul>
-   *   <li>{@link Invocation} itself</li>
+   *   <li>{@link Invocation} itself
    *   <li>Primitive types such as {@code int} or {@code double} or the boxed equivalents
    *   <li>{@link String}
    *   <li>{@link java.util.Date}
@@ -65,5 +65,4 @@ public interface InvocationSerializer {
    * @return The deserialized invocation.
    */
   Invocation deserializeInvocation(Reader reader);
-
 }

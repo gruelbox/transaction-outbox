@@ -21,11 +21,13 @@ import javax.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
+import org.slf4j.event.Level;
 
 /**
- * An implementation of the <a href="https://microservices.io/patterns/data/transactional-outbox.html">Transactional
- * Outbox</a> pattern for Java. See <a href="https://github.com/gruelbox/transaction-outbox">README</a>
- * for usage instructions.
+ * An implementation of the <a
+ * href="https://microservices.io/patterns/data/transactional-outbox.html">Transactional Outbox</a>
+ * pattern for Java. See <a href="https://github.com/gruelbox/transaction-outbox">README</a> for
+ * usage instructions.
  */
 @Slf4j
 public class TransactionOutbox {
@@ -43,9 +45,7 @@ public class TransactionOutbox {
    * cases. If re-implementing this interface, read the documentation on {@link Persistor}
    * carefully.
    */
-  @Valid
-  @NotNull
-  private final Persistor persistor;
+  @Valid @NotNull private final Persistor persistor;
 
   /**
    * Responsible for describing a class as a name and creating instances of that class at runtime
@@ -53,18 +53,16 @@ public class TransactionOutbox {
    *
    * <p>Defaults to {@link Instantiator#usingReflection()}.
    */
-  @Valid
-  @NotNull
-  private final Instantiator instantiator;
+  @Valid @NotNull private final Instantiator instantiator;
 
   /**
    * Used for scheduling background work.
    *
    * <p>If no submitter is specified, {@link TransactionOutbox} will use {@link
-   * Submitter#withDefaultExecutor()}.</p>
+   * Submitter#withDefaultExecutor()}.
    *
    * <p>See {@link Submitter#withExecutor(Executor)} for more information on designing bespoke
-   * submitters for remoting.</p>
+   * submitters for remoting.
    */
   @NotNull private final Submitter submitter;
 
@@ -77,8 +75,13 @@ public class TransactionOutbox {
   @NotNull private final Duration attemptFrequency;
 
   /**
-   * After now many attempts a task should be blacklisted. Defaults to 5.
+   * The log level to use when logging temporary task failures. Includes a full stack trace.
+   * Defaults to {@code WARN} level, but you may wish to reduce it to a lower level if you consider
+   * warnings to be incidents.
    */
+  @NotNull private final Level logLevelTemporaryFailure;
+
+  /** After now many attempts a task should be blacklisted. Defaults to 5. */
   @Min(1)
   private final int blacklistAfterAttempts;
 
@@ -98,9 +101,7 @@ public class TransactionOutbox {
    */
   @NotNull private final ClockProvider clockProvider;
 
-  /**
-   * Event listener for use in testing.
-   */
+  /** Event listener for use in testing. */
   @NotNull private final TransactionOutboxListener listener;
 
   @Builder
@@ -113,7 +114,8 @@ public class TransactionOutbox {
       int flushBatchSize,
       ClockProvider clockProvider,
       TransactionOutboxListener listener,
-      Persistor persistor) {
+      Persistor persistor,
+      Level logLevelTemporaryFailure) {
     this.transactionManager = transactionManager;
     this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
     this.persistor = persistor;
@@ -122,8 +124,8 @@ public class TransactionOutbox {
     this.blacklistAfterAttempts = blacklistAfterAttempts <= 1 ? 5 : blacklistAfterAttempts;
     this.flushBatchSize = flushBatchSize <= 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
     this.clockProvider = Utils.firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
-    this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {
-    });
+    this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {});
+    this.logLevelTemporaryFailure = Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
     Utils.validate(this);
     this.persistor.migrate(transactionManager);
   }
@@ -148,7 +150,7 @@ public class TransactionOutbox {
    * {@link #attemptFrequency} has passed since the time the task was last attempted.
    *
    * @param clazz The class to proxy.
-   * @param <T>   The type to proxy.
+   * @param <T> The type to proxy.
    * @return The proxy of {@code T}.
    */
   public <T> T schedule(Class<T> clazz) {
@@ -202,14 +204,12 @@ public class TransactionOutbox {
    *
    * @param entryId The entry id.
    * @return True if the whitelisting request was successful. May return false if another thread
-   * whitelisted the entry first.
+   *     whitelisted the entry first.
    */
   public boolean whitelist(String entryId) {
     log.info("Whitelisting entry {}", entryId);
     try {
-      return transactionManager.requireTransactionReturns(tx ->
-        persistor.whitelist(tx, entryId)
-      );
+      return transactionManager.requireTransactionReturns(tx -> persistor.whitelist(tx, entryId));
     } catch (Exception e) {
       throw (RuntimeException) Utils.uncheckAndThrow(e);
     }
@@ -233,6 +233,7 @@ public class TransactionOutbox {
   /**
    * Processes an entry immediately in the current thread. Intended for use in custom
    * implementations of {@link Submitter} and should not generally otherwise be called.
+   *
    * @param entry The entry.
    */
   public void processNow(TransactionOutboxEntry entry) {
@@ -291,7 +292,7 @@ public class TransactionOutbox {
                 args))
         .nextAttemptTime(
             LocalDateTime.ofInstant(
-                clockProvider.getClock().instant(), clockProvider.getClock().getZone())
+                    clockProvider.getClock().instant(), clockProvider.getClock().getZone())
                 .plus(attemptFrequency))
         .build();
   }
@@ -315,20 +316,49 @@ public class TransactionOutbox {
       entry.setBlacklisted(blacklisted);
       entry.setNextAttemptTime(now().plus(attemptFrequency));
       transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));
+      listener.failure(entry, cause);
       if (blacklisted) {
-        log.error("Blacklisting failing process after {} attempts: {}",
+        log.error(
+            "Blacklisting failing process after {} attempts: {}",
             entry.getAttempts(),
             entry.description(),
             cause);
         listener.blacklisted(entry, cause);
       } else {
-        log.warn("Temporarily failed to process: {}", entry.description(), cause);
+        logAtLevel(
+            logLevelTemporaryFailure,
+            "Temporarily failed to process: {}",
+            entry.description(),
+            cause);
       }
     } catch (Exception e) {
       log.error(
           "Failed to update attempt count for {}. It may be retried more times than expected.",
           entry.description(),
           e);
+    }
+  }
+
+  private void logAtLevel(Level level, String message, Object... args) {
+    switch (level) {
+      case ERROR:
+        log.error(message, args);
+        break;
+      case WARN:
+        log.warn(message, args);
+        break;
+      case INFO:
+        log.info(message, args);
+        break;
+      case DEBUG:
+        log.debug(message, args);
+        break;
+      case TRACE:
+        log.trace(message, args);
+        break;
+      default:
+        log.warn(message, args);
+        break;
     }
   }
 }
