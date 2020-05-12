@@ -12,6 +12,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class TestPostgres9 extends AbstractAcceptanceTest {
 
   @Container
+  @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
       (JdbcDatabaseContainer)
           new PostgreSQLContainer("postgres:9").withStartupTimeout(Duration.ofHours(1));

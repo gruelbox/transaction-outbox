@@ -7,6 +7,7 @@ import java.util.concurrent.Callable;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import javax.validation.Validation;
+import javax.validation.ValidationException;
 import javax.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.cglib.proxy.Enhancer;
@@ -14,17 +15,6 @@ import net.sf.cglib.proxy.MethodInterceptor;
 
 @Slf4j
 class Utils {
-
-  private static final Validator VALIDATOR =
-      Validation.buildDefaultValidatorFactory().getValidator();
-
-  static void validate(Object object) {
-    var validationErrors = VALIDATOR.validate(object);
-    if (!validationErrors.isEmpty()) {
-      throw new RuntimeException(
-          "Validation on " + object.toString() + " failed: " + validationErrors);
-    }
-  }
 
   @SuppressWarnings({"SameParameterValue", "WeakerAccess", "UnusedReturnValue"})
   static boolean safelyRun(String gerund, ThrowingRunnable runnable) {

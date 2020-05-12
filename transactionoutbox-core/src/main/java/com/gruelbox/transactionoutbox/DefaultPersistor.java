@@ -7,8 +7,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
+import java.sql.Statement;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import javax.validation.constraints.NotNull;
@@ -28,6 +29,9 @@ public class DefaultPersistor implements Persistor {
       // language=MySQL
       "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM TXNO_OUTBOX";
 
+  /** Only wait for 2 second before giving up on obtaining an entry lock. There's no point hanging around. */
+  private static final int LOCK_TIMEOUT_SECONDS = 2;
+
   /** The database dialect to use. Required. */
   @NotNull private final Dialect dialect;
 
@@ -46,14 +50,13 @@ public class DefaultPersistor implements Persistor {
 
   @Override
   public void save(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
-    Utils.validate(entry);
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
     PreparedStatement stmt =
         tx.prepareBatchStatement("INSERT INTO TXNO_OUTBOX VALUES (?, ?, ?, ?, ?, ?)");
     stmt.setString(1, entry.getId());
     stmt.setString(2, writer.toString());
-    stmt.setTimestamp(3, Timestamp.valueOf(entry.getNextAttemptTime()));
+    stmt.setTimestamp(3, Timestamp.from(entry.getNextAttemptTime()));
     stmt.setInt(4, entry.getAttempts());
     stmt.setBoolean(5, entry.isBlacklisted());
     stmt.setInt(6, entry.getVersion());
@@ -77,7 +80,6 @@ public class DefaultPersistor implements Persistor {
 
   @Override
   public void update(Transaction tx, TransactionOutboxEntry entry) throws Exception {
-    Utils.validate(entry);
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
@@ -85,7 +87,7 @@ public class DefaultPersistor implements Persistor {
                 "UPDATE TXNO_OUTBOX "
                     + "SET nextAttemptTime = ?, attempts = ?, blacklisted = ?, version = ? "
                     + "WHERE id = ? and version = ?")) {
-      stmt.setTimestamp(1, Timestamp.valueOf(entry.getNextAttemptTime()));
+      stmt.setTimestamp(1, Timestamp.from(entry.getNextAttemptTime()));
       stmt.setInt(2, entry.getAttempts());
       stmt.setBoolean(3, entry.isBlacklisted());
       stmt.setInt(4, entry.getVersion() + 1);
@@ -111,7 +113,7 @@ public class DefaultPersistor implements Persistor {
                     : "SELECT id FROM TXNO_OUTBOX WHERE id = ? AND version = ? FOR UPDATE")) {
       stmt.setString(1, entry.getId());
       stmt.setInt(2, entry.getVersion());
-      stmt.setQueryTimeout(5);
+      stmt.setQueryTimeout(LOCK_TIMEOUT_SECONDS);
       return gotRecord(entry, stmt);
     }
   }
@@ -123,18 +125,18 @@ public class DefaultPersistor implements Persistor {
             "UPDATE TXNO_OUTBOX SET attempts = 0, blacklisted = false "
                 + "WHERE blacklisted = true AND id = ?");
     stmt.setString(1, entryId);
-    stmt.setQueryTimeout(5);
+    stmt.setQueryTimeout(LOCK_TIMEOUT_SECONDS);
     return stmt.executeUpdate() != 0;
   }
 
   @Override
-  public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize) throws Exception {
+  public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now) throws Exception {
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
                 // language=MySQL
                 SELECT_ALL + " WHERE nextAttemptTime < ? AND blacklisted = false LIMIT ?")) {
-      stmt.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now()));
+      stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
       return gatherResults(batchSize, stmt);
     }
@@ -170,13 +172,20 @@ public class DefaultPersistor implements Persistor {
           TransactionOutboxEntry.builder()
               .id(rs.getString("id"))
               .invocation(serializer.deserializeInvocation(invocationStream))
-              .nextAttemptTime(rs.getTimestamp("nextAttemptTime").toLocalDateTime())
+              .nextAttemptTime(rs.getTimestamp("nextAttemptTime").toInstant())
               .attempts(rs.getInt("attempts"))
               .blacklisted(rs.getBoolean("blacklisted"))
               .version(rs.getInt("version"))
               .build();
       log.debug("Found {}", entry);
       return entry;
+    }
+  }
+
+  // For testing. Assumed low volume.
+  void clear(Transaction tx) throws SQLException {
+    try (Statement stmt = tx.connection().createStatement()) {
+      stmt.execute("DELETE FROM TXNO_OUTBOX");
     }
   }
 }

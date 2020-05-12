@@ -1,14 +1,12 @@
 package com.gruelbox.transactionoutbox;
 
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
-import static java.time.LocalDateTime.now;
 import static java.time.temporal.ChronoUnit.MINUTES;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -104,6 +102,8 @@ public class TransactionOutbox {
   /** Event listener for use in testing. */
   @NotNull private final TransactionOutboxListener listener;
 
+  private final Validator validator;
+
   @Builder
   private TransactionOutbox(
       TransactionManager transactionManager,
@@ -126,7 +126,8 @@ public class TransactionOutbox {
     this.clockProvider = Utils.firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
     this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {});
     this.logLevelTemporaryFailure = Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
-    Utils.validate(this);
+    this.validator = new Validator(this.clockProvider);
+    this.validator.validate(this);
     this.persistor.migrate(transactionManager);
   }
 
@@ -181,7 +182,7 @@ public class TransactionOutbox {
         transactionManager.inTransactionReturns(
             transaction -> {
               List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
-              uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize))
+              uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize, clockProvider.getClock().instant()))
                   .forEach(
                       entry -> {
                         log.debug("Reprocessing {}", entry.description());
@@ -194,7 +195,9 @@ public class TransactionOutbox {
                       });
               return result;
             });
+    log.info("Got batch of {}", batch.size());
     batch.forEach(this::submitNow);
+    log.info("Submitted batch");
     return !batch.isEmpty();
   }
 
@@ -217,6 +220,7 @@ public class TransactionOutbox {
 
   private <T> T schedule(Method method, Object[] args) throws Exception {
     TransactionOutboxEntry entry = newEntry(method, args);
+    validator.validate(entry);
     transactionManager.requireTransaction(
         transaction -> {
           persistor.save(transaction, entry);
@@ -290,17 +294,15 @@ public class TransactionOutbox {
                 method.getName(),
                 method.getParameterTypes(),
                 args))
-        .nextAttemptTime(
-            LocalDateTime.ofInstant(
-                    clockProvider.getClock().instant(), clockProvider.getClock().getZone())
-                .plus(attemptFrequency))
+        .nextAttemptTime(clockProvider.getClock().instant().plus(attemptFrequency))
         .build();
   }
 
   private void pushBack(Transaction transaction, TransactionOutboxEntry entry)
       throws OptimisticLockException {
     try {
-      entry.setNextAttemptTime(now().plus(attemptFrequency));
+      entry.setNextAttemptTime(clockProvider.getClock().instant().plus(attemptFrequency));
+      validator.validate(entry);
       persistor.update(transaction, entry);
     } catch (OptimisticLockException e) {
       throw e;
@@ -314,7 +316,8 @@ public class TransactionOutbox {
       entry.setAttempts(entry.getAttempts() + 1);
       var blacklisted = entry.getAttempts() >= blacklistAfterAttempts;
       entry.setBlacklisted(blacklisted);
-      entry.setNextAttemptTime(now().plus(attemptFrequency));
+      entry.setNextAttemptTime(clockProvider.getClock().instant().plus(attemptFrequency));
+      validator.validate(entry);
       transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));
       listener.failure(entry, cause);
       if (blacklisted) {

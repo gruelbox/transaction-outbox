@@ -12,6 +12,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class TestMySql5 extends AbstractAcceptanceTest {
 
   @Container
+  @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
       new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1));
 

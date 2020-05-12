@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import static java.util.stream.Collectors.joining;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import javax.validation.constraints.Future;
@@ -14,7 +15,7 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 @SuppressWarnings("WeakerAccess")
-@SuperBuilder
+@SuperBuilder(toBuilder = true)
 @EqualsAndHashCode
 @ToString
 public class TransactionOutboxEntry {
@@ -23,7 +24,7 @@ public class TransactionOutboxEntry {
 
   @NotNull @Getter private final Invocation invocation;
 
-  @Future @Getter @Setter private LocalDateTime nextAttemptTime;
+  @Future @Getter @Setter private Instant nextAttemptTime;
 
   @PositiveOrZero @Getter @Setter private int attempts;
 
@@ -31,7 +32,12 @@ public class TransactionOutboxEntry {
 
   @PositiveOrZero @Getter @Setter private int version;
 
+  @EqualsAndHashCode.Exclude
+  @ToString.Exclude
   private volatile boolean initialized;
+
+  @EqualsAndHashCode.Exclude
+  @ToString.Exclude
   private String description;
 
   public String description() {
