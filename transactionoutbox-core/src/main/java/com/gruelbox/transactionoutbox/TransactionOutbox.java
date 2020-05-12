@@ -196,9 +196,9 @@ public class TransactionOutbox {
                       });
               return result;
             });
-    log.info("Got batch of {}", batch.size());
+    log.debug("Got batch of {}", batch.size());
     batch.forEach(this::submitNow);
-    log.info("Submitted batch");
+    log.debug("Submitted batch");
     return !batch.isEmpty();
   }
 
