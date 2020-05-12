@@ -19,6 +19,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.ParsePosition;
 import java.time.DayOfWeek;
@@ -93,6 +94,7 @@ class DefaultInvocationSerializer implements InvocationSerializer {
       addClassPair(Boolean.class, "Boolean");
       addClassPair(Character.class, "Character");
 
+      addClassPair(BigDecimal.class, "BigDecimal");
       addClassPair(String.class, "String");
       addClassPair(Date.class, "Date");
 
