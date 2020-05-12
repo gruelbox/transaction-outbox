@@ -25,7 +25,7 @@ class DefaultMigrationManager {
               "CREATE TABLE TXNO_OUTBOX (\n"
                   + "    id VARCHAR(36) PRIMARY KEY,\n"
                   + "    invocation TEXT,\n"
-                  + "    nextAttemptTime TIMESTAMP,\n"
+                  + "    nextAttemptTime TIMESTAMP(6),\n"
                   + "    attempts INT,\n"
                   + "    blacklisted BOOLEAN,\n"
                   + "    version INT\n"
