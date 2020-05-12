@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import static com.gruelbox.transactionoutbox.Utils.logAtLevel;
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 import static java.time.temporal.ChronoUnit.MINUTES;
 
@@ -329,6 +330,7 @@ public class TransactionOutbox {
         listener.blacklisted(entry, cause);
       } else {
         logAtLevel(
+            log,
             logLevelTemporaryFailure,
             "Temporarily failed to process: {}",
             entry.description(),
@@ -339,29 +341,6 @@ public class TransactionOutbox {
           "Failed to update attempt count for {}. It may be retried more times than expected.",
           entry.description(),
           e);
-    }
-  }
-
-  private void logAtLevel(Level level, String message, Object... args) {
-    switch (level) {
-      case ERROR:
-        log.error(message, args);
-        break;
-      case WARN:
-        log.warn(message, args);
-        break;
-      case INFO:
-        log.info(message, args);
-        break;
-      case DEBUG:
-        log.debug(message, args);
-        break;
-      case TRACE:
-        log.trace(message, args);
-        break;
-      default:
-        log.warn(message, args);
-        break;
     }
   }
 }

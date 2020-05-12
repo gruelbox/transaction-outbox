@@ -12,6 +12,8 @@ import javax.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
+import org.slf4j.Logger;
+import org.slf4j.event.Level;
 
 @Slf4j
 class Utils {
@@ -86,5 +88,28 @@ class Utils {
   static <T> T firstNonNull(T one, Supplier<T> two) {
     if (one == null) return two.get();
     return one;
+  }
+
+  static void logAtLevel(Logger logger, Level level, String message, Object... args) {
+    switch (level) {
+      case ERROR:
+        logger.error(message, args);
+        break;
+      case WARN:
+        logger.warn(message, args);
+        break;
+      case INFO:
+        logger.info(message, args);
+        break;
+      case DEBUG:
+        logger.debug(message, args);
+        break;
+      case TRACE:
+        logger.trace(message, args);
+        break;
+      default:
+        logger.warn(message, args);
+        break;
+    }
   }
 }
