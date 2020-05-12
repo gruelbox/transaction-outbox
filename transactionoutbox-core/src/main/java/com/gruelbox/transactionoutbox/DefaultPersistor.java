@@ -13,6 +13,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import javax.validation.constraints.NotNull;
+
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @SuperBuilder
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class DefaultPersistor implements Persistor {
 
   private static final String SELECT_ALL =

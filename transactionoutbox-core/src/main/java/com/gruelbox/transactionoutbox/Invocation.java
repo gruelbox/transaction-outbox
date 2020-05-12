@@ -13,19 +13,19 @@ public class Invocation {
 
   /** The class name (as provided/expected by an {@link Instantiator}). */
   @SerializedName("c")
-  private final String className;
+  String className;
 
   /** The method name. Combined with {@link #parameterTypes}, uniquely identifies the method. */
   @SerializedName("m")
-  private final String methodName;
+  String methodName;
 
   /**
    * The method parameter types. Combined with {@link #methodName}, uniquely identifies the method.
    */
   @SerializedName("p")
-  private final Class<?>[] parameterTypes;
+  Class<?>[] parameterTypes;
 
   /** The arguments to call. Must match {@link #parameterTypes}. */
   @SerializedName("a")
-  private final Object[] args;
+  Object[] args;
 }

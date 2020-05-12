@@ -46,15 +46,11 @@ public class TransactionOutboxEntry {
         if (!this.initialized) {
           String description =
               String.format(
-                  "%s#%s(%s) [%s]",
+                  "%s.%s(%s) [%s]",
                   invocation.getClassName(),
                   invocation.getMethodName(),
                   Arrays.stream(invocation.getArgs())
-                      .map(
-                          it ->
-                              it == null
-                                  ? "<null>"
-                                  : it instanceof String ? ("\"" + it + "\"") : it.toString())
+                      .map(this::stringify)
                       .collect(joining(", ")),
                   id);
           this.description = description;
@@ -64,5 +60,20 @@ public class TransactionOutboxEntry {
       }
     }
     return this.description;
+  }
+
+  private String stringify(Object o) {
+    if (o == null) {
+      return "null";
+    }
+    if (o.getClass().isArray()) {
+      return "[" + Arrays.stream((Object[]) o)
+          .map(this::stringify)
+          .collect(joining(", ")) + "]";
+    }
+    if (o instanceof String) {
+      return "\"" + o + "\"";
+    }
+    return o.toString();
   }
 }
