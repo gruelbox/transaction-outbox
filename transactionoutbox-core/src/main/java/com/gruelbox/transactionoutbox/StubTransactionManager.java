@@ -5,7 +5,6 @@ import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -14,10 +13,10 @@ import java.util.stream.Collectors;
  */
 @SuperBuilder
 @Slf4j
-public final class StubTransactionManager
+public class StubTransactionManager
     extends AbstractThreadLocalTransactionManager<ThreadLocalTransaction> {
 
-  StubTransactionManager() {}
+  protected StubTransactionManager() {}
 
   @Override
   public <T, E extends Exception> T inTransactionReturnsThrows(
