@@ -11,7 +11,7 @@ import java.util.Set;
  * serialized {@link Invocation}s can result in compatibility issues, with still unprocessed entries
  * in the database containing older versions of your classes. To avoid this, it makes sense to
  * whitelist the types supported and restrict this whitelist to known-stable types such as
- * primitives and common JDK value types. {@link #createDefaultJsonSerializer(Set)} provides exactly
+ * primitives and common JDK value types. {@link #createDefaultJsonSerializer()} provides exactly
  * this and is used by default. However, if you want to extend this list or use a different
  * serialization format, you can create your own implementation here, at your own risk.
  */
@@ -19,39 +19,12 @@ public interface InvocationSerializer {
 
   /**
    * Creates a locked-down serializer which supports a limited list of primitives and simple JDK
-   * value types. Only the following are supported:
+   * value types. Shortcut to {@link DefaultInvocationSerializer#builder()}.
    *
-   * <ul>
-   *   <li>{@link Invocation} itself
-   *   <li>Primitive types such as {@code int} or {@code double} or the boxed equivalents
-   *   <li>{@link String}
-   *   <li>{@link java.util.Date}
-   *   <li>The {@code java.time} classes:
-   *       <ul>
-   *         <li>{@link java.time.DayOfWeek}
-   *         <li>{@link java.time.Duration}
-   *         <li>{@link java.time.Instant}
-   *         <li>{@link java.time.LocalDate}
-   *         <li>{@link java.time.LocalDateTime}
-   *         <li>{@link java.time.Month}
-   *         <li>{@link java.time.MonthDay}
-   *         <li>{@link java.time.Period}
-   *         <li>{@link java.time.Year}
-   *         <li>{@link java.time.YearMonth}
-   *         <li>{@link java.time.ZoneOffset}
-   *         <li>{@link java.time.DayOfWeek}
-   *         <li>{@link java.time.temporal.ChronoUnit}
-   *       </ul>
-   *   <li>Arrays specifically typed to one of the above types
-   *   <li>Any types specifically passed in, which must be GSON compatible.
-   * </ul>
-   *
-   * @param whitelistedTypes Any GSON-annotated classes or enums which should be permitted in
-   *                         serialized or deserialized content.
    * @return The serializer.
    */
-  static InvocationSerializer createDefaultJsonSerializer(Set<Class<?>> whitelistedTypes) {
-    return DefaultInvocationSerializer.builder().whitelistedTypes(whitelistedTypes).build();
+  static InvocationSerializer createDefaultJsonSerializer() {
+    return DefaultInvocationSerializer.builder().build();
   }
 
   /**

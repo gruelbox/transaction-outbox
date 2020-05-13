@@ -42,12 +42,12 @@ public class DefaultPersistor implements Persistor {
 
   /**
    * The serializer to use for {@link Invocation}s. See {@link InvocationSerializer} for more
-   * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer(java.util.Set)}
+   * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer()}
    * with no whitelisted classes..
    */
   @Builder.Default
   private final InvocationSerializer serializer =
-      InvocationSerializer.createDefaultJsonSerializer(Set.of());
+      InvocationSerializer.createDefaultJsonSerializer();
 
   @Override
   public void migrate(TransactionManager transactionManager) {

@@ -46,8 +46,37 @@ import java.util.TimeZone;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * A locked-down serializer which supports a limited list of primitives and simple JDK
+ * value types. Only the following are supported:
+ *
+ * <ul>
+ *   <li>{@link Invocation} itself
+ *   <li>Primitive types such as {@code int} or {@code double} or the boxed equivalents
+ *   <li>{@link String}
+ *   <li>{@link java.util.Date}
+ *   <li>The {@code java.time} classes:
+ *       <ul>
+ *         <li>{@link java.time.DayOfWeek}
+ *         <li>{@link java.time.Duration}
+ *         <li>{@link java.time.Instant}
+ *         <li>{@link java.time.LocalDate}
+ *         <li>{@link java.time.LocalDateTime}
+ *         <li>{@link java.time.Month}
+ *         <li>{@link java.time.MonthDay}
+ *         <li>{@link java.time.Period}
+ *         <li>{@link java.time.Year}
+ *         <li>{@link java.time.YearMonth}
+ *         <li>{@link java.time.ZoneOffset}
+ *         <li>{@link java.time.DayOfWeek}
+ *         <li>{@link java.time.temporal.ChronoUnit}
+ *       </ul>
+ *   <li>Arrays specifically typed to one of the above types
+ *   <li>Any types specifically passed in, which must be GSON compatible.
+ * </ul>
+ */
 @Slf4j
-class DefaultInvocationSerializer implements InvocationSerializer {
+public class DefaultInvocationSerializer implements InvocationSerializer {
 
   private final Gson gson;
 
