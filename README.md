@@ -14,7 +14,8 @@
 1. [Dependency Injection](#dependency-injection)
 1. [Ensuring work is processed eventually](#ensuring-work-is-processed-eventually)
 1. [Managing the "dead letter queue"](#managing-the-dead-letter-queue)
-1. [Configuration options](#configuration-options)
+1. [Configuration options](#configuration-options)]
+1. [Stubbing](#stubbing)
 
 ## What's this?
 
@@ -284,3 +285,23 @@ A good approach here is to use the `TransactionOutboxListener` callback to post 
 ## Configuration options
 
 TODO
+
+## Stubbing
+
+`TransactionOutbox` is not intended to be stubbed; the underlying logic is too onerous to stub out using a a mocking framework such as Mockito. Instead, stubs exist for the various arguments to the builder:
+```
+// This ensures that all the commit hooks are called at the right times, which is very hard to stub manually
+StubTransactionManager transactionManager = StubTransactionManager.builder().build();
+
+// Direct pass-through
+TransactionOutbox outbox = TransactionOutbox.builder()
+        .instantiator(Instantiator.using(clazz -> {
+            assertEquals(WhatIExpectToBeCalled.class, clazz);
+            return theObjectToBeCalled; // This can be a mock
+        }))
+        .persistor(StubPersistor.builder().build()) // Doesn't save anything
+        .submitter(Submitter.withExecutor(MoreExecutors.directExecutor())) // Execute all work in-line
+        .transactionManager(transactionManager)
+        .build();
+```
+Depending on the type of test, you may wish to use a real `Persistor` such as `DefaultPersistor` (if there's a real database available) or a real, multi-threaded `Submitter`. That's up to you.
