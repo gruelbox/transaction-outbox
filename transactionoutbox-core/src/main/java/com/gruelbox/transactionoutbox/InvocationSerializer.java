@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import java.io.Reader;
 import java.io.Writer;
+import java.util.Set;
 
 /**
  * {@link Invocation} objects are inherently difficult to serialize safely since they are
@@ -10,7 +11,7 @@ import java.io.Writer;
  * serialized {@link Invocation}s can result in compatibility issues, with still unprocessed entries
  * in the database containing older versions of your classes. To avoid this, it makes sense to
  * whitelist the types supported and restrict this whitelist to known-stable types such as
- * primitives and common JDK value types. {@link #createDefaultJsonSerializer()} provides exactly
+ * primitives and common JDK value types. {@link #createDefaultJsonSerializer(Set)} provides exactly
  * this and is used by default. However, if you want to extend this list or use a different
  * serialization format, you can create your own implementation here, at your own risk.
  */
@@ -18,7 +19,7 @@ public interface InvocationSerializer {
 
   /**
    * Creates a locked-down serializer which supports a limited list of primitives and simple JDK
-   * value types. Only the following are supported currently:
+   * value types. Only the following are supported:
    *
    * <ul>
    *   <li>{@link Invocation} itself
@@ -41,13 +42,16 @@ public interface InvocationSerializer {
    *         <li>{@link java.time.DayOfWeek}
    *         <li>{@link java.time.temporal.ChronoUnit}
    *       </ul>
-   *   <li>Arrays specifically typed to one of the above types.
+   *   <li>Arrays specifically typed to one of the above types
+   *   <li>Any types specifically passed in, which must be GSON compatible.
    * </ul>
    *
+   * @param whitelistedTypes Any GSON-annotated classes or enums which should be permitted in
+   *                         serialized or deserialized content.
    * @return The serializer.
    */
-  static InvocationSerializer createDefaultJsonSerializer() {
-    return new DefaultInvocationSerializer();
+  static InvocationSerializer createDefaultJsonSerializer(Set<Class<?>> whitelistedTypes) {
+    return DefaultInvocationSerializer.builder().whitelistedTypes(whitelistedTypes).build();
   }
 
   /**

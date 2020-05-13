@@ -14,16 +14,24 @@ import java.time.Year;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.Objects;
+import java.util.Set;
+
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 @SuppressWarnings("RedundantCast")
+@Slf4j
 class TestDefaultInvocationSerializer {
 
   private static final String CLASS_NAME = "foo";
   private static final String METHOD_NAME = "bar";
 
-  private DefaultInvocationSerializer serializer = new DefaultInvocationSerializer();
+  private DefaultInvocationSerializer serializer = DefaultInvocationSerializer.builder()
+      .whitelistedTypes(Set.of(ExampleCustomEnum.class, ExampleCustomClass.class))
+      .build();
 
   @Test
   void testNoArgs() {
@@ -134,6 +142,20 @@ class TestDefaultInvocationSerializer {
     check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
   }
 
+  @Test
+  void testCustomEnum() {
+    Class<?>[] primitives = {ExampleCustomEnum.class, ExampleCustomEnum.class};
+    Object[] values = {ExampleCustomEnum.ONE, ExampleCustomEnum.TWO};
+    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+  }
+
+  @Test
+  void testCustomComplexClass() {
+    Class<?>[] primitives = {ExampleCustomClass.class, ExampleCustomClass.class};
+    Object[] values = {new ExampleCustomClass("Foo", "Bar"), new ExampleCustomClass("Bish", "Bash")};
+    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+  }
+
   void check(Invocation invocation) {
     Invocation deserialized = serdeser(invocation);
     Assertions.assertEquals(deserialized, serdeser(invocation));
@@ -143,6 +165,53 @@ class TestDefaultInvocationSerializer {
   Invocation serdeser(Invocation invocation) {
     var writer = new StringWriter();
     serializer.serializeInvocation(invocation, writer);
+    log.info("Serialised as: {}", writer.toString());
     return serializer.deserializeInvocation(new StringReader(writer.toString()));
   }
+
+  enum ExampleCustomEnum {
+    ONE, TWO
+  }
+
+  static class ExampleCustomClass {
+
+    private final String arg1;
+    private final String arg2;
+
+    ExampleCustomClass(String arg1, String arg2) {
+      this.arg1 = arg1;
+      this.arg2 = arg2;
+    }
+
+    public String getArg1() {
+      return arg1;
+    }
+
+    public String getArg2() {
+      return arg2;
+    }
+
+    @Override
+    public String toString() {
+      return "ExampleCustomClass{" +
+          "arg1='" + arg1 + '\'' +
+          ", arg2='" + arg2 + '\'' +
+          '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      ExampleCustomClass that = (ExampleCustomClass) o;
+      return Objects.equals(arg1, that.arg1) &&
+          Objects.equals(arg2, that.arg2);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(arg1, arg2);
+    }
+  }
+
 }

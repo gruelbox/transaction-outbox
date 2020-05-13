@@ -40,7 +40,10 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
+
+import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -48,10 +51,11 @@ class DefaultInvocationSerializer implements InvocationSerializer {
 
   private final Gson gson;
 
-  DefaultInvocationSerializer() {
+  @Builder
+  DefaultInvocationSerializer(Set<Class<?>> whitelistedTypes) {
     this.gson =
         new GsonBuilder()
-            .registerTypeAdapter(Invocation.class, new InvocationJsonSerializer())
+            .registerTypeAdapter(Invocation.class, new InvocationJsonSerializer(whitelistedTypes == null ? Set.of() : whitelistedTypes))
             .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
             .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
             .create();
@@ -73,7 +77,7 @@ class DefaultInvocationSerializer implements InvocationSerializer {
     private Map<Class<?>, String> classToName = new HashMap<>();
     private Map<String, Class<?>> nameToClass = new HashMap<>();
 
-    InvocationJsonSerializer() {
+    public InvocationJsonSerializer(Set<Class<?>> whitelistedClasses) {
       addClassPair(byte.class, "byte");
       addClassPair(short.class, "short");
       addClassPair(int.class, "int");
@@ -111,6 +115,8 @@ class DefaultInvocationSerializer implements InvocationSerializer {
       addClassPair(ZoneOffset.class, "ZoneOffset");
       addClassPair(DayOfWeek.class, "DayOfWeek");
       addClassPair(ChronoUnit.class, "ChronoUnit");
+
+      whitelistedClasses.forEach(clazz -> addClassPair(clazz, clazz.getName()));
     }
 
     private void addClassPair(Class<?> clazz, String name) {
@@ -148,9 +154,10 @@ class DefaultInvocationSerializer implements InvocationSerializer {
 
     private Class<?> toClass(ClassLoader classLoader, String name) {
       try {
-        return classLoader != null ? classLoader.loadClass(name) : Class.forName(name);
+        return classLoader != null ? Class.forName(name, false, classLoader) : Class.forName(name);
       } catch (ClassNotFoundException e) {
-        throw new RuntimeException(e);
+        throw new RuntimeException("Cannot determine array type for " + name + " using " +
+            (classLoader == null ? "root classloader" : "base classloader") , e);
       }
     }
 

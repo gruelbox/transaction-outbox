@@ -12,6 +12,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import javax.validation.constraints.NotNull;
 
 import lombok.AccessLevel;
@@ -41,11 +42,12 @@ public class DefaultPersistor implements Persistor {
 
   /**
    * The serializer to use for {@link Invocation}s. See {@link InvocationSerializer} for more
-   * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer()}.
+   * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer(java.util.Set)}
+   * with no whitelisted classes..
    */
   @Builder.Default
   private final InvocationSerializer serializer =
-      InvocationSerializer.createDefaultJsonSerializer();
+      InvocationSerializer.createDefaultJsonSerializer(Set.of());
 
   @Override
   public void migrate(TransactionManager transactionManager) {
