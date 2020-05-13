@@ -19,7 +19,7 @@ public interface InvocationSerializer {
 
   /**
    * Creates a locked-down serializer which supports a limited list of primitives and simple JDK
-   * value types. Shortcut to {@link DefaultInvocationSerializer#builder()}.
+   * value types. Shortcut to {@link DefaultInvocationSerializer}.
    *
    * @return The serializer.
    */
