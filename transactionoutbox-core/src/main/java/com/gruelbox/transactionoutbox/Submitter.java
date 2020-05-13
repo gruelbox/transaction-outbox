@@ -59,7 +59,7 @@ public interface Submitter {
    *       get overwhelmed and direct multi-instance queuing can help balance the load at source.
    *       <strong>Note:</strong> it is recommended that the {@code invocation} property of the
    *       {@link TransactionOutboxEntry} be serialized using {@link
-   *       InvocationSerializer#createDefaultJsonSerializer()}
+   *       InvocationSerializer#createDefaultJsonSerializer(java.util.Set)}
    *   <li>Pass the {@code entry} directly to the {@code localExecutor}. This will run the work
    *       immediately in the calling thread and is therefore generally not recommended; the calling
    *       thread will be either the thread calling {@link TransactionOutbox#schedule(Class)}
