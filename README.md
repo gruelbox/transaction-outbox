@@ -14,7 +14,7 @@
 1. [Dependency Injection](#dependency-injection)
 1. [Ensuring work is processed eventually](#ensuring-work-is-processed-eventually)
 1. [Managing the "dead letter queue"](#managing-the-dead-letter-queue)
-1. [Configuration options](#configuration-options)]
+1. [Configuration options](#configuration-options)
 1. [Stubbing](#stubbing)
 
 ## What's this?
