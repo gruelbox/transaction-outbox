@@ -46,4 +46,34 @@ public interface TransactionOutboxListener {
   default void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
     // No-op
   }
+
+  /**
+   * Chains this listener with another and returns the result.
+   *
+   * @param other The other listener. It will always be called after this one.
+   * @return The combined listener.
+   */
+  default TransactionOutboxListener andThen(TransactionOutboxListener other) {
+    var self = this;
+    return new TransactionOutboxListener() {
+
+      @Override
+      public void success(TransactionOutboxEntry entry) {
+        self.success(entry);
+        other.success(entry);
+      }
+
+      @Override
+      public void failure(TransactionOutboxEntry entry, Throwable cause) {
+        self.failure(entry, cause);
+        other.failure(entry, cause);
+      }
+
+      @Override
+      public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
+        self.blacklisted(entry, cause);
+        other.blacklisted(entry, cause);
+      }
+    };
+  }
 }

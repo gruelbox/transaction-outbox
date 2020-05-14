@@ -69,6 +69,7 @@ abstract class AbstractAcceptanceTest {
     TransactionManager transactionManager = simpleTxnManager();
 
     CountDownLatch latch = new CountDownLatch(1);
+    CountDownLatch chainedLatch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
@@ -78,7 +79,12 @@ abstract class AbstractAcceptanceTest {
                         (InterfaceProcessor)
                             (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
             .submitter(Submitter.withExecutor(unreliablePool))
-            .listener(new LatchListener(latch))
+            .listener(new LatchListener(latch).andThen(new TransactionOutboxListener() {
+              @Override
+              public void success(TransactionOutboxEntry entry) {
+                chainedLatch.countDown();
+              }
+            }))
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .build();
 
@@ -96,7 +102,9 @@ abstract class AbstractAcceptanceTest {
         });
 
     // Should be fired after commit
-    assertTrue(latch.await(2, TimeUnit.SECONDS));
+    assertTrue(chainedLatch.await(2, TimeUnit.SECONDS));
+    assertTrue(latch.await(1, TimeUnit.SECONDS));
+
   }
 
   /**
