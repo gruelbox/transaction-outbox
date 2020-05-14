@@ -145,7 +145,7 @@ DSLContext parentDsl(Configuration jooqConfig, JooqTransactionListener listener)
   DataSourceConnectionProvider connectionProvider = new DataSourceConnectionProvider(dataSource);
   jooqConfig.setConnectionProvider(connectionProvider);
   jooqConfig.setSQLDialect(SQLDialect.H2);
-  jooqConfig.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider));
+  jooqConfig.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider, true));
   jooqConfig.set(listener);
   return DSL.using(jooqConfig);
 }

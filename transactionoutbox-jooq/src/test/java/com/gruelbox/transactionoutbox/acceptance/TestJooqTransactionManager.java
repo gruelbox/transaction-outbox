@@ -1,7 +1,12 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
+import static com.gruelbox.transactionoutbox.acceptance.TestUtils.uncheck;
+import static java.util.concurrent.CompletableFuture.runAsync;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.gruelbox.transactionoutbox.Dialect;
@@ -18,9 +23,12 @@ import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -28,6 +36,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+
+import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.MatcherAssert;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
@@ -41,6 +51,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+@Slf4j
 class TestJooqTransactionManager {
 
   private final ExecutorService unreliablePool =
@@ -77,7 +88,7 @@ class TestJooqTransactionManager {
     DefaultConfiguration configuration = new DefaultConfiguration();
     configuration.setConnectionProvider(connectionProvider);
     configuration.setSQLDialect(SQLDialect.H2);
-    configuration.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider));
+    configuration.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider, true));
     JooqTransactionListener listener = JooqTransactionManager.createListener();
     configuration.set(listener);
     dsl = DSL.using(configuration);
@@ -107,25 +118,25 @@ class TestJooqTransactionManager {
           outbox.schedule(Worker.class).process(1);
           try {
             // Should not be fired until after commit
-            Assertions.assertFalse(latch.await(2, TimeUnit.SECONDS));
+            assertFalse(latch.await(2, TimeUnit.SECONDS));
           } catch (InterruptedException e) {
             fail("Interrupted");
           }
         });
 
     // Should be fired after commit
-    Assertions.assertTrue(latch.await(2, TimeUnit.SECONDS));
+    assertTrue(latch.await(2, TimeUnit.SECONDS));
   }
 
   @Test
-  @Disabled // TODO support this. What's going on?
-  void testNestedDirectInvocation() throws InterruptedException {
+  void testNestedDirectInvocation() throws Exception {
     CountDownLatch latch1 = new CountDownLatch(1);
     CountDownLatch latch2 = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
+            .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
                   @Override
@@ -141,31 +152,29 @@ class TestJooqTransactionManager {
 
     clearOutbox(transactionManager);
 
-    transactionManager.inTransactionThrows(
-        tx1 -> {
-          outbox.schedule(Worker.class).process(1);
+    withRunningFlusher(
+        outbox,
+        () -> {
 
           transactionManager.inTransactionThrows(
-              tx2 -> {
-                outbox.schedule(Worker.class).process(2);
+              tx1 -> {
+                outbox.schedule(Worker.class).process(1);
 
-                // Should not be fired until after commit
-                Assertions.assertFalse(latch2.await(2, TimeUnit.SECONDS));
+                transactionManager.inTransactionThrows(tx2 -> outbox.schedule(Worker.class).process(2));
+
+                // Neither should be fired - the second job is in a nested transaction
+                CompletableFuture.allOf(
+                    runAsync(() -> uncheck(() -> assertFalse(latch1.await(2, TimeUnit.SECONDS)))),
+                    runAsync(() -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS))))
+                ).get();
               });
 
           // Should be fired after commit
-          Assertions.assertTrue(latch2.await(2, TimeUnit.SECONDS));
-
-          try {
-            // Should not be fired until after commit
-            Assertions.assertFalse(latch1.await(2, TimeUnit.SECONDS));
-          } catch (InterruptedException e) {
-            fail("Interrupted");
-          }
+          CompletableFuture.allOf(
+              runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
+              runAsync(() -> uncheck(() -> assertTrue(latch2.await(2, TimeUnit.SECONDS))))
+          ).get();
         });
-
-    // Should be fired after commit
-    Assertions.assertTrue(latch1.await(2, TimeUnit.SECONDS));
   }
 
   @Test
@@ -191,25 +200,25 @@ class TestJooqTransactionManager {
           outbox.schedule(Worker.class).process(1);
           try {
             // Should not be fired until after commit
-            Assertions.assertFalse(latch.await(2, TimeUnit.SECONDS));
+            assertFalse(latch.await(2, TimeUnit.SECONDS));
           } catch (InterruptedException e) {
             fail("Interrupted");
           }
         });
 
     // Should be fired after commit
-    Assertions.assertTrue(latch.await(2, TimeUnit.SECONDS));
+    assertTrue(latch.await(2, TimeUnit.SECONDS));
   }
 
   @Test
-  @Disabled // TODO support this. What's going on?
-  void testNestedViaListener() throws InterruptedException {
+  void testNestedViaListener() throws Exception {
     CountDownLatch latch1 = new CountDownLatch(1);
     CountDownLatch latch2 = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
+            .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
                   @Override
@@ -225,35 +234,81 @@ class TestJooqTransactionManager {
 
     clearOutbox(transactionManager);
 
-    dsl.transaction(
-        ctx -> {
-          outbox.schedule(Worker.class).process(1);
+    withRunningFlusher(
+        outbox,
+        () -> {
+          dsl.transaction(
+              ctx -> {
+                outbox.schedule(Worker.class).process(1);
+                ctx.dsl().transaction(() -> outbox.schedule(Worker.class).process(2));
 
-          ctx.dsl()
-              .transaction(
-                  () -> {
-                    outbox.schedule(Worker.class).process(2);
-                    try {
-                      // Should not be fired until after commit
-                      Assertions.assertFalse(latch2.await(2, TimeUnit.SECONDS));
-                    } catch (InterruptedException e) {
-                      fail("Interrupted");
-                    }
-                  });
+                // Neither should be fired - the second job is in a nested transaction
+                CompletableFuture.allOf(
+                    runAsync(() -> uncheck(() -> assertFalse(latch1.await(2, TimeUnit.SECONDS)))),
+                    runAsync(() -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS))))
+                ).get();
+              });
 
-          // Should be fired after commit
-          Assertions.assertTrue(latch2.await(2, TimeUnit.SECONDS));
-
-          try {
-            // Should not be fired until after commit
-            Assertions.assertFalse(latch1.await(2, TimeUnit.SECONDS));
-          } catch (InterruptedException e) {
-            fail("Interrupted");
-          }
+          // Both should be fired after commit
+          CompletableFuture.allOf(
+              runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
+              runAsync(() -> uncheck(() -> assertTrue(latch2.await(2, TimeUnit.SECONDS))))
+          ).get();
         });
+  }
 
-    // Should be fired after commit
-    Assertions.assertTrue(latch1.await(2, TimeUnit.SECONDS));
+  /**
+   * Ensures that given the rollback of an inner transaction, any outbox work scheduled in the inner transaction
+   * is rolled back while the outer transaction's works.
+   */
+  @Test
+  void testNestedWithInnerFailure() throws Exception {
+    CountDownLatch latch1 = new CountDownLatch(1);
+    CountDownLatch latch2 = new CountDownLatch(1);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(Dialect.H2))
+            .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    if (entry.getInvocation().getArgs()[0].equals(1)) {
+                      latch1.countDown();
+                    } else {
+                      latch2.countDown();
+                    }
+                  }
+                })
+            .build();
+
+    clearOutbox(transactionManager);
+
+    withRunningFlusher(
+        outbox,
+        () -> {
+          dsl.transaction(
+              ctx -> {
+                outbox.schedule(Worker.class).process(1);
+
+                assertThrows(UnsupportedOperationException.class, () ->
+                  ctx.dsl().transaction(() -> {
+                    outbox.schedule(Worker.class).process(2);
+                    throw new UnsupportedOperationException();
+                  }));
+
+                CompletableFuture.allOf(
+                    runAsync(() -> uncheck(() -> assertFalse(latch1.await(2, TimeUnit.SECONDS)))),
+                    runAsync(() -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS))))
+                ).get();
+              });
+
+          CompletableFuture.allOf(
+              runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
+              runAsync(() -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS))))
+          ).get();
+        });
   }
 
   @Test
@@ -282,7 +337,7 @@ class TestJooqTransactionManager {
         outbox,
         () -> {
           transactionManager.inTransaction(() -> outbox.schedule(InterfaceWorker.class).process(3));
-          Assertions.assertTrue(latch.await(15, TimeUnit.SECONDS));
+          assertTrue(latch.await(15, TimeUnit.SECONDS));
         });
   }
 
@@ -328,7 +383,7 @@ class TestJooqTransactionManager {
                               outbox.schedule(InterfaceWorker.class).process(i * 10 + j);
                             }
                           }));
-          Assertions.assertTrue(latch.await(30, TimeUnit.SECONDS));
+          assertTrue(latch.await(30, TimeUnit.SECONDS));
         });
 
     MatcherAssert.assertThat(
@@ -360,7 +415,7 @@ class TestJooqTransactionManager {
       runnable.run();
     } finally {
       scheduler.shutdown();
-      Assertions.assertTrue(scheduler.awaitTermination(20, TimeUnit.SECONDS));
+      assertTrue(scheduler.awaitTermination(20, TimeUnit.SECONDS));
     }
   }
 
