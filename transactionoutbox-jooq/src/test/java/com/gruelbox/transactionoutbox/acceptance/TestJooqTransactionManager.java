@@ -78,7 +78,8 @@ class TestJooqTransactionManager {
     configuration.setConnectionProvider(connectionProvider);
     configuration.setSQLDialect(SQLDialect.H2);
     configuration.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider));
-    JooqTransactionListener listener = JooqTransactionManager.createListener(configuration);
+    JooqTransactionListener listener = JooqTransactionManager.createListener();
+    configuration.set(listener);
     dsl = DSL.using(configuration);
     return JooqTransactionManager.create(dsl, listener);
   }

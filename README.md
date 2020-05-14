@@ -134,25 +134,20 @@ Perhaps integrate with Guice and jOOQ's transaction management instead? It's des
 ```
 @Provides
 @Singleton
-Configuration jooqConfig(DataSource dataSource) {
-  DefaultConfiguration jooqConfig = new DefaultConfiguration();
-  DataSourceConnectionProvider connectionProvider = new DataSourceConnectionProvider(dataSource);
-  jooqConfig.setConnectionProvider(connectionProvider);
-  jooqConfig.setSQLDialect(SQLDialect.H2);
-  jooqConfig.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider));
-  return jooqConfig;
-}
-
-@Provides
-@Singleton
-JooqTransactionListener jooqListener(Configuration jooqConfig) {
-  return JooqTransactionManager.createListener(jooqConfig);
+JooqTransactionListener jooqListener() {
+  return JooqTransactionManager.createListener();
 }
 
 @Provides
 @Singleton
 DSLContext parentDsl(Configuration jooqConfig, JooqTransactionListener listener) {
-  return DSL.using(configuration);
+  DefaultConfiguration jooqConfig = new DefaultConfiguration();
+  DataSourceConnectionProvider connectionProvider = new DataSourceConnectionProvider(dataSource);
+  jooqConfig.setConnectionProvider(connectionProvider);
+  jooqConfig.setSQLDialect(SQLDialect.H2);
+  jooqConfig.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider));
+  jooqConfig.set(listener);
+  return DSL.using(jooqConfig);
 }
 
 @Provides
@@ -167,7 +162,7 @@ TransactionOutbox transactionOutbox(Injector injector, TransactionManager transa
   return TransactionOutbox.builder()
     .transactionManager(transactionManager)
     .persistor(Persistor.forDialect(Dialect.MY_SQL_8))
-    .instantiator(Instantiator.using(injector::getInstance))
+    .instantiator(GuiceInstantiator.builder().injector(injector).build())
     .build();
 }
 ```

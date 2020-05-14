@@ -20,7 +20,8 @@ import org.jooq.impl.DefaultConfiguration;
  * configuration.setConnectionProvider(connectionProvider);
  * configuration.setSQLDialect(SQLDialect.H2);
  * configuration.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider));
- * JooqTransactionListener listener = JooqTransactionManager.createListener(configuration);
+ * JooqTransactionListener listener = JooqTransactionManager.createListener();
+ * configuration.set(listener);
  * DSLContext dsl = DSL.using(configuration);
  * return JooqTransactionManager.create(dsl, listener);</pre>
  */
@@ -42,13 +43,10 @@ public final class JooqTransactionManager
    * Creates the {@link org.jooq.TransactionListener} to wire into the {@link DSLContext}. See
    * class-level documentation for more detail.
    *
-   * @param configuration The jOOQ configuration object to link into.
    * @return The transaction listener.
    */
-  public static JooqTransactionListener createListener(DefaultConfiguration configuration) {
-    var result = new JooqTransactionListener();
-    configuration.set(result);
-    return result;
+  public static JooqTransactionListener createListener() {
+    return new JooqTransactionListener();
   }
 
   /**
