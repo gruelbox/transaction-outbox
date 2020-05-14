@@ -11,6 +11,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import javax.validation.ClockProvider;
@@ -20,6 +22,7 @@ import javax.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
+import org.slf4j.MDC;
 import org.slf4j.event.Level;
 
 /**
@@ -80,7 +83,9 @@ public class TransactionOutbox {
    */
   @NotNull private final Level logLevelTemporaryFailure;
 
-  /** After now many attempts a task should be blacklisted. Defaults to 5. */
+  /**
+   * After now many attempts a task should be blacklisted. Defaults to 5.
+   */
   @Min(1)
   private final int blacklistAfterAttempts;
 
@@ -100,8 +105,18 @@ public class TransactionOutbox {
    */
   @NotNull private final ClockProvider clockProvider;
 
-  /** Event listener for use in testing. */
+  /**
+   * Event listener. Allows client code to react to tasks running, failing or getting blacklisted.
+   */
   @NotNull private final TransactionOutboxListener listener;
+
+  /**
+   * Determines whether to include any Slf4j {@link MDC} (Mapped Diagnostic Context) in serialized invocations
+   * and recreate the state in submitted tasks.
+   *
+   * <p>Defaults to true.</p>
+   */
+  private final boolean serializeMdc;
 
   private final Validator validator;
 
@@ -116,7 +131,8 @@ public class TransactionOutbox {
       ClockProvider clockProvider,
       TransactionOutboxListener listener,
       Persistor persistor,
-      Level logLevelTemporaryFailure) {
+      Level logLevelTemporaryFailure,
+      Boolean serializeMdc) {
     this.transactionManager = transactionManager;
     this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
     this.persistor = persistor;
@@ -128,6 +144,7 @@ public class TransactionOutbox {
     this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {});
     this.logLevelTemporaryFailure = Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
     this.validator = new Validator(this.clockProvider);
+    this.serializeMdc = serializeMdc == null ? true : serializeMdc;
     this.validator.validate(this);
     this.persistor.migrate(transactionManager);
   }
@@ -271,19 +288,7 @@ public class TransactionOutbox {
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
     log.debug("Created instance {}", instance);
-    Method method =
-        instance
-            .getClass()
-            .getDeclaredMethod(
-                entry.getInvocation().getMethodName(), entry.getInvocation().getParameterTypes());
-    method.setAccessible(true);
-    if (log.isDebugEnabled()) {
-      log.debug(
-          "Invoking method {} with args {}",
-          method,
-          Arrays.toString(entry.getInvocation().getArgs()));
-    }
-    method.invoke(instance, entry.getInvocation().getArgs());
+    entry.getInvocation().invoke(instance);
   }
 
   private TransactionOutboxEntry newEntry(Method method, Object[] args) {
@@ -294,7 +299,10 @@ public class TransactionOutbox {
                 instantiator.getName(method.getDeclaringClass()),
                 method.getName(),
                 method.getParameterTypes(),
-                args))
+                args,
+                serializeMdc && (MDC.getMDCAdapter() != null)
+                    ? MDC.getCopyOfContextMap()
+                    : null))
         .nextAttemptTime(clockProvider.getClock().instant().plus(attemptFrequency))
         .build();
   }

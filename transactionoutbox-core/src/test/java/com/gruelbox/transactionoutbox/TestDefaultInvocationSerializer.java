@@ -14,6 +14,7 @@ import java.time.Year;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -154,6 +155,13 @@ class TestDefaultInvocationSerializer {
     Class<?>[] primitives = {ExampleCustomClass.class, ExampleCustomClass.class};
     Object[] values = {new ExampleCustomClass("Foo", "Bar"), new ExampleCustomClass("Bish", "Bash")};
     check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+  }
+
+  @Test
+  void testMDC() {
+    Class<?>[] primitives = {Integer.class};
+    Object[] values = {1};
+    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values, Map.of("A", "1", "B", "2")));
   }
 
   void check(Invocation invocation) {

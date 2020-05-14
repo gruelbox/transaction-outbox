@@ -22,6 +22,7 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -40,8 +41,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+
 import lombok.Builder;
-import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.experimental.Accessors;
@@ -59,8 +60,8 @@ abstract class AbstractAcceptanceTest {
   protected abstract ConnectionDetails connectionDetails();
 
   /**
-   * Uses a simple direct transaction manager and connection manager and attempts to fire an
-   * interface using a custom instantiator.
+   * Uses a simple direct transaction manager and connection manager and attempts to fire an interface using a custom
+   * instantiator.
    */
   @Test
   final void simpleConnectionProviderCustomInstantiatorInterfaceClass()
@@ -108,8 +109,7 @@ abstract class AbstractAcceptanceTest {
   }
 
   /**
-   * Uses a simple data source transaction manager and attempts to fire a concrete class via
-   * reflection.
+   * Uses a simple data source transaction manager and attempts to fire a concrete class via reflection.
    */
   @Test
   final void dataSourceConnectionProviderReflectionInstantiatorConcreteClass()
@@ -138,8 +138,8 @@ abstract class AbstractAcceptanceTest {
   }
 
   /**
-   * Implements a custom transaction manager. Any required changes to this test are a sign that we
-   * need to bump the major revision.
+   * Implements a custom transaction manager. Any required changes to this test are a sign that we need to bump the
+   * major revision.
    */
   @Test
   final void customTransactionManager()
@@ -147,10 +147,10 @@ abstract class AbstractAcceptanceTest {
 
     Class.forName(connectionDetails().driverClassName());
     try (Connection connection =
-        DriverManager.getConnection(
-            connectionDetails().url(),
-            connectionDetails().user(),
-            connectionDetails().password())) {
+             DriverManager.getConnection(
+                 connectionDetails().url(),
+                 connectionDetails().user(),
+                 connectionDetails().password())) {
 
       connection.setAutoCommit(false);
       connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
@@ -230,8 +230,8 @@ abstract class AbstractAcceptanceTest {
   }
 
   /**
-   * Runs a piece of work which will fail several times before working successfully. Ensures that
-   * the work runs eventually.
+   * Runs a piece of work which will fail several times before working successfully. Ensures that the work runs
+   * eventually.
    */
   @Test
   final void retryBehaviour() throws Exception {
@@ -260,8 +260,7 @@ abstract class AbstractAcceptanceTest {
   }
 
   /**
-   * Runs a piece of work which will fail enough times to be blacklisted but will then pass when
-   * re-whitelisted.
+   * Runs a piece of work which will fail enough times to be blacklisted but will then pass when re-whitelisted.
    */
   @Test
   final void blacklistAndWhitelist() throws Exception {
@@ -295,7 +294,9 @@ abstract class AbstractAcceptanceTest {
         });
   }
 
-  /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
+  /**
+   * Hammers high-volume, frequently failing tasks to ensure that they all get run.
+   */
   @Test
   final void highVolumeUnreliable() throws Exception {
     int count = 10;
@@ -442,34 +443,6 @@ abstract class AbstractAcceptanceTest {
       } else {
         throw new UnsupportedOperationException();
       }
-    }
-  }
-
-  private static final class LatchListener implements TransactionOutboxListener {
-    private final CountDownLatch successLatch;
-    private final CountDownLatch blacklistLatch;
-
-    @Getter private volatile TransactionOutboxEntry blacklisted;
-
-    LatchListener(CountDownLatch successLatch, CountDownLatch blacklistLatch) {
-      this.successLatch = successLatch;
-      this.blacklistLatch = blacklistLatch;
-    }
-
-    LatchListener(CountDownLatch successLatch) {
-      this.successLatch = successLatch;
-      this.blacklistLatch = new CountDownLatch(1);
-    }
-
-    @Override
-    public void success(TransactionOutboxEntry entry) {
-      successLatch.countDown();
-    }
-
-    @Override
-    public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
-      this.blacklisted = entry;
-      blacklistLatch.countDown();
     }
   }
 

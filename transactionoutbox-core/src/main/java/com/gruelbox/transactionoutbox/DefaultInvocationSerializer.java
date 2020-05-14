@@ -40,6 +40,7 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
 
@@ -205,6 +206,7 @@ public class DefaultInvocationSerializer implements InvocationSerializer {
         i++;
       }
       obj.add("p", params);
+      obj.add("x", context.serialize(src.getMdc()));
       return obj;
     }
 
@@ -233,8 +235,9 @@ public class DefaultInvocationSerializer implements InvocationSerializer {
               e);
         }
       }
+      Map<String, String> mdc = context.deserialize(jsonObject.get("x"), Map.class);
 
-      return new Invocation(className, methodName, params, args);
+      return new Invocation(className, methodName, params, args, mdc);
     }
 
     private Class<?> classForName(String name) {
