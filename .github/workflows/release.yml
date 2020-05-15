@@ -19,18 +19,18 @@ jobs:
           server-id: ossrh # Value of the distributionManagement/repository/id field of the pom.xml
           settings-path: ${{ github.workspace }} # location for the settings.xml file
 
-      - name: Build and publish
-        run: |
-          set -e
-          revision=${GITHUB_REF##*/}
-          echo "Publishing version $revision to Central"
-          echo ${{ GPG_SECRET_KEYS }} | base64 --decode | $GPG_EXECUTABLE --import
-          echo ${{ GPG_OWNERTRUST }} | base64 --decode | $GPG_EXECUTABLE --import-ownertrust
-          mvn -Prelease -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision=$revision -DskipTests
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          SONATYPE_USERNAME: ${{ SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ SONATYPE_PASSWORD }}
-          GPG_EXECUTABLE: gpg
-          GPG_KEYNAME: ${{ GPG_KEYNAME }}
-          GPG_PASSPHRASE: ${{ GPG_PASSPHRASE }}
+#      - name: Build and publish
+#        run: |
+#          set -e
+#          revision=${GITHUB_REF##*/}
+#          echo "Publishing version $revision to Central"
+#          echo ${{ GPG_SECRET_KEYS }} | base64 --decode | $GPG_EXECUTABLE --import
+#          echo ${{ GPG_OWNERTRUST }} | base64 --decode | $GPG_EXECUTABLE --import-ownertrust
+#          mvn -Prelease -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision=$revision -DskipTests
+#        env:
+#          GITHUB_TOKEN: ${{ github.token }}
+#          SONATYPE_USERNAME: ${{ SONATYPE_USERNAME }}
+#          SONATYPE_PASSWORD: ${{ SONATYPE_PASSWORD }}
+#          GPG_EXECUTABLE: gpg
+#          GPG_KEYNAME: ${{ GPG_KEYNAME }}
+#          GPG_PASSPHRASE: ${{ GPG_PASSPHRASE }}
