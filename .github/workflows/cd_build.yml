@@ -27,19 +27,10 @@ jobs:
           revisionMinor=1
           revisionPatch=$GITHUB_RUN_NUMBER
           version="$revisionMajor.$revisionMinor.$revisionPatch"
-          commit=$(git rev-parse HEAD)
-          remote=$(git config --get remote.origin.url)
-          repo=$(basename $remote .git)
-          echo "Building $version at $commit"
-          mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.major=$revisionMajor -Drevision.minor=$revisionMinor -Drevision.patch=$revisionPatch
-          ref="refs/tags/$version"
-          url="https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs"
-          echo "Tagging $ref to $url"
-          curl --show-error --fail -s -X POST $url -H "Authorization: token $GITHUB_TOKEN" -d @- << EOF
-          {
-            "ref": "$ref",
-            "sha": "$commit"
-          }
-          EOF
+          echo "Building $version at $GITHUB_SHA"
+          mvn -B package -s $GITHUB_WORKSPACE/settings.xml -Drevision.major=$revisionMajor -Drevision.minor=$revisionMinor -Drevision.patch=$revisionPatch -DskipTests
+          echo "Tagging $version"
+          git tag $version
+          git push origin $version
         env:
           GITHUB_TOKEN: ${{ github.token }}
