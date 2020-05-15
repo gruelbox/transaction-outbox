@@ -33,9 +33,9 @@ jobs:
           echo "Building $version at $commit"
           mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.major=$revisionMajor -Drevision.minor=$revisionMinor -Drevision.patch=$revisionPatch
           ref="refs/tags/$version"
-          url="https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref"
+          url="https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs"
           echo "Tagging $ref to $url"
-          curl -s -X POST $url -H "Authorization: token $GITHUB_TOKEN" -d @- << EOF
+          curl --show-error --fail -s -X POST $url -H "Authorization: token $GITHUB_TOKEN" -d @- << EOF
           {
             "ref": "$ref",
             "sha": "$commit"
