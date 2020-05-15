@@ -2,6 +2,7 @@
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transaction-outbox/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transaction-outbox)
 [![Javadocs](https://www.javadoc.io/badge/com.gruelbox/transaction-outbox.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transaction-outbox)
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
+[![CodeFactor](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox/badge)](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox)
 
 ## Contents
 1. [What's this?](#whats-this)
