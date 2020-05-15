@@ -53,7 +53,7 @@ Every aspect is highly configurable or overridable. It has direct support for th
 Note that a few bits aren't quire ready, notably: (a) test coverage isn't as high as it should be, (b) it's not had any production "battle testing" and (c) recovery from blacklistings isn't yet implemented. However, please have a play and get tback to me with feedback!
 
 Currently, releases are available as continuously-delivered releases via the Github Package repository. Less regular, stable releases will be performed to Maven Central soon.  Add this to your POM:
-```
+```xml
 <repositories>
   <repository>
     <id>github-transaction-outbox</id>
@@ -63,7 +63,7 @@ Currently, releases are available as continuously-delivered releases via the Git
 </repositories>
 ```
 Check the [latest version](https://github.com/gruelbox/transaction-outbox/packages/159210) and add the dependency:
-```
+```xml
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
@@ -71,7 +71,7 @@ Check the [latest version](https://github.com/gruelbox/transaction-outbox/packag
 </dependency>
 ```
 Plus this if you are using Spring with JPA:
-```
+```xml
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-spring</artifactId>
@@ -79,7 +79,7 @@ Plus this if you are using Spring with JPA:
 </dependency>
 ```
 Or this if you're using Guice:
-```
+```xml
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-guice</artifactId>
@@ -87,7 +87,7 @@ Or this if you're using Guice:
 </dependency>
 ```
 Or this if you're using JOOQ's built-in transaction management:
-```
+```xml
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-jooq</artifactId>
@@ -102,7 +102,7 @@ Create a `TransactionOutbox` using the builder. Instances are thread-safe - only
 The configuration is highly flexible and designed to allow you to integrate with any combination of relational DB and transaction management framework. Here are some examples:
 
 Super-simple - if you have no existing transaction management, connection pooling or dependency injection:
-```
+```java
 TransactionManager transactionManager = TransactionManager.fromConnectionDetails(
     "org.h2.Driver", "jdbc:h2:mem:test;MV_STORE=TRUE", "test", "test"))
 TransactionOutbox outbox = TransactionOutbox.builder()
@@ -111,7 +111,7 @@ TransactionOutbox outbox = TransactionOutbox.builder()
   .build();
 ```
 Better - use connection pooling:
-```
+```java
 try (HikariDataSource ds = new HikariDataSource(createHikariConfig())) {
   TransactionManager transactionManager = TransactionManager.fromDataSource(ds);
   TransactionOutbox outbox = TransactionOutbox.builder()
@@ -121,7 +121,7 @@ try (HikariDataSource ds = new HikariDataSource(createHikariConfig())) {
 }
 ```
 Or add `transactionoutbox-spring` to your POM and integrate with Spring DI, Spring Tx and JPA:
-```
+```java
 @Bean
 @Lazy
 public TransactionOutbox transactionOutbox(SpringTransactionOutboxFactory factory) {
@@ -131,7 +131,7 @@ public TransactionOutbox transactionOutbox(SpringTransactionOutboxFactory factor
 }
 ```
 Perhaps integrate with Guice and jOOQ's transaction management instead? It's designed to permit all sorts of combinations of libraries:
-```
+```java
 @Provides
 @Singleton
 JooqTransactionListener jooqListener() {
@@ -172,7 +172,7 @@ TransactionOutbox transactionOutbox(Injector injector, TransactionManager transa
 During a transaction, you can _schedule_ work to be run at some later point in time (usually immediately, but if that fails, potentially some time later, after a number of retries). This instruction is persisted to the database in the same transaction as the rest of your work, giving guaranteed eventual consistency.
 
 In general, this is expressed as:
-```
+```java
 outbox.schedule(ClassToCall.class).methodToCall(arg1, arg2, arg3);
 ```
 This means:
@@ -186,7 +186,7 @@ You must call `TransactionOutbox.schedule()` _within an ongoing database transac
 
 If using the built-in transaction manager, you should start a transaction using `TransactionManager.inTransaction()`:
 
-```
+```java
 transactionManager.inTransaction(tx -> {
   // Do some work using the transaction
   customerService.createCustomer(tx, customer);
@@ -197,7 +197,7 @@ transactionManager.inTransaction(tx -> {
 
 ### Using spring-txn
 If you're using Spring transaction management, you can use the `Transactional` annotation as normal:
-```
+```java
 @Autowired private CustomerRepository customerRepository;
 @Autowired private Provider<TransactionOutbox> outbox;
 @Autowired private EventRepository eventRepository;
@@ -218,7 +218,7 @@ See the [Spring example](https://github.com/gruelbox/transaction-outbox/tree/mas
 
 You can use `DSLContext.transaction()` as normal:
 
-```
+```java
 dsl.transaction(config -> {
   // Do some work using the transaction
   customerService.createCustomer(config.dsl(), customer);
@@ -229,7 +229,7 @@ dsl.transaction(config -> {
 
 ## Dependency injection
 The default behaviour when you schedule work as follows:
-```
+```java
 outbox.schedule(ClassToCall.class).methodToCall(arg1, arg2, arg3);
 ```
 is to attempt to obtain an instance of `ClassToCall` via reflection, assuming there is a no-args constructor. This 
@@ -238,7 +238,7 @@ obviously doesn't play well with dependency injection.
 `SpringInstantiator`, as used above, will instead use Spring's `ApplicationContext.getBean()` method to obtain the object,
 allowing injection into it, and the Guice example will use `Injector.getInstance()`. If you have some other DI mechanism,
 simply create your own implementation of `Instantiator` and pass it when building the `TransactionalOutbox`:
-```
+```java
 TransactionOutbox.builder()
     .transactionManager(transactionManager)
     .persistor(Persistor.forDialect(Dialect.POSTRESQL_9))
@@ -251,7 +251,7 @@ TransactionOutbox.builder()
 ## Ensuring work is processed eventually
 
 To ensure that any scheduled work that fails first time is eventually retried, create a background task (which can run on multiple application instances) which repeatedly calls `TransactionOutbox.flush()`, e.g:
-```
+```java
 ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 scheduler.scheduleAtFixedRate(outbox::flush, 2, 2, TimeUnit.MINUTES);
 ```
@@ -259,7 +259,7 @@ That's it! Just make sure that this process keeps running, or schedule it repeat
 
 ## Managing the "dead letter queue"
 Work might be retried too many times and get "blacklisted". You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
-```
+```java
 TransactionOutbox.builder()
     ...
     .listener(new TransactionOutboxListener() {
@@ -279,12 +279,88 @@ A good approach here is to use the `TransactionOutboxListener` callback to post 
 
 ## Configuration options
 
-TODO
+This example shows a number of other configuration options in action:
+
+```java
+TransactionManager transactionManager = TransactionManager.fromDataSource(dataSource);
+
+TransactionOutbox outbox = TransactionOutbox.builder()
+    // The most complex part to set up for most will be synchronizing with your existing transaction
+    // management. Pre-rolled implementations are available for jOOQ and Spring (see above for more information)
+    // and you can use those examples to synchronize with anything else by defining your own TransactionManager.
+    // Or, if you have no formal transaction management at the moment, why not start, using transaction-outbox's
+    // built-in one?
+    .transactionManager(transactionManager)
+    // We want to allow the SaleType enum and Money class to be used in arguments (see example below), so let's
+    // customise the Persistor a bit. Selecting the right SQL dialect ensures that features such as SKIP LOCKED
+    // are used correctly.  You can create a fully-custom Persistor implementation if your persistence requirements
+    // are significantly different, and DefaultPersistor is designed to be extended if you only wish to modify
+    // small areas.
+    .persistor(DefaultPersistor.builder()
+        .dialect(Dialect.POSTGRESQL_9)
+        .serializer(DefaultInvocationSerializer.builder()
+            .whitelistedTypes(Set.of(SaleType.class, Money.class))
+            .build())
+        .build())
+    // GuiceInstantiator and SpringInstantiator are great if you are using Guice or Spring DI, but what if you
+    // have your own service locator? Wire it in here. Fully-custom Instantiator implementations are easy to
+    // implement.
+    .instantiator(Instantiator.using(myServiceLocator::createInstance))
+    // Change the log level used when work cannot be submitted to a saturated queue to INFO level (the default
+    // is WARN, which you should probably consider a production incident). You can also change the Executor used
+    // for submitting work to a shared thread pool used by the rest of your application. Fully-custom Submitter
+    // implementations are also easy to implement.
+    .submitter(ExecutorSubmitter.builder()
+        .executor(ForkJoinPool.commonPool())
+        .logLevelWorkQueueSaturation(Level.INFO)
+        .build())
+    // Lower the log level when a task fails temporarily from the default WARN.
+    .logLevelTemporaryFailure(Level.INFO)
+    // 10 attempts at a task before blacklisting it
+    .blacklistAfterAttempts(10)
+    // When calling flush(), select 0.5m records at a time.
+    .flushBatchSize(500_000)
+    // Flush once every 15 minutes only
+    .attemptFrequency(Duration.ofMinutes(15))
+    // Include Slf4j's Mapped Diagnostic Context in tasks. This means that anything in the MDC when schedule()
+    // is called will be recreated in the task when it runs. Very useful for tracking things like user ids and
+    // request ids across invocations.
+    .serializeMdc(true)
+    // We can intercept task successes, failures and blacklistings. The most common use is to catch blacklistings
+    // and raise alerts for these to be investigated. A Slack interactive message is particularly effective here
+    // since it can be wired up to call whitelist() automatically.
+    .listener(new TransactionOutboxListener() {
+
+      @Override
+      public void success(TransactionOutboxEntry entry) {
+        eventPublisher.publish(new OutboxTaskProcessedEvent(entry.getId()));
+      }
+
+      @Override
+      public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
+        eventPublisher.publish(new BlacklistedOutboxTaskEvent(entry.getId()));
+      }
+
+    })
+    .build();
+
+// Usage example, using the in-built transaction manager
+MDC.put("SESSIONKEY", "Foo");
+try {
+  transactionManager.inTransaction(tx -> {
+    writeSomeChanges(tx.connection());
+    outbox.schedule(getClass())
+        .performRemoteCall(SaleType.SALE, Money.of(10, Currency.getInstance("USD")));
+  });
+} finally {
+  MDC.clear();
+}
+```
 
 ## Stubbing
 
 `TransactionOutbox` is not intended to be stubbed; the underlying logic is too onerous to stub out using a a mocking framework such as Mockito. Instead, stubs exist for the various arguments to the builder:
-```
+```java
 // This ensures that all the commit hooks are called at the right times, which is very hard to stub manually
 StubTransactionManager transactionManager = StubTransactionManager.builder().build();
 
@@ -296,6 +372,9 @@ TransactionOutbox outbox = TransactionOutbox.builder()
         }))
         .persistor(StubPersistor.builder().build()) // Doesn't save anything
         .submitter(Submitter.withExecutor(MoreExecutors.directExecutor())) // Execute all work in-line
+        .clockProvider(() ->
+            Clock.fixed(LocalDateTime.of(2020, 3, 1, 12, 0)
+                .toInstant(ZoneOffset.UTC), ZoneOffset.UTC)) // Fix the clock
         .transactionManager(transactionManager)
         .build();
 ```

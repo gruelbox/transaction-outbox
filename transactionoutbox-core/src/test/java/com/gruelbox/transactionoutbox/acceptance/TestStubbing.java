@@ -1,5 +1,13 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.acceptance;
 
+import com.gruelbox.transactionoutbox.Instantiator;
+import com.gruelbox.transactionoutbox.StubPersistor;
+import com.gruelbox.transactionoutbox.StubTransactionManager;
+import com.gruelbox.transactionoutbox.Submitter;
+import com.gruelbox.transactionoutbox.TransactionOutbox;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.MatcherAssert;
 import org.junit.jupiter.api.Test;
@@ -25,6 +33,9 @@ class TestStubbing {
         .persistor(StubPersistor.builder().build())
         .submitter(Submitter.withExecutor(Runnable::run))
         .transactionManager(transactionManager)
+        .clockProvider(() ->
+            Clock.fixed(LocalDateTime.of(2020, 3, 1, 12, 0)
+                .toInstant(ZoneOffset.UTC), ZoneOffset.UTC)) // Fix the clock
         .build();
 
     transactionManager.inTransaction(() -> {
