@@ -1,9 +1,8 @@
-name: Push to Central
+name: Publish to Central
 
 on:
-  push:
-    tags:
-      - '*'
+  release:
+    types: [created]
 
 jobs:
   build:
