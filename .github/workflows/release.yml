@@ -24,13 +24,13 @@ jobs:
           set -e
           revision=${GITHUB_REF##*/}
           echo "Publishing version $revision to Central"
-          echo ${{ GPG_SECRETKEYS }} | base64 --decode | $GPG_EXECUTABLE --import
-          echo ${{ GPG_OWNERTRUST }} | base64 --decode | $GPG_EXECUTABLE --import-ownertrust
+          echo ${{ secrets.GPG_SECRETKEYS }} | base64 --decode | $GPG_EXECUTABLE --import
+          echo ${{ secrets.GPG_OWNERTRUST }} | base64 --decode | $GPG_EXECUTABLE --import-ownertrust
           mvn -Prelease -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision=$revision -DskipTests
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          SONATYPE_USERNAME: ${{ SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ SONATYPE_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           GPG_EXECUTABLE: gpg
-          GPG_KEYNAME: ${{ GPG_KEYNAME }}
-          GPG_PASSPHRASE: ${{ GPG_PASSPHRASE }}
+          GPG_KEYNAME: ${{ secrets.GPG_KEYNAME }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
