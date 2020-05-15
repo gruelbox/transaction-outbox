@@ -20,7 +20,21 @@ jobs:
           server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
           settings-path: ${{ github.workspace }} # location for the settings.xml file
 
-      - name: Build and publish
-        run: mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.patch=$GITHUB_RUN_NUMBER
+      - name: Build, publish to GPR and tag
+        run: |
+          revisionMajor=0
+          revisionMinor=1
+          revisionPatch=$GITHUB_RUN_NUMBER
+          version="$revisionMajor.$revisionMinor.$revisionPatch"
+          commit=$(git rev-parse HEAD)
+          remote=$(git config --get remote.origin.url)
+          repo=$(basename $remote .git)
+          mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.major=$revisionMajor -Drevision.minor=$revisionMinor -Drevision.patch=$revisionPatch
+          curl -s -X POST https://api.github.com/repos/$REPO_OWNER/$repo/git/refs -H "Authorization: token $GITHUB_TOKEN" -d @- << EOF
+          {
+            "ref": "refs/tags/$version",
+            "sha": "$commit"
+          }
+          EOF
         env:
           GITHUB_TOKEN: ${{ github.token }}
