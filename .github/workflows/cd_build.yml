@@ -22,6 +22,7 @@ jobs:
 
       - name: Build, publish to GPR and tag
         run: |
+          set -e
           revisionMajor=0
           revisionMinor=1
           revisionPatch=$GITHUB_RUN_NUMBER
@@ -29,10 +30,14 @@ jobs:
           commit=$(git rev-parse HEAD)
           remote=$(git config --get remote.origin.url)
           repo=$(basename $remote .git)
+          echo "Building $version at $commit"
           mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.major=$revisionMajor -Drevision.minor=$revisionMinor -Drevision.patch=$revisionPatch
-          curl -s -X POST https://api.github.com/repos/$REPO_OWNER/$repo/git/refs -H "Authorization: token $GITHUB_TOKEN" -d @- << EOF
+          ref="refs/tags/$version"
+          url="https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref"
+          echo "Tagging $ref to $url"
+          curl -s -X POST $url -H "Authorization: token $GITHUB_TOKEN" -d @- << EOF
           {
-            "ref": "refs/tags/$version",
+            "ref": "$ref",
             "sha": "$commit"
           }
           EOF
