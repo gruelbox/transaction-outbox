@@ -88,6 +88,8 @@ Our service is now resilient and explicitly eventually consistent, as long as al
 
 If you find yourself wondering _why bother with the queues now_? You're quite right. As we now have outgoing buffers, we already have most of the benefits of middleware (at least for some use cases). We could replace the calls to a message queue with direct queues to the other services' load balancers and switch to a peer-to-peer architecture, if we so choose.
 
+> Note that for the above example to work, `StockReductionEvent` and `IncomeEvent` need to be whitelisted for serialization. See [Configuration reference](#configuration-reference).
+
 ## Installation
 
 Requires at least Java 11. **Stuck on an earlier JDK? [Speak up](https://github.com/gruelbox/transaction-outbox/issues/new/choose)**. If there's any interest in downgrading, it won't be particularly hard to strip out the Java 9/10/11 features like `var`.
