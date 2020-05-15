@@ -174,7 +174,7 @@ transactionManager.inTransaction(tx -> {
   // Do some work using the transaction
   customerService.createCustomer(tx, customer);
   // Schedule a transaction outbox task (automatically uses the same transaction)
-  outbox.schedule(EventPublisher.class).publishEvent(NewCustomerEvent.of(customer));
+  outbox.schedule(EventPublisher.class).publishCustomerCreatedEvent(customer.id());
 });
 ```
 
@@ -191,8 +191,9 @@ public void createCustomer() {
   // Do some work using the transaction
   customerRepository.save(new Customer(1L, "Martin", "Carthy"));
   customerRepository.save(new Customer(2L, "Dave", "Pegg"));
-  // Schedule a transaction outbox task (automatically uses the same transaction)
-  outbox.get().schedule(eventPublisher.getClass()).publish(new Event(1L, "Created customers", LocalDateTime.now()));
+  // Schedule transaction outbox tasks (automatically uses the same transaction)
+  outbox.get().schedule(eventPublisher.getClass()).publishCustomerCreatedEvent(1L);
+  outbox.get().schedule(eventPublisher.getClass()).publishCustomerCreatedEvent(2L);
 }
 ```
 See the [Spring example](https://github.com/gruelbox/transaction-outbox/tree/master/transactionoutbox-spring/src/test/java/com/gruelbox/transactionoutbox/acceptance/TransactionOutboxSpringDemoApplication.class) to see this in context.
