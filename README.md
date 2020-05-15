@@ -4,6 +4,10 @@
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox/badge)](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox)
 
+A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. Can replace or augment message queues such as RabbitMQ or ApacheMQ, while additionally allowing local work and remote requests to be committed in the same database transaction, guaranteeing eventual consistency*.
+
+Features a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks.
+
 ## Contents
 1. [What's this?](#whats-this)
 1. [Why do I need it?](#why-do-i-need-it)
@@ -19,10 +23,6 @@
 1. [Managing the "dead letter queue"](#managing-the-dead-letter-queue)
 1. [Configuration options](#configuration-options)
 1. [Stubbing](#stubbing)
-
-## What's this?
-
-An implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. Features a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks.
 
 ## Why do I need it?
 
