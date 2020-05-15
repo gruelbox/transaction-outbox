@@ -26,9 +26,9 @@ jobs:
             revision="0.1.$GITHUB_RUN_NUMBER"
             echo "Building $revision at $GITHUB_SHA"
             mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision="$revision"
-            echo "Tagging $version"
-            git tag $version
-            git push origin $version
+            echo "Tagging $revision"
+            git tag $revision
+            git push origin $revision
           else
             mvn -B package
           fi
