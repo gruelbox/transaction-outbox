@@ -1,4 +1,6 @@
 # transaction-outbox
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transaction-outbox/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transaction-outbox)
+[![Javadocs](https://www.javadoc.io/badge/com.gruelbox/transaction-outbox.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transaction-outbox)
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 
 ## Contents
@@ -50,9 +52,21 @@ Every aspect is highly configurable or overridable. It has direct support for th
 
 ## Installation
 
-Note that a few bits aren't quire ready, notably: (a) test coverage isn't as high as it should be, (b) it's not had any production "battle testing" and (c) recovery from blacklistings isn't yet implemented. However, please have a play and get tback to me with feedback!
+The latest stable release is available from Maven Central. Check the [latest version](https://github.com/gruelbox/transaction-outbox/releases) and add the dependency:
+```xml
+<dependency>
+  <groupId>com.gruelbox</groupId>
+  <artifactId>transactionoutbox-core</artifactId>
+  <version>version (e.g. 0.1.4)</version>
+</dependency>
+```
+The following additional artifact plugins are also available (more details below):
 
-Currently, releases are available as continuously-delivered releases via the Github Package repository. Less regular, stable releases will be performed to Maven Central soon.  Add this to your POM:
+ - transactionoutbox-spring
+ - transactionoutbox-guice
+ - transactionoutbox-jooq
+
+Maven Central is updated regularly. You can follow bleeding-edge continuously-delivered releases from Github Package Repository. A new release is added here with every succesful build on the master branch, so is equivalent to a `SNAPSHOT` except that you can safely build production releases against it without the risk of it changing.
 ```xml
 <repositories>
   <repository>
@@ -61,38 +75,6 @@ Currently, releases are available as continuously-delivered releases via the Git
     <url>https://maven.pkg.github.com/gruelbox/transaction-outbox</url>
   </repository>
 </repositories>
-```
-Check the [latest version](https://github.com/gruelbox/transaction-outbox/packages/159210) and add the dependency:
-```xml
-<dependency>
-  <groupId>com.gruelbox</groupId>
-  <artifactId>transactionoutbox-core</artifactId>
-  <version>version (e.g. 0.1.4)</version>
-</dependency>
-```
-Plus this if you are using Spring with JPA:
-```xml
-<dependency>
-  <groupId>com.gruelbox</groupId>
-  <artifactId>transactionoutbox-spring</artifactId>
-  <version>version (e.g. 0.1.4)</version>
-</dependency>
-```
-Or this if you're using Guice:
-```xml
-<dependency>
-  <groupId>com.gruelbox</groupId>
-  <artifactId>transactionoutbox-guice</artifactId>
-  <version>version (e.g. 0.1.4)</version>
-</dependency>
-```
-Or this if you're using JOOQ's built-in transaction management:
-```xml
-<dependency>
-  <groupId>com.gruelbox</groupId>
-  <artifactId>transactionoutbox-jooq</artifactId>
-  <version>version (e.g. 0.1.4)</version>
-</dependency>
 ```
 
 ## Creating a `TransactionOutbox`
