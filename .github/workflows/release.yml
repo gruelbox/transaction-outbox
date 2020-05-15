@@ -1,4 +1,4 @@
-name: Continous Delivery
+name: Push to Central
 
 on:
   push:
