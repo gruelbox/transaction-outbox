@@ -234,12 +234,14 @@ TransactionOutbox.builder()
 
 ## Ensuring work is processed eventually
 
-To ensure that any scheduled work that fails first time is eventually retried, create a background task (which can run on multiple application instances) which repeatedly calls `TransactionOutbox.flush()`, e.g:
+To ensure that any scheduled work that fails first time is eventually retried, create a background task which repeatedly calls `TransactionOutbox.flush()`, e.g:
 ```java
 ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 scheduler.scheduleAtFixedRate(outbox::flush, 2, 2, TimeUnit.MINUTES);
 ```
 That's it! Just make sure that this process keeps running, or schedule it repeatedly using message queues or a scheduler such as Quartz.
+
+Don't worry about it running on multiple instances simultaneously. It's designed to handle this, and indeed it can be a benefit; spreading high workloads across instances without any need for more complex high-availability configuration (that said, if you want to distribute work across a cluster at point of submission, this is also supported).
 
 ## Managing the "dead letter queue"
 Work might be retried too many times and get "blacklisted". You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
