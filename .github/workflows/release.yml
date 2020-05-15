@@ -1,8 +1,9 @@
 name: Continous Delivery
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - '*'
 
 jobs:
   build:
@@ -22,11 +23,11 @@ jobs:
       - name: Build and publish
         run: |
           set -e
-          version=( ${GITHUB_REF//./ } )
-          echo "Publishing version ${version[0]}.${version[1]}.${version[2]}"
+          revision=${GITHUB_REF##*/}
+          echo "Publishing version $revision to Central"
           echo ${{ GPG_SECRET_KEYS }} | base64 --decode | $GPG_EXECUTABLE --import
           echo ${{ GPG_OWNERTRUST }} | base64 --decode | $GPG_EXECUTABLE --import-ownertrust
-          mvn -Prelease -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.major=${version[0]} -Drevision.minor=${version[1]} -Drevision.patch=${version[2]}-SNAPSHOT -DskipTests
+          mvn -Prelease -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision=$revision -DskipTests
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SONATYPE_USERNAME: ${{ SONATYPE_USERNAME }}
