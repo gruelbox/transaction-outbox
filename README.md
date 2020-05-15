@@ -84,9 +84,9 @@ Here's what happens:
  - If that call fails, or the application dies before the call is attempted, a background "mop-up" thread will re-attempt the call a configurable number of times, with configurable time between each, before **blacklisting** the request and firing and event for it to be investigated (similar to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue)).
  - Blacklisted requests can be easily **whitelisted** again once the underlying issue is resolved.
 
-Our service is now resilient and explicitly eventually consistent.
+Our service is now resilient and explicitly eventually consistent, as long as all three elements (`SaleRepository` and the downstream event handlers) are idempotent, since those messages will be attempted repeatedly until confirmed successful, which means they could occur multiple times.
 
-Furthermore, if you find yourself wondering _why bother with the queues now_? You're quite right. As we now have outgoing buffers, we already have most of the benefits of middleware (at least for some use cases). We could replace the calls to a message queue with direct queues to the other services' load balancers and switch to a peer-to-peer architecture, if we so choose.
+If you find yourself wondering _why bother with the queues now_? You're quite right. As we now have outgoing buffers, we already have most of the benefits of middleware (at least for some use cases). We could replace the calls to a message queue with direct queues to the other services' load balancers and switch to a peer-to-peer architecture, if we so choose.
 
 ## Installation
 
