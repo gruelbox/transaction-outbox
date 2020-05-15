@@ -66,7 +66,7 @@ The following additional artifact plugins are also available (more details below
  - transactionoutbox-guice
  - transactionoutbox-jooq
 
-Maven Central is updated regularly. You can follow bleeding-edge continuously-delivered releases from Github Package Repository. A new release is added here with every succesful build on the master branch, so is equivalent to a `SNAPSHOT` except that you can safely build production releases against it without the risk of it changing.
+Maven Central is updated regularly. Alternatively, you can follow bleeding-edge continuously-delivered releases from Github Package Repository. This is equivalent to a `SNAPSHOT`, except that you can safely build production releases against it without the risk of it changing.
 ```xml
 <repositories>
   <repository>
