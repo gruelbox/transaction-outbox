@@ -53,6 +53,8 @@ Every aspect is highly configurable or overridable. It has direct support for th
 
 ## Installation
 
+Requires at least Java 11. **Stuck on an earlier JDK? [Speak up](https://github.com/gruelbox/transaction-outbox/issues/new/choose)**. If there's any interest in downgrading, it won't be particularly hard to strip out the Java 9/10/11 features like `var`.
+
 The latest stable release is available from Maven Central. Check the [latest version](https://github.com/gruelbox/transaction-outbox/releases) and add the dependency:
 ```xml
 <dependency>
