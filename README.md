@@ -350,21 +350,25 @@ try {
 
 Instead, stubs exist for the various arguments to the builder, allowing you to build a `TransactionOutbox` with minimal external dependencies which can be called and verified in tests.
 ```java
-// This ensures that all the commit hooks are called at the right times, which is very hard to stub manually
+// GIVEN
+SomeService mockService = Mockito.mock(SomeService.class);
 StubTransactionManager transactionManager = StubTransactionManager.builder().build();
-
-// Direct pass-through
 TransactionOutbox outbox = TransactionOutbox.builder()
-    .instantiator(Instantiator.using(clazz -> {
-      assertEquals(WhatIExpectToBeCalled.class, clazz);
-      return theObjectToBeCalled; // This can be a mock
-    }))
+    .instantiator(Instantiator.using(clazz -> mockService)) // Return our mock
     .persistor(StubPersistor.builder().build()) // Doesn't save anything
     .submitter(Submitter.withExecutor(MoreExecutors.directExecutor())) // Execute all work in-line
     .clockProvider(() ->
         Clock.fixed(LocalDateTime.of(2020, 3, 1, 12, 0)
-            .toInstant(ZoneOffset.UTC), ZoneOffset.UTC)) // Fix the clock
+            .toInstant(ZoneOffset.UTC), ZoneOffset.UTC)) // Fix the clock (not necessary here)
     .transactionManager(transactionManager)
     .build();
+
+// WHEN
+transactionManager.inTransaction(tx -> 
+   outbox.schedule(SomeService.class).doAThing(1));
+
+// THEN 
+Mockito.verify(mockService).doAThing(1);
 ```
+
 Depending on the type of test, you may wish to use a real `Persistor` such as `DefaultPersistor` (if there's a real database available) or a real, multi-threaded `Submitter`. That's up to you.
