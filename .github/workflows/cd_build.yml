@@ -27,8 +27,8 @@ jobs:
           revisionMinor=1
           revisionPatch=$GITHUB_RUN_NUMBER
           version="$revisionMajor.$revisionMinor.$revisionPatch"
-          #echo "Building $version at $GITHUB_SHA"
-          #mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.major=$revisionMajor -Drevision.minor=$revisionMinor -Drevision.patch=$revisionPatch
+          echo "Building $version at $GITHUB_SHA"
+          mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.major=$revisionMajor -Drevision.minor=$revisionMinor -Drevision.patch=$revisionPatch
           echo "Tagging $version"
           git tag $version
           git push origin $version
