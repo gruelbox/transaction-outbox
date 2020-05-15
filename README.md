@@ -79,7 +79,7 @@ public void createWidget(@PathParam("id") SaleId saleId, Sale sale) {
 Here's what happens:
 
  - `TransactionOutbox` creates a proxy of `MessageQueue`. Any method calls on the proxy are serialized and written to a database table _in the same transaction_ as the `SaleRepository` call. The call returns immediately rather than actually invoking the real method.
- - If the transaction rolls back, so are the serialized requests.
+ - If the transaction rolls back, so do the serialized requests.
  - Immediately after the transaction is successfully committed, another thread will attempt to make the _real_ call to `MessageQueue` asynchronously.
  - If that call fails, or the application dies before the call is attempted, a background "mop-up" thread will re-attempt the call a configurable number of times, with configurable time between each, before **blacklisting** the request and firing and event for it to be investigated (similar to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue)).
  - Blacklisted requests can be easily **whitelisted** again once the underlying issue is resolved.
