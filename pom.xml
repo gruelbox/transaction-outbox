@@ -32,7 +32,7 @@
     <revision.patch>99999-SNAPSHOT</revision.patch>
     <revision>${revision.major}.${revision.minor}.${revision.patch}</revision>
     <junit.jupiter.version>5.7.0-M1</junit.jupiter.version>
-    <testcontainers.version>1.13.0</testcontainers.version>
+    <testcontainers.version>1.14.1</testcontainers.version>
   </properties>
 
   <modules>
