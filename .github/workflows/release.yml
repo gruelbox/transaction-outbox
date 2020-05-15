@@ -6,7 +6,6 @@ on:
 
 jobs:
   build:
-    if: github.repository == "gruelbox/transaction-outbox"
     runs-on: ubuntu-latest
 
     steps:
