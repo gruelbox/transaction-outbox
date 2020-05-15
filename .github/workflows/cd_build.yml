@@ -22,15 +22,15 @@ jobs:
 
       - name: Build, publish to GPR and tag
         run: |
-          set -e
-          revisionMajor=0
-          revisionMinor=1
-          revisionPatch=$GITHUB_RUN_NUMBER
-          version="$revisionMajor.$revisionMinor.$revisionPatch"
-          echo "Building $version at $GITHUB_SHA"
-          mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision.major=$revisionMajor -Drevision.minor=$revisionMinor -Drevision.patch=$revisionPatch
-          echo "Tagging $version"
-          git tag $version
-          git push origin $version
+          if [ "$GITHUB_REPOSITORY" == "gruelbox/transaction-outbox" ]; then
+            revision="0.1.$GITHUB_RUN_NUMBER"
+            echo "Building $revision at $GITHUB_SHA"
+            mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision="$revision"
+            echo "Tagging $version"
+            git tag $version
+            git push origin $version
+          else
+            mvn -B package
+          fi
         env:
           GITHUB_TOKEN: ${{ github.token }}

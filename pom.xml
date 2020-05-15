@@ -27,10 +27,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <logback.version>1.2.3</logback.version>
-    <revision.major>0</revision.major>
-    <revision.minor>1</revision.minor>
-    <revision.patch>99999-SNAPSHOT</revision.patch>
-    <revision>${revision.major}.${revision.minor}.${revision.patch}</revision>
+    <revision>0.1.99999-SNAPSHOT</revision>
     <junit.jupiter.version>5.7.0-M1</junit.jupiter.version>
     <testcontainers.version>1.13.0</testcontainers.version>
   </properties>
