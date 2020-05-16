@@ -71,6 +71,7 @@ public interface Persistor {
    *
    * @param tx The current {@link Transaction}.
    * @param entry The entry to be locked
+   * @return true if the lock was successful.
    * @throws OptimisticLockException If no record with same id and version is found.
    * @throws Exception Any other exception.
    */
