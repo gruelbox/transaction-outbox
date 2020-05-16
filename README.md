@@ -78,11 +78,11 @@ public void createWidget(@PathParam("id") SaleId saleId, Sale sale) {
 ```
 Here's what happens:
 
- - `TransactionOutbox` creates a proxy of `MessageQueue`. Any method calls on the proxy are serialized and written to a database table _in the same transaction_ as the `SaleRepository` call. The call returns immediately rather than actually invoking the real method.
+ - [`TransactionOutbox`](https://www.javadoc.io/static/com.gruelbox/transactionoutbox-core/0.1.57/com/gruelbox/transactionoutbox/TransactionOutbox.html) creates a proxy of `MessageQueue`. Any method calls on the proxy are serialized and written to a database table _in the same transaction_ as the `SaleRepository` call. The call returns immediately rather than actually invoking the real method.
  - If the transaction rolls back, so do the serialized requests.
  - Immediately after the transaction is successfully committed, another thread will attempt to make the _real_ call to `MessageQueue` asynchronously.
- - If that call fails, or the application dies before the call is attempted, a background "mop-up" thread will re-attempt the call a configurable number of times, with configurable time between each, before **blacklisting** the request and firing and event for it to be investigated (similar to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue)).
- - Blacklisted requests can be easily **whitelisted** again once the underlying issue is resolved.
+ - If that call fails, or the application dies before the call is attempted, a [background "mop-up" thread](#set-up-the-background-worker) will re-attempt the call a configurable number of times, with configurable time between each, before [blacklisting](#managing-the-dead-letter-queue) the request and firing and event for it to be investigated (similar to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue)).
+ - Blacklisted requests can be easily [whitelisted](#managing-the-dead-letter-queue) again once the underlying issue is resolved.
 
 Our service is now resilient and explicitly eventually consistent, as long as all three elements (`SaleRepository` and the downstream event handlers) are idempotent, since those messages will be attempted repeatedly until confirmed successful, which means they could occur multiple times.
 
@@ -92,23 +92,35 @@ If you find yourself wondering _why bother with the queues now_? You're quite ri
 
 ## Installation
 
-Requires at least Java 11. **Stuck on an earlier JDK? [Speak up](https://github.com/gruelbox/transaction-outbox/issues/new/choose)**. If there's any interest in downgrading, it won't be particularly hard to strip out the Java 9/10/11 features like `var`.
+> Requires at least Java 11. **Stuck on an earlier JDK? [Speak up](https://github.com/gruelbox/transaction-outbox/issues/new/choose)**. If there's any interest in downgrading, it won't be particularly hard to strip out the Java 9/10/11 features like `var`.
 
-The latest stable release is available from Maven Central. Check the [latest version](https://github.com/gruelbox/transaction-outbox/releases) and add the dependency:
+### Stable releases
+
+The latest stable release is available from Maven Central. The latest version is: [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-core/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-core).
+
+#### Maven
 ```xml
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
-  <version>version (e.g. 0.1.4)</version>
+  <version>${transactionoutbox-version}</version>
 </dependency>
+```
+#### Gradle
+```groovy
+implementation 'com.gruelbox:transactionoutbox-core:$transactionOutboxVersion'
 ```
 The following additional artifact plugins are also available (more details below):
 
- - transactionoutbox-spring
- - transactionoutbox-guice
- - transactionoutbox-jooq
+ - transactionoutbox-spring [![Spring on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring) [![Spring Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-spring.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-spring)
+ - transactionoutbox-guice [![Guice on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-guice/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-guice) [![Guice Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-guice.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-guice)
+ - transactionoutbox-jooq [![jOOQ on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-jooq/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-jooq) [![jOOQ Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-jooq.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-jooq)
 
-Maven Central is updated regularly. Alternatively, you can follow bleeding-edge continuously-delivered releases from Github Package Repository. This is equivalent to a `SNAPSHOT`, except that you can safely build production releases against it without the risk of it changing.
+### Development snapshots
+
+Maven Central is updated regularly. Alternatively, if you want to stay at the bleeding edge, you can use continuously-delivered releases from [Github Package Repository](https://github.com/gruelbox/transaction-outbox/packages). These can be used from production builds since they will never be deleted.
+
+#### Maven
 ```xml
 <repositories>
   <repository>
@@ -117,6 +129,29 @@ Maven Central is updated regularly. Alternatively, you can follow bleeding-edge 
     <url>https://maven.pkg.github.com/gruelbox/transaction-outbox</url>
   </repository>
 </repositories>
+```
+You will need to authenticate with Github to use Github Package Repository, with something like the following in your Maven `settings.xml`:
+```xml
+<servers>
+    <server>
+        <id>github-transaction-outbox</id>
+        <username>${env.GITHUB_USERNAME}</username>
+        <password>${env.GITHUB_TOKEN}</password>
+    </server>
+</servers>
+```
+#### Gradle
+```groovy
+repositories {
+    maven {
+        name = "github-transaction-outbox"
+        url = uri("https://maven.pkg.github.com/gruelbox/transaction-outboxY")
+        credentials {
+            username = $githubUserName
+            password = $githubToken
+        }
+    }
+}
 ```
 
 ## Basic Configuration
