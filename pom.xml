@@ -47,12 +47,12 @@
     <module>transactionoutbox-jooq</module>
   </modules>
 
-  <repositories>
-    <repository>
+  <pluginRepositories>
+    <pluginRepository>
       <id>projectlombok.org</id>
       <url>https://projectlombok.org/edge-releases</url>
-    </repository>
-  </repositories>
+    </pluginRepository>
+  </pluginRepositories>
 
   <dependencyManagement>
     <dependencies>
@@ -95,7 +95,7 @@
       <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
-        <version>edge-SNAPSHOT</version>
+        <version>1.18.12</version>
         <scope>provided</scope>
       </dependency>
 
