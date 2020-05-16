@@ -25,12 +25,12 @@ jobs:
           if [ "$GITHUB_REPOSITORY" == "gruelbox/transaction-outbox" ]; then
             revision="0.1.$GITHUB_RUN_NUMBER"
             echo "Building $revision at $GITHUB_SHA"
-            mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision="$revision"
+            mvn -Pdelombok -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision="$revision"
             echo "Tagging $revision"
             git tag $revision
             git push origin $revision
           else
-            mvn -B package
+            mvn -Pdelombok -B package
           fi
         env:
           GITHUB_TOKEN: ${{ github.token }}

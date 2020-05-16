@@ -57,5 +57,6 @@ public interface Persistor {
 
   boolean whitelist(Transaction tx, String entryId) throws Exception;
 
-  List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now) throws Exception;
+  List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
+      throws Exception;
 }

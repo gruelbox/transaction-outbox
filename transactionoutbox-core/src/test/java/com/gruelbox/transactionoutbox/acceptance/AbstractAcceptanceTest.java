@@ -22,7 +22,6 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -41,7 +40,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
-
 import lombok.Builder;
 import lombok.SneakyThrows;
 import lombok.Value;
@@ -60,8 +58,8 @@ abstract class AbstractAcceptanceTest {
   protected abstract ConnectionDetails connectionDetails();
 
   /**
-   * Uses a simple direct transaction manager and connection manager and attempts to fire an interface using a custom
-   * instantiator.
+   * Uses a simple direct transaction manager and connection manager and attempts to fire an
+   * interface using a custom instantiator.
    */
   @Test
   final void simpleConnectionProviderCustomInstantiatorInterfaceClass()
@@ -80,12 +78,15 @@ abstract class AbstractAcceptanceTest {
                         (InterfaceProcessor)
                             (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
             .submitter(Submitter.withExecutor(unreliablePool))
-            .listener(new LatchListener(latch).andThen(new TransactionOutboxListener() {
-              @Override
-              public void success(TransactionOutboxEntry entry) {
-                chainedLatch.countDown();
-              }
-            }))
+            .listener(
+                new LatchListener(latch)
+                    .andThen(
+                        new TransactionOutboxListener() {
+                          @Override
+                          public void success(TransactionOutboxEntry entry) {
+                            chainedLatch.countDown();
+                          }
+                        }))
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .build();
 
@@ -105,11 +106,11 @@ abstract class AbstractAcceptanceTest {
     // Should be fired after commit
     assertTrue(chainedLatch.await(2, TimeUnit.SECONDS));
     assertTrue(latch.await(1, TimeUnit.SECONDS));
-
   }
 
   /**
-   * Uses a simple data source transaction manager and attempts to fire a concrete class via reflection.
+   * Uses a simple data source transaction manager and attempts to fire a concrete class via
+   * reflection.
    */
   @Test
   final void dataSourceConnectionProviderReflectionInstantiatorConcreteClass()
@@ -138,8 +139,8 @@ abstract class AbstractAcceptanceTest {
   }
 
   /**
-   * Implements a custom transaction manager. Any required changes to this test are a sign that we need to bump the
-   * major revision.
+   * Implements a custom transaction manager. Any required changes to this test are a sign that we
+   * need to bump the major revision.
    */
   @Test
   final void customTransactionManager()
@@ -147,10 +148,10 @@ abstract class AbstractAcceptanceTest {
 
     Class.forName(connectionDetails().driverClassName());
     try (Connection connection =
-             DriverManager.getConnection(
-                 connectionDetails().url(),
-                 connectionDetails().user(),
-                 connectionDetails().password())) {
+        DriverManager.getConnection(
+            connectionDetails().url(),
+            connectionDetails().user(),
+            connectionDetails().password())) {
 
       connection.setAutoCommit(false);
       connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
@@ -230,8 +231,8 @@ abstract class AbstractAcceptanceTest {
   }
 
   /**
-   * Runs a piece of work which will fail several times before working successfully. Ensures that the work runs
-   * eventually.
+   * Runs a piece of work which will fail several times before working successfully. Ensures that
+   * the work runs eventually.
    */
   @Test
   final void retryBehaviour() throws Exception {
@@ -260,7 +261,8 @@ abstract class AbstractAcceptanceTest {
   }
 
   /**
-   * Runs a piece of work which will fail enough times to be blacklisted but will then pass when re-whitelisted.
+   * Runs a piece of work which will fail enough times to be blacklisted but will then pass when
+   * re-whitelisted.
    */
   @Test
   final void blacklistAndWhitelist() throws Exception {
@@ -294,9 +296,7 @@ abstract class AbstractAcceptanceTest {
         });
   }
 
-  /**
-   * Hammers high-volume, frequently failing tasks to ensure that they all get run.
-   */
+  /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
   @Test
   final void highVolumeUnreliable() throws Exception {
     int count = 10;

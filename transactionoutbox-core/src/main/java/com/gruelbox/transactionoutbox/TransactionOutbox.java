@@ -9,10 +9,7 @@ import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import javax.validation.ClockProvider;
@@ -83,9 +80,7 @@ public class TransactionOutbox {
    */
   @NotNull private final Level logLevelTemporaryFailure;
 
-  /**
-   * After now many attempts a task should be blacklisted. Defaults to 5.
-   */
+  /** After now many attempts a task should be blacklisted. Defaults to 5. */
   @Min(1)
   private final int blacklistAfterAttempts;
 
@@ -111,10 +106,10 @@ public class TransactionOutbox {
   @NotNull private final TransactionOutboxListener listener;
 
   /**
-   * Determines whether to include any Slf4j {@link MDC} (Mapped Diagnostic Context) in serialized invocations
-   * and recreate the state in submitted tasks.
+   * Determines whether to include any Slf4j {@link MDC} (Mapped Diagnostic Context) in serialized
+   * invocations and recreate the state in submitted tasks.
    *
-   * <p>Defaults to true.</p>
+   * <p>Defaults to true.
    */
   private final boolean serializeMdc;
 
@@ -200,7 +195,10 @@ public class TransactionOutbox {
         transactionManager.inTransactionReturns(
             transaction -> {
               List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
-              uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize, clockProvider.getClock().instant()))
+              uncheckedly(
+                      () ->
+                          persistor.selectBatch(
+                              transaction, flushBatchSize, clockProvider.getClock().instant()))
                   .forEach(
                       entry -> {
                         log.debug("Reprocessing {}", entry.description());
@@ -300,9 +298,7 @@ public class TransactionOutbox {
                 method.getName(),
                 method.getParameterTypes(),
                 args,
-                serializeMdc && (MDC.getMDCAdapter() != null)
-                    ? MDC.getCopyOfContextMap()
-                    : null))
+                serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null))
         .nextAttemptTime(clockProvider.getClock().instant().plus(attemptFrequency))
         .build();
   }

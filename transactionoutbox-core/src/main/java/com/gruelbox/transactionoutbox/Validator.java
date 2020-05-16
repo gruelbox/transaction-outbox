@@ -6,21 +6,22 @@ import javax.validation.ValidationException;
 
 class Validator {
 
-    private final javax.validation.Validator validator;
+  private final javax.validation.Validator validator;
 
-    Validator(ClockProvider clockProvider) {
-        this.validator = Validation.byDefaultProvider()
+  Validator(ClockProvider clockProvider) {
+    this.validator =
+        Validation.byDefaultProvider()
             .configure()
             .clockProvider(clockProvider)
             .buildValidatorFactory()
             .getValidator();
-    }
+  }
 
-    void validate(Object object) {
-        var validationErrors = validator.validate(object);
-        if (!validationErrors.isEmpty()) {
-            throw new ValidationException(
-                "Validation on " + object.toString() + " failed: " + validationErrors);
-        }
+  void validate(Object object) {
+    var validationErrors = validator.validate(object);
+    if (!validationErrors.isEmpty()) {
+      throw new ValidationException(
+          "Validation on " + object.toString() + " failed: " + validationErrors);
     }
+  }
 }

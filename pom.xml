@@ -21,11 +21,19 @@
   </organization>
 
   <properties>
+    <!-- Core -->
     <maven.compiler.source>11</maven.compiler.source>
     <maven.compiler.target>11</maven.compiler.target>
     <file.encoding>UTF-8</file.encoding>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- For delomboking -->
+    <src.dir>src/main/java</src.dir>
+    <test.dir>src/test/java</test.dir>
+    <skip.format>false</skip.format>
+
+    <!-- Dependency versions -->
     <logback.version>1.2.3</logback.version>
     <revision>0.1.99999-SNAPSHOT</revision>
     <junit.jupiter.version>5.7.0-M1</junit.jupiter.version>
@@ -38,6 +46,13 @@
     <module>transactionoutbox-guice</module>
     <module>transactionoutbox-jooq</module>
   </modules>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>projectlombok.org</id>
+      <url>https://projectlombok.org/edge-releases</url>
+    </pluginRepository>
+  </pluginRepositories>
 
   <dependencyManagement>
     <dependencies>
@@ -178,6 +193,7 @@
   </dependencyManagement>
 
   <build>
+
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -203,7 +219,7 @@
         <version>2.9</version>
         <configuration>
           <filesNamePattern>.*\.java</filesNamePattern>
-          <skip>false</skip>
+          <skip>${skip.format}</skip>
         </configuration>
         <executions>
           <execution>
@@ -331,6 +347,50 @@
           <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
       </distributionManagement>
+    </profile>
+    <profile>
+      <id>delombok</id>
+      <properties>
+        <src.dir>target/generated-sources/delombok</src.dir>
+        <skip.format>true</skip.format>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok-maven-plugin</artifactId>
+            <version>1.18.12.0</version>
+            <dependencies>
+              <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>edge-SNAPSHOT</version>
+              </dependency>
+            </dependencies>
+            <executions>
+              <execution>
+                <id>delombok</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>delombok</goal>
+                </goals>
+                <configuration>
+                  <addOutputDirectory>false</addOutputDirectory>
+                  <sourceDirectory>src/main/java</sourceDirectory>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <configuration>
+              <defaultVersion>${project.version}</defaultVersion>
+              <sourcepath>target/generated-sources/delombok</sourcepath>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 

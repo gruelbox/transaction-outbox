@@ -13,7 +13,7 @@ public interface Submitter {
   /**
    * Schedules background work using a local {@link Executor} implementation.
    *
-   * <p>Shortcut for {@code ExecutorSubmitter.builder().executor(executor).build()}.</p>
+   * <p>Shortcut for {@code ExecutorSubmitter.builder().executor(executor).build()}.
    *
    * @param executor The executor.
    * @return The submitter.
@@ -30,7 +30,7 @@ public interface Submitter {
    * @return The submitter.
    */
   static Submitter withDefaultExecutor() {
-    //JDK bug means this warning can't be fixed
+    // JDK bug means this warning can't be fixed
     //noinspection Convert2Diamond
     return withExecutor(
         new ThreadPoolExecutor(

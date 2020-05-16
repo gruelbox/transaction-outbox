@@ -1,13 +1,10 @@
 package com.gruelbox.transactionoutbox;
 
-import lombok.Builder;
-
 import java.time.Instant;
 import java.util.List;
+import lombok.Builder;
 
-/**
- * Stub implementation of {@link Persistor}.
- */
+/** Stub implementation of {@link Persistor}. */
 @Builder
 public class StubPersistor implements Persistor {
 

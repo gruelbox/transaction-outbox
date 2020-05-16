@@ -40,16 +40,14 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
-
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * A locked-down serializer which supports a limited list of primitives and simple JDK
- * value types. Only the following are supported:
+ * A locked-down serializer which supports a limited list of primitives and simple JDK value types.
+ * Only the following are supported:
  *
  * <ul>
  *   <li>{@link Invocation} itself
@@ -85,7 +83,10 @@ public class DefaultInvocationSerializer implements InvocationSerializer {
   DefaultInvocationSerializer(Set<Class<?>> whitelistedTypes) {
     this.gson =
         new GsonBuilder()
-            .registerTypeAdapter(Invocation.class, new InvocationJsonSerializer(whitelistedTypes == null ? Set.of() : whitelistedTypes))
+            .registerTypeAdapter(
+                Invocation.class,
+                new InvocationJsonSerializer(
+                    whitelistedTypes == null ? Set.of() : whitelistedTypes))
             .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
             .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
             .create();
@@ -186,8 +187,12 @@ public class DefaultInvocationSerializer implements InvocationSerializer {
       try {
         return classLoader != null ? Class.forName(name, false, classLoader) : Class.forName(name);
       } catch (ClassNotFoundException e) {
-        throw new RuntimeException("Cannot determine array type for " + name + " using " +
-            (classLoader == null ? "root classloader" : "base classloader") , e);
+        throw new RuntimeException(
+            "Cannot determine array type for "
+                + name
+                + " using "
+                + (classLoader == null ? "root classloader" : "base classloader"),
+            e);
       }
     }
 
