@@ -75,7 +75,7 @@ import lombok.extern.slf4j.Slf4j;
  * </ul>
  */
 @Slf4j
-public class DefaultInvocationSerializer implements InvocationSerializer {
+public final class DefaultInvocationSerializer implements InvocationSerializer {
 
   private final Gson gson;
 
@@ -108,7 +108,7 @@ public class DefaultInvocationSerializer implements InvocationSerializer {
     private Map<Class<?>, String> classToName = new HashMap<>();
     private Map<String, Class<?>> nameToClass = new HashMap<>();
 
-    public InvocationJsonSerializer(Set<Class<?>> whitelistedClasses) {
+    InvocationJsonSerializer(Set<Class<?>> whitelistedClasses) {
       addClassPair(byte.class, "byte");
       addClassPair(short.class, "short");
       addClassPair(int.class, "int");
