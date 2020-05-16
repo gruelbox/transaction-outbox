@@ -263,7 +263,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
     }
   }
 
-  public static final class UtcDateTypeAdapter extends TypeAdapter<Date> {
+  static final class UtcDateTypeAdapter extends TypeAdapter<Date> {
     private final TimeZone UTC_TIME_ZONE = TimeZone.getTimeZone("UTC");
 
     @Override
