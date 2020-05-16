@@ -25,7 +25,7 @@ jobs:
           echo "Publishing version $revision to Central"
           echo ${{ secrets.GPG_SECRETKEYS }} | base64 --decode | $GPG_EXECUTABLE --import --no-tty --batch --yes
           echo ${{ secrets.GPG_OWNERTRUST }} | base64 --decode | $GPG_EXECUTABLE --import-ownertrust --no-tty --batch --yes
-          mvn -Prelease -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision=$revision -DskipTests
+          mvn -Prelease,delombok -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision=$revision -DskipTests
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
