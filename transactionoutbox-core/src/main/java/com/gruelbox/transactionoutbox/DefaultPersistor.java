@@ -20,26 +20,44 @@ import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * The default {@link Persistor} for {@link TransactionOutbox}. Most methods are open for extension,
- * or you can modify various options through the builder.
+ * The default {@link Persistor} for {@link TransactionOutbox}.
+ *
+ * <p>Saves requests to a relational database table, by default called {@code TXNO_OUTBOX}. This can optionally
+ * be automatically created and upgraded by {@link DefaultPersistor}, although this behaviour can be disabled if
+ * you wish.
+ *
+ * <p>More significant changes can be achieved by subclassing, which is explicitly supported. If, on the other hand,
+ * you want to use a completely non-relational underlying data store or do something equally esoteric, you
+ * may prefer to implement {@link Persistor} from the ground up.</p>
  */
 @Slf4j
 @SuperBuilder
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class DefaultPersistor implements Persistor {
 
-  private static final String SELECT_ALL =
-      // language=MySQL
-      "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM TXNO_OUTBOX";
+  /** @param How many seconds to wait before timing out on obtaining a write lock. There's no point making this
+   *              long; it's always better to just back off as quickly as possible and try another record. Generally
+   *             these lock timeouts only kick in if {@link Dialect#isSupportsSkipLock()} is false. */
+  @SuppressWarnings("JavaDoc")
+  @Builder.Default
+  @NotNull private final int writeLockTimeoutSeconds = 2;
 
-  /**
-   * Only wait for 2 second before giving up on obtaining an entry lock. There's no point hanging
-   * around.
-   */
-  private static final int LOCK_TIMEOUT_SECONDS = 2;
-
-  /** The database dialect to use. Required. */
+  /** @param The database dialect to use. Required. */
+  @SuppressWarnings("JavaDoc")
   @NotNull private final Dialect dialect;
+
+  /** @param The database table name. The default is {@code TXNO_OUTBOX}. */
+  @SuppressWarnings("JavaDoc")
+  @Builder.Default
+  @NotNull private final String tableName = "TXNO_OUTBOX";
+
+  /** @param Set to false to disable automatic database migrations. This may be preferred if the default
+   *             migration behaviour interferes with your existing toolset, and you prefer to manage the migrations
+   *             explicitly (e.g. using FlyWay or Liquibase), or your do not give the application DDL permissions
+   *             at runtime. */
+  @SuppressWarnings("JavaDoc")
+  @Builder.Default
+  @NotNull private final boolean migrate = true;
 
   /**
    * The serializer to use for {@link Invocation}s. See {@link InvocationSerializer} for more
@@ -60,7 +78,7 @@ public class DefaultPersistor implements Persistor {
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
     PreparedStatement stmt =
-        tx.prepareBatchStatement("INSERT INTO TXNO_OUTBOX VALUES (?, ?, ?, ?, ?, ?)");
+        tx.prepareBatchStatement("INSERT INTO " + tableName + " VALUES (?, ?, ?, ?, ?, ?)");
     stmt.setString(1, entry.getId());
     stmt.setString(2, writer.toString());
     stmt.setTimestamp(3, Timestamp.from(entry.getNextAttemptTime()));
@@ -75,7 +93,7 @@ public class DefaultPersistor implements Persistor {
   public void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception {
     try (PreparedStatement stmt =
         // language=MySQL
-        tx.connection().prepareStatement("DELETE FROM TXNO_OUTBOX WHERE id = ? and version = ?")) {
+        tx.connection().prepareStatement("DELETE FROM " + tableName + " WHERE id = ? and version = ?")) {
       stmt.setString(1, entry.getId());
       stmt.setInt(2, entry.getVersion());
       if (stmt.executeUpdate() != 1) {
@@ -91,7 +109,7 @@ public class DefaultPersistor implements Persistor {
         tx.connection()
             .prepareStatement(
                 // language=MySQL
-                "UPDATE TXNO_OUTBOX "
+                "UPDATE " + tableName + " "
                     + "SET nextAttemptTime = ?, attempts = ?, blacklisted = ?, version = ? "
                     + "WHERE id = ? and version = ?")) {
       stmt.setTimestamp(1, Timestamp.from(entry.getNextAttemptTime()));
@@ -115,12 +133,12 @@ public class DefaultPersistor implements Persistor {
             .prepareStatement(
                 dialect.isSupportsSkipLock()
                     // language=MySQL
-                    ? "SELECT id FROM TXNO_OUTBOX WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
+                    ? "SELECT id FROM " + tableName + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
                     // language=MySQL
-                    : "SELECT id FROM TXNO_OUTBOX WHERE id = ? AND version = ? FOR UPDATE")) {
+                    : "SELECT id FROM " + tableName + " WHERE id = ? AND version = ? FOR UPDATE")) {
       stmt.setString(1, entry.getId());
       stmt.setInt(2, entry.getVersion());
-      stmt.setQueryTimeout(LOCK_TIMEOUT_SECONDS);
+      stmt.setQueryTimeout(writeLockTimeoutSeconds);
       return gotRecord(entry, stmt);
     }
   }
@@ -129,10 +147,10 @@ public class DefaultPersistor implements Persistor {
   public boolean whitelist(Transaction tx, String entryId) throws Exception {
     PreparedStatement stmt =
         tx.prepareBatchStatement(
-            "UPDATE TXNO_OUTBOX SET attempts = 0, blacklisted = false "
+            "UPDATE " + tableName + " SET attempts = 0, blacklisted = false "
                 + "WHERE blacklisted = true AND id = ?");
     stmt.setString(1, entryId);
-    stmt.setQueryTimeout(LOCK_TIMEOUT_SECONDS);
+    stmt.setQueryTimeout(writeLockTimeoutSeconds);
     return stmt.executeUpdate() != 0;
   }
 
@@ -143,7 +161,7 @@ public class DefaultPersistor implements Persistor {
         tx.connection()
             .prepareStatement(
                 // language=MySQL
-                SELECT_ALL + " WHERE nextAttemptTime < ? AND blacklisted = false LIMIT ?")) {
+                "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM " + tableName + " WHERE nextAttemptTime < ? AND blacklisted = false LIMIT ?")) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
       return gatherResults(batchSize, stmt);
@@ -193,7 +211,7 @@ public class DefaultPersistor implements Persistor {
   // For testing. Assumed low volume.
   void clear(Transaction tx) throws SQLException {
     try (Statement stmt = tx.connection().createStatement()) {
-      stmt.execute("DELETE FROM TXNO_OUTBOX");
+      stmt.execute("DELETE FROM " + tableName);
     }
   }
 }

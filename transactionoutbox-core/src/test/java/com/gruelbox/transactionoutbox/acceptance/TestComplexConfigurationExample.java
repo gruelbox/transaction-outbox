@@ -52,28 +52,22 @@ class TestComplexConfigurationExample {
             // transaction-outbox's
             // built-in one?
             .transactionManager(transactionManager)
-            // We want to allow the SaleType enum and Money class to be used in arguments (see
-            // example below), so let's
-            // customise the Persistor a bit. Selecting the right SQL dialect ensures that features
-            // such as SKIP LOCKED
-            // are used correctly.  You can create a fully-custom Persistor implementation if your
-            // persistence requirements
-            // are significantly different, and DefaultPersistor is designed to be extended if you
-            // only wish to modify
-            // small areas.
-            .persistor(
-                DefaultPersistor.builder()
-                    .dialect(Dialect.POSTGRESQL_9)
-                    .serializer(
-                        DefaultInvocationSerializer.builder()
-                            .whitelistedTypes(Set.of(SaleType.class, Money.class))
-                            .build())
+            // Modify how requests are persisted to the database.
+            .persistor(DefaultPersistor.builder()
+                // Selecting the right SQL dialect ensures that features such as SKIP LOCKED are used correctly.
+                .dialect(Dialect.POSTGRESQL_9)
+                // Override the table name (defaults to "TXNO_OUTBOX")
+                .tableName("transactionOutbox")
+                // Shorten the time we will wait for write locks (defaults to 2)
+                .writeLockTimeoutSeconds(1)
+                // Disable automatic creation and migration of the outbox table, forcing the application to manage
+                // migrations itself
+                .migrate(false)
+                // Allow the SaleType enum and Money class to be used in arguments (see example below)
+                .serializer(DefaultInvocationSerializer.builder()
+                    .whitelistedTypes(Set.of(SaleType.class, Money.class))
                     .build())
-            // GuiceInstantiator and SpringInstantiator are great if you are using Guice or Spring
-            // DI, but what if you
-            // have your own service locator? Wire it in here. Fully-custom Instantiator
-            // implementations are easy to
-            // implement.
+                .build())
             .instantiator(Instantiator.using(myServiceLocator::createInstance))
             // Change the log level used when work cannot be submitted to a saturated queue to INFO
             // level (the default
