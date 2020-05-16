@@ -45,14 +45,16 @@ import javax.validation.constraints.NotNull;
 public class ExecutorSubmitter implements Submitter {
 
   /**
-   * The executor to use.
+   * @param executor The executor to use.
    */
-  private final Executor executor;
+  @SuppressWarnings("JavaDoc") private final Executor executor;
 
   /**
-   * The log level to use when work submission hits the executor queue limit. This usually indicates
-   * saturation and may be of greater interest than the default {@code DEBUG} level.
+   * @param logLevelWorkQueueSaturation The log level to use when work submission hits the executor queue limit. This
+   *                                    usually indicates saturation and may be of greater interest than the default
+   *                                    {@code DEBUG} level.
    */
+  @SuppressWarnings("JavaDoc")
   @NotNull
   @Builder.Default
   private final Level logLevelWorkQueueSaturation = Level.DEBUG;

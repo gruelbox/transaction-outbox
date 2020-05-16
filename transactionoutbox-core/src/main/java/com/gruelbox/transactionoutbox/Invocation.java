@@ -13,38 +13,58 @@ import java.util.Map;
 /**
  * Represents the invocation of a specific method on a named class (where the name is provided by an
  * {@link Instantiator}), with the specified arguments.
+ *
+ * <p>Optimized for safe serialization via GSON.</p>
  */
 @SuppressWarnings("WeakerAccess")
 @Value
 @Slf4j
 public class Invocation {
 
-  /** The class name (as provided/expected by an {@link Instantiator}). */
+  /** @return The class name (as provided/expected by an {@link Instantiator}). */
+  @SuppressWarnings("JavaDoc")
   @SerializedName("c")
   String className;
 
-  /** The method name. Combined with {@link #parameterTypes}, uniquely identifies the method. */
+  /** @return The method name. Combined with {@link #parameterTypes}, uniquely identifies the method. */
+  @SuppressWarnings("JavaDoc")
   @SerializedName("m")
   String methodName;
 
   /**
-   * The method parameter types. Combined with {@link #methodName}, uniquely identifies the method.
+   * @return The method parameter types. Combined with {@link #methodName}, uniquely identifies the method.
    */
+  @SuppressWarnings("JavaDoc")
   @SerializedName("p")
   Class<?>[] parameterTypes;
 
-  /** The arguments to call. Must match {@link #parameterTypes}. */
+  /** @return The arguments to call. Must match {@link #parameterTypes}. */
+  @SuppressWarnings("JavaDoc")
   @SerializedName("a")
   Object[] args;
 
-  /** Thread-local context to recreate when running the task. */
+  /** @return Thread-local context to recreate when running the task. */
+  @SuppressWarnings("JavaDoc")
   @SerializedName("x")
   Map<String, String> mdc;
 
+  /**
+   * @param className The class name (as provided/expected by an {@link Instantiator}).
+   * @param methodName The method name. Combined with {@link #parameterTypes}, uniquely identifies the method.
+   * @param parameterTypes The method parameter types. Combined with {@link #methodName}, uniquely identifies the method.
+   * @param args The arguments to call. Must match {@link #parameterTypes}.
+   */
   public Invocation(String className, String methodName, Class<?>[] parameterTypes, Object[] args) {
     this(className, methodName, parameterTypes, args, null);
   }
 
+  /**
+   * @param className The class name (as provided/expected by an {@link Instantiator}).
+   * @param methodName The method name. Combined with {@link #parameterTypes}, uniquely identifies the method.
+   * @param parameterTypes The method parameter types. Combined with {@link #methodName}, uniquely identifies the method.
+   * @param args The arguments to call. Must match {@link #parameterTypes}.
+   * @param mdc Thread-local context to recreate when running the task.
+   */
   public Invocation(String className, String methodName, Class<?>[] parameterTypes, Object[] args, Map<String, String> mdc) {
     this.className = className;
     this.methodName = methodName;

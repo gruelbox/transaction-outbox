@@ -18,5 +18,5 @@ jobs:
         with:
           java-version: 11
 
-      - name: Build with Maven
-        run: mvn -B package
+      - name: Build with Maven and delombok
+        run: mvn -Pdelombok -B package
