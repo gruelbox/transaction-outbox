@@ -4,8 +4,10 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Saves and loads {@link TransactionOutboxEntry}s. May make this public to allow modification at
- * some point.
+ * Saves and loads {@link TransactionOutboxEntry}s. For most use cases, just use {@link DefaultPersistor}. It
+ * is parameterisable and designed for extension, so can be easily modified. Creating completely new implementations
+ * of {@link Persistor} should be reserved for cases where the underlying data store is of a completely different
+ * nature entirely.
  */
 public interface Persistor {
 
@@ -21,7 +23,7 @@ public interface Persistor {
   }
 
   /**
-   * Upgrades the database tables used by the persistor to the latest version. Called on creation of
+   * Upgrades any database schema used by the persistor to the latest version. Called on creation of
    * a {@link TransactionOutbox}.
    *
    * @param transactionManager The transactoin manager.
@@ -51,12 +53,52 @@ public interface Persistor {
    */
   void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
+  /**
+   * Modifies an existing {@link TransactionOutboxEntry}. Performs an optimistic lock check on any existing
+   * record via a compare-and-swap operation and throws {@link OptimisticLockException} if the lock is failed.
+   * {@link TransactionOutboxEntry#setVersion(int)} is called before returning containing the new version
+   * of the entry.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param entry The entry to be updated.
+   * @throws OptimisticLockException If no record with same id and version is found.
+   * @throws Exception Any other exception.
+   */
   void update(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
+  /**
+   * Attempts to pessimistically lock an existing {@link TransactionOutboxEntry}.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param entry The entry to be locked
+   * @throws OptimisticLockException If no record with same id and version is found.
+   * @throws Exception Any other exception.
+   */
   boolean lock(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
+  /**
+   * Clears the blacklisted flag and resets the attempt count to zero.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param entryId The entry id.
+   * @return true if the update was successful. This will be false if the record was no longer
+   * blacklisted or didn't exist anymore.
+   * @throws Exception Any other exception.
+   */
   boolean whitelist(Transaction tx, String entryId) throws Exception;
 
+  /**
+   * Selects up to a specified maximum number of non-blacklisted records which have passed their
+   * {@link TransactionOutboxEntry#getNextAttemptTime()}. Until a subsequent call to
+   * {@link #lock(Transaction, TransactionOutboxEntry)}, these records may be selected by another instance
+   * for processing.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param batchSize The number of records to select.
+   * @param now The time to use when selecting records.
+   * @return The records.
+   * @throws Exception Any exception.
+   */
   List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
       throws Exception;
 }
