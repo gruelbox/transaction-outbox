@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public abstract class AbstractFullyQualifiedNameInstantiator implements Instantiator {
+abstract class AbstractFullyQualifiedNameInstantiator implements Instantiator {
 
   @Override
   public final String getName(Class<?> clazz) {
