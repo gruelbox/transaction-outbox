@@ -1,6 +1,6 @@
 # transaction-outbox
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transaction-outbox/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transaction-outbox)
-[![Javadocs](https://www.javadoc.io/badge/com.gruelbox/transaction-outbox.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transaction-outbox)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-core/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-core)
+[![Javadocs](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-core.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core)
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox/badge)](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox)
 
@@ -159,6 +159,9 @@ TransactionOutbox outbox = TransactionOutbox.builder()
 
 ### Spring
 
+[![Spring on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring)
+[![Spring Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-spring.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-spring)
+
 With the out-of-the-box Spring integration, you can let Spring take over both the transaction management _and_ the role of the `Instantiator`. Add the `transactionoutbox-spring` dependency and create your `TransactionOutbox` as a bean:
 ```java
 @Bean
@@ -187,6 +190,9 @@ Notice that with a DI framework like Spring in play, you can **self-invoke** on 
 
 ### Guice
 
+[![Guice on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-guice/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-guice)
+[![Guice Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-guice.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-guice)
+
 To use Guice for DI instead, add a dependency on `transactionoutbox-guice`, and "inject the injector":
 ```java
 @Provides
@@ -201,6 +207,9 @@ TransactionOutbox transactionOutbox(Injector injector, TransactionManager transa
 ```
 
 ### jOOQ
+
+[![jOOQ on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-jooq/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-jooq)
+[![jOOQ Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-jooq.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-jooq)
 
 Like Transaction Outbox, jOOQ is intended to play nicely with any other transaction management approach, but provides its own as an option. If you are already using jOOQ's `TransactionProvider` via `DSLContext.transaction(...)` throughout your application, you can continue to do so.
 
