@@ -4,10 +4,10 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Saves and loads {@link TransactionOutboxEntry}s. For most use cases, just use {@link DefaultPersistor}. It
- * is parameterisable and designed for extension, so can be easily modified. Creating completely new implementations
- * of {@link Persistor} should be reserved for cases where the underlying data store is of a completely different
- * nature entirely.
+ * Saves and loads {@link TransactionOutboxEntry}s. For most use cases, just use {@link
+ * DefaultPersistor}. It is parameterisable and designed for extension, so can be easily modified.
+ * Creating completely new implementations of {@link Persistor} should be reserved for cases where
+ * the underlying data store is of a completely different nature entirely.
  */
 public interface Persistor {
 
@@ -54,10 +54,10 @@ public interface Persistor {
   void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
   /**
-   * Modifies an existing {@link TransactionOutboxEntry}. Performs an optimistic lock check on any existing
-   * record via a compare-and-swap operation and throws {@link OptimisticLockException} if the lock is failed.
-   * {@link TransactionOutboxEntry#setVersion(int)} is called before returning containing the new version
-   * of the entry.
+   * Modifies an existing {@link TransactionOutboxEntry}. Performs an optimistic lock check on any
+   * existing record via a compare-and-swap operation and throws {@link OptimisticLockException} if
+   * the lock is failed. {@link TransactionOutboxEntry#setVersion(int)} is called before returning
+   * containing the new version of the entry.
    *
    * @param tx The current {@link Transaction}.
    * @param entry The entry to be updated.
@@ -83,15 +83,15 @@ public interface Persistor {
    * @param tx The current {@link Transaction}.
    * @param entryId The entry id.
    * @return true if the update was successful. This will be false if the record was no longer
-   * blacklisted or didn't exist anymore.
+   *     blacklisted or didn't exist anymore.
    * @throws Exception Any other exception.
    */
   boolean whitelist(Transaction tx, String entryId) throws Exception;
 
   /**
    * Selects up to a specified maximum number of non-blacklisted records which have passed their
-   * {@link TransactionOutboxEntry#getNextAttemptTime()}. Until a subsequent call to
-   * {@link #lock(Transaction, TransactionOutboxEntry)}, these records may be selected by another instance
+   * {@link TransactionOutboxEntry#getNextAttemptTime()}. Until a subsequent call to {@link
+   * #lock(Transaction, TransactionOutboxEntry)}, these records may be selected by another instance
    * for processing.
    *
    * @param tx The current {@link Transaction}.
