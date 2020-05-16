@@ -156,7 +156,7 @@ repositories {
 
 ## Basic Configuration
 
-An application needs a single, shared instance of `TransactionOutbox`, which is configured using a builder on construction. This takes some time to get right, particularly if you already have a transaction management solution in your application.
+An application needs a single, shared instance of [`TransactionOutbox`](https://www.javadoc.io/static/com.gruelbox/transactionoutbox-core/0.1.57/com/gruelbox/transactionoutbox/TransactionOutbox.html), which is configured using a builder on construction. This takes some time to get right, particularly if you already have a transaction management solution in your application.
 
 ### No existing transaction manager or dependency injection
 If you have no existing transaction management, connection pooling or dependency injection, here's a quick way to get started:
@@ -179,13 +179,13 @@ transactionManager.inTransaction(tx -> {
   outbox.schedule(MyClass.class).myMethod("Foo", "Bar"));
 });
 ```
-Alternatively, you could create the `TransactionManager` from a `DataSource`, allowing you to use a connection pooling `DataSource` such as Hikari:
+Alternatively, you could create the [`TransactionManager`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionManager.html) from a [`DataSource`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionManager.html), allowing you to use a connection pooling `DataSource` such as Hikari:
 
 ```java
 TransactionManager transactionManager = TransactionManager.fromDataSource(dataSource);
 ```
 
-In this default configuration, `MyClass` must have a default constructor so the "real" implementation can be constructed at the point the method is actually invoked (which might be on another day on another instance of the application). However, you can avoid this requirement by providing an `Instantiator` on every instance of your application that knows how to create the objects:
+In this default configuration, `MyClass` must have a default constructor so the "real" implementation can be constructed at the point the method is actually invoked (which might be on another day on another instance of the application). However, you can avoid this requirement by providing an [`Instantiator`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/Instantiator.html) on every instance of your application that knows how to create the objects:
 ```java
 TransactionOutbox outbox = TransactionOutbox.builder()
   .instantiator(Instantiator.using(clazz -> createInstanceOf(clazz)))
@@ -279,7 +279,7 @@ dsl.transaction(ctx -> {
 
 ## Set up the background worker
 
-At the moment, if any work fails first time, it won't be retried.  All we need to add is a background task that repeatedly calls `TransactionOutbox.flush()`, e.g:
+At the moment, if any work fails first time, it won't be retried.  All we need to add is a background task that repeatedly calls [`TransactionOutbox.flush()`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html), e.g:
 ```java
 ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 scheduler.scheduleAtFixedRate(outbox::flush, 2, 2, TimeUnit.MINUTES);
@@ -288,7 +288,7 @@ Or with RxJava:
 ```java
 Observable.interval(2, MINUTES).subscribe(i -> outbox.flush());
 ```
-Wire this into your app in whichever way works best. Don't worry about it running on multiple instances simultaneously. It's designed to handle this, and indeed it can be a benefit; spreading high workloads across instances without any need for more complex high-availability configuration (that said, if you want to distribute work across a cluster at point of submission, this is also supported).
+Wire this into your app in whichever way works best. Don't worry about it running on multiple instances simultaneously. It's designed to handle concurrent use, and indeed it can be a benefit; spreading high workloads across instances without any need for more complex high-availability configuration (that said, if you want to distribute work across a cluster at point of submission, this is also supported).
 
 ## Managing the "dead letter queue"
 Work might be retried too many times and get blacklisted. You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
@@ -304,11 +304,11 @@ TransactionOutbox.builder()
     })
     .build();
 ```
-To mark the work for reprocessing, just use `TransactionOutbox.whitelist()`. Its failure count will be marked back down to zero and it will get reprocessed on the next call to `flush()`:
+To mark the work for reprocessing, just use [`TransactionOutbox.whitelist()`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html). Its failure count will be marked back down to zero and it will get reprocessed on the next call to `flush()`:
 ```
 transactionOutboxEntry.whitelist(entryId);
 ```
-A good approach here is to use the `TransactionOutboxListener` callback to post an [interactive Slack message](https://api.slack.com/legacy/interactive-messages) - this can operate as both the alert and the "button" allowing a support engineer to submit the work for reprocessing.
+A good approach here is to use the [`TransactionOutboxListener`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutboxListener.html) callback to post an [interactive Slack message](https://api.slack.com/legacy/interactive-messages) - this can operate as both the alert and the "button" allowing a support engineer to submit the work for reprocessing.
 
 ## Configuration reference
 
@@ -394,7 +394,7 @@ try {
 
 `TransactionOutbox` should not be directly stubbed (e.g. using Mockito); the contract is too complex to stub out.
 
-Instead, stubs exist for the various arguments to the builder, allowing you to build a `TransactionOutbox` with minimal external dependencies which can be called and verified in tests.
+Instead, [stubs](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/StubTransactionManager.html) [exist](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/StubPersistor.html) for the various arguments to the builder, allowing you to build a `TransactionOutbox` with minimal external dependencies which can be called and verified in tests.
 ```java
 // GIVEN
 SomeService mockService = Mockito.mock(SomeService.class);
