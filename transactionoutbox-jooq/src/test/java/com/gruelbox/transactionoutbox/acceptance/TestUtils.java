@@ -3,7 +3,6 @@ package com.gruelbox.transactionoutbox.acceptance;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.UncheckedException;
-
 import java.sql.Statement;
 
 class TestUtils {

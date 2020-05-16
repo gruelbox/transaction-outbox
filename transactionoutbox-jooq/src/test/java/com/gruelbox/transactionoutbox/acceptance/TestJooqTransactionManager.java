@@ -28,7 +28,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -36,7 +35,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
-
 import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.MatcherAssert;
 import org.jooq.DSLContext;
@@ -46,9 +44,7 @@ import org.jooq.impl.DataSourceConnectionProvider;
 import org.jooq.impl.DefaultConfiguration;
 import org.jooq.impl.ThreadLocalTransactionProvider;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 @Slf4j
@@ -88,7 +84,8 @@ class TestJooqTransactionManager {
     DefaultConfiguration configuration = new DefaultConfiguration();
     configuration.setConnectionProvider(connectionProvider);
     configuration.setSQLDialect(SQLDialect.H2);
-    configuration.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider, true));
+    configuration.setTransactionProvider(
+        new ThreadLocalTransactionProvider(connectionProvider, true));
     JooqTransactionListener listener = JooqTransactionManager.createListener();
     configuration.set(listener);
     dsl = DSL.using(configuration);
@@ -155,25 +152,27 @@ class TestJooqTransactionManager {
     withRunningFlusher(
         outbox,
         () -> {
-
           transactionManager.inTransactionThrows(
               tx1 -> {
                 outbox.schedule(Worker.class).process(1);
 
-                transactionManager.inTransactionThrows(tx2 -> outbox.schedule(Worker.class).process(2));
+                transactionManager.inTransactionThrows(
+                    tx2 -> outbox.schedule(Worker.class).process(2));
 
                 // Neither should be fired - the second job is in a nested transaction
                 CompletableFuture.allOf(
-                    runAsync(() -> uncheck(() -> assertFalse(latch1.await(2, TimeUnit.SECONDS)))),
-                    runAsync(() -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS))))
-                ).get();
+                        runAsync(
+                            () -> uncheck(() -> assertFalse(latch1.await(2, TimeUnit.SECONDS)))),
+                        runAsync(
+                            () -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS)))))
+                    .get();
               });
 
           // Should be fired after commit
           CompletableFuture.allOf(
-              runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
-              runAsync(() -> uncheck(() -> assertTrue(latch2.await(2, TimeUnit.SECONDS))))
-          ).get();
+                  runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
+                  runAsync(() -> uncheck(() -> assertTrue(latch2.await(2, TimeUnit.SECONDS)))))
+              .get();
         });
   }
 
@@ -244,22 +243,24 @@ class TestJooqTransactionManager {
 
                 // Neither should be fired - the second job is in a nested transaction
                 CompletableFuture.allOf(
-                    runAsync(() -> uncheck(() -> assertFalse(latch1.await(2, TimeUnit.SECONDS)))),
-                    runAsync(() -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS))))
-                ).get();
+                        runAsync(
+                            () -> uncheck(() -> assertFalse(latch1.await(2, TimeUnit.SECONDS)))),
+                        runAsync(
+                            () -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS)))))
+                    .get();
               });
 
           // Both should be fired after commit
           CompletableFuture.allOf(
-              runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
-              runAsync(() -> uncheck(() -> assertTrue(latch2.await(2, TimeUnit.SECONDS))))
-          ).get();
+                  runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
+                  runAsync(() -> uncheck(() -> assertTrue(latch2.await(2, TimeUnit.SECONDS)))))
+              .get();
         });
   }
 
   /**
-   * Ensures that given the rollback of an inner transaction, any outbox work scheduled in the inner transaction
-   * is rolled back while the outer transaction's works.
+   * Ensures that given the rollback of an inner transaction, any outbox work scheduled in the inner
+   * transaction is rolled back while the outer transaction's works.
    */
   @Test
   void testNestedWithInnerFailure() throws Exception {
@@ -292,22 +293,28 @@ class TestJooqTransactionManager {
               ctx -> {
                 outbox.schedule(Worker.class).process(1);
 
-                assertThrows(UnsupportedOperationException.class, () ->
-                  ctx.dsl().transaction(() -> {
-                    outbox.schedule(Worker.class).process(2);
-                    throw new UnsupportedOperationException();
-                  }));
+                assertThrows(
+                    UnsupportedOperationException.class,
+                    () ->
+                        ctx.dsl()
+                            .transaction(
+                                () -> {
+                                  outbox.schedule(Worker.class).process(2);
+                                  throw new UnsupportedOperationException();
+                                }));
 
                 CompletableFuture.allOf(
-                    runAsync(() -> uncheck(() -> assertFalse(latch1.await(2, TimeUnit.SECONDS)))),
-                    runAsync(() -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS))))
-                ).get();
+                        runAsync(
+                            () -> uncheck(() -> assertFalse(latch1.await(2, TimeUnit.SECONDS)))),
+                        runAsync(
+                            () -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS)))))
+                    .get();
               });
 
           CompletableFuture.allOf(
-              runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
-              runAsync(() -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS))))
-          ).get();
+                  runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
+                  runAsync(() -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS)))))
+              .get();
         });
   }
 

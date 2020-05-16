@@ -10,26 +10,23 @@ import org.junit.jupiter.api.Test;
 
 class TestGuiceInstantiator {
 
-    @Test
-    void testInjection() {
-        Injector injector = Guice.createInjector();
-        GuiceInstantiator guiceInstantiator = GuiceInstantiator.builder().injector(injector).build();
-        Object instance = guiceInstantiator.getInstance(Parent.class.getName());
-        MatcherAssert.assertThat(instance, Matchers.isA(Parent.class));
+  @Test
+  void testInjection() {
+    Injector injector = Guice.createInjector();
+    GuiceInstantiator guiceInstantiator = GuiceInstantiator.builder().injector(injector).build();
+    Object instance = guiceInstantiator.getInstance(Parent.class.getName());
+    MatcherAssert.assertThat(instance, Matchers.isA(Parent.class));
+  }
+
+  static final class Child {}
+
+  static final class Parent {
+
+    private final Child child;
+
+    @Inject
+    Parent(Child child) {
+      this.child = child;
     }
-
-    static final class Child {
-
-    }
-
-    static final class Parent {
-
-        private final Child child;
-
-        @Inject
-        Parent(Child child) {
-            this.child = child;
-        }
-    }
-
+  }
 }

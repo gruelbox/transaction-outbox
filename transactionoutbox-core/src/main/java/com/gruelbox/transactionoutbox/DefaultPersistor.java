@@ -12,9 +12,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import javax.validation.constraints.NotNull;
-
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -34,7 +32,10 @@ public class DefaultPersistor implements Persistor {
       // language=MySQL
       "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM TXNO_OUTBOX";
 
-  /** Only wait for 2 second before giving up on obtaining an entry lock. There's no point hanging around. */
+  /**
+   * Only wait for 2 second before giving up on obtaining an entry lock. There's no point hanging
+   * around.
+   */
   private static final int LOCK_TIMEOUT_SECONDS = 2;
 
   /** The database dialect to use. Required. */
@@ -42,8 +43,8 @@ public class DefaultPersistor implements Persistor {
 
   /**
    * The serializer to use for {@link Invocation}s. See {@link InvocationSerializer} for more
-   * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer()}
-   * with no whitelisted classes..
+   * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer()} with no
+   * whitelisted classes..
    */
   @Builder.Default
   private final InvocationSerializer serializer =
@@ -136,7 +137,8 @@ public class DefaultPersistor implements Persistor {
   }
 
   @Override
-  public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now) throws Exception {
+  public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
+      throws Exception {
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(

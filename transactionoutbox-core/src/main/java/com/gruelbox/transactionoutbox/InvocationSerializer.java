@@ -2,7 +2,6 @@ package com.gruelbox.transactionoutbox;
 
 import java.io.Reader;
 import java.io.Writer;
-import java.util.Set;
 
 /**
  * {@link Invocation} objects are inherently difficult to serialize safely since they are

@@ -4,12 +4,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
-import javax.validation.Validation;
-import javax.validation.ValidationException;
-import javax.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.cglib.proxy.Callback;
 import net.sf.cglib.proxy.Enhancer;
@@ -82,7 +78,7 @@ class Utils {
       return (T)
           Proxy.newProxyInstance(
               clazz.getClassLoader(),
-              new Class[]{clazz},
+              new Class[] {clazz},
               (proxy, method, args) -> processor.apply(method, args));
     } else if (hasDefaultConstructor(clazz)) {
       // CGLIB on its own can create an instance
@@ -93,27 +89,28 @@ class Utils {
                   (o, method, objects, methodProxy) -> processor.apply(method, objects));
     } else {
       // Slowest - we need to use Objenesis and CGLIB together
-      MethodInterceptor methodInterceptor = (o, method, objects, methodProxy) -> processor.apply(method, objects);
+      MethodInterceptor methodInterceptor =
+          (o, method, objects, methodProxy) -> processor.apply(method, objects);
       Enhancer enhancer = new Enhancer();
       enhancer.setSuperclass(clazz);
-      enhancer.setCallbackTypes(new Class<?>[]{MethodInterceptor.class});
+      enhancer.setCallbackTypes(new Class<?>[] {MethodInterceptor.class});
       enhancer.setInterceptDuringConstruction(true);
       Class<T> proxyClass = enhancer.createClass();
       // TODO could cache the ObjectInstantiators - see ObjenesisSupport in spring-aop
       ObjectInstantiator<T> oi = objenesis.getInstantiatorOf(proxyClass);
       T proxy = oi.newInstance();
-      ((net.sf.cglib.proxy.Factory) proxy).setCallbacks(new Callback[]{methodInterceptor});
+      ((net.sf.cglib.proxy.Factory) proxy).setCallbacks(new Callback[] {methodInterceptor});
       enhancer.setInterceptDuringConstruction(false);
       return proxy;
     }
   }
 
-  static <T> T firstNonNull(T one, Supplier < T > two) {
+  static <T> T firstNonNull(T one, Supplier<T> two) {
     if (one == null) return two.get();
     return one;
   }
 
-  static void logAtLevel (Logger logger, Level level, String message, Object...args){
+  static void logAtLevel(Logger logger, Level level, String message, Object... args) {
     switch (level) {
       case ERROR:
         logger.error(message, args);

@@ -1,25 +1,18 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import com.gruelbox.transactionoutbox.Instantiator;
-import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.StubPersistor;
 import com.gruelbox.transactionoutbox.StubTransactionManager;
-import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
-import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
-
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 @Slf4j
 public class TestMDC {
@@ -48,13 +41,12 @@ public class TestMDC {
 
     MDC.put("SESSION-KEY", "Foo");
     try {
-      transactionManager.inTransaction(() ->
-          outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
+      transactionManager.inTransaction(
+          () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
     } finally {
       MDC.clear();
     }
 
     assertTrue(latch.await(2, TimeUnit.SECONDS));
   }
-
 }

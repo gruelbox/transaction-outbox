@@ -3,7 +3,6 @@ package com.gruelbox.transactionoutbox;
 import static java.util.stream.Collectors.joining;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import javax.validation.constraints.Future;
 import javax.validation.constraints.NotNull;
@@ -32,13 +31,9 @@ public class TransactionOutboxEntry {
 
   @PositiveOrZero @Getter @Setter private int version;
 
-  @EqualsAndHashCode.Exclude
-  @ToString.Exclude
-  private volatile boolean initialized;
+  @EqualsAndHashCode.Exclude @ToString.Exclude private volatile boolean initialized;
 
-  @EqualsAndHashCode.Exclude
-  @ToString.Exclude
-  private String description;
+  @EqualsAndHashCode.Exclude @ToString.Exclude private String description;
 
   public String description() {
     if (!this.initialized) {
@@ -49,9 +44,7 @@ public class TransactionOutboxEntry {
                   "%s.%s(%s) [%s]",
                   invocation.getClassName(),
                   invocation.getMethodName(),
-                  Arrays.stream(invocation.getArgs())
-                      .map(this::stringify)
-                      .collect(joining(", ")),
+                  Arrays.stream(invocation.getArgs()).map(this::stringify).collect(joining(", ")),
                   id);
           this.description = description;
           this.initialized = true;
@@ -67,9 +60,7 @@ public class TransactionOutboxEntry {
       return "null";
     }
     if (o.getClass().isArray()) {
-      return "[" + Arrays.stream((Object[]) o)
-          .map(this::stringify)
-          .collect(joining(", ")) + "]";
+      return "[" + Arrays.stream((Object[]) o).map(this::stringify).collect(joining(", ")) + "]";
     }
     if (o instanceof String) {
       return "\"" + o + "\"";

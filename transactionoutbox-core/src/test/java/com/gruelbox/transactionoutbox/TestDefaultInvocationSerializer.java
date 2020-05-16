@@ -17,8 +17,6 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-
-import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -30,9 +28,10 @@ class TestDefaultInvocationSerializer {
   private static final String CLASS_NAME = "foo";
   private static final String METHOD_NAME = "bar";
 
-  private DefaultInvocationSerializer serializer = DefaultInvocationSerializer.builder()
-      .whitelistedTypes(Set.of(ExampleCustomEnum.class, ExampleCustomClass.class))
-      .build();
+  private DefaultInvocationSerializer serializer =
+      DefaultInvocationSerializer.builder()
+          .whitelistedTypes(Set.of(ExampleCustomEnum.class, ExampleCustomClass.class))
+          .build();
 
   @Test
   void testNoArgs() {
@@ -153,7 +152,9 @@ class TestDefaultInvocationSerializer {
   @Test
   void testCustomComplexClass() {
     Class<?>[] primitives = {ExampleCustomClass.class, ExampleCustomClass.class};
-    Object[] values = {new ExampleCustomClass("Foo", "Bar"), new ExampleCustomClass("Bish", "Bash")};
+    Object[] values = {
+      new ExampleCustomClass("Foo", "Bar"), new ExampleCustomClass("Bish", "Bash")
+    };
     check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
   }
 
@@ -178,7 +179,8 @@ class TestDefaultInvocationSerializer {
   }
 
   enum ExampleCustomEnum {
-    ONE, TWO
+    ONE,
+    TWO
   }
 
   static class ExampleCustomClass {
@@ -201,10 +203,7 @@ class TestDefaultInvocationSerializer {
 
     @Override
     public String toString() {
-      return "ExampleCustomClass{" +
-          "arg1='" + arg1 + '\'' +
-          ", arg2='" + arg2 + '\'' +
-          '}';
+      return "ExampleCustomClass{" + "arg1='" + arg1 + '\'' + ", arg2='" + arg2 + '\'' + '}';
     }
 
     @Override
@@ -212,8 +211,7 @@ class TestDefaultInvocationSerializer {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       ExampleCustomClass that = (ExampleCustomClass) o;
-      return Objects.equals(arg1, that.arg1) &&
-          Objects.equals(arg2, that.arg2);
+      return Objects.equals(arg1, that.arg1) && Objects.equals(arg2, that.arg2);
     }
 
     @Override
@@ -221,5 +219,4 @@ class TestDefaultInvocationSerializer {
       return Objects.hash(arg1, arg2);
     }
   }
-
 }

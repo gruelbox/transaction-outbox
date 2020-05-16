@@ -5,7 +5,6 @@ import java.util.Deque;
 import java.util.LinkedList;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.DSLContext;
-import org.jooq.impl.DefaultConfiguration;
 
 /**
  * Transaction manager which uses jOOQ's transaction management. In order to wire into JOOQ's
