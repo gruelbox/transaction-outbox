@@ -7,9 +7,7 @@
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox/badge)](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox)
 
-A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. Can replace or augment message queues such as RabbitMQ or ApacheMQ, while additionally allowing local work and remote requests to be committed in the same database transaction, guaranteeing eventual consistency*.
-
-Transaction Outbox has a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks.  Every aspect is highly configurable or overridable.  It features out-of-the-box support for **Spring DI**, **Spring Txn**, **Hibernate**, **Guice**, **MySQL 5 & 8**, **PostgreSQL 9-12** and **H2**.
+A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. `TransactionOutbox` has a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks.  Every aspect is highly configurable or overridable.  It features out-of-the-box support for **Spring DI**, **Spring Txn**, **Hibernate**, **Guice**, **MySQL 5 & 8**, **PostgreSQL 9-12** and **H2**.
 
 ## Contents
 1. [Why do I need it?](#why-do-i-need-it)
@@ -108,7 +106,7 @@ The latest stable release is available from Maven Central. The latest version is
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
-  <version>${transactionoutbox-version}</version>
+  <version>${transactionoutbox.version}</version>
 </dependency>
 ```
 #### Gradle
@@ -135,7 +133,7 @@ Maven Central is updated regularly. Alternatively, if you want to stay at the bl
   </repository>
 </repositories>
 ```
-You will need to authenticate with Github to use Github Package Repository, with something like the following in your Maven `settings.xml`:
+You will need to authenticate with Github to use Github Package Repository. Create a personal access token in [your GitHub settings](https://github.com/settings/tokens). It only needs **read:package** permissions. Then add something like the following in your Maven `settings.xml`:
 ```xml
 <servers>
     <server>
@@ -145,6 +143,8 @@ You will need to authenticate with Github to use Github Package Repository, with
     </server>
 </servers>
 ```
+The above example uses environment variables, allowing you to keep the credentials out of source control, but you can hard-code them if you know what you're doing.
+
 #### Gradle
 ```groovy
 repositories {
