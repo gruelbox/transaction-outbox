@@ -47,13 +47,6 @@
     <module>transactionoutbox-jooq</module>
   </modules>
 
-  <pluginRepositories>
-    <pluginRepository>
-      <id>projectlombok.org</id>
-      <url>https://projectlombok.org/edge-releases</url>
-    </pluginRepository>
-  </pluginRepositories>
-
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -329,6 +322,12 @@
         <src.dir>target/generated-sources/delombok</src.dir>
         <skip.format>true</skip.format>
       </properties>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>projectlombok.org</id>
+          <url>https://projectlombok.org/edge-releases</url>
+        </pluginRepository>
+      </pluginRepositories>
       <build>
         <plugins>
           <plugin>
