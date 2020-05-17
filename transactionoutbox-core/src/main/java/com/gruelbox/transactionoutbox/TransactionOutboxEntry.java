@@ -11,7 +11,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-import lombok.experimental.Accessors;
 import lombok.experimental.SuperBuilder;
 
 /**
@@ -28,49 +27,62 @@ public class TransactionOutboxEntry {
    * @return The id of the record. Usually a UUID.
    */
   @SuppressWarnings("JavaDoc")
-  @NotNull @Getter private final String id;
+  @NotNull
+  @Getter
+  private final String id;
 
   /**
    * @param invocation The method invocation to perform.
    * @return The method invocation to perform.
    */
   @SuppressWarnings("JavaDoc")
-  @NotNull @Getter private final Invocation invocation;
+  @NotNull
+  @Getter
+  private final Invocation invocation;
 
   /**
    * @param nextAttemptTime The timestamp after which the task is available for re-attempting.
    * @return The timestamp after which the task is available for re-attempting.
    */
   @SuppressWarnings("JavaDoc")
-  @Future @Getter @Setter private Instant nextAttemptTime;
+  @Future
+  @Getter
+  @Setter
+  private Instant nextAttemptTime;
 
   /**
    * @param attempts The number of unsuccessful attempts so far made to run the task.
    * @return The number of unsuccessful attempts so far made to run the task.
    */
   @SuppressWarnings("JavaDoc")
-  @PositiveOrZero @Getter @Setter private int attempts;
+  @PositiveOrZero
+  @Getter
+  @Setter
+  private int attempts;
 
   /**
    * @param blacklisted True if the task has exceeded the configured maximum number of attempts.
    * @return True if the task has exceeded the configured maximum number of attempts.
    */
   @SuppressWarnings("JavaDoc")
-  @Getter @Setter private boolean blacklisted;
+  @Getter
+  @Setter
+  private boolean blacklisted;
 
   /**
    * @param version The optimistic locking version. Monotonically increasing with each update.
    * @return The optimistic locking version. Monotonically increasing with each update.
    */
   @SuppressWarnings("JavaDoc")
-  @PositiveOrZero @Getter @Setter private int version;
+  @PositiveOrZero
+  @Getter
+  @Setter
+  private int version;
 
   @EqualsAndHashCode.Exclude @ToString.Exclude private volatile boolean initialized;
   @EqualsAndHashCode.Exclude @ToString.Exclude private String description;
 
-  /**
-   * @return A textual description of the task.
-   */
+  /** @return A textual description of the task. */
   public String description() {
     if (!this.initialized) {
       synchronized (this) {

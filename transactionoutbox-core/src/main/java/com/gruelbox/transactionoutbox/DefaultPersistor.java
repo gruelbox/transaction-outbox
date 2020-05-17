@@ -36,9 +36,9 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultPersistor implements Persistor {
 
   /**
-   * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write lock. There's no point
-   *     making this long; it's always better to just back off as quickly as possible and try
-   *     another record. Generally these lock timeouts only kick in if {@link
+   * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
+   *     lock. There's no point making this long; it's always better to just back off as quickly as
+   *     possible and try another record. Generally these lock timeouts only kick in if {@link
    *     Dialect#isSupportsSkipLock()} is false.
    */
   @SuppressWarnings("JavaDoc")
@@ -58,9 +58,9 @@ public class DefaultPersistor implements Persistor {
   private final String tableName = "TXNO_OUTBOX";
 
   /**
-   * @param migrate Set to false to disable automatic database migrations. This may be preferred if the
-   *     default migration behaviour interferes with your existing toolset, and you prefer to manage
-   *     the migrations explicitly (e.g. using FlyWay or Liquibase), or your do not give the
+   * @param migrate Set to false to disable automatic database migrations. This may be preferred if
+   *     the default migration behaviour interferes with your existing toolset, and you prefer to
+   *     manage the migrations explicitly (e.g. using FlyWay or Liquibase), or your do not give the
    *     application DDL permissions at runtime.
    */
   @SuppressWarnings("JavaDoc")
@@ -69,9 +69,9 @@ public class DefaultPersistor implements Persistor {
   private final boolean migrate = true;
 
   /**
-   * @param serializer The serializer to use for {@link Invocation}s. See {@link InvocationSerializer} for more
-   * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer()} with no
-   * whitelisted classes..
+   * @param serializer The serializer to use for {@link Invocation}s. See {@link
+   *     InvocationSerializer} for more information. Defaults to {@link
+   *     InvocationSerializer#createDefaultJsonSerializer()} with no whitelisted classes..
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
