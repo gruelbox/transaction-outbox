@@ -36,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultPersistor implements Persistor {
 
   /**
-   * @param How many seconds to wait before timing out on obtaining a write lock. There's no point
+   * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write lock. There's no point
    *     making this long; it's always better to just back off as quickly as possible and try
    *     another record. Generally these lock timeouts only kick in if {@link
    *     Dialect#isSupportsSkipLock()} is false.
@@ -46,19 +46,19 @@ public class DefaultPersistor implements Persistor {
   @NotNull
   private final int writeLockTimeoutSeconds = 2;
 
-  /** @param The database dialect to use. Required. */
+  /** @param dialect The database dialect to use. Required. */
   @SuppressWarnings("JavaDoc")
   @NotNull
   private final Dialect dialect;
 
-  /** @param The database table name. The default is {@code TXNO_OUTBOX}. */
+  /** @param tableName The database table name. The default is {@code TXNO_OUTBOX}. */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
   @NotNull
   private final String tableName = "TXNO_OUTBOX";
 
   /**
-   * @param Set to false to disable automatic database migrations. This may be preferred if the
+   * @param migrate Set to false to disable automatic database migrations. This may be preferred if the
    *     default migration behaviour interferes with your existing toolset, and you prefer to manage
    *     the migrations explicitly (e.g. using FlyWay or Liquibase), or your do not give the
    *     application DDL permissions at runtime.
@@ -69,10 +69,11 @@ public class DefaultPersistor implements Persistor {
   private final boolean migrate = true;
 
   /**
-   * The serializer to use for {@link Invocation}s. See {@link InvocationSerializer} for more
+   * @param serializer The serializer to use for {@link Invocation}s. See {@link InvocationSerializer} for more
    * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer()} with no
    * whitelisted classes..
    */
+  @SuppressWarnings("JavaDoc")
   @Builder.Default
   private final InvocationSerializer serializer =
       InvocationSerializer.createDefaultJsonSerializer();
