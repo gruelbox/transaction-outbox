@@ -1,6 +1,9 @@
 # transaction-outbox
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-core/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-core)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-core/badge.svg)](#stable-releases)
 [![Javadocs](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-core.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core)
+![GitHub Release Date](https://img.shields.io/github/release-date/gruelbox/transaction-outbox)
+[![Latest snapshot](https://img.shields.io/github/v/tag/gruelbox/transaction-outbox?label=snapshot&sort=semver)](#development-snapshots)
+![GitHub last commit](https://img.shields.io/github/last-commit/gruelbox/transaction-outbox)
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox/badge)](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox)
 
@@ -11,6 +14,8 @@ Transaction Outbox has a clean, extensible API, very few dependencies and plays 
 ## Contents
 1. [Why do I need it?](#why-do-i-need-it)
 1. [Installation](#installation)
+   1. [Stable releases](#stable-releases)
+   1. [Development snapshots](#development-snapshots)
 1. [Basic Configuration](#basic-configuration)
    1. [No existing transaction manager or dependency injection](#no-existing-transaction-manager-or-dependency-injection)
    1. [Spring](#spring)
