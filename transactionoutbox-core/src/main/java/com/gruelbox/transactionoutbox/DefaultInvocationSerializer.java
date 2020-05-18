@@ -45,6 +45,8 @@ import java.util.TimeZone;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.validation.constraints.Null;
+
 /**
  * A locked-down serializer which supports a limited list of primitives and simple JDK value types.
  * Only the following are supported:
@@ -80,13 +82,13 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
   private final Gson gson;
 
   @Builder
-  DefaultInvocationSerializer(Set<Class<?>> whitelistedTypes) {
+  DefaultInvocationSerializer(Set<Class<?>> whitelistedTypes, Integer version) {
     this.gson =
         new GsonBuilder()
             .registerTypeAdapter(
                 Invocation.class,
                 new InvocationJsonSerializer(
-                    whitelistedTypes == null ? Set.of() : whitelistedTypes))
+                    whitelistedTypes == null ? Set.of() : whitelistedTypes, version == null ? 2 : version))
             .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
             .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
             .create();
@@ -109,10 +111,12 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
   private static final class InvocationJsonSerializer
       implements JsonSerializer<Invocation>, JsonDeserializer<Invocation> {
 
+    private final int version;
     private Map<Class<?>, String> classToName = new HashMap<>();
     private Map<String, Class<?>> nameToClass = new HashMap<>();
 
-    InvocationJsonSerializer(Set<Class<?>> whitelistedClasses) {
+    InvocationJsonSerializer(Set<Class<?>> whitelistedClasses, int version) {
+      this.version = version;
       addClassPair(byte.class, "byte");
       addClassPair(short.class, "short");
       addClassPair(int.class, "int");
@@ -202,24 +206,49 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
 
     @Override
     public JsonElement serialize(Invocation src, Type typeOfSrc, JsonSerializationContext context) {
+      if (version == 1) {
+        log.warn("Serializing as deprecated version {}", version);
+        return serializeV1(src, typeOfSrc, context);
+      }
+      JsonObject obj = new JsonObject();
+      obj.addProperty("c", src.getClassName());
+      obj.addProperty("m", src.getMethodName());
+      JsonArray params = new JsonArray();
+      JsonArray args = new JsonArray();
+      int i = 0;
+      for (Class<?> parameterType : src.getParameterTypes()) {
+        params.add(nameForClass(parameterType));
+        Object arg = src.getArgs()[i];
+        if (arg == null) {
+          JsonObject jsonObject = new JsonObject();
+          jsonObject.add("t", null);
+          jsonObject.add("v", null);
+          args.add(jsonObject);
+        } else {
+          JsonObject jsonObject = new JsonObject();
+          jsonObject.addProperty("t", nameForClass(arg.getClass()));
+          jsonObject.add("v", context.serialize(arg));
+          args.add(jsonObject);
+        }
+        i++;
+      }
+      obj.add("p", params);
+      obj.add("a", args);
+      obj.add("x", context.serialize(src.getMdc()));
+      return obj;
+    }
+
+    JsonElement serializeV1(Invocation src, Type typeOfSrc, JsonSerializationContext context) {
       JsonObject obj = new JsonObject();
       obj.addProperty("c", src.getClassName());
       obj.addProperty("m", src.getMethodName());
       JsonArray params = new JsonArray();
       int i = 0;
       for (Class<?> parameterType : src.getParameterTypes()) {
-        Object arg = src.getArgs()[i];
-        if (arg == null) {
-          JsonObject jsonObject = new JsonObject();
-          jsonObject.add("t", null);
-          jsonObject.add("v", null);
-          params.add(jsonObject);
-        } else {
-          JsonObject jsonObject = new JsonObject();
-          jsonObject.addProperty("t", nameForClass(parameterType));
-          jsonObject.add("v", context.serialize(arg));
-          params.add(jsonObject);
-        }
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("t", nameForClass(parameterType));
+        jsonObject.add("v", context.serialize(src.getArgs()[i]));
+        params.add(jsonObject);
         i++;
       }
       obj.add("p", params);
@@ -238,17 +267,33 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
 
       JsonArray jsonParams = jsonObject.get("p").getAsJsonArray();
       Class<?>[] params = new Class<?>[jsonParams.size()];
-      Object[] args = new Object[jsonParams.size()];
       for (int i = 0; i < jsonParams.size(); i++) {
         JsonElement param = jsonParams.get(i);
-        Class<?> paramClass = classForName(param.getAsJsonObject().get("t").getAsString());
-        params[i] = paramClass;
-        JsonElement paramValue = param.getAsJsonObject().get("v");
+        if (param.isJsonObject()) {
+          // For backwards compatibility
+          params[i] = classForName(param.getAsJsonObject().get("t").getAsString());
+        } else {
+          params[i] = classForName(param.getAsString());
+        }
+      }
+
+      JsonElement argsElement = jsonObject.get("a");
+      if (argsElement == null) {
+        // For backwards compatibility
+        argsElement = jsonObject.get("p");
+      }
+      JsonArray jsonArgs = argsElement.getAsJsonArray();
+      Object[] args = new Object[jsonArgs.size()];
+      for (int i = 0; i < jsonArgs.size(); i++) {
+        JsonElement arg = jsonArgs.get(i);
+        JsonElement argType = arg.getAsJsonObject().get("t");
+        JsonElement argValue = arg.getAsJsonObject().get("v");
+        Class<?> argClass = classForName(argType.getAsString());
         try {
-          args[i] = context.deserialize(paramValue, paramClass);
+          args[i] = context.deserialize(argValue, argClass);
         } catch (Exception e) {
           throw new RuntimeException(
-              "Failed to deserialize parameter [" + paramValue + "] of type [" + paramClass + "]",
+              "Failed to deserialize arg [" + argValue + "] of type [" + argType + "]",
               e);
         }
       }

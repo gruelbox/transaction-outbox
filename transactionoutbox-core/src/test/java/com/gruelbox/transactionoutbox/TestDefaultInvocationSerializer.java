@@ -1,5 +1,12 @@
 package com.gruelbox.transactionoutbox;
 
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.DynamicNode;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.params.provider.Arguments;
+
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.DayOfWeek;
@@ -17,9 +24,7 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import java.util.stream.Stream;
 
 @SuppressWarnings("RedundantCast")
 @Slf4j
@@ -28,154 +33,167 @@ class TestDefaultInvocationSerializer {
   private static final String CLASS_NAME = "foo";
   private static final String METHOD_NAME = "bar";
 
-  private DefaultInvocationSerializer serializer =
-      DefaultInvocationSerializer.builder()
+  @TestFactory
+  Stream<DynamicNode> versions() {
+    return TestingUtils.parameterizedClassTester("serializedVersion={0}", Inner.class,
+        Stream.of(Arguments.of(1), Arguments.of(2), Arguments.of(new Object[] { null })));
+  }
+
+  static class Inner {
+
+    private DefaultInvocationSerializer serializer;
+
+    Inner(Integer version) {
+      this.serializer = DefaultInvocationSerializer.builder()
           .whitelistedTypes(Set.of(ExampleCustomEnum.class, ExampleCustomClass.class))
+          .version(version)
           .build();
+    }
 
-  @Test
-  void testNoArgs() {
-    check(new Invocation(String.class.getName(), "toString", new Class<?>[0], new Object[0]));
-  }
+    @Test
+    void testNoArgs() {
+      check(new Invocation(String.class.getName(), "toString", new Class<?>[0], new Object[0]));
+    }
 
-  @Test
-  void testArrays() {
-    check(
-        new Invocation(
-            CLASS_NAME,
-            METHOD_NAME,
-            new Class<?>[] {int[].class},
-            new Object[] {new int[] {1, 2, 3}}));
-    check(
-        new Invocation(
-            CLASS_NAME,
-            METHOD_NAME,
-            new Class<?>[] {Integer[].class},
-            new Object[] {new Integer[] {1, 2, 3}}));
-    check(
-        new Invocation(
-            CLASS_NAME,
-            METHOD_NAME,
-            new Class<?>[] {String[].class},
-            new Object[] {new String[] {"1", "2", "3"}}));
-  }
+    @Test
+    void testArrays() {
+      check(
+          new Invocation(
+              CLASS_NAME,
+              METHOD_NAME,
+              new Class<?>[]{int[].class},
+              new Object[]{new int[]{1, 2, 3}}));
+      check(
+          new Invocation(
+              CLASS_NAME,
+              METHOD_NAME,
+              new Class<?>[]{Integer[].class},
+              new Object[]{new Integer[]{1, 2, 3}}));
+      check(
+          new Invocation(
+              CLASS_NAME,
+              METHOD_NAME,
+              new Class<?>[]{String[].class},
+              new Object[]{new String[]{"1", "2", "3"}}));
+    }
 
-  @Test
-  void testPrimitives() {
-    Class<?>[] primitives = {
-      byte.class,
-      short.class,
-      int.class,
-      long.class,
-      float.class,
-      double.class,
-      boolean.class,
-      char.class
-    };
-    Object[] values = {(byte) 1, (short) 2, 3, 4L, 1.23F, 1.23D, true, '-'};
-    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
-  }
+    @Test
+    void testPrimitives() {
+      Class<?>[] primitives = {
+          byte.class,
+          short.class,
+          int.class,
+          long.class,
+          float.class,
+          double.class,
+          boolean.class,
+          char.class
+      };
+      Object[] values = {(byte) 1, (short) 2, 3, 4L, 1.23F, 1.23D, true, '-'};
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
 
-  @Test
-  void testBoxedPrimitives() {
-    Class<?>[] primitives = {
-      Byte.class,
-      Short.class,
-      Integer.class,
-      Long.class,
-      Float.class,
-      Double.class,
-      Boolean.class,
-      Character.class,
-      String.class
-    };
-    Object[] values = {
-      (Byte) (byte) 1,
-      (Short) (short) 2,
-      (Integer) 3,
-      (Long) 4L,
-      (Float) 1.23F,
-      (Double) 1.23D,
-      (Boolean) true,
-      (Character) '-',
-      "Foo"
-    };
-    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
-  }
+    @Test
+    void testBoxedPrimitives() {
+      Class<?>[] primitives = {
+          Byte.class,
+          Short.class,
+          Integer.class,
+          Long.class,
+          Float.class,
+          Double.class,
+          Boolean.class,
+          Character.class,
+          String.class
+      };
+      Object[] values = {
+          (Byte) (byte) 1,
+          (Short) (short) 2,
+          (Integer) 3,
+          (Long) 4L,
+          (Float) 1.23F,
+          (Double) 1.23D,
+          (Boolean) true,
+          (Character) '-',
+          "Foo"
+      };
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
 
-  @Test
-  void testJavaDateEnums() {
-    Class<?>[] primitives = {DayOfWeek.class, Month.class, ChronoUnit.class};
-    Object[] values = {DayOfWeek.FRIDAY, Month.APRIL, ChronoUnit.DAYS};
-    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
-  }
+    @Test
+    void testJavaDateEnums() {
+      Class<?>[] primitives = {DayOfWeek.class, Month.class, ChronoUnit.class};
+      Object[] values = {DayOfWeek.FRIDAY, Month.APRIL, ChronoUnit.DAYS};
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
 
-  @Test
-  void testJavaUtilDate() {
-    Class<?>[] primitives = {Date.class};
-    Object[] values = {new Date()};
-    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
-  }
+    @Test
+    void testJavaUtilDate() {
+      Class<?>[] primitives = {Date.class};
+      Object[] values = {new Date()};
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
 
-  @Test
-  void testJavaTimeClasses() {
-    Class<?>[] primitives = {
-      Duration.class,
-      Instant.class,
-      LocalDate.class,
-      LocalDateTime.class,
-      MonthDay.class,
-      Period.class,
-      Year.class,
-      YearMonth.class
-    };
-    Object[] values = {
-      Duration.ofDays(1),
-      Instant.now(),
-      LocalDate.now(),
-      LocalDateTime.now(),
-      MonthDay.of(1, 1),
-      Period.ofMonths(1),
-      Year.now(),
-      YearMonth.now()
-    };
-    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
-  }
+    @Test
+    void testJavaTimeClasses() {
+      Class<?>[] primitives = {
+          Duration.class,
+          Instant.class,
+          LocalDate.class,
+          LocalDateTime.class,
+          MonthDay.class,
+          Period.class,
+          Year.class,
+          YearMonth.class
+      };
+      Object[] values = {
+          Duration.ofDays(1),
+          Instant.now(),
+          LocalDate.now(),
+          LocalDateTime.now(),
+          MonthDay.of(1, 1),
+          Period.ofMonths(1),
+          Year.now(),
+          YearMonth.now()
+      };
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
 
-  @Test
-  void testCustomEnum() {
-    Class<?>[] primitives = {ExampleCustomEnum.class, ExampleCustomEnum.class};
-    Object[] values = {ExampleCustomEnum.ONE, ExampleCustomEnum.TWO};
-    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
-  }
+    @Test
+    void testCustomEnum() {
+      Class<?>[] primitives = {ExampleCustomEnum.class, ExampleCustomEnum.class};
+      Object[] values = {ExampleCustomEnum.ONE, ExampleCustomEnum.TWO};
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
 
-  @Test
-  void testCustomComplexClass() {
-    Class<?>[] primitives = {ExampleCustomClass.class, ExampleCustomClass.class};
-    Object[] values = {
-      new ExampleCustomClass("Foo", "Bar"), new ExampleCustomClass("Bish", "Bash")
-    };
-    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
-  }
+    @Test
+    void testCustomComplexClass() {
+      Class<?>[] primitives = {ExampleCustomClass.class, ExampleCustomClass.class};
+      Object[] values = {
+          new ExampleCustomClass("Foo", "Bar"), new ExampleCustomClass("Bish", "Bash")
+      };
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
 
-  @Test
-  void testMDC() {
-    Class<?>[] primitives = {Integer.class};
-    Object[] values = {1};
-    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values, Map.of("A", "1", "B", "2")));
-  }
+    @Test
+    void testMDC() {
+      Class<?>[] primitives = {Integer.class};
+      Object[] values = {1};
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values, Map.of("A", "1", "B", "2")));
+    }
 
-  void check(Invocation invocation) {
-    Invocation deserialized = serdeser(invocation);
-    Assertions.assertEquals(deserialized, serdeser(invocation));
-    Assertions.assertEquals(invocation, deserialized);
-  }
+    void check(Invocation invocation) {
+      Invocation deserialized = serdeser(invocation);
+      Assertions.assertEquals(deserialized, serdeser(invocation));
+      Assertions.assertEquals(invocation, deserialized);
+    }
 
-  Invocation serdeser(Invocation invocation) {
-    var writer = new StringWriter();
-    serializer.serializeInvocation(invocation, writer);
-    log.info("Serialised as: {}", writer.toString());
-    return serializer.deserializeInvocation(new StringReader(writer.toString()));
+    Invocation serdeser(Invocation invocation) {
+      var writer = new StringWriter();
+      serializer.serializeInvocation(invocation, writer);
+      log.info("Serialised as: {}", writer.toString());
+      return serializer.deserializeInvocation(new StringReader(writer.toString()));
+    }
   }
 
   enum ExampleCustomEnum {
