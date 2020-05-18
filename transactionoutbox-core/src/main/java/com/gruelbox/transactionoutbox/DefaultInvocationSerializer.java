@@ -155,6 +155,8 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       addClassPair(DayOfWeek.class, "DayOfWeek");
       addClassPair(ChronoUnit.class, "ChronoUnit");
 
+      addClassPair(Transaction.class, "Transaction");
+
       whitelistedClasses.forEach(clazz -> addClassPair(clazz, clazz.getName()));
     }
 

@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.gruelbox.transactionoutbox.Context;
+import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
+import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.Persistor;
@@ -20,9 +22,9 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import java.sql.SQLException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -123,7 +125,12 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(createTransactionManager())
-            .persistor(Persistor.forDialect(Dialect.H2))
+            .persistor(DefaultPersistor.builder()
+                .dialect(Dialect.H2)
+                .serializer(DefaultInvocationSerializer.builder()
+                    .whitelistedTypes(Set.of(org.jooq.Configuration.class))
+                    .build())
+                .build())
             .listener(
                 new TransactionOutboxListener() {
                   @Override
@@ -160,7 +167,12 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(createTransactionManager())
-            .persistor(Persistor.forDialect(Dialect.H2))
+            .persistor(DefaultPersistor.builder()
+                .dialect(Dialect.H2)
+                .serializer(DefaultInvocationSerializer.builder()
+                    .whitelistedTypes(Set.of(org.jooq.Configuration.class))
+                    .build())
+                .build())
             .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
@@ -269,7 +281,12 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(createTransactionManager())
-            .persistor(Persistor.forDialect(Dialect.H2))
+            .persistor(DefaultPersistor.builder()
+                .dialect(Dialect.H2)
+                .serializer(DefaultInvocationSerializer.builder()
+                    .whitelistedTypes(Set.of(org.jooq.Configuration.class))
+                    .build())
+                .build())
             .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
