@@ -253,7 +253,9 @@ TransactionOutbox transactionOutbox(Injector injector, TransactionManager transa
 
 Like Transaction Outbox, jOOQ is intended to play nicely with any other transaction management approach, but provides its own as an option. If you are already using jOOQ's `TransactionProvider` via `DSLContext.transaction(...)` throughout your application, you can continue to do so.
 
-While it's not necessary, it is recommended that you use jOOQ's `ThreadLocalTransactionProvider`. `TransactionOutbox` assumes thread-bound transactions, so by keeping transactions bound to threads in jOOQ you will avoid hard-to-trace errors when transactions are passed across threads.  The following is a recommended setup:
+jOOQ gives you the option to either use thread-local transaction management or explicitly pass a contextual `DSLContext` or `Configuration` down your stack. You can do the same thing with `TransactionOutbox`.
+
+#### Using thread-local transactions
 
 ```java
 // Configure jOOQ to use thread-local transaction management. 
@@ -283,6 +285,38 @@ dsl.transaction(() -> {
   outbox.schedule(MyClass.class).publishCustomerCreatedEvent(2L);
 });
 ```
+#### Using explicit transaction context
+
+Without the need to synchronise the thread context, setup is a bit easier:
+
+```java
+// Create the DSLContext and connect the listener
+var dsl = DSL.using(dataSource, SQLDialect.H2);
+dsl.configuration().set(JooqTransactionManager.createListener());
+
+// Create the outbox
+var outbox = TransactionOutbox.builder()
+    .transactionManager(JooqTransactionManager.create(dsl))
+    .persistor(Persistor.forDialect(Dialect.MY_SQL_8))
+    .build();
+```
+
+However, we now need to modify the method we call to allow `TransactionOutbox` to inject the transaction context at the time it is run:
+```java
+void publishCustomerCreatedEvent(long id, @Context Configuration cfg2) {
+  ...
+}
+```
+And provide it for recording the database record at the time of scheduling:
+```java
+dsl.transaction(cfg1 -> {
+  new CustomerDao(cfg1).save(new Customer(1L, "Martin", "Carthy"));
+  new CustomerDao(cfg1).save(new Customer(2L, "Dave", "Pegg"));
+  outbox.schedule(MyClass.class).publishCustomerCreatedEvent(1L, cfg1);
+  outbox.schedule(MyClass.class).publishCustomerCreatedEvent(2L, cfg1);
+});
+```
+> **NOTE** that in the examples above, `cfg1` is the transaction context in which the request is written to the database, and `cfg2` is the context in which it is executed, which will be a different transaction at some later time. `cfg1` is stripped from the request before writing it to the database and replaced with `cfg2` at run time.
 
 ## Set up the background worker
 
