@@ -90,9 +90,7 @@ public class TransactionOutbox {
     this.persistor.migrate(transactionManager);
   }
 
-  /**
-   * @return A builder for creating a new instance of {@link TransactionOutbox}.
-   */
+  /** @return A builder for creating a new instance of {@link TransactionOutbox}. */
   public static TransactionOutboxBuilder builder() {
     return new TransactionOutboxBuilder();
   }
@@ -362,9 +360,7 @@ public class TransactionOutbox {
     }
   }
 
-  /**
-   * Builder for {@link TransactionOutbox}.
-   */
+  /** Builder for {@link TransactionOutbox}. */
   @ToString
   public static class TransactionOutboxBuilder {
 

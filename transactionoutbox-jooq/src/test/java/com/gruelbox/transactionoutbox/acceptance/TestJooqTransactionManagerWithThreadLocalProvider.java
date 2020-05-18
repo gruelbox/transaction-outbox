@@ -26,7 +26,6 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import java.sql.SQLException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
@@ -267,12 +266,14 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
-            .persistor(DefaultPersistor.builder()
-                .dialect(Dialect.H2)
-                .serializer(DefaultInvocationSerializer.builder()
-                    .whitelistedTypes(Set.of(org.jooq.Configuration.class))
+            .persistor(
+                DefaultPersistor.builder()
+                    .dialect(Dialect.H2)
+                    .serializer(
+                        DefaultInvocationSerializer.builder()
+                            .whitelistedTypes(Set.of(org.jooq.Configuration.class))
+                            .build())
                     .build())
-                .build())
             .listener(
                 new TransactionOutboxListener() {
                   @Override

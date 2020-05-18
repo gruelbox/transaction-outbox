@@ -1,12 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.DynamicNode;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestFactory;
-import org.junit.jupiter.params.provider.Arguments;
-
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.DayOfWeek;
@@ -25,6 +18,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.DynamicNode;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.params.provider.Arguments;
 
 @SuppressWarnings("RedundantCast")
 @Slf4j
@@ -35,8 +34,10 @@ class TestDefaultInvocationSerializer {
 
   @TestFactory
   Stream<DynamicNode> versions() {
-    return TestingUtils.parameterizedClassTester("serializedVersion={0}", Inner.class,
-        Stream.of(Arguments.of(1), Arguments.of(2), Arguments.of(new Object[] { null })));
+    return TestingUtils.parameterizedClassTester(
+        "serializedVersion={0}",
+        Inner.class,
+        Stream.of(Arguments.of(1), Arguments.of(2), Arguments.of(new Object[] {null})));
   }
 
   static class Inner {
@@ -44,10 +45,11 @@ class TestDefaultInvocationSerializer {
     private DefaultInvocationSerializer serializer;
 
     Inner(Integer version) {
-      this.serializer = DefaultInvocationSerializer.builder()
-          .whitelistedTypes(Set.of(ExampleCustomEnum.class, ExampleCustomClass.class))
-          .version(version)
-          .build();
+      this.serializer =
+          DefaultInvocationSerializer.builder()
+              .whitelistedTypes(Set.of(ExampleCustomEnum.class, ExampleCustomClass.class))
+              .version(version)
+              .build();
     }
 
     @Test
@@ -61,33 +63,33 @@ class TestDefaultInvocationSerializer {
           new Invocation(
               CLASS_NAME,
               METHOD_NAME,
-              new Class<?>[]{int[].class},
-              new Object[]{new int[]{1, 2, 3}}));
+              new Class<?>[] {int[].class},
+              new Object[] {new int[] {1, 2, 3}}));
       check(
           new Invocation(
               CLASS_NAME,
               METHOD_NAME,
-              new Class<?>[]{Integer[].class},
-              new Object[]{new Integer[]{1, 2, 3}}));
+              new Class<?>[] {Integer[].class},
+              new Object[] {new Integer[] {1, 2, 3}}));
       check(
           new Invocation(
               CLASS_NAME,
               METHOD_NAME,
-              new Class<?>[]{String[].class},
-              new Object[]{new String[]{"1", "2", "3"}}));
+              new Class<?>[] {String[].class},
+              new Object[] {new String[] {"1", "2", "3"}}));
     }
 
     @Test
     void testPrimitives() {
       Class<?>[] primitives = {
-          byte.class,
-          short.class,
-          int.class,
-          long.class,
-          float.class,
-          double.class,
-          boolean.class,
-          char.class
+        byte.class,
+        short.class,
+        int.class,
+        long.class,
+        float.class,
+        double.class,
+        boolean.class,
+        char.class
       };
       Object[] values = {(byte) 1, (short) 2, 3, 4L, 1.23F, 1.23D, true, '-'};
       check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
@@ -96,26 +98,26 @@ class TestDefaultInvocationSerializer {
     @Test
     void testBoxedPrimitives() {
       Class<?>[] primitives = {
-          Byte.class,
-          Short.class,
-          Integer.class,
-          Long.class,
-          Float.class,
-          Double.class,
-          Boolean.class,
-          Character.class,
-          String.class
+        Byte.class,
+        Short.class,
+        Integer.class,
+        Long.class,
+        Float.class,
+        Double.class,
+        Boolean.class,
+        Character.class,
+        String.class
       };
       Object[] values = {
-          (Byte) (byte) 1,
-          (Short) (short) 2,
-          (Integer) 3,
-          (Long) 4L,
-          (Float) 1.23F,
-          (Double) 1.23D,
-          (Boolean) true,
-          (Character) '-',
-          "Foo"
+        (Byte) (byte) 1,
+        (Short) (short) 2,
+        (Integer) 3,
+        (Long) 4L,
+        (Float) 1.23F,
+        (Double) 1.23D,
+        (Boolean) true,
+        (Character) '-',
+        "Foo"
       };
       check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
     }
@@ -137,24 +139,24 @@ class TestDefaultInvocationSerializer {
     @Test
     void testJavaTimeClasses() {
       Class<?>[] primitives = {
-          Duration.class,
-          Instant.class,
-          LocalDate.class,
-          LocalDateTime.class,
-          MonthDay.class,
-          Period.class,
-          Year.class,
-          YearMonth.class
+        Duration.class,
+        Instant.class,
+        LocalDate.class,
+        LocalDateTime.class,
+        MonthDay.class,
+        Period.class,
+        Year.class,
+        YearMonth.class
       };
       Object[] values = {
-          Duration.ofDays(1),
-          Instant.now(),
-          LocalDate.now(),
-          LocalDateTime.now(),
-          MonthDay.of(1, 1),
-          Period.ofMonths(1),
-          Year.now(),
-          YearMonth.now()
+        Duration.ofDays(1),
+        Instant.now(),
+        LocalDate.now(),
+        LocalDateTime.now(),
+        MonthDay.of(1, 1),
+        Period.ofMonths(1),
+        Year.now(),
+        YearMonth.now()
       };
       check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
     }
@@ -170,7 +172,7 @@ class TestDefaultInvocationSerializer {
     void testCustomComplexClass() {
       Class<?>[] primitives = {ExampleCustomClass.class, ExampleCustomClass.class};
       Object[] values = {
-          new ExampleCustomClass("Foo", "Bar"), new ExampleCustomClass("Bish", "Bash")
+        new ExampleCustomClass("Foo", "Bar"), new ExampleCustomClass("Bish", "Bash")
       };
       check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
     }
@@ -179,7 +181,8 @@ class TestDefaultInvocationSerializer {
     void testMDC() {
       Class<?>[] primitives = {Integer.class};
       Object[] values = {1};
-      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values, Map.of("A", "1", "B", "2")));
+      check(
+          new Invocation(CLASS_NAME, METHOD_NAME, primitives, values, Map.of("A", "1", "B", "2")));
     }
 
     void check(Invocation invocation) {

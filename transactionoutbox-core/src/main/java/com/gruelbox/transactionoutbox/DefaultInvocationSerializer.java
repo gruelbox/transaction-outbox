@@ -45,8 +45,6 @@ import java.util.TimeZone;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.validation.constraints.Null;
-
 /**
  * A locked-down serializer which supports a limited list of primitives and simple JDK value types.
  * Only the following are supported:
@@ -88,7 +86,8 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
             .registerTypeAdapter(
                 Invocation.class,
                 new InvocationJsonSerializer(
-                    whitelistedTypes == null ? Set.of() : whitelistedTypes, version == null ? 2 : version))
+                    whitelistedTypes == null ? Set.of() : whitelistedTypes,
+                    version == null ? 2 : version))
             .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
             .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
             .create();
@@ -296,8 +295,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
             args[i] = context.deserialize(argValue, argClass);
           } catch (Exception e) {
             throw new RuntimeException(
-                "Failed to deserialize arg [" + argValue + "] of type [" + argType + "]",
-                e);
+                "Failed to deserialize arg [" + argValue + "] of type [" + argType + "]", e);
           }
         }
       }
