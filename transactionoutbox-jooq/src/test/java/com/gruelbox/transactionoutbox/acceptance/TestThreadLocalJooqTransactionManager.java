@@ -48,7 +48,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 @Slf4j
-class TestJooqTransactionManager {
+class TestThreadLocalJooqTransactionManager {
 
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
@@ -384,7 +384,7 @@ class TestJooqTransactionManager {
               .parallel()
               .forEach(
                   i ->
-                      dsl.transaction(
+                      transactionManager.inTransaction(
                           () -> {
                             for (int j = 0; j < 10; j++) {
                               outbox.schedule(InterfaceWorker.class).process(i * 10 + j);

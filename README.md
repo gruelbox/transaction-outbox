@@ -253,8 +253,10 @@ TransactionOutbox transactionOutbox(Injector injector, TransactionManager transa
 
 Like Transaction Outbox, jOOQ is intended to play nicely with any other transaction management approach, but provides its own as an option. If you are already using jOOQ's `TransactionProvider` via `DSLContext.transaction(...)` throughout your application, you can continue to do so.
 
+While it's not necessary, it is recommended that you use jOOQ's `ThreadLocalTransactionProvider`. `TransactionOutbox` assumes thread-bound transactions, so by keeping transactions bound to threads in jOOQ you will avoid hard-to-trace errors when transactions are passed across threads.  The following is a recommended setup:
+
 ```java
-// Configure jOOQ to use thread-local transaction management
+// Configure jOOQ to use thread-local transaction management. 
 var jooqConfig = new DefaultConfiguration();
 var connectionProvider = new DataSourceConnectionProvider(dataSource);
 jooqConfig.setConnectionProvider(connectionProvider);
@@ -273,8 +275,8 @@ var outbox = TransactionOutbox.builder()
     .build();
 }
 
-// Use jOOQ and Transaction Outbox together
-dsl.transaction(ctx -> {
+// Use jOOQ and Transaction Outbox together, assuming thread-bound transactions
+dsl.transaction(() -> {
   customerDao.save(new Customer(1L, "Martin", "Carthy"));
   customerDao.save(new Customer(2L, "Dave", "Pegg"));
   outbox.schedule(MyClass.class).publishCustomerCreatedEvent(1L);

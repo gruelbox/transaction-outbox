@@ -22,48 +22,58 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * The default {@link Persistor} for {@link TransactionOutbox}.
  *
- * <p>Saves requests to a relational database table, by default called {@code TXNO_OUTBOX}. This can optionally
- * be automatically created and upgraded by {@link DefaultPersistor}, although this behaviour can be disabled if
- * you wish.
+ * <p>Saves requests to a relational database table, by default called {@code TXNO_OUTBOX}. This can
+ * optionally be automatically created and upgraded by {@link DefaultPersistor}, although this
+ * behaviour can be disabled if you wish.
  *
- * <p>More significant changes can be achieved by subclassing, which is explicitly supported. If, on the other hand,
- * you want to use a completely non-relational underlying data store or do something equally esoteric, you
- * may prefer to implement {@link Persistor} from the ground up.</p>
+ * <p>More significant changes can be achieved by subclassing, which is explicitly supported. If, on
+ * the other hand, you want to use a completely non-relational underlying data store or do something
+ * equally esoteric, you may prefer to implement {@link Persistor} from the ground up.
  */
 @Slf4j
 @SuperBuilder
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class DefaultPersistor implements Persistor {
 
-  /** @param How many seconds to wait before timing out on obtaining a write lock. There's no point making this
-   *              long; it's always better to just back off as quickly as possible and try another record. Generally
-   *             these lock timeouts only kick in if {@link Dialect#isSupportsSkipLock()} is false. */
+  /**
+   * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
+   *     lock. There's no point making this long; it's always better to just back off as quickly as
+   *     possible and try another record. Generally these lock timeouts only kick in if {@link
+   *     Dialect#isSupportsSkipLock()} is false.
+   */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  @NotNull private final int writeLockTimeoutSeconds = 2;
+  @NotNull
+  private final int writeLockTimeoutSeconds = 2;
 
-  /** @param The database dialect to use. Required. */
+  /** @param dialect The database dialect to use. Required. */
   @SuppressWarnings("JavaDoc")
-  @NotNull private final Dialect dialect;
+  @NotNull
+  private final Dialect dialect;
 
-  /** @param The database table name. The default is {@code TXNO_OUTBOX}. */
-  @SuppressWarnings("JavaDoc")
-  @Builder.Default
-  @NotNull private final String tableName = "TXNO_OUTBOX";
-
-  /** @param Set to false to disable automatic database migrations. This may be preferred if the default
-   *             migration behaviour interferes with your existing toolset, and you prefer to manage the migrations
-   *             explicitly (e.g. using FlyWay or Liquibase), or your do not give the application DDL permissions
-   *             at runtime. */
+  /** @param tableName The database table name. The default is {@code TXNO_OUTBOX}. */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  @NotNull private final boolean migrate = true;
+  @NotNull
+  private final String tableName = "TXNO_OUTBOX";
 
   /**
-   * The serializer to use for {@link Invocation}s. See {@link InvocationSerializer} for more
-   * information. Defaults to {@link InvocationSerializer#createDefaultJsonSerializer()} with no
-   * whitelisted classes..
+   * @param migrate Set to false to disable automatic database migrations. This may be preferred if
+   *     the default migration behaviour interferes with your existing toolset, and you prefer to
+   *     manage the migrations explicitly (e.g. using FlyWay or Liquibase), or your do not give the
+   *     application DDL permissions at runtime.
    */
+  @SuppressWarnings("JavaDoc")
+  @Builder.Default
+  @NotNull
+  private final boolean migrate = true;
+
+  /**
+   * @param serializer The serializer to use for {@link Invocation}s. See {@link
+   *     InvocationSerializer} for more information. Defaults to {@link
+   *     InvocationSerializer#createDefaultJsonSerializer()} with no whitelisted classes..
+   */
+  @SuppressWarnings("JavaDoc")
   @Builder.Default
   private final InvocationSerializer serializer =
       InvocationSerializer.createDefaultJsonSerializer();
@@ -93,7 +103,8 @@ public class DefaultPersistor implements Persistor {
   public void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception {
     try (PreparedStatement stmt =
         // language=MySQL
-        tx.connection().prepareStatement("DELETE FROM " + tableName + " WHERE id = ? and version = ?")) {
+        tx.connection()
+            .prepareStatement("DELETE FROM " + tableName + " WHERE id = ? and version = ?")) {
       stmt.setString(1, entry.getId());
       stmt.setInt(2, entry.getVersion());
       if (stmt.executeUpdate() != 1) {
@@ -109,7 +120,9 @@ public class DefaultPersistor implements Persistor {
         tx.connection()
             .prepareStatement(
                 // language=MySQL
-                "UPDATE " + tableName + " "
+                "UPDATE "
+                    + tableName
+                    + " "
                     + "SET nextAttemptTime = ?, attempts = ?, blacklisted = ?, version = ? "
                     + "WHERE id = ? and version = ?")) {
       stmt.setTimestamp(1, Timestamp.from(entry.getNextAttemptTime()));
@@ -133,7 +146,9 @@ public class DefaultPersistor implements Persistor {
             .prepareStatement(
                 dialect.isSupportsSkipLock()
                     // language=MySQL
-                    ? "SELECT id FROM " + tableName + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
+                    ? "SELECT id FROM "
+                        + tableName
+                        + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
                     // language=MySQL
                     : "SELECT id FROM " + tableName + " WHERE id = ? AND version = ? FOR UPDATE")) {
       stmt.setString(1, entry.getId());
@@ -147,7 +162,9 @@ public class DefaultPersistor implements Persistor {
   public boolean whitelist(Transaction tx, String entryId) throws Exception {
     PreparedStatement stmt =
         tx.prepareBatchStatement(
-            "UPDATE " + tableName + " SET attempts = 0, blacklisted = false "
+            "UPDATE "
+                + tableName
+                + " SET attempts = 0, blacklisted = false "
                 + "WHERE blacklisted = true AND id = ?");
     stmt.setString(1, entryId);
     stmt.setQueryTimeout(writeLockTimeoutSeconds);
@@ -161,7 +178,9 @@ public class DefaultPersistor implements Persistor {
         tx.connection()
             .prepareStatement(
                 // language=MySQL
-                "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM " + tableName + " WHERE nextAttemptTime < ? AND blacklisted = false LIMIT ?")) {
+                "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM "
+                    + tableName
+                    + " WHERE nextAttemptTime < ? AND blacklisted = false LIMIT ?")) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
       return gatherResults(batchSize, stmt);

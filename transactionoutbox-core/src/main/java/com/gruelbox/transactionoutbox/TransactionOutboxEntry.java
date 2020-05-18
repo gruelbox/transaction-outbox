@@ -13,28 +13,76 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
-@SuppressWarnings("WeakerAccess")
+/**
+ * Internal representation of a {@link TransactionOutbox} task. Generally only directly of interest
+ * to implementers of SPIs such as {@link Persistor} or {@link Submitter}.
+ */
 @SuperBuilder(toBuilder = true)
 @EqualsAndHashCode
 @ToString
 public class TransactionOutboxEntry {
 
-  @NotNull @Getter private final String id;
+  /**
+   * @param id The id of the record. Usually a UUID.
+   * @return The id of the record. Usually a UUID.
+   */
+  @SuppressWarnings("JavaDoc")
+  @NotNull
+  @Getter
+  private final String id;
 
-  @NotNull @Getter private final Invocation invocation;
+  /**
+   * @param invocation The method invocation to perform.
+   * @return The method invocation to perform.
+   */
+  @SuppressWarnings("JavaDoc")
+  @NotNull
+  @Getter
+  private final Invocation invocation;
 
-  @Future @Getter @Setter private Instant nextAttemptTime;
+  /**
+   * @param nextAttemptTime The timestamp after which the task is available for re-attempting.
+   * @return The timestamp after which the task is available for re-attempting.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Future
+  @Getter
+  @Setter
+  private Instant nextAttemptTime;
 
-  @PositiveOrZero @Getter @Setter private int attempts;
+  /**
+   * @param attempts The number of unsuccessful attempts so far made to run the task.
+   * @return The number of unsuccessful attempts so far made to run the task.
+   */
+  @SuppressWarnings("JavaDoc")
+  @PositiveOrZero
+  @Getter
+  @Setter
+  private int attempts;
 
-  @Getter @Setter private boolean blacklisted;
+  /**
+   * @param blacklisted True if the task has exceeded the configured maximum number of attempts.
+   * @return True if the task has exceeded the configured maximum number of attempts.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  @Setter
+  private boolean blacklisted;
 
-  @PositiveOrZero @Getter @Setter private int version;
+  /**
+   * @param version The optimistic locking version. Monotonically increasing with each update.
+   * @return The optimistic locking version. Monotonically increasing with each update.
+   */
+  @SuppressWarnings("JavaDoc")
+  @PositiveOrZero
+  @Getter
+  @Setter
+  private int version;
 
   @EqualsAndHashCode.Exclude @ToString.Exclude private volatile boolean initialized;
-
   @EqualsAndHashCode.Exclude @ToString.Exclude private String description;
 
+  /** @return A textual description of the task. */
   public String description() {
     if (!this.initialized) {
       synchronized (this) {

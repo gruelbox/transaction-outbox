@@ -36,15 +36,16 @@ public class TransactionOutbox {
   @NotNull private final TransactionManager transactionManager;
 
   /**
-   * The method {@link TransactionOutbox} uses to interact with the database. This encapsulates all
-   * {@link TransactionOutbox} interaction with the database outside transaction management (which
-   * is handled by the {@link TransactionManager}).
-   *
-   * <p>Defaults to a multi-platform SQL implementation that should not need to be changed in most
-   * cases. If re-implementing this interface, read the documentation on {@link Persistor}
-   * carefully.
+   * @param persistor The method {@link TransactionOutbox} uses to interact with the database. This
+   *     encapsulates all {@link TransactionOutbox} interaction with the database outside
+   *     transaction management (which is handled by the {@link TransactionManager}). Defaults to a
+   *     multi-platform SQL implementation that should not need to be changed in most cases. If
+   *     re-implementing this interface, read the documentation on {@link Persistor} carefully.
    */
-  @Valid @NotNull private final Persistor persistor;
+  @SuppressWarnings("JavaDoc")
+  @Valid
+  @NotNull
+  private final Persistor persistor;
 
   /**
    * Responsible for describing a class as a name and creating instances of that class at runtime
@@ -256,6 +257,7 @@ public class TransactionOutbox {
    *
    * @param entry The entry.
    */
+  @SuppressWarnings("WeakerAccess")
   public void processNow(TransactionOutboxEntry entry) {
     try {
       var success =
