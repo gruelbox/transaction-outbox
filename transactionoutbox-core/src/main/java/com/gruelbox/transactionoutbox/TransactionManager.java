@@ -125,6 +125,10 @@ public interface TransactionManager {
    * Runs the specified work in the context of the "current" transaction (the definition of which is
    * up to the implementation).
    *
+   * <p>Only supported by transaction managers which support thread-local context. Those that do not
+   * support this method <em>must</em> support {@link #transactionFromContext(Object)} and context
+   * injection into {@link TransactionOutbox#schedule(Class)}.
+   *
    * @param work Code which must be called while the transaction is active.
    * @param <E> The exception type.
    * @throws E If any exception is thrown by {@link Runnable}.
@@ -139,13 +143,39 @@ public interface TransactionManager {
    * Runs the specified work in the context of the "current" transaction (the definition of which is
    * up to the implementation).
    *
+   * <p>Only supported by transaction managers which support thread-local context. Those that do not
+   * support this method <em>must</em> support {@link #transactionFromContext(Object)} and context
+   * injection into {@link TransactionOutbox#schedule(Class)}.
+   *
    * @param work Code which must be called while the transaction is active.
    * @param <T> The type returned.
    * @param <E> The exception type.
    * @return The value returned by {@code work}.
    * @throws E If any exception is thrown by {@link Runnable}.
    * @throws NoTransactionActiveException If a transaction is not currently active.
+   * @throws UnsupportedOperationException If the transaction manager does not support thread-local
+   *     context.
    */
   <T, E extends Exception> T requireTransactionReturns(ThrowingTransactionalSupplier<T, E> work)
       throws E, NoTransactionActiveException;
+
+  /**
+   * Given an implementation-specific transaction context, return the active {@link Transaction}.
+   * Must be supported by any implementations which do not support {@link
+   * #requireTransactionReturns(ThrowingTransactionalSupplier)}, but otherwise can be ignored. If
+   * not supported, context injection into {@link TransactionOutbox#schedule(Class)} will not be
+   * supported.
+   *
+   * @param context The implementation-specific context, of the same type returned by {@link
+   *     #contextType()}.
+   * @return The transaction.
+   */
+  default Transaction transactionFromContext(Object context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /** @return The type expected by {@link #transactionFromContext(Object)}. */
+  default Class<?> contextType() {
+    return null;
+  }
 }

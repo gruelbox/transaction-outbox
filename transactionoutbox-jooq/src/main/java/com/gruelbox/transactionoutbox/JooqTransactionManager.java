@@ -1,9 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
-import com.gruelbox.transactionoutbox.AbstractThreadLocalTransactionManager.ThreadLocalTransaction;
-import java.util.Deque;
-import java.util.LinkedList;
-import lombok.extern.slf4j.Slf4j;
+import org.jooq.Configuration;
 import org.jooq.DSLContext;
 
 /**
@@ -24,19 +21,7 @@ import org.jooq.DSLContext;
  * DSLContext dsl = DSL.using(configuration);
  * return JooqTransactionManager.create(dsl, listener);</pre>
  */
-@Slf4j
-public final class JooqTransactionManager
-    extends AbstractThreadLocalTransactionManager<ThreadLocalTransaction> {
-
-  private final ThreadLocal<Deque<DSLContext>> currentDsl =
-      ThreadLocal.withInitial(LinkedList::new);
-
-  /** The parent jOOQ DSL context. */
-  private final DSLContext parentDsl;
-
-  private JooqTransactionManager(DSLContext parentDsl) {
-    this.parentDsl = parentDsl;
-  }
+public interface JooqTransactionManager extends TransactionManager {
 
   /**
    * Creates the {@link org.jooq.TransactionListener} to wire into the {@link DSLContext}. See
@@ -44,43 +29,73 @@ public final class JooqTransactionManager
    *
    * @return The transaction listener.
    */
-  public static JooqTransactionListener createListener() {
+  static JooqTransactionListener createListener() {
     return new JooqTransactionListener();
   }
 
   /**
-   * Creates the transaction manager.
+   * Creates a transaction manager which uses thread-local context. Attaches to the supplied {@link
+   * JooqTransactionListener} to receive notifications of transactions starting and finishing on the
+   * local thread so that {@link TransactionOutbox#schedule(Class)} can be called for methods that
+   * don't explicitly inject a {@link Configuration}, e.g.:
+   *
+   * <pre>dsl.transaction(() -&gt; outbox.schedule(Foo.class).process("bar"));</pre>
    *
    * @param dslContext The DSL context.
    * @param listener The listener, linked to the DSL context.
    * @return The transaction manager.
    */
-  public static JooqTransactionManager create(
-      DSLContext dslContext, JooqTransactionListener listener) {
-    var result = new JooqTransactionManager(dslContext);
+  static TransactionManager create(DSLContext dslContext, JooqTransactionListener listener) {
+    var result = new ThreadLocalJooqTransactionManager(dslContext);
     listener.setJooqTransactionManager(result);
     return result;
   }
 
+  /**
+   * Creates a transaction manager which uses explicitly-passed context, allowing multiple active
+   * contexts in the current thread and contexts which are passed between threads. Requires a {@link
+   * org.jooq.Configuration} for the transaction context or a {@link org.jooq.Transaction} to be
+   * used to be passed any method called via {@link TransactionOutbox#schedule(Class)} and injected
+   * using {@link org.jooq.Context}. Example:
+   *
+   * <pre>
+   * void doSchedule() {
+   *   dsl.transaction(ctx -&gt; outbox.schedule(getClass()).process("bar", null));
+   * }
+   *
+   * void process(String arg, @Context org.jooq.Configuration ctx) {
+   *   ...
+   * }</pre>
+   *
+   * <p>Or:
+   *
+   * <pre>
+   * void doSchedule() {
+   *   transactionManager.inTransaction(tx -&gt; outbox.schedule(getClass()).process("bar", null));
+   * }
+   *
+   * void process(String arg, Transaction tx) {
+   *   ...
+   * }</pre>
+   *
+   * @param dslContext The DSL context.
+   * @return The transaction manager.
+   */
+  static TransactionManager create(DSLContext dslContext) {
+    return new DefaultJooqTransactionManager(dslContext);
+  }
+
   @Override
-  public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E> work) {
-    DSLContext dsl = currentDsl.get().isEmpty() ? parentDsl : currentDsl.get().peek();
-    return dsl.transactionResult(
-        config ->
-            config
-                .dsl()
-                .connectionResult(connection -> work.doWork(peekTransaction().orElseThrow())));
-  }
-
-  void pushContext(DSLContext dsl) {
-    currentDsl.get().push(dsl);
-  }
-
-  void popContext() {
-    currentDsl.get().pop();
-    if (currentDsl.get().isEmpty()) {
-      currentDsl.remove();
+  default Transaction transactionFromContext(Object context) {
+    Object txn = ((Configuration) context).data(JooqTransactionListener.TXN_KEY);
+    if (txn == null) {
+      throw new IllegalStateException(
+          JooqTransactionListener.class.getSimpleName() + " is not attached to the DSL");
     }
+    return (Transaction) txn;
+  }
+
+  default Class<?> contextType() {
+    return Configuration.class;
   }
 }

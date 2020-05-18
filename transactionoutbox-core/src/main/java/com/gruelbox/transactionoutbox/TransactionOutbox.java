@@ -9,14 +9,17 @@ import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.stream.IntStream;
 import javax.validation.ClockProvider;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
-import lombok.Builder;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
 import org.slf4j.MDC;
@@ -35,88 +38,30 @@ public class TransactionOutbox {
 
   @NotNull private final TransactionManager transactionManager;
 
-  /**
-   * @param persistor The method {@link TransactionOutbox} uses to interact with the database. This
-   *     encapsulates all {@link TransactionOutbox} interaction with the database outside
-   *     transaction management (which is handled by the {@link TransactionManager}). Defaults to a
-   *     multi-platform SQL implementation that should not need to be changed in most cases. If
-   *     re-implementing this interface, read the documentation on {@link Persistor} carefully.
-   */
-  @SuppressWarnings("JavaDoc")
-  @Valid
-  @NotNull
-  private final Persistor persistor;
+  @Valid @NotNull private final Persistor persistor;
 
-  /**
-   * Responsible for describing a class as a name and creating instances of that class at runtime
-   * from the name. See {@link Instantiator} for more information.
-   *
-   * <p>Defaults to {@link Instantiator#usingReflection()}.
-   */
   @Valid @NotNull private final Instantiator instantiator;
 
-  /**
-   * Used for scheduling background work.
-   *
-   * <p>If no submitter is specified, {@link TransactionOutbox} will use {@link
-   * Submitter#withDefaultExecutor()}.
-   *
-   * <p>See {@link Submitter#withExecutor(Executor)} for more information on designing bespoke
-   * submitters for remoting.
-   */
   @NotNull private final Submitter submitter;
 
-  /**
-   * How often tasks should be re-attempted. This should be balanced with {@link #flushBatchSize}
-   * and the frequency with which {@link #flush()} is called to achieve optimum throughput.
-   *
-   * <p>Defaults to 2 minutes.
-   */
   @NotNull private final Duration attemptFrequency;
 
-  /**
-   * The log level to use when logging temporary task failures. Includes a full stack trace.
-   * Defaults to {@code WARN} level, but you may wish to reduce it to a lower level if you consider
-   * warnings to be incidents.
-   */
   @NotNull private final Level logLevelTemporaryFailure;
 
-  /** After now many attempts a task should be blacklisted. Defaults to 5. */
   @Min(1)
   private final int blacklistAfterAttempts;
 
-  /**
-   * How many items should be attempted in each flush. This should be balanced with {@link
-   * #attemptFrequency} and the frequency with which {@link #flush()} is called to achieve optimum
-   * throughput.
-   *
-   * <p>Defaults to 4096.
-   */
   @Min(1)
   private final int flushBatchSize;
 
-  /**
-   * The {@link Clock} source. Generally best left alone except when testing. Defaults to the system
-   * clock.
-   */
   @NotNull private final ClockProvider clockProvider;
 
-  /**
-   * Event listener. Allows client code to react to tasks running, failing or getting blacklisted.
-   */
   @NotNull private final TransactionOutboxListener listener;
 
-  /**
-   * Determines whether to include any Slf4j {@link MDC} (Mapped Diagnostic Context) in serialized
-   * invocations and recreate the state in submitted tasks.
-   *
-   * <p>Defaults to true.
-   */
   private final boolean serializeMdc;
 
   private final Validator validator;
 
-  @Builder
   private TransactionOutbox(
       TransactionManager transactionManager,
       Instantiator instantiator,
@@ -145,6 +90,11 @@ public class TransactionOutbox {
     this.persistor.migrate(transactionManager);
   }
 
+  /** @return A builder for creating a new instance of {@link TransactionOutbox}. */
+  public static TransactionOutboxBuilder builder() {
+    return new TransactionOutboxBuilder();
+  }
+
   /**
    * The main entry point for submitting new transaction outbox tasks.
    *
@@ -169,7 +119,51 @@ public class TransactionOutbox {
    * @return The proxy of {@code T}.
    */
   public <T> T schedule(Class<T> clazz) {
-    return Utils.createProxy(clazz, (method, args) -> uncheckedly(() -> schedule(method, args)));
+    return Utils.createProxy(
+        clazz, (method, args) -> uncheckedly(() -> extractTransactionAndSchedule(method, args)));
+  }
+
+  private <T> T extractTransactionAndSchedule(Method method, Object[] args) throws Exception {
+    if (transactionManager.contextType() != null) {
+      OptionalInt txIndex =
+          IntStream.range(0, args.length)
+              .filter(
+                  i ->
+                      transactionManager.contextType().isInstance(args[i])
+                          || args[i] instanceof Transaction)
+              .findFirst();
+      if (txIndex.isPresent()) {
+        Object context = args[txIndex.getAsInt()];
+        if (context instanceof Transaction) {
+          Object[] argv = Arrays.copyOf(args, args.length);
+          argv[txIndex.getAsInt()] = null;
+          return schedule((Transaction) context, method, argv);
+        }
+        Transaction transaction = transactionManager.transactionFromContext(context);
+        Object[] argv = Arrays.copyOf(args, args.length);
+        argv[txIndex.getAsInt()] = null;
+        return schedule(transaction, method, argv);
+      }
+    }
+    return transactionManager.requireTransactionReturns(
+        transaction -> schedule(transaction, method, args));
+  }
+
+  private Transaction transactionFromContext(Object transactionContext) {
+    if (transactionContext instanceof Transaction) {
+      return (Transaction) transactionContext;
+    } else {
+      if (!transactionManager.contextType().isInstance(transactionContext)) {
+        throw new IllegalArgumentException(
+            transactionContext.getClass().getName()
+                + " is not a valid transaction context for "
+                + transactionManager.getClass().getName()
+                + " (expected "
+                + transactionManager.contextType()
+                + ")");
+      }
+      return transactionManager.transactionFromContext(transactionContext);
+    }
   }
 
   /**
@@ -220,7 +214,7 @@ public class TransactionOutbox {
 
   /**
    * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction.
+   * active transaction and a transaction manager that supports thread local context.
    *
    * @param entryId The entry id.
    * @return True if the whitelisting request was successful. May return false if another thread
@@ -235,14 +229,30 @@ public class TransactionOutbox {
     }
   }
 
-  private <T> T schedule(Method method, Object[] args) throws Exception {
+  /**
+   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
+   * active transaction and a transaction manager that supports supplied context.
+   *
+   * @param entryId The entry id.
+   * @param transactionContext The transaction context ({@link TransactionManager} implementation
+   *     specific).
+   * @return True if the whitelisting request was successful. May return false if another thread
+   *     whitelisted the entry first.
+   */
+  public boolean whitelist(String entryId, Object transactionContext) {
+    log.info("Whitelisting entry {}", entryId);
+    try {
+      return persistor.whitelist(transactionFromContext(transactionContext), entryId);
+    } catch (Exception e) {
+      throw (RuntimeException) Utils.uncheckAndThrow(e);
+    }
+  }
+
+  private <T> T schedule(Transaction transaction, Method method, Object[] args) throws Exception {
     TransactionOutboxEntry entry = newEntry(method, args);
     validator.validate(entry);
-    transactionManager.requireTransaction(
-        transaction -> {
-          persistor.save(transaction, entry);
-          transaction.addPostCommitHook(() -> submitNow(entry));
-        });
+    persistor.save(transaction, entry);
+    transaction.addPostCommitHook(() -> submitNow(entry));
     log.debug("Scheduled {} for running after transaction commit", entry.description());
     return null;
   }
@@ -267,7 +277,7 @@ public class TransactionOutbox {
                   return false;
                 }
                 log.info("Processing {}", entry.description());
-                invoke(entry);
+                invoke(entry, transaction);
                 persistor.delete(transaction, entry);
                 return true;
               });
@@ -284,11 +294,11 @@ public class TransactionOutbox {
     }
   }
 
-  private void invoke(TransactionOutboxEntry entry)
+  private void invoke(TransactionOutboxEntry entry, Transaction transaction)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
     log.debug("Created instance {}", instance);
-    entry.getInvocation().invoke(instance);
+    entry.getInvocation().invoke(instance, transaction);
   }
 
   private TransactionOutboxEntry newEntry(Method method, Object[] args) {
@@ -347,6 +357,166 @@ public class TransactionOutbox {
           "Failed to update attempt count for {}. It may be retried more times than expected.",
           entry.description(),
           e);
+    }
+  }
+
+  /** Builder for {@link TransactionOutbox}. */
+  @ToString
+  public static class TransactionOutboxBuilder {
+
+    private TransactionManager transactionManager;
+    private Instantiator instantiator;
+    private Submitter submitter;
+    private Duration attemptFrequency;
+    private int blacklistAfterAttempts;
+    private int flushBatchSize;
+    private ClockProvider clockProvider;
+    private TransactionOutboxListener listener;
+    private Persistor persistor;
+    private Level logLevelTemporaryFailure;
+    private Boolean serializeMdc;
+
+    TransactionOutboxBuilder() {}
+
+    /**
+     * @param transactionManager Provides {@link TransactionOutbox} with the ability to start,
+     *     commit and roll back transactions as well as interact with running transactions started
+     *     outside.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder transactionManager(TransactionManager transactionManager) {
+      this.transactionManager = transactionManager;
+      return this;
+    }
+
+    /**
+     * @param instantiator Responsible for describing a class as a name and creating instances of
+     *     that class at runtime from the name. See {@link Instantiator} for more information.
+     *     Defaults to {@link Instantiator#usingReflection()}.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder instantiator(Instantiator instantiator) {
+      this.instantiator = instantiator;
+      return this;
+    }
+
+    /**
+     * @param submitter Used for scheduling background work. If no submitter is specified, {@link
+     *     TransactionOutbox} will use {@link Submitter#withDefaultExecutor()}. See {@link
+     *     Submitter#withExecutor(Executor)} for more information on designing bespoke submitters
+     *     for remoting.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder submitter(Submitter submitter) {
+      this.submitter = submitter;
+      return this;
+    }
+
+    /**
+     * @param attemptFrequency How often tasks should be re-attempted. This should be balanced with
+     *     {@link #flushBatchSize} and the frequency with which {@link #flush()} is called to
+     *     achieve optimum throughput. Defaults to 2 minutes.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder attemptFrequency(Duration attemptFrequency) {
+      this.attemptFrequency = attemptFrequency;
+      return this;
+    }
+
+    /**
+     * @param blacklistAfterAttempts After now many attempts a task should be blacklisted. Defaults
+     *     to 5.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder blacklistAfterAttempts(int blacklistAfterAttempts) {
+      this.blacklistAfterAttempts = blacklistAfterAttempts;
+      return this;
+    }
+
+    /**
+     * @param flushBatchSize How many items should be attempted in each flush. This should be
+     *     balanced with {@link #attemptFrequency} and the frequency with which {@link #flush()} is
+     *     called to achieve optimum throughput. Defaults to 4096.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder flushBatchSize(int flushBatchSize) {
+      this.flushBatchSize = flushBatchSize;
+      return this;
+    }
+
+    /**
+     * @param clockProvider The {@link Clock} source. Generally best left alone except when testing.
+     *     Defaults to the system clock.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder clockProvider(ClockProvider clockProvider) {
+      this.clockProvider = clockProvider;
+      return this;
+    }
+
+    /**
+     * @param listener Event listener. Allows client code to react to tasks running, failing or
+     *     getting blacklisted.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder listener(TransactionOutboxListener listener) {
+      this.listener = listener;
+      return this;
+    }
+
+    /**
+     * @param persistor The method {@link TransactionOutbox} uses to interact with the database.
+     *     This encapsulates all {@link TransactionOutbox} interaction with the database outside
+     *     transaction management (which is handled by the {@link TransactionManager}). Defaults to
+     *     a multi-platform SQL implementation that should not need to be changed in most cases. If
+     *     re-implementing this interface, read the documentation on {@link Persistor} carefully.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder persistor(Persistor persistor) {
+      this.persistor = persistor;
+      return this;
+    }
+
+    /**
+     * @param logLevelTemporaryFailure The log level to use when logging temporary task failures.
+     *     Includes a full stack trace. Defaults to {@code WARN} level, but you may wish to reduce
+     *     it to a lower level if you consider warnings to be incidents.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder logLevelTemporaryFailure(Level logLevelTemporaryFailure) {
+      this.logLevelTemporaryFailure = logLevelTemporaryFailure;
+      return this;
+    }
+
+    /**
+     * @param serializeMdc Determines whether to include any Slf4j {@link MDC} (Mapped Diagnostic
+     *     Context) in serialized invocations and recreate the state in submitted tasks. Defaults to
+     *     true.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder serializeMdc(Boolean serializeMdc) {
+      this.serializeMdc = serializeMdc;
+      return this;
+    }
+
+    /**
+     * Creates and initialises the {@link TransactionOutbox}.
+     *
+     * @return The outbox implementation.
+     */
+    public TransactionOutbox build() {
+      return new TransactionOutbox(
+          transactionManager,
+          instantiator,
+          submitter,
+          attemptFrequency,
+          blacklistAfterAttempts,
+          flushBatchSize,
+          clockProvider,
+          listener,
+          persistor,
+          logLevelTemporaryFailure,
+          serializeMdc);
     }
   }
 }

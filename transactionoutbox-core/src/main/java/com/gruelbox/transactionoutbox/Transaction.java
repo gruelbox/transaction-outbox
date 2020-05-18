@@ -10,6 +10,16 @@ public interface Transaction {
   Connection connection();
 
   /**
+   * @return A {@link TransactionManager}-specific object representing the context of this
+   *     transaction. Intended for use with {@link TransactionManager} implementations that support
+   *     explicitly-passed transaction context injection into method arguments annotated with {@link
+   *     Context}.
+   */
+  default <T> T context() {
+    return null;
+  }
+
+  /**
    * Creates a prepared statement which will be cached and re-used within a transaction. Any batch
    * on these statements is executed before the transaction is committed, and automatically closed.
    *

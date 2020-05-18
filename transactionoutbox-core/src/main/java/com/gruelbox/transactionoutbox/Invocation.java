@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
 import com.google.gson.annotations.SerializedName;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -84,10 +85,11 @@ public class Invocation {
     this.mdc = mdc;
   }
 
-  void invoke(Object instance)
+  void invoke(Object instance, Transaction transaction)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
     method.setAccessible(true);
+    Object[] args = injectArguments(method, transaction);
     if (log.isDebugEnabled()) {
       log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
     }
@@ -106,5 +108,39 @@ public class Invocation {
     } else {
       method.invoke(instance, args);
     }
+  }
+
+  private Object[] injectArguments(Method method, Transaction transaction) {
+    Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+    for (int i = 0; i < parameterTypes.length; i++) {
+      Class<?> paramType = parameterTypes[i];
+      if (Transaction.class.isAssignableFrom(parameterTypes[i])) {
+        if (args[i] != null) {
+          throw new IllegalArgumentException("Unexpected serialized transaction in invocation");
+        }
+        Object[] args = Arrays.copyOf(this.args, this.args.length);
+        args[i] = transaction;
+        return args;
+      }
+      if (Arrays.stream(parameterAnnotations[i])
+          .anyMatch(annotation -> annotation instanceof Context)) {
+        if (args[i] != null) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Parameter %s.%s[%d] is annotated with Context but invocation contains serialized content",
+                  method.getDeclaringClass().getName(), method.getName(), i));
+        }
+        if (transaction.context() == null) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Parameter %s.%s[%d] is annotated with Context but no context is provided by transaction manager",
+                  method.getDeclaringClass().getName(), method.getName(), i));
+        }
+        Object[] args = Arrays.copyOf(this.args, this.args.length);
+        args[i] = transaction.context();
+        return args;
+      }
+    }
+    return args;
   }
 }

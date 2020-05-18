@@ -1,21 +1,9 @@
 package com.gruelbox.transactionoutbox;
 
-import static com.gruelbox.transactionoutbox.Utils.safelyClose;
-import static com.gruelbox.transactionoutbox.Utils.uncheck;
-
-import com.gruelbox.transactionoutbox.AbstractThreadLocalTransactionManager.ThreadLocalTransaction;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-abstract class AbstractThreadLocalTransactionManager<TX extends ThreadLocalTransaction>
+abstract class AbstractThreadLocalTransactionManager<TX extends SimpleTransaction>
     implements TransactionManager {
 
   private final ThreadLocal<Deque<TX>> transactions = ThreadLocal.withInitial(LinkedList::new);
@@ -70,61 +58,5 @@ abstract class AbstractThreadLocalTransactionManager<TX extends ThreadLocalTrans
 
   Optional<TX> peekTransaction() {
     return Optional.ofNullable(transactions.get().peek());
-  }
-
-  @AllArgsConstructor(access = AccessLevel.PROTECTED)
-  protected static class ThreadLocalTransaction implements Transaction, AutoCloseable {
-
-    private final List<Runnable> postCommitHooks = new ArrayList<>();
-    private final Map<String, PreparedStatement> preparedStatements = new HashMap<>();
-    private final Connection connection;
-
-    @Override
-    public final Connection connection() {
-      return connection;
-    }
-
-    @Override
-    public final void addPostCommitHook(Runnable runnable) {
-      postCommitHooks.add(runnable);
-    }
-
-    @Override
-    public final PreparedStatement prepareBatchStatement(String sql) {
-      return preparedStatements.computeIfAbsent(
-          sql, s -> Utils.uncheckedly(() -> connection.prepareStatement(s)));
-    }
-
-    final void flushBatches() {
-      if (!preparedStatements.isEmpty()) {
-        log.debug("Flushing batches");
-        for (PreparedStatement statement : preparedStatements.values()) {
-          uncheck(statement::executeBatch);
-        }
-      }
-    }
-
-    final void processHooks() {
-      if (!postCommitHooks.isEmpty()) {
-        log.debug("Running post-commit hooks");
-        postCommitHooks.forEach(Runnable::run);
-      }
-    }
-
-    void commit() {
-      uncheck(connection::commit);
-    }
-
-    void rollback() throws SQLException {
-      connection.rollback();
-    }
-
-    @Override
-    public void close() {
-      if (!preparedStatements.isEmpty()) {
-        log.debug("Closing batch statements");
-        safelyClose(preparedStatements.values());
-      }
-    }
   }
 }

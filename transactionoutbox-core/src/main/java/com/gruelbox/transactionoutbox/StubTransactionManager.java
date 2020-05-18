@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-import com.gruelbox.transactionoutbox.AbstractThreadLocalTransactionManager.ThreadLocalTransaction;
 import java.sql.Connection;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -11,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 @SuperBuilder
 @Slf4j
 public class StubTransactionManager
-    extends AbstractThreadLocalTransactionManager<ThreadLocalTransaction> {
+    extends AbstractThreadLocalTransactionManager<SimpleTransaction> {
 
   protected StubTransactionManager() {}
 
@@ -21,7 +20,7 @@ public class StubTransactionManager
     return withTransaction(
         atx -> {
           T result = work.doWork(atx);
-          ((ThreadLocalTransaction) atx).processHooks();
+          ((SimpleTransaction) atx).processHooks();
           return result;
         });
   }
@@ -42,8 +41,8 @@ public class StubTransactionManager
                           .collect(Collectors.joining(", ")));
               return null;
             });
-    try (ThreadLocalTransaction transaction =
-        pushTransaction(new ThreadLocalTransaction(mockConnection))) {
+    try (SimpleTransaction transaction =
+        pushTransaction(new SimpleTransaction(mockConnection, null))) {
       return work.doWork(transaction);
     } finally {
       popTransaction();
