@@ -39,7 +39,7 @@ public interface JooqTransactionManager extends TransactionManager {
    * local thread so that {@link TransactionOutbox#schedule(Class)} can be called for methods that
    * don't explicitly inject a {@link Configuration}, e.g.:
    *
-   * <pre>dsl.transaction(() -> outbox.schedule(Foo.class).process("bar"));</pre>
+   * <pre>dsl.transaction(() -&gt; outbox.schedule(Foo.class).process("bar"));</pre>
    *
    * @param dslContext The DSL context.
    * @param listener The listener, linked to the DSL context.
@@ -60,7 +60,7 @@ public interface JooqTransactionManager extends TransactionManager {
    *
    * <pre>
    * void doSchedule() {
-   *   dsl.transaction(ctx -> outbox.schedule(getClass()).process("bar", null));
+   *   dsl.transaction(ctx -&gt; outbox.schedule(getClass()).process("bar", null));
    * }
    *
    * void process(String arg, @Context org.jooq.Configuration ctx) {
@@ -71,7 +71,7 @@ public interface JooqTransactionManager extends TransactionManager {
    *
    * <pre>
    * void doSchedule() {
-   *   transactionManager.inTransaction(tx -> outbox.schedule(getClass()).process("bar", null));
+   *   transactionManager.inTransaction(tx -&gt; outbox.schedule(getClass()).process("bar", null));
    * }
    *
    * void process(String arg, Transaction tx) {
