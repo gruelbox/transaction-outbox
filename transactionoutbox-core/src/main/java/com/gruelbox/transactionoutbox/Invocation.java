@@ -113,7 +113,6 @@ public class Invocation {
   private Object[] injectArguments(Method method, Transaction transaction) {
     Annotation[][] parameterAnnotations = method.getParameterAnnotations();
     for (int i = 0; i < parameterTypes.length; i++) {
-      Class<?> paramType = parameterTypes[i];
       if (Transaction.class.isAssignableFrom(parameterTypes[i])) {
         if (args[i] != null) {
           throw new IllegalArgumentException("Unexpected serialized transaction in invocation");
