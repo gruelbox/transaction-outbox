@@ -287,14 +287,16 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       for (int i = 0; i < jsonArgs.size(); i++) {
         JsonElement arg = jsonArgs.get(i);
         JsonElement argType = arg.getAsJsonObject().get("t");
-        JsonElement argValue = arg.getAsJsonObject().get("v");
-        Class<?> argClass = classForName(argType.getAsString());
-        try {
-          args[i] = context.deserialize(argValue, argClass);
-        } catch (Exception e) {
-          throw new RuntimeException(
-              "Failed to deserialize arg [" + argValue + "] of type [" + argType + "]",
-              e);
+        if (argType != null) {
+          JsonElement argValue = arg.getAsJsonObject().get("v");
+          Class<?> argClass = classForName(argType.getAsString());
+          try {
+            args[i] = context.deserialize(argValue, argClass);
+          } catch (Exception e) {
+            throw new RuntimeException(
+                "Failed to deserialize arg [" + argValue + "] of type [" + argType + "]",
+                e);
+          }
         }
       }
       Map<String, String> mdc = context.deserialize(jsonObject.get("x"), Map.class);
