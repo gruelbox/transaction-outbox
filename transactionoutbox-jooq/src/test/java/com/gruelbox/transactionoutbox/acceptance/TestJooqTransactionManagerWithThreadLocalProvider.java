@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.gruelbox.transactionoutbox.Context;
+import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
+import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.JooqTransactionListener;
@@ -27,6 +29,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -264,7 +267,12 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
-            .persistor(Persistor.forDialect(Dialect.H2))
+            .persistor(DefaultPersistor.builder()
+                .dialect(Dialect.H2)
+                .serializer(DefaultInvocationSerializer.builder()
+                    .whitelistedTypes(Set.of(org.jooq.Configuration.class))
+                    .build())
+                .build())
             .listener(
                 new TransactionOutboxListener() {
                   @Override
