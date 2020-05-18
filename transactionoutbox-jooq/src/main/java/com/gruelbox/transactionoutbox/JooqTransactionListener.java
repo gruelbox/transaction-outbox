@@ -1,7 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-import com.gruelbox.transactionoutbox.AbstractThreadLocalTransactionManager.ThreadLocalTransaction;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.TransactionContext;
 import org.jooq.TransactionListener;
@@ -10,9 +8,15 @@ import org.jooq.TransactionListener;
 @Slf4j
 public class JooqTransactionListener implements TransactionListener {
 
-  @Setter private JooqTransactionManager jooqTransactionManager;
+  static final String TXN_KEY = JooqTransactionListener.class.getName() + ".txn";
+
+  private ThreadLocalJooqTransactionManager jooqTransactionManager;
 
   JooqTransactionListener() {}
+
+  void setJooqTransactionManager(ThreadLocalJooqTransactionManager jooqTransactionManager) {
+    this.jooqTransactionManager = jooqTransactionManager;
+  }
 
   @Override
   public void beginStart(TransactionContext ctx) {
@@ -23,38 +27,52 @@ public class JooqTransactionListener implements TransactionListener {
   public void beginEnd(TransactionContext ctx) {
     ctx.dsl()
         .connection(
-            connection ->
-                jooqTransactionManager.pushTransaction(new ThreadLocalTransaction(connection)));
-    jooqTransactionManager.pushContext(ctx.dsl());
+            connection -> {
+              SimpleTransaction transaction =
+                  new SimpleTransaction(connection, ctx.dsl().configuration());
+              ctx.dsl().configuration().data(TXN_KEY, transaction);
+              if (jooqTransactionManager != null) {
+                jooqTransactionManager.pushTransaction(transaction);
+              }
+            });
   }
 
   @Override
   public void commitStart(TransactionContext ctx) {
     log.debug("Transaction commit start");
     try {
-      jooqTransactionManager.peekTransaction().orElseThrow().flushBatches();
+      getTransaction(ctx).flushBatches();
     } finally {
-      jooqTransactionManager.peekTransaction().orElseThrow().close();
+      getTransaction(ctx).close();
     }
   }
 
   @Override
   public void commitEnd(TransactionContext ctx) {
     log.debug("Transaction commit end");
-    ThreadLocalTransaction transaction = jooqTransactionManager.popTransaction();
-    jooqTransactionManager.popContext();
+    SimpleTransaction transaction = getTransaction(ctx);
+    safePopThreadLocals();
     transaction.processHooks();
   }
 
   @Override
   public void rollbackStart(TransactionContext ctx) {
     log.debug("Transaction rollback");
-    jooqTransactionManager.peekTransaction().orElseThrow().close();
+    getTransaction(ctx).close();
   }
 
   @Override
   public void rollbackEnd(TransactionContext ctx) {
-    ThreadLocalTransaction transaction = jooqTransactionManager.popTransaction();
-    jooqTransactionManager.popContext();
+    safePopThreadLocals();
+  }
+
+  private SimpleTransaction getTransaction(TransactionContext ctx) {
+    return (SimpleTransaction) ctx.dsl().configuration().data(TXN_KEY);
+  }
+
+  private void safePopThreadLocals() {
+    if (jooqTransactionManager != null) {
+      jooqTransactionManager.popTransaction();
+    }
   }
 }

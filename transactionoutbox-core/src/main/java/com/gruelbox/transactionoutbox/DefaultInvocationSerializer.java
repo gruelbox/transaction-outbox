@@ -94,7 +94,11 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
 
   @Override
   public void serializeInvocation(Invocation invocation, Writer writer) {
-    gson.toJson(invocation, writer);
+    try {
+      gson.toJson(invocation, writer);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Cannot serialize " + invocation, e);
+    }
   }
 
   @Override
@@ -204,10 +208,18 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       JsonArray params = new JsonArray();
       int i = 0;
       for (Class<?> parameterType : src.getParameterTypes()) {
-        JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("t", nameForClass(parameterType));
-        jsonObject.add("v", context.serialize(src.getArgs()[i]));
-        params.add(jsonObject);
+        Object arg = src.getArgs()[i];
+        if (arg == null) {
+          JsonObject jsonObject = new JsonObject();
+          jsonObject.add("t", null);
+          jsonObject.add("v", null);
+          params.add(jsonObject);
+        } else {
+          JsonObject jsonObject = new JsonObject();
+          jsonObject.addProperty("t", nameForClass(parameterType));
+          jsonObject.add("v", context.serialize(arg));
+          params.add(jsonObject);
+        }
         i++;
       }
       obj.add("p", params);

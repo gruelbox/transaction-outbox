@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-import com.gruelbox.transactionoutbox.AbstractThreadLocalTransactionManager.ThreadLocalTransaction;
 import java.sql.Connection;
 import java.sql.SQLException;
 import lombok.experimental.SuperBuilder;
@@ -13,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 @SuperBuilder
 @Slf4j
 final class SimpleTransactionManager
-    extends AbstractThreadLocalTransactionManager<ThreadLocalTransaction> {
+    extends AbstractThreadLocalTransactionManager<SimpleTransaction> {
 
   private final ConnectionProvider connectionProvider;
 
@@ -22,14 +21,14 @@ final class SimpleTransactionManager
       ThrowingTransactionalSupplier<T, E> work) throws E {
     return withTransaction(
         atx -> {
-          T result = processAndCommitOrRollback(work, (ThreadLocalTransaction) atx);
-          ((ThreadLocalTransaction) atx).processHooks();
+          T result = processAndCommitOrRollback(work, (SimpleTransaction) atx);
+          ((SimpleTransaction) atx).processHooks();
           return result;
         });
   }
 
   private <T, E extends Exception> T processAndCommitOrRollback(
-      ThrowingTransactionalSupplier<T, E> work, ThreadLocalTransaction transaction) throws E {
+      ThrowingTransactionalSupplier<T, E> work, SimpleTransaction transaction) throws E {
     try {
       log.debug("Processing work");
       T result = work.doWork(transaction);
@@ -54,8 +53,7 @@ final class SimpleTransactionManager
   private <T, E extends Exception> T withTransaction(ThrowingTransactionalSupplier<T, E> work)
       throws E {
     try (Connection connection = connectionProvider.obtainConnection();
-        ThreadLocalTransaction transaction =
-            pushTransaction(new ThreadLocalTransaction(connection))) {
+        SimpleTransaction transaction = pushTransaction(new SimpleTransaction(connection, null))) {
       log.debug("Got connection {}", connection);
       boolean autoCommit = transaction.connection().getAutoCommit();
       if (autoCommit) {

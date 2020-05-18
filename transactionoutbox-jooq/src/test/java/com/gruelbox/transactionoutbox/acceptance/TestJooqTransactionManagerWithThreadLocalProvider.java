@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.gruelbox.transactionoutbox.Context;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.JooqTransactionListener;
@@ -16,12 +17,14 @@ import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
+import com.gruelbox.transactionoutbox.Transaction;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -37,6 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.MatcherAssert;
+import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
@@ -48,7 +52,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 @Slf4j
-class TestThreadLocalJooqTransactionManager {
+class TestJooqTransactionManagerWithThreadLocalProvider {
 
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
@@ -61,6 +65,7 @@ class TestThreadLocalJooqTransactionManager {
   void beforeEach() {
     dataSource = pooledDataSource();
     transactionManager = createTransactionManager();
+    TestUtils.createTestTable(dsl);
   }
 
   @AfterEach
@@ -93,12 +98,13 @@ class TestThreadLocalJooqTransactionManager {
   }
 
   @Test
-  void testSimpleDirectInvocation() throws InterruptedException {
+  void testSimpleDirectInvocationWithThreadContext() throws InterruptedException {
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
+            .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
             .listener(
                 new TransactionOutboxListener() {
                   @Override
@@ -123,6 +129,42 @@ class TestThreadLocalJooqTransactionManager {
 
     // Should be fired after commit
     assertTrue(latch.await(2, TimeUnit.SECONDS));
+    TestUtils.assertRecordExists(dsl, 1);
+  }
+
+  @Test
+  void testSimpleDirectInvocationWithExplicitContext() throws InterruptedException {
+    CountDownLatch latch = new CountDownLatch(1);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(Dialect.H2))
+            .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    latch.countDown();
+                  }
+                })
+            .build();
+
+    clearOutbox(transactionManager);
+
+    transactionManager.inTransaction(
+        tx -> {
+          outbox.schedule(Worker.class).process(1, tx);
+          try {
+            // Should not be fired until after commit
+            assertFalse(latch.await(2, TimeUnit.SECONDS));
+          } catch (InterruptedException e) {
+            fail("Interrupted");
+          }
+        });
+
+    // Should be fired after commit
+    assertTrue(latch.await(2, TimeUnit.SECONDS));
+    TestUtils.assertRecordExists(dsl, 1);
   }
 
   @Test
@@ -133,6 +175,7 @@ class TestThreadLocalJooqTransactionManager {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
+            .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
             .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
@@ -174,14 +217,18 @@ class TestThreadLocalJooqTransactionManager {
                   runAsync(() -> uncheck(() -> assertTrue(latch2.await(2, TimeUnit.SECONDS)))))
               .get();
         });
+
+    TestUtils.assertRecordExists(dsl, 1);
+    TestUtils.assertRecordExists(dsl, 2);
   }
 
   @Test
-  void testSimpleViaListener() throws InterruptedException {
+  void testSimpleViaListenerWithThreadContext() throws InterruptedException {
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
+            .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
             .persistor(Persistor.forDialect(Dialect.H2))
             .listener(
                 new TransactionOutboxListener() {
@@ -207,6 +254,42 @@ class TestThreadLocalJooqTransactionManager {
 
     // Should be fired after commit
     assertTrue(latch.await(2, TimeUnit.SECONDS));
+    TestUtils.assertRecordExists(dsl, 1);
+  }
+
+  @Test
+  void testSimpleViaListenerWithExplicitContext() throws InterruptedException {
+    CountDownLatch latch = new CountDownLatch(1);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
+            .persistor(Persistor.forDialect(Dialect.H2))
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    latch.countDown();
+                  }
+                })
+            .build();
+
+    clearOutbox(transactionManager);
+
+    dsl.transaction(
+        ctx -> {
+          outbox.schedule(Worker.class).process(1, ctx);
+          try {
+            // Should not be fired until after commit
+            assertFalse(latch.await(2, TimeUnit.SECONDS));
+          } catch (InterruptedException e) {
+            fail("Interrupted");
+          }
+        });
+
+    // Should be fired after commit
+    assertTrue(latch.await(2, TimeUnit.SECONDS));
+    TestUtils.assertRecordExists(dsl, 1);
   }
 
   @Test
@@ -217,6 +300,7 @@ class TestThreadLocalJooqTransactionManager {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
+            .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
             .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
@@ -256,6 +340,8 @@ class TestThreadLocalJooqTransactionManager {
                   runAsync(() -> uncheck(() -> assertTrue(latch2.await(2, TimeUnit.SECONDS)))))
               .get();
         });
+    TestUtils.assertRecordExists(dsl, 1);
+    TestUtils.assertRecordExists(dsl, 2);
   }
 
   /**
@@ -270,6 +356,7 @@ class TestThreadLocalJooqTransactionManager {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(Dialect.H2))
+            .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
             .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
@@ -434,9 +521,23 @@ class TestThreadLocalJooqTransactionManager {
   @SuppressWarnings("EmptyMethod")
   static class Worker {
 
+    private final TransactionManager transactionManager;
+
+    Worker(TransactionManager transactionManager) {
+      this.transactionManager = transactionManager;
+    }
+
     @SuppressWarnings("SameParameterValue")
     void process(int i) {
-      // No-op
+      TestUtils.writeRecord(transactionManager, i);
+    }
+
+    void process(int i, Transaction transaction) {
+      TestUtils.writeRecord(transaction, i);
+    }
+
+    void process(int i, @Context Configuration configuration) {
+      TestUtils.writeRecord(configuration, i);
     }
   }
 
