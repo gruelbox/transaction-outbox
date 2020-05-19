@@ -3,7 +3,11 @@ package com.gruelbox.transactionoutbox;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+/**
+ * @deprecated Use {@link SpringInstantiator} and {@link SpringTransactionManager} as per the README.
+ */
 @Service
+@Deprecated
 public class SpringTransactionOutboxFactory {
 
   private final SpringTransactionManager springTransactionManager;
