@@ -113,12 +113,6 @@ The latest stable release is available from Maven Central. The latest version is
 ```groovy
 implementation 'com.gruelbox:transactionoutbox-core:$transactionOutboxVersion'
 ```
-The following additional artifact plugins are also available (more details below):
-
- - transactionoutbox-spring [![Spring on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring) [![Spring Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-spring.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-spring)
- - transactionoutbox-guice [![Guice on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-guice/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-guice) [![Guice Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-guice.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-guice)
- - transactionoutbox-jooq [![jOOQ on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-jooq/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-jooq) [![jOOQ Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-jooq.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-jooq)
-
 ### Development snapshots
 
 Maven Central is updated regularly. Alternatively, if you want to stay at the bleeding edge, you can use continuously-delivered releases from [Github Package Repository](https://github.com/gruelbox/transaction-outbox/packages). These can be used from production builds since they will never be deleted.
@@ -199,124 +193,15 @@ TransactionOutbox outbox = TransactionOutbox.builder()
 
 ### Spring
 
-[![Spring on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring)
-[![Spring Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-spring.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-spring)
-
-With the out-of-the-box Spring integration, you can let Spring take over both the transaction management _and_ the role of the `Instantiator`. Add the `transactionoutbox-spring` dependency and create your `TransactionOutbox` as a bean:
-```java
-@Bean
-@Lazy
-public TransactionOutbox transactionOutbox(SpringTransactionOutboxFactory factory) {
-  return factory.create()
-      .persistor(Persistor.forDialect(Dialect.H2))
-      .build();
-}
-
-...
-
-@Transactional
-public void doStuff() {
-  customerRepository.save(new Customer(1L, "Martin", "Carthy"));
-  customerRepository.save(new Customer(2L, "Dave", "Pegg"));
-  outbox.get().schedule(getClass()).publishCustomerCreatedEvent(1L);
-  outbox.get().schedule(getClass()).publishCustomerCreatedEvent(2L);
-}
-
-void publishCustomerCreatedEvent(long id) {
-  // Remote call here
-}
-```
-Notice that with a DI framework like Spring in play, you can **self-invoke** on `getClass()` - invoke a method on the same class that's scheduling it.
+See [transaction-outbox-spring](transactionoutbox-spring/README.md), which integrates Spring's DI and/or transaction management with `TransactionOutbox`.
 
 ### Guice
 
-[![Guice on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-guice/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-guice)
-[![Guice Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-guice.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-guice)
-
-To use Guice for DI instead, add a dependency on `transactionoutbox-guice`, and "inject the injector":
-```java
-@Provides
-@Singleton
-TransactionOutbox transactionOutbox(Injector injector, TransactionManager transactionManager) {
-  return TransactionOutbox.builder()
-    .transactionManager(transactionManager)
-    .persistor(Persistor.forDialect(Dialect.MY_SQL_8))
-    .instantiator(GuiceInstantiator.builder().injector(injector).build())
-    .build();
-}
-```
+See [transaction-outbox-guice](transactionoutbox-guice/README.md), which integrates Guice DI  `TransactionOutbox`.
 
 ### jOOQ
 
-[![jOOQ on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-jooq/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-jooq)
-[![jOOQ Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-jooq.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-jooq)
-
-Like Transaction Outbox, jOOQ is intended to play nicely with any other transaction management approach, but provides its own as an option. If you are already using jOOQ's `TransactionProvider` via `DSLContext.transaction(...)` throughout your application, you can continue to do so.
-
-jOOQ gives you the option to either use thread-local transaction management or explicitly pass a contextual `DSLContext` or `Configuration` down your stack. You can do the same thing with `TransactionOutbox`.
-
-#### Using thread-local transactions
-
-```java
-// Configure jOOQ to use thread-local transaction management. 
-var jooqConfig = new DefaultConfiguration();
-var connectionProvider = new DataSourceConnectionProvider(dataSource);
-jooqConfig.setConnectionProvider(connectionProvider);
-jooqConfig.setSQLDialect(SQLDialect.H2);
-jooqConfig.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider, true));
-
-// Add the outbox listener to synchronise the two transaction managers
-var jooqTransactionListener = JooqTransactionManager.createListener();
-jooqConfig.set(listener);
-var dsl = DSL.using(jooqConfig);
-
-// Create the outbox
-var outbox = TransactionOutbox.builder()
-    .transactionManager(JooqTransactionManager.create(dsl, listener))
-    .persistor(Persistor.forDialect(Dialect.MY_SQL_8))
-    .build();
-}
-
-// Use jOOQ and Transaction Outbox together, assuming thread-bound transactions
-dsl.transaction(() -> {
-  customerDao.save(new Customer(1L, "Martin", "Carthy"));
-  customerDao.save(new Customer(2L, "Dave", "Pegg"));
-  outbox.schedule(MyClass.class).publishCustomerCreatedEvent(1L);
-  outbox.schedule(MyClass.class).publishCustomerCreatedEvent(2L);
-});
-```
-#### Using explicit transaction context
-
-Without the need to synchronise the thread context, setup is a bit easier:
-
-```java
-// Create the DSLContext and connect the listener
-var dsl = DSL.using(dataSource, SQLDialect.H2);
-dsl.configuration().set(JooqTransactionManager.createListener());
-
-// Create the outbox
-var outbox = TransactionOutbox.builder()
-    .transactionManager(JooqTransactionManager.create(dsl))
-    .persistor(Persistor.forDialect(Dialect.MY_SQL_8))
-    .build();
-```
-
-However, we now need to modify the method we call to allow `TransactionOutbox` to inject the transaction context at the time it is run:
-```java
-void publishCustomerCreatedEvent(long id, @Context Configuration cfg2) {
-  ...
-}
-```
-And provide it for recording the database record at the time of scheduling:
-```java
-dsl.transaction(cfg1 -> {
-  new CustomerDao(cfg1).save(new Customer(1L, "Martin", "Carthy"));
-  new CustomerDao(cfg1).save(new Customer(2L, "Dave", "Pegg"));
-  outbox.schedule(MyClass.class).publishCustomerCreatedEvent(1L, cfg1);
-  outbox.schedule(MyClass.class).publishCustomerCreatedEvent(2L, cfg1);
-});
-```
-> **NOTE** that in the examples above, `cfg1` is the transaction context in which the request is written to the database, and `cfg2` is the context in which it is executed, which will be a different transaction at some later time. `cfg1` is stripped from the request before writing it to the database and replaced with `cfg2` at run time.
+See [transaction-outbox-jooq](transactionoutbox-jooq/README.md), which integrates jOOQ transaction management with `TransactionOutbox`.
 
 ## Set up the background worker
 
