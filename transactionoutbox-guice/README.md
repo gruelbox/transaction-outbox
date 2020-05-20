@@ -1,6 +1,6 @@
 # transaction-outbox-guice
 
-Extension for [transaction-outbox-core](../) which integrates with Guice.
+Extension for [transaction-outbox-core](../README.md) which integrates with Guice.
 
 ## Installation
 

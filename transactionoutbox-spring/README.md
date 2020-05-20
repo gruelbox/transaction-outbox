@@ -1,6 +1,8 @@
 # transaction-outbox-spring
 
-Extension for [transaction-outbox-core](../) which integrates Spring's DI and/or transaction management.
+Extension for [transaction-outbox-core](../README.md) which integrates Spring's DI and/or transaction management.
+
+I don't actually use Spring in production, so this is more presented as an example at the moment. Doubtless I've missed a lot of nuances about the flexibility of Spring. Pull requests very welcome.
 
 ## Installation
 
