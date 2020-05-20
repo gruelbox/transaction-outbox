@@ -11,6 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 public class StubThreadLocalTransactionManager
     extends AbstractThreadLocalTransactionManager<SimpleTransaction> {
 
+  @Beta
+  public StubThreadLocalTransactionManager() {
+    // Nothing to do
+  }
+
   @Override
   public <T, E extends Exception> T inTransactionReturnsThrows(
       ThrowingTransactionalSupplier<T, E> work) throws E {

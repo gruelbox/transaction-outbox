@@ -1,6 +1,6 @@
 # transaction-outbox-jooq
 
-Extension for [transaction-outbox-core](../) which integrates with jOOQ for transaction management.
+Extension for [transaction-outbox-core](../README.md) which integrates with jOOQ for transaction management.
 
 Like Transaction Outbox, jOOQ is intended to play nicely with any other transaction management approach, but provides its own as an option. If you are already using jOOQ's `TransactionProvider` via `DSLContext.transaction(...)` throughout your application, you can continue to do so with this extension.
 
@@ -91,9 +91,9 @@ The call pattern in the thread-local context example above will now not work:
 ```java
 outbox.schedule(MyClass.class).publishCustomerCreatedEvent(1L);
 ```
-`TransactionOutbox` needs the currently active transaction context to write the database record. To do so, you need to change the scheduled method itself to receive a `Configuration` and annotate the parameter with `@Context`:
+`TransactionOutbox` needs the currently active transaction context to write the database record. To do so, you need to change the scheduled method itself to receive a `Configuration`:
 ```java
-void publishCustomerCreatedEvent(long id, @Context Configuration cfg2) {
+void publishCustomerCreatedEvent(long id, Configuration cfg2) {
   cfg.dsl().insertInto(...)...
 }
 ```

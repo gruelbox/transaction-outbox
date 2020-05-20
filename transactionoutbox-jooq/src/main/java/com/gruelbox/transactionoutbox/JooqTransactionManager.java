@@ -85,6 +85,7 @@ public interface JooqTransactionManager extends TransactionManager {
    * @param dslContext The DSL context.
    * @return The transaction manager.
    */
+  @Beta
   static ParameterContextTransactionManager<Configuration> create(DSLContext dslContext) {
     return new DefaultJooqTransactionManager(dslContext);
   }

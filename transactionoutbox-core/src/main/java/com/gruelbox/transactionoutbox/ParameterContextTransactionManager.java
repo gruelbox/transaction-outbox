@@ -21,6 +21,7 @@ import java.util.Arrays;
  *   outbox.schedule(MyClass.class).myMethod("foo", context));
  * </pre>
  */
+@Beta
 public interface ParameterContextTransactionManager<T> extends TransactionManager {
 
   /**

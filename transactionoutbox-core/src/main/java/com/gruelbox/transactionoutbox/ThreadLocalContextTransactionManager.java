@@ -11,7 +11,7 @@ import java.lang.reflect.Method;
  *
  * <p>Call pattern permitted:
  *
- * <pre>transactionManager.inTransaction(() -> outbox.schedule(MyClass.ckass).myMethod("foo");</pre>
+ * <pre>transactionManager.inTransaction(() -&gt; outbox.schedule(MyClass.ckass).myMethod("foo");</pre>
  *
  * <p>Adds the {@link #requireTransactionReturns(ThrowingTransactionalSupplier)} and {@link
  * #requireTransaction(ThrowingTransactionalWork)} methods, which extract the current transaction

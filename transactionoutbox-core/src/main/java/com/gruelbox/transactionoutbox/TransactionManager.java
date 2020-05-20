@@ -140,6 +140,7 @@ public interface TransactionManager {
    * or transaction context.
    *
    * @param invocation The invocation.
+   * @param transaction The transaction that the invocation will be run in.
    * @return The modified invocation.
    */
   Invocation injectTransaction(Invocation invocation, Transaction transaction);

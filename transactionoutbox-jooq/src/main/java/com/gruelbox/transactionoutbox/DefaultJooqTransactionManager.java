@@ -10,6 +10,7 @@ import org.jooq.DSLContext;
  * connected to the {@link DSLContext}.
  */
 @Slf4j
+@Beta
 final class DefaultJooqTransactionManager
     implements ParameterContextTransactionManager<Configuration> {
 

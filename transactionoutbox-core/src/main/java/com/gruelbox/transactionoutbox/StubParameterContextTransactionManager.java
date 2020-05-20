@@ -4,14 +4,12 @@ import java.sql.Connection;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
-import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * A stub transaction manager that assumes no underlying database, and a transaction context of the
  * specified type.
  */
-@SuperBuilder
 @Slf4j
 public class StubParameterContextTransactionManager<C>
     implements ParameterContextTransactionManager<C> {
@@ -24,6 +22,7 @@ public class StubParameterContextTransactionManager<C>
    * @param contextClass The class that represents the context. Must support equals/hashCode.
    * @param contextFactory Generates context instances when transactions are started.
    */
+  @Beta
   public StubParameterContextTransactionManager(Class<C> contextClass, Supplier<C> contextFactory) {
     this.contextClass = contextClass;
     this.contextFactory = contextFactory;
