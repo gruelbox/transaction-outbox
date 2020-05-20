@@ -20,3 +20,23 @@ jobs:
 
       - name: Build with Maven and delombok
         run: mvn -Pdelombok -B package
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: javadocs-core
+          path: transactionoutbox-core/target/apidocs
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: javadocs-guice
+          path: transactionoutbox-guice/target/apidocs
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: javadocs-jooq
+          path: transactionoutbox-jooq/target/apidocs
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: javadocs-spring
+          path: transactionoutbox-spring/target/apidocs
