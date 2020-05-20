@@ -5,7 +5,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.StubPersistor;
-import com.gruelbox.transactionoutbox.StubTransactionManager;
+import com.gruelbox.transactionoutbox.StubThreadLocalTransactionManager;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import java.util.concurrent.CountDownLatch;
@@ -20,10 +20,9 @@ public class TestMDC {
   @Test
   final void testMDCPassedToTask() throws InterruptedException {
 
-    TransactionManager transactionManager = StubTransactionManager.builder().build();
+    TransactionManager transactionManager = new StubThreadLocalTransactionManager();
 
     CountDownLatch latch = new CountDownLatch(1);
-    CountDownLatch chainedLatch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)

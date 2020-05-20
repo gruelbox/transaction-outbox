@@ -443,8 +443,12 @@ try {
 Instead, [stubs](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/StubTransactionManager.html) [exist](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/StubPersistor.html) for the various arguments to the builder, allowing you to build a `TransactionOutbox` with minimal external dependencies which can be called and verified in tests.
 ```java
 // GIVEN
+
 SomeService mockService = Mockito.mock(SomeService.class);
-StubTransactionManager transactionManager = StubTransactionManager.builder().build();
+
+// Also see StubParameterContextTransactionManager
+StubTransactionManager transactionManager = new StubThreadLocalTransactionManager();
+
 TransactionOutbox outbox = TransactionOutbox.builder()
     .instantiator(Instantiator.using(clazz -> mockService)) // Return our mock
     .persistor(StubPersistor.builder().build()) // Doesn't save anything

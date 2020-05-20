@@ -15,6 +15,7 @@ import com.gruelbox.transactionoutbox.JooqTransactionListener;
 import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.Submitter;
+import com.gruelbox.transactionoutbox.ThreadLocalContextTransactionManager;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
@@ -53,7 +54,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndThreadLocalContext {
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
   private HikariDataSource dataSource;
-  private TransactionManager transactionManager;
+  private ThreadLocalContextTransactionManager transactionManager;
   private DSLContext dsl;
 
   @BeforeEach
@@ -79,7 +80,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndThreadLocalContext {
     return new HikariDataSource(config);
   }
 
-  private TransactionManager createTransactionManager() {
+  private ThreadLocalContextTransactionManager createTransactionManager() {
     DefaultConfiguration configuration = new DefaultConfiguration();
     configuration.setConnectionProvider(new DataSourceConnectionProvider(dataSource));
     configuration.setSQLDialect(SQLDialect.H2);
@@ -388,9 +389,9 @@ class TestJooqTransactionManagerWithDefaultProviderAndThreadLocalContext {
   @SuppressWarnings("EmptyMethod")
   static class Worker {
 
-    private final TransactionManager transactionManager;
+    private final ThreadLocalContextTransactionManager transactionManager;
 
-    Worker(TransactionManager transactionManager) {
+    Worker(ThreadLocalContextTransactionManager transactionManager) {
       this.transactionManager = transactionManager;
     }
 

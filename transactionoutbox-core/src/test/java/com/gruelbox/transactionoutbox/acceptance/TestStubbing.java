@@ -1,11 +1,19 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.isA;
+import static org.hamcrest.Matchers.notNullValue;
 
 import com.gruelbox.transactionoutbox.Instantiator;
+import com.gruelbox.transactionoutbox.StubParameterContextTransactionManager;
 import com.gruelbox.transactionoutbox.StubPersistor;
-import com.gruelbox.transactionoutbox.StubTransactionManager;
+import com.gruelbox.transactionoutbox.StubThreadLocalTransactionManager;
 import com.gruelbox.transactionoutbox.Submitter;
+import com.gruelbox.transactionoutbox.Transaction;
+import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -14,8 +22,9 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
-import org.hamcrest.MatcherAssert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Checks that stubbing {@link TransactionOutbox} works cleanly. */
@@ -23,20 +32,11 @@ import org.junit.jupiter.api.Test;
 class TestStubbing {
 
   @Test
-  void testStubbing() {
-    StubTransactionManager transactionManager = StubTransactionManager.builder().build();
-    TransactionOutbox outbox =
-        TransactionOutbox.builder()
-            .instantiator(Instantiator.usingReflection())
-            .persistor(StubPersistor.builder().build())
-            .submitter(Submitter.withExecutor(Runnable::run))
-            .transactionManager(transactionManager)
-            .clockProvider(
-                () ->
-                    Clock.fixed(
-                        LocalDateTime.of(2020, 3, 1, 12, 0).toInstant(ZoneOffset.UTC),
-                        ZoneOffset.UTC)) // Fix the clock
-            .build();
+  void testStubbingWithThreadLocalContext() {
+    StubThreadLocalTransactionManager transactionManager = new StubThreadLocalTransactionManager();
+    TransactionOutbox outbox = createOutbox(transactionManager);
+
+    Interface.invocations.clear();
 
     transactionManager.inTransaction(
         () -> {
@@ -58,8 +58,65 @@ class TestStubbing {
     expected4.add(4);
     expected4.add(null);
     expected4.add(null);
-    MatcherAssert.assertThat(
-        Interface.invocations, contains(expected1, expected2, expected3, expected4));
+    assertThat(Interface.invocations, contains(expected1, expected2, expected3, expected4));
+  }
+
+  @Test
+  void testStubbingWithExplicitContextInvalidContext() {
+    StubParameterContextTransactionManager<Context> transactionManager =
+        new StubParameterContextTransactionManager<>(Context.class, () -> new Context(1L));
+    TransactionOutbox outbox = createOutbox(transactionManager);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            transactionManager.inTransaction(
+                tx -> outbox.schedule(Interface.class).doThing(1, new Context(2L))));
+  }
+
+  @Test
+  void testStubbingWithExplicitContextPassingTransaction() {
+    StubParameterContextTransactionManager<Context> transactionManager =
+        new StubParameterContextTransactionManager<>(Context.class, () -> new Context(1L));
+    TransactionOutbox outbox = createOutbox(transactionManager);
+
+    Interface.invocations.clear();
+
+    transactionManager.inTransaction(tx -> outbox.schedule(Interface.class).doThing(1, tx));
+
+    assertThat(Interface.invocations, hasSize(1));
+    assertThat(Interface.invocations.get(0).get(0), equalTo(1));
+    assertThat(Interface.invocations.get(0).get(1), isA(Transaction.class));
+  }
+
+  @Test
+  void testStubbingWithExplicitContextPassingContext() {
+    StubParameterContextTransactionManager<Context> transactionManager =
+        new StubParameterContextTransactionManager<>(Context.class, () -> new Context(1L));
+    TransactionOutbox outbox = createOutbox(transactionManager);
+
+    Interface.invocations.clear();
+
+    transactionManager.inTransaction(
+        tx -> outbox.schedule(Interface.class).doThing(1, (Context) tx.context()));
+
+    assertThat(Interface.invocations, hasSize(1));
+    assertThat(Interface.invocations.get(0).get(0), equalTo(1));
+    assertThat(Interface.invocations.get(0).get(1), isA(Context.class));
+  }
+
+  private TransactionOutbox createOutbox(TransactionManager transactionManager) {
+    return TransactionOutbox.builder()
+        .instantiator(Instantiator.usingReflection())
+        .persistor(StubPersistor.builder().build())
+        .submitter(Submitter.withExecutor(Runnable::run))
+        .transactionManager(transactionManager)
+        .clockProvider(
+            () ->
+                Clock.fixed(
+                    LocalDateTime.of(2020, 3, 1, 12, 0).toInstant(ZoneOffset.UTC),
+                    ZoneOffset.UTC)) // Fix the clock
+        .build();
   }
 
   static class Interface {
@@ -73,5 +130,20 @@ class TestStubbing {
       args.add(arg3 == null ? null : Arrays.asList(arg3));
       invocations.add(args);
     }
+
+    void doThing(int arg1, Transaction transaction) {
+      assertThat(transaction, notNullValue());
+      invocations.add(List.of(arg1, transaction));
+    }
+
+    void doThing(int arg1, Context context) {
+      assertThat(context, notNullValue());
+      invocations.add(List.of(arg1, context));
+    }
+  }
+
+  @Value
+  static class Context {
+    long id;
   }
 }

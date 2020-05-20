@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox.acceptance;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.gruelbox.transactionoutbox.ThreadLocalContextTransactionManager;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.Transaction;
 import com.gruelbox.transactionoutbox.TransactionManager;
@@ -69,7 +70,7 @@ class TestUtils {
     writeRecord(configuration, value);
   }
 
-  static void writeRecord(TransactionManager transactionManager, int value) {
+  static void writeRecord(ThreadLocalContextTransactionManager transactionManager, int value) {
     transactionManager.requireTransaction(tx -> writeRecord(tx, value));
   }
 

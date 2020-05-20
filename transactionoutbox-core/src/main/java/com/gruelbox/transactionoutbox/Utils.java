@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.cglib.proxy.Callback;
 import net.sf.cglib.proxy.Enhancer;
@@ -103,6 +104,22 @@ class Utils {
       enhancer.setInterceptDuringConstruction(false);
       return proxy;
     }
+  }
+
+  static <T> T createLoggingProxy(Class<T> clazz) {
+    return createProxy(
+        clazz,
+        (method, args) -> {
+          log.info(
+              "Called mock " + clazz.getSimpleName() + ".{}({})",
+              method.getName(),
+              args == null
+                  ? ""
+                  : Arrays.stream(args)
+                      .map(it -> it == null ? "null" : it.toString())
+                      .collect(Collectors.joining(", ")));
+          return null;
+        });
   }
 
   static <T> T firstNonNull(T one, Supplier<T> two) {

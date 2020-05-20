@@ -18,7 +18,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /** Transaction manager which uses spring-tx and Hibernate. */
 @Slf4j
 @Service
-public class SpringTransactionManager implements TransactionManager {
+public class SpringTransactionManager implements ThreadLocalContextTransactionManager {
 
   private final SpringTransaction transactionInstance = new SpringTransaction();
 

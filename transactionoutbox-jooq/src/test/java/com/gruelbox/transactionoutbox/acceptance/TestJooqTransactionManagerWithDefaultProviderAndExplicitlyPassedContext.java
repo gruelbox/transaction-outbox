@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import com.gruelbox.transactionoutbox.Context;
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
 import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
@@ -376,7 +375,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
       TestUtils.writeRecord(transaction, i);
     }
 
-    void process(int i, @Context Configuration configuration) {
+    void process(int i, Configuration configuration) {
       TestUtils.writeRecord(configuration, i);
     }
   }
