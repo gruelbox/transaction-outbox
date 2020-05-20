@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
  * classes scheduled have a unique name in the context, so doesn't often play well with proxies and
  * other auto-generated code such as repositories based on {@code CrudRepository}.
  */
+@Beta
 @Service
 public class SpringInstantiator implements Instantiator {
 

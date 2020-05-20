@@ -10,10 +10,10 @@ public interface Transaction {
   Connection connection();
 
   /**
+   * @param <T> The context type. Coerced on read.
    * @return A {@link TransactionManager}-specific object representing the context of this
    *     transaction. Intended for use with {@link TransactionManager} implementations that support
-   *     explicitly-passed transaction context injection into method arguments annotated with {@link
-   *     Context}.
+   *     explicitly-passed transaction context injection into method arguments.
    */
   default <T> T context() {
     return null;

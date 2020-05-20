@@ -9,12 +9,9 @@ import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.Executor;
-import java.util.stream.IntStream;
 import javax.validation.ClockProvider;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
@@ -120,50 +117,14 @@ public class TransactionOutbox {
    */
   public <T> T schedule(Class<T> clazz) {
     return Utils.createProxy(
-        clazz, (method, args) -> uncheckedly(() -> extractTransactionAndSchedule(method, args)));
-  }
-
-  private <T> T extractTransactionAndSchedule(Method method, Object[] args) throws Exception {
-    if (transactionManager.contextType() != null) {
-      OptionalInt txIndex =
-          IntStream.range(0, args.length)
-              .filter(
-                  i ->
-                      transactionManager.contextType().isInstance(args[i])
-                          || args[i] instanceof Transaction)
-              .findFirst();
-      if (txIndex.isPresent()) {
-        Object context = args[txIndex.getAsInt()];
-        if (context instanceof Transaction) {
-          Object[] argv = Arrays.copyOf(args, args.length);
-          argv[txIndex.getAsInt()] = null;
-          return schedule((Transaction) context, method, argv);
-        }
-        Transaction transaction = transactionManager.transactionFromContext(context);
-        Object[] argv = Arrays.copyOf(args, args.length);
-        argv[txIndex.getAsInt()] = null;
-        return schedule(transaction, method, argv);
-      }
-    }
-    return transactionManager.requireTransactionReturns(
-        transaction -> schedule(transaction, method, args));
-  }
-
-  private Transaction transactionFromContext(Object transactionContext) {
-    if (transactionContext instanceof Transaction) {
-      return (Transaction) transactionContext;
-    } else {
-      if (!transactionManager.contextType().isInstance(transactionContext)) {
-        throw new IllegalArgumentException(
-            transactionContext.getClass().getName()
-                + " is not a valid transaction context for "
-                + transactionManager.getClass().getName()
-                + " (expected "
-                + transactionManager.contextType()
-                + ")");
-      }
-      return transactionManager.transactionFromContext(transactionContext);
-    }
+        clazz,
+        (method, args) ->
+            uncheckedly(
+                () -> {
+                  var extracted = transactionManager.extractTransaction(method, args);
+                  return schedule(
+                      extracted.getTransaction(), extracted.getMethod(), extracted.getArgs());
+                }));
   }
 
   /**
@@ -221,9 +182,14 @@ public class TransactionOutbox {
    *     whitelisted the entry first.
    */
   public boolean whitelist(String entryId) {
+    if (!(transactionManager instanceof ThreadLocalContextTransactionManager)) {
+      throw new UnsupportedOperationException(
+          "This method requires a ThreadLocalContextTransactionManager");
+    }
     log.info("Whitelisting entry {}", entryId);
     try {
-      return transactionManager.requireTransactionReturns(tx -> persistor.whitelist(tx, entryId));
+      return ((ThreadLocalContextTransactionManager) transactionManager)
+          .requireTransactionReturns(tx -> persistor.whitelist(tx, entryId));
     } catch (Exception e) {
       throw (RuntimeException) Utils.uncheckAndThrow(e);
     }
@@ -239,10 +205,21 @@ public class TransactionOutbox {
    * @return True if the whitelisting request was successful. May return false if another thread
    *     whitelisted the entry first.
    */
+  @SuppressWarnings({"unchecked", "rawtypes"})
   public boolean whitelist(String entryId, Object transactionContext) {
+    if (!(transactionManager instanceof ParameterContextTransactionManager)) {
+      throw new UnsupportedOperationException(
+          "This method requires a ParameterContextTransactionManager");
+    }
     log.info("Whitelisting entry {}", entryId);
     try {
-      return persistor.whitelist(transactionFromContext(transactionContext), entryId);
+      if (transactionContext instanceof Transaction) {
+        return persistor.whitelist((Transaction) transactionContext, entryId);
+      }
+      Transaction transaction =
+          ((ParameterContextTransactionManager) transactionManager)
+              .transactionFromContext(transactionContext);
+      return persistor.whitelist(transaction, entryId);
     } catch (Exception e) {
       throw (RuntimeException) Utils.uncheckAndThrow(e);
     }
@@ -298,7 +275,7 @@ public class TransactionOutbox {
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
     log.debug("Created instance {}", instance);
-    entry.getInvocation().invoke(instance, transaction);
+    transactionManager.injectTransaction(entry.getInvocation(), transaction).invoke(instance);
   }
 
   private TransactionOutboxEntry newEntry(Method method, Object[] args) {

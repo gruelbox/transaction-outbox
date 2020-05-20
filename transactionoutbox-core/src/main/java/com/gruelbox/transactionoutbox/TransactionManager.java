@@ -3,12 +3,14 @@ package com.gruelbox.transactionoutbox;
 import static com.gruelbox.transactionoutbox.Utils.uncheck;
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
+import java.lang.reflect.Method;
 import javax.sql.DataSource;
 
 /**
- * Key interface giving {@link TransactionOutbox} access to JDBC. In most applications with existing
- * transaction management, this will be a custom implementation. However, {@link
- * SimpleTransactionManager} is provided as a simplistic example for small, standalone applications.
+ * Key interface giving {@link TransactionOutbox} access to JDBC.
+ *
+ * <p>In practice, most implementations should extend {@link ThreadLocalContextTransactionManager}
+ * or {@link ParameterContextTransactionManager}.
  */
 public interface TransactionManager {
 
@@ -23,7 +25,7 @@ public interface TransactionManager {
    * @param dataSource The data source.
    * @return The transaction manager.
    */
-  static TransactionManager fromDataSource(DataSource dataSource) {
+  static ThreadLocalContextTransactionManager fromDataSource(DataSource dataSource) {
     return SimpleTransactionManager.builder()
         .connectionProvider(DataSourceConnectionProvider.builder().dataSource(dataSource).build())
         .build();
@@ -43,7 +45,7 @@ public interface TransactionManager {
    * @param password The password.
    * @return The transaction manager.
    */
-  static TransactionManager fromConnectionDetails(
+  static ThreadLocalContextTransactionManager fromConnectionDetails(
       String driverClass, String url, String username, String password) {
     return SimpleTransactionManager.builder()
         .connectionProvider(
@@ -122,60 +124,24 @@ public interface TransactionManager {
       throws E;
 
   /**
-   * Runs the specified work in the context of the "current" transaction (the definition of which is
-   * up to the implementation).
+   * All transaction managers need to be able to take a method call at the time it is scheduled and
+   * determine the {@link Transaction} to use to pass to {@link Persistor} and save the request.
+   * They can do this either by examining some current application state or by parsing the method
+   * and arguments.
    *
-   * <p>Only supported by transaction managers which support thread-local context. Those that do not
-   * support this method <em>must</em> support {@link #transactionFromContext(Object)} and context
-   * injection into {@link TransactionOutbox#schedule(Class)}.
-   *
-   * @param work Code which must be called while the transaction is active.
-   * @param <E> The exception type.
-   * @throws E If any exception is thrown by {@link Runnable}.
-   * @throws NoTransactionActiveException If a transaction is not currently active.
+   * @param method The method called.
+   * @param args The method arguments.
+   * @return The extracted transaction and any modifications to the method and arguments.
    */
-  default <E extends Exception> void requireTransaction(ThrowingTransactionalWork<E> work)
-      throws E, NoTransactionActiveException {
-    requireTransactionReturns(ThrowingTransactionalSupplier.fromWork(work));
-  }
+  TransactionalInvocation extractTransaction(Method method, Object[] args);
 
   /**
-   * Runs the specified work in the context of the "current" transaction (the definition of which is
-   * up to the implementation).
+   * Makes any modifications to an invocation at runtime necessary to inject the current transaction
+   * or transaction context.
    *
-   * <p>Only supported by transaction managers which support thread-local context. Those that do not
-   * support this method <em>must</em> support {@link #transactionFromContext(Object)} and context
-   * injection into {@link TransactionOutbox#schedule(Class)}.
-   *
-   * @param work Code which must be called while the transaction is active.
-   * @param <T> The type returned.
-   * @param <E> The exception type.
-   * @return The value returned by {@code work}.
-   * @throws E If any exception is thrown by {@link Runnable}.
-   * @throws NoTransactionActiveException If a transaction is not currently active.
-   * @throws UnsupportedOperationException If the transaction manager does not support thread-local
-   *     context.
+   * @param invocation The invocation.
+   * @param transaction The transaction that the invocation will be run in.
+   * @return The modified invocation.
    */
-  <T, E extends Exception> T requireTransactionReturns(ThrowingTransactionalSupplier<T, E> work)
-      throws E, NoTransactionActiveException;
-
-  /**
-   * Given an implementation-specific transaction context, return the active {@link Transaction}.
-   * Must be supported by any implementations which do not support {@link
-   * #requireTransactionReturns(ThrowingTransactionalSupplier)}, but otherwise can be ignored. If
-   * not supported, context injection into {@link TransactionOutbox#schedule(Class)} will not be
-   * supported.
-   *
-   * @param context The implementation-specific context, of the same type returned by {@link
-   *     #contextType()}.
-   * @return The transaction.
-   */
-  default Transaction transactionFromContext(Object context) {
-    throw new UnsupportedOperationException();
-  }
-
-  /** @return The type expected by {@link #transactionFromContext(Object)}. */
-  default Class<?> contextType() {
-    return null;
-  }
+  Invocation injectTransaction(Invocation invocation, Transaction transaction);
 }

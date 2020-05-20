@@ -45,7 +45,8 @@ public interface JooqTransactionManager extends TransactionManager {
    * @param listener The listener, linked to the DSL context.
    * @return The transaction manager.
    */
-  static TransactionManager create(DSLContext dslContext, JooqTransactionListener listener) {
+  static ThreadLocalContextTransactionManager create(
+      DSLContext dslContext, JooqTransactionListener listener) {
     var result = new ThreadLocalJooqTransactionManager(dslContext);
     listener.setJooqTransactionManager(result);
     return result;
@@ -55,15 +56,16 @@ public interface JooqTransactionManager extends TransactionManager {
    * Creates a transaction manager which uses explicitly-passed context, allowing multiple active
    * contexts in the current thread and contexts which are passed between threads. Requires a {@link
    * org.jooq.Configuration} for the transaction context or a {@link org.jooq.Transaction} to be
-   * used to be passed any method called via {@link TransactionOutbox#schedule(Class)} and injected
-   * using {@link org.jooq.Context}. Example:
+   * used to be passed any method called via {@link TransactionOutbox#schedule(Class)}. Example:
    *
    * <pre>
    * void doSchedule() {
-   *   dsl.transaction(ctx -&gt; outbox.schedule(getClass()).process("bar", null));
+   *   // ctx1 is used to write the request to the DB
+   *   dsl.transaction(ctx1 -&gt; outbox.schedule(getClass()).process("bar", ctx1));
    * }
    *
-   * void process(String arg, @Context org.jooq.Configuration ctx) {
+   * // ctx2 is injected at run time
+   * void process(String arg, org.jooq.Configuration ctx2) {
    *   ...
    * }</pre>
    *
@@ -71,31 +73,20 @@ public interface JooqTransactionManager extends TransactionManager {
    *
    * <pre>
    * void doSchedule() {
-   *   transactionManager.inTransaction(tx -&gt; outbox.schedule(getClass()).process("bar", null));
+   *   // tx1 is used to write the request to the DB
+   *   transactionManager.inTransaction(tx1 -&gt; outbox.schedule(getClass()).process("bar", tx1));
    * }
    *
-   * void process(String arg, Transaction tx) {
+   * // tx2 is injected at run time
+   * void process(String arg, Transaction tx2) {
    *   ...
    * }</pre>
    *
    * @param dslContext The DSL context.
    * @return The transaction manager.
    */
-  static TransactionManager create(DSLContext dslContext) {
+  @Beta
+  static ParameterContextTransactionManager<Configuration> create(DSLContext dslContext) {
     return new DefaultJooqTransactionManager(dslContext);
-  }
-
-  @Override
-  default Transaction transactionFromContext(Object context) {
-    Object txn = ((Configuration) context).data(JooqTransactionListener.TXN_KEY);
-    if (txn == null) {
-      throw new IllegalStateException(
-          JooqTransactionListener.class.getSimpleName() + " is not attached to the DSL");
-    }
-    return (Transaction) txn;
-  }
-
-  default Class<?> contextType() {
-    return Configuration.class;
   }
 }

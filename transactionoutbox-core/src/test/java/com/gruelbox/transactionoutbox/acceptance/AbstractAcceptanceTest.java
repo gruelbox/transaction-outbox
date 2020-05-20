@@ -13,6 +13,7 @@ import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.Submitter;
+import com.gruelbox.transactionoutbox.ThreadLocalContextTransactionManager;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.Transaction;
@@ -182,7 +183,7 @@ abstract class AbstractAcceptanceTest {
           };
 
       TransactionManager transactionManager =
-          new TransactionManager() {
+          new ThreadLocalContextTransactionManager() {
             @Override
             public <T, E extends Exception> T inTransactionReturnsThrows(
                 ThrowingTransactionalSupplier<T, E> work) throws E {

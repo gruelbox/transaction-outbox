@@ -12,29 +12,29 @@ import lombok.extern.slf4j.Slf4j;
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 abstract class AbstractThreadLocalTransactionManager<TX extends SimpleTransaction>
-    implements TransactionManager {
+    implements ThreadLocalContextTransactionManager {
 
   private final ThreadLocal<Deque<TX>> transactions = ThreadLocal.withInitial(LinkedList::new);
 
   @Override
   public final void inTransaction(Runnable runnable) {
-    TransactionManager.super.inTransaction(runnable);
+    ThreadLocalContextTransactionManager.super.inTransaction(runnable);
   }
 
   @Override
   public final void inTransaction(TransactionalWork work) {
-    TransactionManager.super.inTransaction(work);
+    ThreadLocalContextTransactionManager.super.inTransaction(work);
   }
 
   @Override
   public final <T> T inTransactionReturns(TransactionalSupplier<T> supplier) {
-    return TransactionManager.super.inTransactionReturns(supplier);
+    return ThreadLocalContextTransactionManager.super.inTransactionReturns(supplier);
   }
 
   @Override
   public final <E extends Exception> void inTransactionThrows(ThrowingTransactionalWork<E> work)
       throws E {
-    TransactionManager.super.inTransactionThrows(work);
+    ThreadLocalContextTransactionManager.super.inTransactionThrows(work);
   }
 
   @Override
