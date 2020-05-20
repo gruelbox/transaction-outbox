@@ -2,7 +2,8 @@ package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.SpringTransactionOutboxFactory;
+import com.gruelbox.transactionoutbox.SpringInstantiator;
+import com.gruelbox.transactionoutbox.SpringTransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -18,7 +19,12 @@ public class TransactionOutboxSpringDemoApplication {
 
   @Bean
   @Lazy
-  public TransactionOutbox transactionOutbox(SpringTransactionOutboxFactory factory) {
-    return factory.create().persistor(Persistor.forDialect(Dialect.H2)).build();
+  public TransactionOutbox transactionOutbox(SpringInstantiator instantiator,
+                                             SpringTransactionManager transactionManager) {
+    return TransactionOutbox.builder()
+        .instantiator(instantiator)
+        .transactionManager(transactionManager)
+        .persistor(Persistor.forDialect(Dialect.H2))
+        .build();
   }
 }
