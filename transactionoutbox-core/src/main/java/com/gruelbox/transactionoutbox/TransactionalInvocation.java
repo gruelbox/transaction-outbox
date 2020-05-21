@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-import java.lang.reflect.Method;
 import lombok.Value;
 
 /**
@@ -8,7 +7,9 @@ import lombok.Value;
  */
 @Value
 public class TransactionalInvocation {
-  Method method;
+  Class<?> clazz;
+  String methodName;
+  Class<?>[] parameters;
   Object[] args;
   Transaction transaction;
 }

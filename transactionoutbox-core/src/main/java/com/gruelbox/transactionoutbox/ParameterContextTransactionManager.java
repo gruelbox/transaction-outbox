@@ -50,6 +50,7 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
   @Override
   default TransactionalInvocation extractTransaction(Method method, Object[] args) {
     args = Arrays.copyOf(args, args.length);
+    var params = Arrays.copyOf(method.getParameterTypes(), method.getParameterCount());
     Transaction transaction = null;
     for (int i = 0; i < args.length; i++) {
       Object candidate = args[i];
@@ -69,6 +70,7 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
           }
         }
         args[i] = null;
+        params[i] = TransactionContextPlaceholder.class;
       }
     }
     if (transaction == null) {
@@ -80,7 +82,8 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
               + Transaction.class.getName()
               + ") to be passed as a parameter to any scheduled method.");
     }
-    return new TransactionalInvocation(method, args, transaction);
+    return new TransactionalInvocation(
+        method.getDeclaringClass(), method.getName(), params, args, transaction);
   }
 
   /**
@@ -94,6 +97,8 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
   @Override
   default Invocation injectTransaction(Invocation invocation, Transaction transaction) {
     Object[] args = Arrays.copyOf(invocation.getArgs(), invocation.getArgs().length);
+    Class<?>[] params =
+        Arrays.copyOf(invocation.getParameterTypes(), invocation.getParameterTypes().length);
     for (int i = 0; i < invocation.getParameterTypes().length; i++) {
       Class<?> parameterType = invocation.getParameterTypes()[i];
       if (Transaction.class.isAssignableFrom(parameterType)) {
@@ -104,7 +109,7 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
                   invocation.getClassName(), invocation.getMethodName(), i));
         }
         args[i] = transaction;
-      } else if (contextType().isAssignableFrom(parameterType)) {
+      } else if (parameterType.equals(TransactionContextPlaceholder.class)) {
         if (args[i] != null) {
           throw new IllegalArgumentException(
               String.format(
@@ -112,8 +117,10 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
                   invocation.getClassName(), invocation.getMethodName(), i));
         }
         args[i] = transaction.context();
+        params[i] = contextType();
       }
     }
-    return invocation.replaceArgs(args);
+    return new Invocation(
+        invocation.getClassName(), invocation.getMethodName(), params, args, invocation.getMdc());
   }
 }
