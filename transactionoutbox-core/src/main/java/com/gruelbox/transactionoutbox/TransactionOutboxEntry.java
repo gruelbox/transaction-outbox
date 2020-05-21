@@ -78,6 +78,17 @@ public class TransactionOutboxEntry {
   private boolean blacklisted;
 
   /**
+   * @param processed True if the task has been processed but has been retained to prevent duplicate
+   *     requests.
+   * @return True if the task has been processed but has been retained to prevent * duplicate
+   *     requests.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  @Setter
+  private boolean processed;
+
+  /**
    * @param version The optimistic locking version. Monotonically increasing with each update.
    * @return The optimistic locking version. Monotonically increasing with each update.
    */
@@ -97,11 +108,12 @@ public class TransactionOutboxEntry {
         if (!this.initialized) {
           String description =
               String.format(
-                  "%s.%s(%s) [%s]",
+                  "%s.%s(%s) [%s]%s",
                   invocation.getClassName(),
                   invocation.getMethodName(),
                   Arrays.stream(invocation.getArgs()).map(this::stringify).collect(joining(", ")),
-                  id);
+                  id,
+                  uniqueRequestId == null ? "" : " uid=[" + uniqueRequestId + "]");
           this.description = description;
           this.initialized = true;
           return description;

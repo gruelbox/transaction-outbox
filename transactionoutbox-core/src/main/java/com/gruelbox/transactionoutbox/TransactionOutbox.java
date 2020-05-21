@@ -8,6 +8,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -116,7 +117,8 @@ public class TransactionOutbox {
   }
 
   /**
-   * Starts building a schedule request with parameterization.
+   * Starts building a schedule request with parameterization. See {@link
+   * ParameterizedScheduleBuilder#schedule(Class)} for more information.
    *
    * @return Builder.
    */
@@ -139,19 +141,26 @@ public class TransactionOutbox {
    * <p>Calls {@link TransactionManager#inTransactionReturns(TransactionalSupplier)} to start a new
    * transaction for the fetch.
    *
+   * <p>Additionally, expires any records completed prior to the {@link
+   * TransactionOutboxBuilder#retentionThreshold(Duration)}.
+   *
    * @return true if any work was flushed.
    */
   @SuppressWarnings("UnusedReturnValue")
   public boolean flush() {
+    Instant now = clockProvider.getClock().instant();
+    List<TransactionOutboxEntry> batch = flush(now);
+    expireIdempotencyProtection(now);
+    return !batch.isEmpty();
+  }
+
+  private List<TransactionOutboxEntry> flush(Instant now) {
     log.info("Flushing stale tasks");
     var batch =
         transactionManager.inTransactionReturns(
             transaction -> {
               List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
-              uncheckedly(
-                      () ->
-                          persistor.selectBatch(
-                              transaction, flushBatchSize, clockProvider.getClock().instant()))
+              uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize, now))
                   .forEach(
                       entry -> {
                         log.debug("Reprocessing {}", entry.description());
@@ -167,7 +176,27 @@ public class TransactionOutbox {
     log.debug("Got batch of {}", batch.size());
     batch.forEach(this::submitNow);
     log.debug("Submitted batch");
-    return !batch.isEmpty();
+    return batch;
+  }
+
+  private void expireIdempotencyProtection(Instant now) {
+    long totalRecordsDeleted = 0;
+    int recordsDeleted;
+    do {
+      recordsDeleted =
+          transactionManager.inTransactionReturns(
+              tx ->
+                  uncheckedly(() -> persistor.deleteProcessedAndExpired(tx, flushBatchSize, now)));
+      totalRecordsDeleted += recordsDeleted;
+    } while (recordsDeleted > 0);
+    if (totalRecordsDeleted > 0) {
+      long s = retentionThreshold.toSeconds();
+      String duration = String.format("%dd:%02dh:%02dm", s / 3600, (s % 3600) / 60, (s % 60));
+      log.info(
+          "Expired idempotency protection on {} requests completed more than {} ago",
+          totalRecordsDeleted,
+          duration);
+    }
   }
 
   /**
@@ -269,7 +298,14 @@ public class TransactionOutbox {
                 }
                 log.info("Processing {}", entry.description());
                 invoke(entry, transaction);
-                persistor.delete(transaction, entry);
+                if (entry.getUniqueRequestId() == null) {
+                  persistor.delete(transaction, entry);
+                } else {
+                  entry.setProcessed(true);
+                  entry.setNextAttemptTime(
+                      clockProvider.getClock().instant().plus(retentionThreshold));
+                  persistor.update(transaction, entry);
+                }
                 return true;
               });
       if (success) {
@@ -547,11 +583,12 @@ public class TransactionOutbox {
      * Equivalent to {@link TransactionOutbox#schedule(Class)}, but applying additional parameters
      * to the request as configured using {@link TransactionOutbox#with()}.
      *
-     * <p>Usage:
+     * <p>Usage example:
      *
-     * <pre>transactionOutbox.with().uniqueRequestId("my-request")
-     *   .schedule(MyService.class)
-     *   .runMyMethod("with", "some", "arguments");</pre>
+     * <pre>transactionOutbox.with()
+     * .uniqueRequestId("my-request")
+     * .schedule(MyService.class)
+     * .runMyMethod("with", "some", "arguments");</pre>
      *
      * @param clazz The class to proxy.
      * @param <T> The type to proxy.

@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox;
 import static java.time.Instant.now;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -20,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -46,6 +48,38 @@ abstract class AbstractDefaultPersistorTest {
     txManager()
         .inTransactionThrows(
             tx -> assertThat(persistor().selectBatch(tx, 100, now.plusMillis(1)), contains(entry)));
+  }
+
+  @Test
+  void testInsertDuplicate() throws Exception {
+    TransactionOutboxEntry entry1 = createEntry("FOO1", now, false, "context-clientkey1");
+    txManager().inTransactionThrows(tx -> persistor().save(tx, entry1));
+    Thread.sleep(1100);
+    txManager()
+        .inTransactionThrows(
+            tx ->
+                assertThat(persistor().selectBatch(tx, 100, now.plusMillis(1)), contains(entry1)));
+
+    TransactionOutboxEntry entry2 = createEntry("FOO2", now, false, "context-clientkey2");
+    txManager().inTransactionThrows(tx -> persistor().save(tx, entry2));
+    Thread.sleep(1100);
+    txManager()
+        .inTransactionThrows(
+            tx ->
+                assertThat(
+                    persistor().selectBatch(tx, 100, now.plusMillis(1)),
+                    containsInAnyOrder(entry1, entry2)));
+
+    TransactionOutboxEntry entry3 = createEntry("FOO3", now, false, "context-clientkey1");
+    Assertions.assertThrows(
+        AlreadyScheduledException.class,
+        () -> txManager().inTransactionThrows(tx -> persistor().save(tx, entry3)));
+    txManager()
+        .inTransactionThrows(
+            tx ->
+                assertThat(
+                    persistor().selectBatch(tx, 100, now.plusMillis(1)),
+                    containsInAnyOrder(entry1, entry2)));
   }
 
   @Test
@@ -251,6 +285,22 @@ abstract class AbstractDefaultPersistorTest {
                 new Object[] {1, BigDecimal.TEN, null}))
         .blacklisted(blacklisted)
         .nextAttemptTime(nextAttemptTime)
+        .build();
+  }
+
+  private TransactionOutboxEntry createEntry(
+      String id, Instant nextAttemptTime, boolean blacklisted, String uniqueId) {
+    return TransactionOutboxEntry.builder()
+        .id(id)
+        .invocation(
+            new Invocation(
+                "Foo",
+                "Bar",
+                new Class<?>[] {int.class, BigDecimal.class, String.class},
+                new Object[] {1, BigDecimal.TEN, null}))
+        .blacklisted(blacklisted)
+        .nextAttemptTime(nextAttemptTime)
+        .uniqueRequestId(uniqueId)
         .build();
   }
 }

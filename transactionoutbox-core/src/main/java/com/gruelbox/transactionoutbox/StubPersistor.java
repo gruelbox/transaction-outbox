@@ -44,4 +44,9 @@ public class StubPersistor implements Persistor {
   public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now) {
     return List.of();
   }
+
+  @Override
+  public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now) {
+    return 0;
+  }
 }

@@ -11,11 +11,20 @@ import lombok.Getter;
  */
 @AllArgsConstructor
 @Getter
+@Beta
 public enum Dialect {
-  MY_SQL_5(false),
-  MY_SQL_8(true),
-  POSTGRESQL_9(true),
-  H2(false);
+  MY_SQL_5(
+      false,
+      "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blacklisted = false LIMIT ?"),
+  MY_SQL_8(
+      true,
+      "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blacklisted = false LIMIT ?"),
+  POSTGRESQL_9(
+      true,
+      "DELETE FROM {{table}} WHERE ctid IN (SELECT ctid FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blacklisted = false LIMIT ?)"),
+  H2(
+      false,
+      "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blacklisted = false LIMIT ?");
 
   /**
    * @return True if hot row support ({@code SKIP LOCKED}) is available, increasing performance when
@@ -24,4 +33,8 @@ public enum Dialect {
    */
   @SuppressWarnings("JavaDoc")
   private final boolean supportsSkipLock;
+
+  /** @return Format string for the SQL required to delete expired retained records. */
+  @SuppressWarnings("JavaDoc")
+  private final String deleteExpired;
 }

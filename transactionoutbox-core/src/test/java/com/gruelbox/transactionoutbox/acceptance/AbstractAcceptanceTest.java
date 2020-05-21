@@ -8,6 +8,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
@@ -27,12 +28,14 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,11 +43,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import lombok.Builder;
 import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.experimental.Accessors;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,6 +112,109 @@ abstract class AbstractAcceptanceTest {
     // Should be fired after commit
     assertTrue(chainedLatch.await(2, TimeUnit.SECONDS));
     assertTrue(latch.await(1, TimeUnit.SECONDS));
+  }
+
+  @Test
+  void duplicateRequests() throws InterruptedException {
+
+    TransactionManager transactionManager = simpleTxnManager();
+
+    List<String> ids = new CopyOnWriteArrayList<>();
+    CountDownLatch latch = new CountDownLatch(4);
+    AtomicReference<Clock> clockProvider = new AtomicReference<>(Clock.systemDefaultZone());
+
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    ids.add((String) entry.getInvocation().getArgs()[0]);
+                    latch.countDown();
+                  }
+                })
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .retentionThreshold(Duration.ofDays(2))
+            .clockProvider(clockProvider::get)
+            .build();
+
+    clearOutbox();
+
+    // Schedule some work
+    transactionManager.inTransaction(
+        () ->
+            outbox
+                .with()
+                .uniqueRequestId("context-clientkey1")
+                .schedule(ClassProcessor.class)
+                .process("1"));
+
+    // Make sure we can schedule more work with a different client key
+    transactionManager.inTransaction(
+        () ->
+            outbox
+                .with()
+                .uniqueRequestId("context-clientkey2")
+                .schedule(ClassProcessor.class)
+                .process("2"));
+
+    // Make sure we can't repeat the same work
+    transactionManager.inTransaction(
+        () ->
+            Assertions.assertThrows(
+                AlreadyScheduledException.class,
+                () ->
+                    outbox
+                        .with()
+                        .uniqueRequestId("context-clientkey1")
+                        .schedule(ClassProcessor.class)
+                        .process("3")));
+
+    // Run the clock forward to just under the retention threshold
+    clockProvider.set(
+        Clock.fixed(
+            clockProvider.get().instant().plus(Duration.ofDays(2)).minusSeconds(30),
+            clockProvider.get().getZone()));
+    outbox.flush();
+
+    // Make sure we can schedule more work with a different client key
+    transactionManager.inTransaction(
+        () ->
+            outbox
+                .with()
+                .uniqueRequestId("context-clientkey4")
+                .schedule(ClassProcessor.class)
+                .process("4"));
+
+    // Make sure we still can't repeat the same work
+    transactionManager.inTransaction(
+        () ->
+            Assertions.assertThrows(
+                AlreadyScheduledException.class,
+                () ->
+                    outbox
+                        .with()
+                        .uniqueRequestId("context-clientkey1")
+                        .schedule(ClassProcessor.class)
+                        .process("5")));
+
+    // Run the clock over the threshold
+    clockProvider.set(
+        Clock.fixed(clockProvider.get().instant().plusSeconds(60), clockProvider.get().getZone()));
+    outbox.flush();
+
+    // We should now be able to add the work
+    transactionManager.inTransaction(
+        () ->
+            outbox
+                .with()
+                .uniqueRequestId("context-clientkey1")
+                .schedule(ClassProcessor.class)
+                .process("6"));
+
+    assertTrue(latch.await(10, TimeUnit.SECONDS));
+    assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
   }
 
   /**

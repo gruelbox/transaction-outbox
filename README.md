@@ -234,6 +234,11 @@ To mark the work for reprocessing, just use [`TransactionOutbox.whitelist()`](ht
 ```
 transactionOutboxEntry.whitelist(entryId);
 ```
+Or if using a `TransactionManager` that relies on explicit context (such as a non-thread local) [`JooqTransactionManager`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-jooq/latest/com/gruelbox/transactionoutbox/JooqTransactionManager.html):
+```
+transactionOutboxEntry.whitelist(entryId, context);
+```
+
 A good approach here is to use the [`TransactionOutboxListener`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutboxListener.html) callback to post an [interactive Slack message](https://api.slack.com/legacy/interactive-messages) - this can operate as both the alert and the "button" allowing a support engineer to submit the work for reprocessing.
 
 ## Configuration reference
