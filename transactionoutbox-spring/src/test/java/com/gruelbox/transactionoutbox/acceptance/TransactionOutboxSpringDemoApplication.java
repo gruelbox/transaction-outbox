@@ -19,8 +19,8 @@ public class TransactionOutboxSpringDemoApplication {
 
   @Bean
   @Lazy
-  public TransactionOutbox transactionOutbox(SpringInstantiator instantiator,
-                                             SpringTransactionManager transactionManager) {
+  public TransactionOutbox transactionOutbox(
+      SpringInstantiator instantiator, SpringTransactionManager transactionManager) {
     return TransactionOutbox.builder()
         .instantiator(instantiator)
         .transactionManager(transactionManager)

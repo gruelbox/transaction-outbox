@@ -6,8 +6,8 @@ import org.jooq.DSLContext;
 
 /**
  * jOOQ transaction manager which uses thread-local context. Best used with {@link
- * org.jooq.impl.ThreadLocalTransactionProvider}. Relies on a {@link JooqTransactionListener}
- * being attached to the {@link DSLContext}.
+ * org.jooq.impl.ThreadLocalTransactionProvider}. Relies on a {@link JooqTransactionListener} being
+ * attached to the {@link DSLContext}.
  */
 @Slf4j
 final class ThreadLocalJooqTransactionManager

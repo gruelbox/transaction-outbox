@@ -6,6 +6,7 @@ import java.io.StringWriter;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.SQLTimeoutException;
 import java.sql.Statement;
 import java.sql.Timestamp;
@@ -84,19 +85,48 @@ public class DefaultPersistor implements Persistor {
   }
 
   @Override
-  public void save(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
+  public void save(Transaction tx, TransactionOutboxEntry entry)
+      throws SQLException, AlreadyScheduledException {
+    var insertSql =
+        "INSERT INTO "
+            + tableName
+            + " (id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
-    PreparedStatement stmt =
-        tx.prepareBatchStatement("INSERT INTO " + tableName + " VALUES (?, ?, ?, ?, ?, ?)");
+    if (entry.getUniqueRequestId() == null) {
+      PreparedStatement stmt = tx.prepareBatchStatement(insertSql);
+      setupInsert(entry, writer, stmt);
+      stmt.addBatch();
+      log.debug("Inserted {} in batch", entry.description());
+    } else {
+      try (PreparedStatement stmt = tx.connection().prepareStatement(insertSql)) {
+        setupInsert(entry, writer, stmt);
+        stmt.executeUpdate();
+        log.debug("Inserted {} immediately", entry.description());
+      } catch (SQLIntegrityConstraintViolationException e) {
+        throw new AlreadyScheduledException(
+            "Request " + entry.description() + " already exists", e);
+      } catch (Exception e) {
+        if (e.getClass().getName().equals("org.postgresql.util.PSQLException")
+            && e.getMessage().contains("constraint")) {
+          throw new AlreadyScheduledException(
+              "Request " + entry.description() + " already exists", e);
+        }
+      }
+    }
+  }
+
+  private void setupInsert(
+      TransactionOutboxEntry entry, StringWriter writer, PreparedStatement stmt)
+      throws SQLException {
     stmt.setString(1, entry.getId());
-    stmt.setString(2, writer.toString());
-    stmt.setTimestamp(3, Timestamp.from(entry.getNextAttemptTime()));
-    stmt.setInt(4, entry.getAttempts());
-    stmt.setBoolean(5, entry.isBlacklisted());
-    stmt.setInt(6, entry.getVersion());
-    stmt.addBatch();
-    log.debug("Inserted {} in batch", entry.description());
+    stmt.setString(2, entry.getUniqueRequestId());
+    stmt.setString(3, writer.toString());
+    stmt.setTimestamp(4, Timestamp.from(entry.getNextAttemptTime()));
+    stmt.setInt(5, entry.getAttempts());
+    stmt.setBoolean(6, entry.isBlacklisted());
+    stmt.setBoolean(7, entry.isProcessed());
+    stmt.setInt(8, entry.getVersion());
   }
 
   @Override
@@ -123,14 +153,15 @@ public class DefaultPersistor implements Persistor {
                 "UPDATE "
                     + tableName
                     + " "
-                    + "SET nextAttemptTime = ?, attempts = ?, blacklisted = ?, version = ? "
+                    + "SET nextAttemptTime = ?, attempts = ?, blacklisted = ?, processed = ?, version = ? "
                     + "WHERE id = ? and version = ?")) {
       stmt.setTimestamp(1, Timestamp.from(entry.getNextAttemptTime()));
       stmt.setInt(2, entry.getAttempts());
       stmt.setBoolean(3, entry.isBlacklisted());
-      stmt.setInt(4, entry.getVersion() + 1);
-      stmt.setString(5, entry.getId());
-      stmt.setInt(6, entry.getVersion());
+      stmt.setBoolean(4, entry.isProcessed());
+      stmt.setInt(5, entry.getVersion() + 1);
+      stmt.setString(6, entry.getId());
+      stmt.setInt(7, entry.getVersion());
       if (stmt.executeUpdate() != 1) {
         throw new OptimisticLockException();
       }
@@ -165,7 +196,7 @@ public class DefaultPersistor implements Persistor {
             "UPDATE "
                 + tableName
                 + " SET attempts = 0, blacklisted = false "
-                + "WHERE blacklisted = true AND id = ?");
+                + "WHERE blacklisted = true AND processed = false AND id = ?");
     stmt.setString(1, entryId);
     stmt.setQueryTimeout(writeLockTimeoutSeconds);
     return stmt.executeUpdate() != 0;
@@ -178,12 +209,24 @@ public class DefaultPersistor implements Persistor {
         tx.connection()
             .prepareStatement(
                 // language=MySQL
-                "SELECT id, invocation, nextAttemptTime, attempts, blacklisted, version FROM "
+                "SELECT id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version FROM "
                     + tableName
-                    + " WHERE nextAttemptTime < ? AND blacklisted = false LIMIT ?")) {
+                    + " WHERE nextAttemptTime < ? AND blacklisted = false AND processed = false LIMIT ?")) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
       return gatherResults(batchSize, stmt);
+    }
+  }
+
+  @Override
+  public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now)
+      throws Exception {
+    try (PreparedStatement stmt =
+        tx.connection()
+            .prepareStatement(dialect.getDeleteExpired().replace("{{table}}", tableName))) {
+      stmt.setTimestamp(1, Timestamp.from(now));
+      stmt.setInt(2, batchSize);
+      return stmt.executeUpdate();
     }
   }
 
@@ -216,10 +259,12 @@ public class DefaultPersistor implements Persistor {
       TransactionOutboxEntry entry =
           TransactionOutboxEntry.builder()
               .id(rs.getString("id"))
+              .uniqueRequestId(rs.getString("uniqueRequestId"))
               .invocation(serializer.deserializeInvocation(invocationStream))
               .nextAttemptTime(rs.getTimestamp("nextAttemptTime").toInstant())
               .attempts(rs.getInt("attempts"))
               .blacklisted(rs.getBoolean("blacklisted"))
+              .processed(rs.getBoolean("processed"))
               .version(rs.getInt("version"))
               .build();
       log.debug("Found {}", entry);

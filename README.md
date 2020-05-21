@@ -21,6 +21,7 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
    1. [jOOQ](#jooq)
 1. [Set up the background worker](#set-up-the-background-worker)
 1. [Managing the "dead letter queue"](#managing-the-dead-letter-queue)
+1. [Idempotency protection](#idempotency-protection)
 1. [Configuration reference](#configuration-reference)
 1. [Stubbing in tests](#stubbing-in-tests)
 
@@ -234,7 +235,43 @@ To mark the work for reprocessing, just use [`TransactionOutbox.whitelist()`](ht
 ```
 transactionOutboxEntry.whitelist(entryId);
 ```
+Or if using a `TransactionManager` that relies on explicit context (such as a non-thread local) [`JooqTransactionManager`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-jooq/latest/com/gruelbox/transactionoutbox/JooqTransactionManager.html):
+```
+transactionOutboxEntry.whitelist(entryId, context);
+```
+
 A good approach here is to use the [`TransactionOutboxListener`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutboxListener.html) callback to post an [interactive Slack message](https://api.slack.com/legacy/interactive-messages) - this can operate as both the alert and the "button" allowing a support engineer to submit the work for reprocessing.
+
+## Idempotency protection
+
+A common use case for `TransactionOutbox` is to receive an incoming request (such as a message from a message queue), acknowledge it immediately and process it asynchronously, for example:
+
+```java
+public class FooEventHandler implements SQSEventHandler<ThingHappenedEvent> {
+
+  @Inject private TransactionOutbox outbox;
+
+  public void handle(ThingHappenedEvent event) {
+    outbox.schedule(FooService.class).handleEvent(event.getThingId());
+  }
+}
+```
+However, incoming transports, whether they be message queues or APIs, usually need to rely on idempotency in message handlers (for the same reason that outgoing requests from outbox also rely on idempotency). This means the above code could get called twice.
+
+As long as `FooService.handleEvent()` is idempotent itself, this is harmless, but we can't always assume this. The incoming message might be a broadcast, with no knowledge of the behaviour of handlers and therefore no way of pre-generating any new record ids the handler might need and passing them in the message.
+
+To protect against this, `TransactionOutbox` can automatically detect duplicate requests and reject them with `AlreadyScheduledException`. Records of requests are retained up to a configurable threshold (see below).
+
+To use this, use the call pattern:
+
+```java
+outbox.with()
+  .uniqueRequestId("context-clientid")
+  .schedule(Service.class)
+  .process("Foo");
+```
+
+Where `context-clientid` is a globally-unique identifier derived from the incoming request.  Such ids are usually available from queue middleware as message ids, or if not you can require as part of the incoming API (possibly with a tenant prefix to ensure global uniqueness across tenants).
 
 ## Configuration reference
 
@@ -290,6 +327,9 @@ TransactionOutbox outbox = TransactionOutbox.builder()
     // is called will be recreated in the task when it runs. Very useful for tracking things like user ids and
     // request ids across invocations.
     .serializeMdc(true)
+    // Sets how long we should keep records of requests with a unique request id so duplicate requests
+    // can be rejected. Defaults to 7 days.
+    .retentionThreshold(Duration.ofDays(1))
     // We can intercept task successes, failures and blacklistings. The most common use is to catch blacklistings
     // and raise alerts for these to be investigated. A Slack interactive message is particularly effective here
     // since it can be wired up to call whitelist() automatically.

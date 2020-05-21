@@ -29,7 +29,17 @@ class DefaultMigrationManager {
                   + "    attempts INT,\n"
                   + "    blacklisted BOOLEAN,\n"
                   + "    version INT\n"
-                  + ")"));
+                  + ")"),
+          new Migration(
+              2,
+              "Add unique request id",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE"),
+          new Migration(
+              3, "Add processed flag", "ALTER TABLE TXNO_OUTBOX ADD COLUMN processed BOOLEAN"),
+          new Migration(
+              4,
+              "Add flush index",
+              "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blacklisted, nextAttemptTime)"));
 
   static void migrate(TransactionManager transactionManager) {
     transactionManager.inTransaction(

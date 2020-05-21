@@ -9,8 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
-import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.JooqTransactionListener;
@@ -28,7 +26,6 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -79,7 +76,7 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
   private HikariDataSource pooledDataSource() {
     HikariConfig config = new HikariConfig();
     config.setJdbcUrl(
-        "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE");
+        "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=2000;LOB_TIMEOUT=2000;MV_STORE=TRUE");
     config.setUsername("test");
     config.setPassword("test");
     config.addDataSourceProperty("cachePrepStmts", "true");

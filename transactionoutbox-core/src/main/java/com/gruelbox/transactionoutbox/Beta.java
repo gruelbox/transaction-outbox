@@ -17,7 +17,7 @@ import java.lang.annotation.Target;
  * work during upgrades. However it is generally inadvisable for <i>libraries</i> (which get
  * included on users' CLASSPATHs, outside the library developers' control) to do so.
  */
-@Target({ElementType.TYPE, ElementType.METHOD, ElementType.CONSTRUCTOR })
+@Target({ElementType.TYPE, ElementType.METHOD, ElementType.CONSTRUCTOR})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface Beta {}
