@@ -15,9 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationAdapter;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/**
- * Transaction manager which uses spring-tx and Hibernate.
- */
+/** Transaction manager which uses spring-tx and Hibernate. */
 @Beta
 @Slf4j
 @Service

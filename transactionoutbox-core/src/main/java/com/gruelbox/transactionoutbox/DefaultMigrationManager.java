@@ -29,7 +29,11 @@ class DefaultMigrationManager {
                   + "    attempts INT,\n"
                   + "    blacklisted BOOLEAN,\n"
                   + "    version INT\n"
-                  + ")"));
+                  + ")"),
+          new Migration(
+              2,
+              "Add unique request id",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE AFTER id)"));
 
   static void migrate(TransactionManager transactionManager) {
     transactionManager.inTransaction(

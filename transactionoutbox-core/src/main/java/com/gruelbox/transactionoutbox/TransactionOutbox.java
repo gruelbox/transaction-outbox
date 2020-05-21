@@ -18,6 +18,7 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.validator.constraints.Length;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
 import org.slf4j.MDC;
 import org.slf4j.event.Level;
@@ -34,15 +35,10 @@ public class TransactionOutbox {
   private static final int DEFAULT_FLUSH_BATCH_SIZE = 4096;
 
   @NotNull private final TransactionManager transactionManager;
-
   @Valid @NotNull private final Persistor persistor;
-
   @Valid @NotNull private final Instantiator instantiator;
-
   @NotNull private final Submitter submitter;
-
   @NotNull private final Duration attemptFrequency;
-
   @NotNull private final Level logLevelTemporaryFailure;
 
   @Min(1)
@@ -52,12 +48,10 @@ public class TransactionOutbox {
   private final int flushBatchSize;
 
   @NotNull private final ClockProvider clockProvider;
-
   @NotNull private final TransactionOutboxListener listener;
-
   private final boolean serializeMdc;
-
   private final Validator validator;
+  @NotNull private final Duration retentionThreshold;
 
   private TransactionOutbox(
       TransactionManager transactionManager,
@@ -70,7 +64,8 @@ public class TransactionOutbox {
       TransactionOutboxListener listener,
       Persistor persistor,
       Level logLevelTemporaryFailure,
-      Boolean serializeMdc) {
+      Boolean serializeMdc,
+      Duration retentionThreshold) {
     this.transactionManager = transactionManager;
     this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
     this.persistor = persistor;
@@ -83,6 +78,7 @@ public class TransactionOutbox {
     this.logLevelTemporaryFailure = Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
     this.validator = new Validator(this.clockProvider);
     this.serializeMdc = serializeMdc == null ? true : serializeMdc;
+    this.retentionThreshold = retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold;
     this.validator.validate(this);
     this.persistor.migrate(transactionManager);
   }
@@ -116,15 +112,16 @@ public class TransactionOutbox {
    * @return The proxy of {@code T}.
    */
   public <T> T schedule(Class<T> clazz) {
-    return Utils.createProxy(
-        clazz,
-        (method, args) ->
-            uncheckedly(
-                () -> {
-                  var extracted = transactionManager.extractTransaction(method, args);
-                  return schedule(
-                      extracted.getTransaction(), extracted.getMethod(), extracted.getArgs());
-                }));
+    return schedule(clazz, null);
+  }
+
+  /**
+   * Starts building a schedule request with parameterization.
+   *
+   * @return Builder.
+   */
+  public ParameterizedScheduleBuilder with() {
+    return new ParameterizedScheduleBuilderImpl();
   }
 
   /**
@@ -225,8 +222,25 @@ public class TransactionOutbox {
     }
   }
 
-  private <T> T schedule(Transaction transaction, Method method, Object[] args) throws Exception {
-    TransactionOutboxEntry entry = newEntry(method, args);
+  private <T> T schedule(Class<T> clazz, String uniqueRequestId) {
+    return Utils.createProxy(
+        clazz,
+        (method, args) ->
+            uncheckedly(
+                () -> {
+                  var extracted = transactionManager.extractTransaction(method, args);
+                  return schedule(
+                      extracted.getTransaction(),
+                      extracted.getMethod(),
+                      extracted.getArgs(),
+                      uniqueRequestId);
+                }));
+  }
+
+  private <T> T schedule(
+      Transaction transaction, Method method, Object[] args, String uniqueRequestId)
+      throws Exception {
+    TransactionOutboxEntry entry = newEntry(method, args, uniqueRequestId);
     validator.validate(entry);
     persistor.save(transaction, entry);
     transaction.addPostCommitHook(() -> submitNow(entry));
@@ -278,7 +292,7 @@ public class TransactionOutbox {
     transactionManager.injectTransaction(entry.getInvocation(), transaction).invoke(instance);
   }
 
-  private TransactionOutboxEntry newEntry(Method method, Object[] args) {
+  private TransactionOutboxEntry newEntry(Method method, Object[] args, String uniqueRequestId) {
     return TransactionOutboxEntry.builder()
         .id(UUID.randomUUID().toString())
         .invocation(
@@ -289,6 +303,7 @@ public class TransactionOutbox {
                 args,
                 serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null))
         .nextAttemptTime(clockProvider.getClock().instant().plus(attemptFrequency))
+        .uniqueRequestId(uniqueRequestId)
         .build();
   }
 
@@ -352,6 +367,7 @@ public class TransactionOutbox {
     private Persistor persistor;
     private Level logLevelTemporaryFailure;
     private Boolean serializeMdc;
+    private Duration retentionThreshold;
 
     TransactionOutboxBuilder() {}
 
@@ -477,6 +493,17 @@ public class TransactionOutbox {
     }
 
     /**
+     * @param retentionThreshold The length of time that any request with a unique client id will be
+     *     remembered, such that if the same request is repeated within the threshold period, {@link
+     *     AlreadyScheduledException} will be thrown.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder retentionThreshold(Duration retentionThreshold) {
+      this.retentionThreshold = retentionThreshold;
+      return this;
+    }
+
+    /**
      * Creates and initialises the {@link TransactionOutbox}.
      *
      * @return The outbox implementation.
@@ -493,7 +520,61 @@ public class TransactionOutbox {
           listener,
           persistor,
           logLevelTemporaryFailure,
-          serializeMdc);
+          serializeMdc,
+          retentionThreshold);
+    }
+  }
+
+  public interface ParameterizedScheduleBuilder {
+
+    /**
+     * Specifies a unique id for the request. This defaults to {@code null}, but if non-null, will
+     * cause the request to be retained in the database after completion for the specified {@link
+     * TransactionOutboxBuilder#retentionThreshold(Duration)}, during which time any duplicate
+     * requests to schedule the same request id will throw {@link AlreadyScheduledException}. This
+     * allows tasks to be scheduled idempotently even if the request itself is not idempotent (e.g.
+     * from a message queue listener, which can usually only work reliably on an "at least once"
+     * basis).
+     *
+     * @param uniqueRequestId The unique request id. May be {@code null}, but if non-null may be a
+     *     maximum of 100 characters in length. It is advised that if these ids are client-supplied,
+     *     they be prepended with some sort of context identifier to ensure global uniqueness.
+     * @return Builder.
+     */
+    ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId);
+
+    /**
+     * Equivalent to {@link TransactionOutbox#schedule(Class)}, but applying additional parameters
+     * to the request as configured using {@link TransactionOutbox#with()}.
+     *
+     * <p>Usage:
+     *
+     * <pre>transactionOutbox.with().uniqueRequestId("my-request")
+     *   .schedule(MyService.class)
+     *   .runMyMethod("with", "some", "arguments");</pre>
+     *
+     * @param clazz The class to proxy.
+     * @param <T> The type to proxy.
+     * @return The proxy of {@code T}.
+     */
+    <T> T schedule(Class<T> clazz);
+  }
+
+  private class ParameterizedScheduleBuilderImpl implements ParameterizedScheduleBuilder {
+
+    @Length(max = 100)
+    private String uniqueRequestId;
+
+    @Override
+    public ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId) {
+      this.uniqueRequestId = uniqueRequestId;
+      return this;
+    }
+
+    @Override
+    public <T> T schedule(Class<T> clazz) {
+      validator.validate(this);
+      return TransactionOutbox.this.schedule(clazz, uniqueRequestId);
     }
   }
 }

@@ -32,6 +32,14 @@ public class TransactionOutboxEntry {
   private final String id;
 
   /**
+   * @param uniqueRequestId A unique, client-supplied key for the entry. If supplied, it must be
+   *     globally unique
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  private final String uniqueRequestId;
+
+  /**
    * @param invocation The method invocation to perform.
    * @return The method invocation to perform.
    */

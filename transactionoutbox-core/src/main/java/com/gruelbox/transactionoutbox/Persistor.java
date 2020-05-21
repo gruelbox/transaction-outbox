@@ -31,7 +31,9 @@ public interface Persistor {
   void migrate(TransactionManager transactionManager);
 
   /**
-   * Saves a new {@link TransactionOutboxEntry}.
+   * Saves a new {@link TransactionOutboxEntry}. Should throw {@link AlreadyScheduledException} if
+   * the record already exists based on the {@code id} or {@code uniqueRequestId} (the latter of
+   * which should not treat nulls as duplicates).
    *
    * @param tx The current {@link Transaction}.
    * @param entry The entry to save. All properties on the object should be saved recursively.

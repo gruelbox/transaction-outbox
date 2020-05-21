@@ -84,19 +84,41 @@ public class DefaultPersistor implements Persistor {
   }
 
   @Override
-  public void save(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
+  public void save(Transaction tx, TransactionOutboxEntry entry)
+      throws SQLException, AlreadyScheduledException {
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
-    PreparedStatement stmt =
-        tx.prepareBatchStatement("INSERT INTO " + tableName + " VALUES (?, ?, ?, ?, ?, ?)");
+    if (entry.getUniqueRequestId() == null) {
+      PreparedStatement stmt =
+          tx.prepareBatchStatement("INSERT INTO " + tableName + " VALUES (?, ?, ?, ?, ?, ?)");
+      setupInsert(entry, writer, stmt);
+      stmt.addBatch();
+      log.debug("Inserted {} in batch", entry.description());
+    } else {
+      try (PreparedStatement stmt =
+          tx.connection()
+              .prepareStatement("INSERT INTO " + tableName + " VALUES (?, ?, ?, ?, ?, ?)")) {
+        setupInsert(entry, writer, stmt);
+        stmt.executeUpdate();
+        log.debug("Inserted {} immediately", entry.description());
+      } catch (SQLException e) {
+        // TODO check for key violation and rethrow as AlreadyScheduledException
+        log.error("", e);
+        throw e;
+      }
+    }
+  }
+
+  private void setupInsert(
+      TransactionOutboxEntry entry, StringWriter writer, PreparedStatement stmt)
+      throws SQLException {
     stmt.setString(1, entry.getId());
-    stmt.setString(2, writer.toString());
-    stmt.setTimestamp(3, Timestamp.from(entry.getNextAttemptTime()));
-    stmt.setInt(4, entry.getAttempts());
-    stmt.setBoolean(5, entry.isBlacklisted());
-    stmt.setInt(6, entry.getVersion());
-    stmt.addBatch();
-    log.debug("Inserted {} in batch", entry.description());
+    stmt.setString(2, entry.getUniqueRequestId());
+    stmt.setString(3, writer.toString());
+    stmt.setTimestamp(4, Timestamp.from(entry.getNextAttemptTime()));
+    stmt.setInt(5, entry.getAttempts());
+    stmt.setBoolean(6, entry.isBlacklisted());
+    stmt.setInt(7, entry.getVersion());
   }
 
   @Override
