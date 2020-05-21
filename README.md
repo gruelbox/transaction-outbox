@@ -235,7 +235,7 @@ To mark the work for reprocessing, just use [`TransactionOutbox.whitelist()`](ht
 ```
 transactionOutboxEntry.whitelist(entryId);
 ```
-Or if using a `TransactionManager` that relies on explicit context (such as a non-thread local) [`JooqTransactionManager`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-jooq/latest/com/gruelbox/transactionoutbox/JooqTransactionManager.html):
+Or if using a `TransactionManager` that relies on explicit context (such as a non-thread local [`JooqTransactionManager`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-jooq/latest/com/gruelbox/transactionoutbox/JooqTransactionManager.html)):
 ```
 transactionOutboxEntry.whitelist(entryId, context);
 ```
