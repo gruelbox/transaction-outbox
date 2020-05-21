@@ -174,7 +174,7 @@ abstract class AbstractAcceptanceTest {
     // Run the clock forward to just under the retention threshold
     clockProvider.set(
         Clock.fixed(
-            clockProvider.get().instant().plus(Duration.ofDays(2)).minusSeconds(30),
+            clockProvider.get().instant().plus(Duration.ofDays(2)).minusSeconds(60),
             clockProvider.get().getZone()));
     outbox.flush();
 
@@ -201,7 +201,7 @@ abstract class AbstractAcceptanceTest {
 
     // Run the clock over the threshold
     clockProvider.set(
-        Clock.fixed(clockProvider.get().instant().plusSeconds(60), clockProvider.get().getZone()));
+        Clock.fixed(clockProvider.get().instant().plusSeconds(120), clockProvider.get().getZone()));
     outbox.flush();
 
     // We should now be able to add the work
