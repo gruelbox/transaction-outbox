@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -115,12 +114,11 @@ abstract class AbstractAcceptanceTest {
   }
 
   @Test
-  void duplicateRequests() throws InterruptedException {
+  void duplicateRequests() {
 
     TransactionManager transactionManager = simpleTxnManager();
 
-    List<String> ids = new CopyOnWriteArrayList<>();
-    CountDownLatch latch = new CountDownLatch(4);
+    List<String> ids = new ArrayList<>();
     AtomicReference<Clock> clockProvider = new AtomicReference<>(Clock.systemDefaultZone());
 
     TransactionOutbox outbox =
@@ -131,9 +129,9 @@ abstract class AbstractAcceptanceTest {
                   @Override
                   public void success(TransactionOutboxEntry entry) {
                     ids.add((String) entry.getInvocation().getArgs()[0]);
-                    latch.countDown();
                   }
                 })
+            .submitter(Submitter.withExecutor(Runnable::run))
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .retentionThreshold(Duration.ofDays(2))
             .clockProvider(clockProvider::get)
@@ -213,7 +211,6 @@ abstract class AbstractAcceptanceTest {
                 .schedule(ClassProcessor.class)
                 .process("6"));
 
-    assertTrue(latch.await(10, TimeUnit.SECONDS));
     assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
   }
 

@@ -196,6 +196,8 @@ public class TransactionOutbox {
           "Expired idempotency protection on {} requests completed more than {} ago",
           totalRecordsDeleted,
           duration);
+    } else {
+      log.debug("No records found to delete as of {}", now);
     }
   }
 
@@ -301,9 +303,11 @@ public class TransactionOutbox {
                 if (entry.getUniqueRequestId() == null) {
                   persistor.delete(transaction, entry);
                 } else {
+                  Instant deletionTime =
+                      clockProvider.getClock().instant().plus(retentionThreshold);
+                  log.debug("Deferring deletion of {} to {}", entry.description(), deletionTime);
                   entry.setProcessed(true);
-                  entry.setNextAttemptTime(
-                      clockProvider.getClock().instant().plus(retentionThreshold));
+                  entry.setNextAttemptTime(deletionTime);
                   persistor.update(transaction, entry);
                 }
                 return true;
