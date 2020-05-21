@@ -5,7 +5,6 @@ import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 import static java.time.temporal.ChronoUnit.MINUTES;
 
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -260,13 +259,18 @@ public class TransactionOutbox {
             uncheckedly(
                 () -> {
                   var extracted = transactionManager.extractTransaction(method, args);
-                  TransactionOutboxEntry entry = newEntry(extracted.getClazz(),
-                      extracted.getMethodName(), extracted.getParameters(), extracted.getArgs(),
-                      uniqueRequestId);
+                  TransactionOutboxEntry entry =
+                      newEntry(
+                          extracted.getClazz(),
+                          extracted.getMethodName(),
+                          extracted.getParameters(),
+                          extracted.getArgs(),
+                          uniqueRequestId);
                   validator.validate(entry);
                   persistor.save(extracted.getTransaction(), entry);
                   extracted.getTransaction().addPostCommitHook(() -> submitNow(entry));
-                  log.debug("Scheduled {} for running after transaction commit", entry.description());
+                  log.debug(
+                      "Scheduled {} for running after transaction commit", entry.description());
                   return null;
                 }));
   }
@@ -324,7 +328,8 @@ public class TransactionOutbox {
     transactionManager.injectTransaction(entry.getInvocation(), transaction).invoke(instance);
   }
 
-  private TransactionOutboxEntry newEntry(Class<?> clazz, String methodName, Class<?>[] params, Object[] args, String uniqueRequestId) {
+  private TransactionOutboxEntry newEntry(
+      Class<?> clazz, String methodName, Class<?>[] params, Object[] args, String uniqueRequestId) {
     return TransactionOutboxEntry.builder()
         .id(UUID.randomUUID().toString())
         .invocation(

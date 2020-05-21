@@ -82,7 +82,8 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
               + Transaction.class.getName()
               + ") to be passed as a parameter to any scheduled method.");
     }
-    return new TransactionalInvocation(method.getDeclaringClass(), method.getName(), params, args, transaction);
+    return new TransactionalInvocation(
+        method.getDeclaringClass(), method.getName(), params, args, transaction);
   }
 
   /**
@@ -96,7 +97,8 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
   @Override
   default Invocation injectTransaction(Invocation invocation, Transaction transaction) {
     Object[] args = Arrays.copyOf(invocation.getArgs(), invocation.getArgs().length);
-    Class<?>[] params = Arrays.copyOf(invocation.getParameterTypes(), invocation.getParameterTypes().length);
+    Class<?>[] params =
+        Arrays.copyOf(invocation.getParameterTypes(), invocation.getParameterTypes().length);
     for (int i = 0; i < invocation.getParameterTypes().length; i++) {
       Class<?> parameterType = invocation.getParameterTypes()[i];
       if (Transaction.class.isAssignableFrom(parameterType)) {
@@ -118,6 +120,7 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
         params[i] = contextType();
       }
     }
-    return new Invocation(invocation.getClassName(), invocation.getMethodName(), params, args, invocation.getMdc());
+    return new Invocation(
+        invocation.getClassName(), invocation.getMethodName(), params, args, invocation.getMdc());
   }
 }
