@@ -124,14 +124,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(createTransactionManager())
-            .persistor(
-                DefaultPersistor.builder()
-                    .dialect(Dialect.H2)
-                    .serializer(
-                        DefaultInvocationSerializer.builder()
-                            .whitelistedTypes(Set.of(org.jooq.Configuration.class))
-                            .build())
-                    .build())
+            .persistor(Persistor.forDialect(Dialect.H2))
             .listener(
                 new TransactionOutboxListener() {
                   @Override
@@ -168,14 +161,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(createTransactionManager())
-            .persistor(
-                DefaultPersistor.builder()
-                    .dialect(Dialect.H2)
-                    .serializer(
-                        DefaultInvocationSerializer.builder()
-                            .whitelistedTypes(Set.of(org.jooq.Configuration.class))
-                            .build())
-                    .build())
+            .persistor(Persistor.forDialect(Dialect.H2))
             .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
@@ -284,14 +270,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(createTransactionManager())
-            .persistor(
-                DefaultPersistor.builder()
-                    .dialect(Dialect.H2)
-                    .serializer(
-                        DefaultInvocationSerializer.builder()
-                            .whitelistedTypes(Set.of(org.jooq.Configuration.class))
-                            .build())
-                    .build())
+            .persistor(Persistor.forDialect(Dialect.H2))
             .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {

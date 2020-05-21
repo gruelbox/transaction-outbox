@@ -155,6 +155,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       addClassPair(ChronoUnit.class, "ChronoUnit");
 
       addClassPair(Transaction.class, "Transaction");
+      addClassPair(TransactionContextPlaceholder.class, "TransactionContext");
 
       whitelistedClasses.forEach(clazz -> addClassPair(clazz, clazz.getName()));
     }

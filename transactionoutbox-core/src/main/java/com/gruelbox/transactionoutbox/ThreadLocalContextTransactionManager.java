@@ -63,7 +63,8 @@ public interface ThreadLocalContextTransactionManager extends TransactionManager
   @Override
   default TransactionalInvocation extractTransaction(Method method, Object[] args) {
     return requireTransactionReturns(
-        transaction -> new TransactionalInvocation(method, args, transaction));
+        transaction -> new TransactionalInvocation(method.getDeclaringClass(), method.getName(),
+            method.getParameterTypes(), args, transaction));
   }
 
   /**

@@ -260,23 +260,15 @@ public class TransactionOutbox {
             uncheckedly(
                 () -> {
                   var extracted = transactionManager.extractTransaction(method, args);
-                  return schedule(
-                      extracted.getTransaction(),
-                      extracted.getMethod(),
-                      extracted.getArgs(),
+                  TransactionOutboxEntry entry = newEntry(extracted.getClazz(),
+                      extracted.getMethodName(), extracted.getParameters(), extracted.getArgs(),
                       uniqueRequestId);
+                  validator.validate(entry);
+                  persistor.save(extracted.getTransaction(), entry);
+                  extracted.getTransaction().addPostCommitHook(() -> submitNow(entry));
+                  log.debug("Scheduled {} for running after transaction commit", entry.description());
+                  return null;
                 }));
-  }
-
-  private <T> T schedule(
-      Transaction transaction, Method method, Object[] args, String uniqueRequestId)
-      throws Exception {
-    TransactionOutboxEntry entry = newEntry(method, args, uniqueRequestId);
-    validator.validate(entry);
-    persistor.save(transaction, entry);
-    transaction.addPostCommitHook(() -> submitNow(entry));
-    log.debug("Scheduled {} for running after transaction commit", entry.description());
-    return null;
   }
 
   private void submitNow(TransactionOutboxEntry entry) {
@@ -332,14 +324,14 @@ public class TransactionOutbox {
     transactionManager.injectTransaction(entry.getInvocation(), transaction).invoke(instance);
   }
 
-  private TransactionOutboxEntry newEntry(Method method, Object[] args, String uniqueRequestId) {
+  private TransactionOutboxEntry newEntry(Class<?> clazz, String methodName, Class<?>[] params, Object[] args, String uniqueRequestId) {
     return TransactionOutboxEntry.builder()
         .id(UUID.randomUUID().toString())
         .invocation(
             new Invocation(
-                instantiator.getName(method.getDeclaringClass()),
-                method.getName(),
-                method.getParameterTypes(),
+                instantiator.getName(clazz),
+                methodName,
+                params,
                 args,
                 serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null))
         .nextAttemptTime(clockProvider.getClock().instant().plus(attemptFrequency))

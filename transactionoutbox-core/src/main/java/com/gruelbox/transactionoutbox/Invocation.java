@@ -107,8 +107,4 @@ public class Invocation {
       method.invoke(instance, args);
     }
   }
-
-  Invocation replaceArgs(Object[] args) {
-    return new Invocation(className, methodName, parameterTypes, args, mdc);
-  }
 }

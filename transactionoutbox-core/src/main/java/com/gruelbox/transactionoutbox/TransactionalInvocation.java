@@ -8,7 +8,9 @@ import lombok.Value;
  */
 @Value
 public class TransactionalInvocation {
-  Method method;
+  Class<?> clazz;
+  String methodName;
+  Class<?>[] parameters;
   Object[] args;
   Transaction transaction;
 }
