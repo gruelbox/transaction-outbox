@@ -9,7 +9,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - uses: actions/checkout@v2
 
       - name: Set up JDK 11
@@ -26,6 +25,15 @@ jobs:
           echo ${{ secrets.GPG_SECRETKEYS }} | base64 --decode | $GPG_EXECUTABLE --import --no-tty --batch --yes
           echo ${{ secrets.GPG_OWNERTRUST }} | base64 --decode | $GPG_EXECUTABLE --import-ownertrust --no-tty --batch --yes
           mvn -Prelease,delombok -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision=$revision -DskipTests
+          echo "Updating READMEs"
+          sed -i "s_\(<version>\)[^<]*_\1${revision}_g" README.md
+          sed -i "s_\(<version>\)[^<]*_\1${revision}_g" transactionoutbox-guice/README.md
+          sed -i "s_\(<version>\)[^<]*_\1${revision}_g" transactionoutbox-jooq/README.md
+          sed -i "s_\(<version>\)[^<]*_\1${revision}_g" transactionoutbox-spring/README.md
+          sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-core:\)[^']*_\1${revision}_g" README.md
+          sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-guice:\)[^']*_\1${revision}_g" transactionoutbox-guice/README.md
+          sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-jooq:\)[^']*_\1${revision}_g" transactionoutbox-jooq/README.md
+          sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-spring:\)[^']*_\1${revision}_g" transactionoutbox-spring/README.md
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
@@ -33,3 +41,11 @@ jobs:
           GPG_EXECUTABLE: gpg
           GPG_KEYNAME: ${{ secrets.GPG_KEYNAME }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v2
+        with:
+          commit-message: "Update versions in READMEs [skip ci]"
+          title: Update versions in READMEs
+          body: Updates the versions in the README files following the release
+          branch: update-readme-versions

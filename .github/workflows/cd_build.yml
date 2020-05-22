@@ -2,7 +2,7 @@ name: Continous Delivery
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   build:
@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - uses: actions/checkout@v2
 
       - name: Set up JDK 11
@@ -29,8 +28,26 @@ jobs:
             echo "Tagging $revision"
             git tag $revision
             git push origin $revision
+
+            echo "Updating READMEs - temporary for testing"
+            sed -i "s_\(<version>\)[^<]*_\1${revision}_g" README.md
+            sed -i "s_\(<version>\)[^<]*_\1${revision}_g" transactionoutbox-guice/README.md
+            sed -i "s_\(<version>\)[^<]*_\1${revision}_g" transactionoutbox-jooq/README.md
+            sed -i "s_\(<version>\)[^<]*_\1${revision}_g" transactionoutbox-spring/README.md
+            sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-core:\)[^']*_\1${revision}_g" README.md
+            sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-guice:\)[^']*_\1${revision}_g" transactionoutbox-guice/README.md
+            sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-jooq:\)[^']*_\1${revision}_g" transactionoutbox-jooq/README.md
+            sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-spring:\)[^']*_\1${revision}_g" transactionoutbox-spring/README.md
           else
             mvn -Pdelombok -B package
           fi
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v2
+        with:
+          commit-message: "Update versions in READMEs [skip ci]"
+          title: Update versions in READMEs
+          body: Updates the versions in the README files following the release
+          branch: update-readme-versions
