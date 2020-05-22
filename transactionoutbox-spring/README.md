@@ -1,5 +1,9 @@
 # transaction-outbox-spring
 
+[![Spring on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring)
+[![Spring Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-spring.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-spring)
+[![Latest snapshot](https://img.shields.io/github/v/tag/gruelbox/transaction-outbox?label=snapshot&sort=semver)](#development-snapshots)
+
 Extension for [transaction-outbox-core](../README.md) which integrates Spring's DI and/or transaction management.
 
 I don't actually use Spring in production, so this is more presented as an example at the moment. Doubtless I've missed a lot of nuances about the flexibility of Spring. Pull requests very welcome.
@@ -8,31 +12,30 @@ I don't actually use Spring in production, so this is more presented as an examp
 
 ### Stable releases
 
-[![Spring on Maven Central](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.gruelbox/transactionoutbox-spring)
-[![Spring Javadoc](https://www.javadoc.io/badge/com.gruelbox/transactionoutbox-spring.svg?color=blue)](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-spring)
-
 The latest stable release is available from Maven Central.
 
 #### Maven
+
 ```xml
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-spring</artifactId>
-  <version>${transactionoutbox.version}</version>
+  <version>0.00.0</version>
 </dependency>
 ```
+
 #### Gradle
+
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-spring:$transactionOutboxVersion'
+implementation 'com.gruelbox:transactionoutbox-spring:0.00.0'
 ```
 
 ### Development snapshots
 
-[![Latest snapshot](https://img.shields.io/github/v/tag/gruelbox/transaction-outbox?label=snapshot&sort=semver)](#development-snapshots)
-
 Maven Central is updated regularly. Alternatively, if you want to stay at the bleeding edge, you can use continuously-delivered releases from [Github Package Repository](https://github.com/gruelbox/transaction-outbox/packages). These can be used from production builds since they will never be deleted.
 
 #### Maven
+
 ```xml
 <repositories>
   <repository>
@@ -42,7 +45,9 @@ Maven Central is updated regularly. Alternatively, if you want to stay at the bl
   </repository>
 </repositories>
 ```
+
 You will need to authenticate with Github to use Github Package Repository. Create a personal access token in [your GitHub settings](https://github.com/settings/tokens). It only needs **read:package** permissions. Then add something like the following in your Maven `settings.xml`:
+
 ```xml
 <servers>
     <server>
@@ -52,6 +57,7 @@ You will need to authenticate with Github to use Github Package Repository. Crea
     </server>
 </servers>
 ```
+
 The above example uses environment variables, allowing you to keep the credentials out of source control, but you can hard-code them if you know what you're doing.
 
 ## Configuration
@@ -88,4 +94,5 @@ void publishCustomerCreatedEvent(long id) {
   // Remote call here
 }
 ```
+
 Notice that with a DI framework like Spring in play, you can **self-invoke** on `getClass()` - invoke a method on the same class that's scheduling it.
