@@ -14,6 +14,7 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
 
 1. [Why do I need it?](#why-do-i-need-it)
 1. [Installation](#installation)
+   1. [Requirements](#requirements)
    1. [Stable releases](#stable-releases)
    1. [Development snapshots](#development-snapshots)
 1. [Basic Configuration](#basic-configuration)
@@ -103,11 +104,13 @@ If you find yourself wondering _why bother with the queues now_? You're quite ri
 
 ## Installation
 
-> Requires at least Java 11. **Stuck on an earlier JDK? [Speak up](https://github.com/gruelbox/transaction-outbox/issues/new/choose)**. If there's any interest in downgrading, it won't be particularly hard to strip out the Java 9/10/11 features like `var`.
+### Requirements
+- At least **Java 11**. Downgrading to requiring Java 8 is [under consideration](https://github.com/gruelbox/transaction-outbox/issues/29).
+- A **data store with the concept of a transaction spanning multiple mutation operations** (such as a traditional RDBMS). The transaction outbox pattern is applicable to data stores which don't support transactions (e.g. by appending outbox records to a MongoDB document) but the API is not designed for this. Feel free to propose options if this interests you.
+- Specifically, **MySQL**, **PostgreSQL** and **H2** are currently supported, but pull requests to support Oracle, SQL Server or any other traditional RDMBS would be trivial.
 
 ### Stable releases
-
-The latest stable release is available from Maven Central.
+The latest stable release is available from Maven Central. Stable releases are [sort-of semantically versioned](https://semver.org/). That is, they follow semver in every respect other than that the version numbers are not monotically increasing. The project uses continuous delivery and selects individual stable releases to promote to Central, so Central releases will always be spaced apart numerically. The important thing, though, is that dependencies should be safe to upgrade as long as the major version number has not increased. 
 
 #### Maven
 
@@ -127,7 +130,7 @@ implementation 'com.gruelbox:transactionoutbox-core:1.3.109'
 
 ### Development snapshots
 
-Maven Central is updated regularly. Alternatively, if you want to stay at the bleeding edge, you can use continuously-delivered releases from [Github Package Repository](https://github.com/gruelbox/transaction-outbox/packages). These can be used from production builds since they will never be deleted.
+Maven Central is updated regularly. However, if you want to stay at the bleeding edge, you can use continuously-delivered releases from [Github Package Repository](https://github.com/gruelbox/transaction-outbox/packages). These can be used from your production builds since they will never be deleted (unlike `SNAPSHOT`s).
 
 #### Maven
 
