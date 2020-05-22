@@ -21,7 +21,9 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
    1. [jOOQ](#jooq)
 1. [Set up the background worker](#set-up-the-background-worker)
 1. [Managing the "dead letter queue"](#managing-the-dead-letter-queue)
-1. [Idempotency protection](#idempotency-protection)
+1. [Advanced](#advanced)
+   1. [The nested outbox pattern](#the-nested-outbox-pattern)
+   1. [Idempotency protection](#idempotency-protection)
 1. [Configuration reference](#configuration-reference)
 1. [Stubbing in tests](#stubbing-in-tests)
 
@@ -242,7 +244,20 @@ transactionOutboxEntry.whitelist(entryId, context);
 
 A good approach here is to use the [`TransactionOutboxListener`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutboxListener.html) callback to post an [interactive Slack message](https://api.slack.com/legacy/interactive-messages) - this can operate as both the alert and the "button" allowing a support engineer to submit the work for reprocessing.
 
-## Idempotency protection
+## Advanced
+
+### The nested-outbox pattern
+
+In practice it can be extremely hard to guarantee that an entire unit of work is idempotent and thus suitable for retry. For example, the request might be to "update a customer record" with a new address, but this might record the change to an audit history table with a fresh UUID, the current date and time and so on, which in turn triggers external changes outside the transaction.  The parent customer update request may be idempotent, but the downstream effects may not be.
+
+To tackle this, `TransactionOutbox` supports a use case where outbox requests spawn further outbox requests, along with a layer of additional [idempotency protection](#idempotency-protection) for particularly diffcult cases.  The nested pattern works as follows:
+
+* Modify the customer record: `outbox.schedule(CustomerService.class).update(newDetails)`
+* The `update` method spawns a new outbox request to process the downstream effect: `outbox.schedule(AuditService.class).audit("CUSTOMER_UPDATED", UUID.randomUUID(), Instant.now(), newDetails.customerId())`
+
+Now, if any part of the top-level request throws, nothing occurs. If the top level request succeeds, an idempotent request to create the audit record will retry safely.
+
+### Idempotency protection
 
 A common use case for `TransactionOutbox` is to receive an incoming request (such as a message from a message queue), acknowledge it immediately and process it asynchronously, for example:
 
