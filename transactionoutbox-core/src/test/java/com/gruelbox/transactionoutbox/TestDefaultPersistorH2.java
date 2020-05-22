@@ -24,4 +24,9 @@ class TestDefaultPersistorH2 extends AbstractDefaultPersistorTest {
   protected TransactionManager txManager() {
     return txManager;
   }
+
+  @Override
+  protected Dialect dialect() {
+    return Dialect.H2;
+  }
 }

@@ -205,13 +205,15 @@ public class DefaultPersistor implements Persistor {
   @Override
   public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
       throws Exception {
+    String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
                 // language=MySQL
                 "SELECT id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version FROM "
                     + tableName
-                    + " WHERE nextAttemptTime < ? AND blacklisted = false AND processed = false LIMIT ?")) {
+                    + " WHERE nextAttemptTime < ? AND blacklisted = false AND processed = false LIMIT ?"
+                    + forUpdate)) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
       return gatherResults(batchSize, stmt);
