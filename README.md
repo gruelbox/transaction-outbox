@@ -229,20 +229,37 @@ See [transaction-outbox-jooq](transactionoutbox-jooq/README.md), which integrate
 
 ## Set up the background worker
 
-At the moment, if any work fails first time, it won't be retried. All we need to add is a background task that repeatedly calls [`TransactionOutbox.flush()`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html), e.g:
+At the moment, if any work fails first time, it won't be retried. All we need to add is a background thread that repeatedly calls [`TransactionOutbox.flush()`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html) to pick up and reprocess stale work.
+
+How you do this is up to you; it very much depends on how background processing works in your application (a reactive solution will be very different to one based on Guava `Service`, for example). However, here is a simple example:
 
 ```java
-ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-scheduler.scheduleAtFixedRate(outbox::flush, 2, 2, TimeUnit.MINUTES);
+Thread backgroundThread = new Thread(() -> {
+  while (!Thread.interrupted()) {
+    try {
+      // Keep flushing work until there's nothing left to flush
+      while (outbox.flush()) {}
+    } catch (Exception e) {
+      log.error("Error flushing transaction outbox. Pausing", e);
+    }
+    try {
+       // When we run out of work, pause for a minute before checking again
+       Thread.sleep(60_000);
+    } catch (InterruptedException e) {
+       break;
+    }
+  }
+});
+
+// Startup
+backgroundThread.start();
+
+// Shut down
+backgroundThread.interrupt();
+backgroundThread.join();
 ```
 
-Or with RxJava:
-
-```java
-Observable.interval(2, MINUTES).subscribe(i -> outbox.flush());
-```
-
-Wire this into your app in whichever way works best. Don't worry about it running on multiple instances simultaneously. It's designed to handle concurrent use, and indeed it can be a benefit; spreading high workloads across instances without any need for more complex high-availability configuration (that said, if you want to distribute work across a cluster at point of submission, this is also supported).
+Don't worry about it running on multiple instances simultaneously. It's designed to handle concurrent use (particularly on databases that support `SKIP LOCKED`, such as Postgres and MySQL 8+), and indeed multi-processing it can be a benefit; spreading high workloads across instances without any need for more complex high-availability configuration (that said, if you want to distribute work across a cluster at point of submission, this is also supported).
 
 ## Managing the "dead letter queue"
 
