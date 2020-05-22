@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
 @Slf4j
-public class TestMDC {
+class TestMDC {
 
   @Test
   final void testMDCPassedToTask() throws InterruptedException {

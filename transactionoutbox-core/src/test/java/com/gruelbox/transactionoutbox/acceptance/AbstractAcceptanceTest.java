@@ -48,12 +48,14 @@ import lombok.Builder;
 import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.experimental.Accessors;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.org.apache.commons.lang.math.RandomUtils;
 
+@Slf4j
 abstract class AbstractAcceptanceTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractAcceptanceTest.class);
@@ -480,22 +482,28 @@ abstract class AbstractAcceptanceTest {
 
   private void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
       throws Exception {
-    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    Thread backgroundThread = new Thread(() -> {
+      while (!Thread.interrupted()) {
+        try {
+          // Keep flushing work until there's nothing left to flush
+          //noinspection StatementWithEmptyBody
+          while (outbox.flush()) {}
+        } catch (Exception e) {
+          log.error("Error flushing transaction outbox. Pausing", e);
+        }
+        try {
+          Thread.sleep(250);
+        } catch (InterruptedException e) {
+          break;
+        }
+      }
+    });
+    backgroundThread.start();
     try {
-      scheduler.scheduleAtFixedRate(
-          () -> {
-            if (Thread.interrupted()) {
-              return;
-            }
-            outbox.flush();
-          },
-          250,
-          250,
-          TimeUnit.MILLISECONDS);
       runnable.run();
     } finally {
-      scheduler.shutdown();
-      assertTrue(scheduler.awaitTermination(20, TimeUnit.SECONDS));
+      backgroundThread.interrupt();
+      backgroundThread.join();
     }
   }
 
