@@ -1,12 +1,12 @@
 package com.gruelbox.transactionoutbox;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
-import javax.validation.ClockProvider;
 import javax.validation.ValidationException;
 import org.junit.jupiter.api.Test;
 
@@ -19,8 +19,8 @@ class TestValidator {
           new Class<?>[] {int.class, BigDecimal.class, String.class},
           new Object[] {1, BigDecimal.TEN, null});
 
-  private final ClockProvider clockProvider = () -> Clock.fixed(Instant.now(), ZoneId.of("+4"));
-  private final Validator validator = new Validator(clockProvider);
+  private final Instant now = Instant.now();
+  private final Validator validator = new Validator(() -> Clock.fixed(now, ZoneId.of("+4")));
 
   @Test
   void testEntryDateInPast() {
@@ -28,7 +28,7 @@ class TestValidator {
         TransactionOutboxEntry.builder()
             .id("FOO")
             .invocation(COMPLEX_INVOCATION)
-            .nextAttemptTime(clockProvider.getClock().instant().minusMillis(1))
+            .nextAttemptTime(now.minusMillis(1))
             .build();
     assertThrows(ValidationException.class, () -> validator.validate(entry));
   }
@@ -39,7 +39,7 @@ class TestValidator {
         TransactionOutboxEntry.builder()
             .id("FOO")
             .invocation(COMPLEX_INVOCATION)
-            .nextAttemptTime(clockProvider.getClock().instant())
+            .nextAttemptTime(now)
             .build();
     assertThrows(ValidationException.class, () -> validator.validate(entry));
   }
@@ -50,8 +50,8 @@ class TestValidator {
         TransactionOutboxEntry.builder()
             .id("FOO")
             .invocation(COMPLEX_INVOCATION)
-            .nextAttemptTime(clockProvider.getClock().instant().plusMillis(1))
+            .nextAttemptTime(now.plusMillis(1))
             .build();
-    assertThrows(ValidationException.class, () -> validator.validate(entry));
+    assertDoesNotThrow(() -> validator.validate(entry));
   }
 }

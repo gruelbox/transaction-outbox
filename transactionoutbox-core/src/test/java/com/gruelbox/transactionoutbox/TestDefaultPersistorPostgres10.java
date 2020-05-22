@@ -35,4 +35,9 @@ class TestDefaultPersistorPostgres10 extends AbstractDefaultPersistorTest {
   protected TransactionManager txManager() {
     return txManager;
   }
+
+  @Override
+  protected Dialect dialect() {
+    return Dialect.POSTGRESQL_9;
+  }
 }

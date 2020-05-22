@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import static com.gruelbox.transactionoutbox.Utils.logAtLevel;
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
+import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.time.temporal.ChronoUnit.MINUTES;
 
 import java.lang.reflect.InvocationTargetException;
@@ -299,11 +300,10 @@ public class TransactionOutbox {
                 if (entry.getUniqueRequestId() == null) {
                   persistor.delete(transaction, entry);
                 } else {
-                  Instant deletionTime =
-                      clockProvider.getClock().instant().plus(retentionThreshold);
-                  log.debug("Deferring deletion of {} to {}", entry.description(), deletionTime);
+                  log.debug(
+                      "Deferring deletion of {} by {}", entry.description(), retentionThreshold);
                   entry.setProcessed(true);
-                  entry.setNextAttemptTime(deletionTime);
+                  entry.setNextAttemptTime(after(retentionThreshold));
                   persistor.update(transaction, entry);
                 }
                 return true;
@@ -339,7 +339,7 @@ public class TransactionOutbox {
                 params,
                 args,
                 serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null))
-        .nextAttemptTime(clockProvider.getClock().instant().plus(attemptFrequency))
+        .nextAttemptTime(after(attemptFrequency))
         .uniqueRequestId(uniqueRequestId)
         .build();
   }
@@ -347,7 +347,7 @@ public class TransactionOutbox {
   private void pushBack(Transaction transaction, TransactionOutboxEntry entry)
       throws OptimisticLockException {
     try {
-      entry.setNextAttemptTime(clockProvider.getClock().instant().plus(attemptFrequency));
+      entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
       persistor.update(transaction, entry);
     } catch (OptimisticLockException e) {
@@ -357,12 +357,16 @@ public class TransactionOutbox {
     }
   }
 
+  private Instant after(Duration duration) {
+    return clockProvider.getClock().instant().plus(duration).truncatedTo(MILLIS);
+  }
+
   private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
       var blacklisted = entry.getAttempts() >= blacklistAfterAttempts;
       entry.setBlacklisted(blacklisted);
-      entry.setNextAttemptTime(clockProvider.getClock().instant().plus(attemptFrequency));
+      entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
       transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));
       listener.failure(entry, cause);
