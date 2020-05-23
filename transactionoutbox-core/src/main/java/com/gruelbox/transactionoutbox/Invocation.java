@@ -15,7 +15,6 @@ import org.slf4j.MDC;
  *
  * <p>Optimized for safe serialization via GSON.
  */
-@SuppressWarnings("WeakerAccess")
 @Value
 @Slf4j
 public class Invocation {
@@ -84,7 +83,7 @@ public class Invocation {
     this.mdc = mdc;
   }
 
-  void invoke(Object instance)
+  Object invoke(Object instance)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
     method.setAccessible(true);
@@ -95,7 +94,7 @@ public class Invocation {
       var oldMdc = MDC.getCopyOfContextMap();
       MDC.setContextMap(mdc);
       try {
-        method.invoke(instance, args);
+        return method.invoke(instance, args);
       } finally {
         if (oldMdc == null) {
           MDC.clear();
@@ -104,7 +103,7 @@ public class Invocation {
         }
       }
     } else {
-      method.invoke(instance, args);
+      return method.invoke(instance, args);
     }
   }
 }
