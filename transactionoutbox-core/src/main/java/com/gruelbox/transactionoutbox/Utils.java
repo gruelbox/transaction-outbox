@@ -73,7 +73,7 @@ class Utils {
   }
 
   @SuppressWarnings({"unchecked", "cast"})
-  static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], T> processor) {
+  static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], Object> processor) {
     if (clazz.isInterface()) {
       // Fastest - we can just proxy an interface directly
       return (T)
