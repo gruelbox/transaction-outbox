@@ -48,7 +48,7 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
    */
   @SuppressWarnings("unchecked")
   @Override
-  default TransactionalInvocation extractTransaction(Method method, Object[] args) {
+  default TransactionalInvocation<Transaction> extractTransaction(Method method, Object[] args) {
     args = Arrays.copyOf(args, args.length);
     var params = Arrays.copyOf(method.getParameterTypes(), method.getParameterCount());
     Transaction transaction = null;
@@ -82,7 +82,7 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
               + Transaction.class.getName()
               + ") to be passed as a parameter to any scheduled method.");
     }
-    return new TransactionalInvocation(
+    return new TransactionalInvocation<>(
         method.getDeclaringClass(), method.getName(), params, args, transaction);
   }
 
