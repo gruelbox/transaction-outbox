@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import lombok.Value;
 
 /**
@@ -11,5 +12,5 @@ public class TransactionalInvocation {
   String methodName;
   Class<?>[] parameters;
   Object[] args;
-  Transaction transaction;
+  BaseTransaction<?> transaction;
 }

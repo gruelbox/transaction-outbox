@@ -64,6 +64,7 @@ class TestProxyGeneration {
 
   static class Parent {
 
+    @SuppressWarnings("FieldCanBeLocal")
     private final Child child;
 
     Parent(Child child) {

@@ -13,14 +13,11 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
-/**
- * Internal representation of a {@link TransactionOutbox} task. Generally only directly of interest
- * to implementers of SPIs such as {@link Persistor} or {@link Submitter}.
- */
+/** Internal representation of a {@code TransactionOutbox} task. */
 @SuperBuilder(toBuilder = true)
 @EqualsAndHashCode
 @ToString
-public class TransactionOutboxEntry {
+public final class TransactionOutboxEntry {
 
   /**
    * @param id The id of the record. Usually a UUID.
@@ -98,8 +95,8 @@ public class TransactionOutboxEntry {
   @Setter
   private int version;
 
-  @EqualsAndHashCode.Exclude @ToString.Exclude private volatile boolean initialized;
-  @EqualsAndHashCode.Exclude @ToString.Exclude private String description;
+  @EqualsAndHashCode.Exclude @ToString.Exclude private transient volatile boolean initialized;
+  @EqualsAndHashCode.Exclude @ToString.Exclude private transient String description;
 
   /** @return A textual description of the task. */
   public String description() {
@@ -111,7 +108,11 @@ public class TransactionOutboxEntry {
                   "%s.%s(%s) [%s]%s",
                   invocation.getClassName(),
                   invocation.getMethodName(),
-                  Arrays.stream(invocation.getArgs()).map(this::stringify).collect(joining(", ")),
+                  invocation.getArgs() == null
+                      ? ""
+                      : Arrays.stream(invocation.getArgs())
+                          .map(this::stringify)
+                          .collect(joining(", ")),
                   id,
                   uniqueRequestId == null ? "" : " uid=[" + uniqueRequestId + "]");
           this.description = description;

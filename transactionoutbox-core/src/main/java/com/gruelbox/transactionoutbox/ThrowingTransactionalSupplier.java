@@ -1,35 +1,40 @@
 package com.gruelbox.transactionoutbox;
 
-@FunctionalInterface
-public interface ThrowingTransactionalSupplier<T, E extends Exception> {
+import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 
-  static <F extends Exception> ThrowingTransactionalSupplier<Void, F> fromRunnable(
-      Runnable runnable) {
+@FunctionalInterface
+public interface ThrowingTransactionalSupplier<
+    T, E extends Exception, TX extends BaseTransaction<?>> {
+
+  static <F extends Exception, G extends BaseTransaction<?>>
+      ThrowingTransactionalSupplier<Void, F, G> fromRunnable(Runnable runnable) {
     return transaction -> {
       runnable.run();
       return null;
     };
   }
 
-  static <F extends Exception> ThrowingTransactionalSupplier<Void, F> fromWork(
-      ThrowingTransactionalWork<F> work) {
+  static <F extends Exception, G extends BaseTransaction<?>>
+      ThrowingTransactionalSupplier<Void, F, G> fromWork(ThrowingTransactionalWork<F, G> work) {
     return transaction -> {
       work.doWork(transaction);
       return null;
     };
   }
 
-  static ThrowingTransactionalSupplier<Void, RuntimeException> fromWork(TransactionalWork work) {
+  static <G extends BaseTransaction<?>>
+      ThrowingTransactionalSupplier<Void, RuntimeException, G> fromWork(TransactionalWork<G> work) {
     return transaction -> {
       work.doWork(transaction);
       return null;
     };
   }
 
-  static <T> ThrowingTransactionalSupplier<T, RuntimeException> fromSupplier(
-      TransactionalSupplier<T> work) {
+  static <T, G extends BaseTransaction<?>>
+      ThrowingTransactionalSupplier<T, RuntimeException, G> fromSupplier(
+          TransactionalSupplier<T, G> work) {
     return work::doWork;
   }
 
-  T doWork(Transaction transaction) throws E;
+  T doWork(TX transaction) throws E;
 }

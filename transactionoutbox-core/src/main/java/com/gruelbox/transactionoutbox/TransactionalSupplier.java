@@ -1,14 +1,17 @@
 package com.gruelbox.transactionoutbox;
 
-@FunctionalInterface
-public interface TransactionalSupplier<T> {
+import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 
-  static <U> TransactionalSupplier<U> fromWork(TransactionalWork work) {
+@FunctionalInterface
+public interface TransactionalSupplier<T, TX extends BaseTransaction<?>> {
+
+  static <U, V extends BaseTransaction<?>> TransactionalSupplier<U, V> fromWork(
+      TransactionalWork<V> work) {
     return transaction -> {
       work.doWork(transaction);
       return null;
     };
   }
 
-  T doWork(Transaction transaction);
+  T doWork(TX transaction);
 }

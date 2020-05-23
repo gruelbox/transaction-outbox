@@ -11,19 +11,22 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.gruelbox.transactionoutbox.GuiceInstantiator;
 import com.gruelbox.transactionoutbox.StubPersistor;
-import com.gruelbox.transactionoutbox.StubThreadLocalTransactionManager;
 import com.gruelbox.transactionoutbox.Submitter;
-import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
+import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
+import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.sql.Connection;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /**
  * Demonstrates an alternative approach to using {@link TransactionOutbox} using binding annotations
@@ -33,13 +36,13 @@ import org.junit.jupiter.api.Test;
 class TestGuiceBinding {
 
   /** The real service */
-  @Inject MyService local;
+  @Inject private MyService local;
 
   /** The remoted version */
-  @Inject @Remote MyService remote;
+  @Inject @Remote private MyService remote;
 
   /** We need this to schedule the work */
-  @Inject TransactionManager transactionManager;
+  @Inject private JdbcTransactionManager<SimpleTransaction<Void>> transactionManager;
 
   @Test
   void testProviderInjection() {
@@ -71,7 +74,7 @@ class TestGuiceBinding {
   @Target({ElementType.PARAMETER, ElementType.METHOD, ElementType.FIELD})
   @Retention(RetentionPolicy.RUNTIME)
   @BindingAnnotation
-  public @interface Remote {}
+  @interface Remote {}
 
   /** Sets up the bindings */
   static final class DemoModule extends AbstractModule {
@@ -84,13 +87,15 @@ class TestGuiceBinding {
 
     @Provides
     @Singleton
-    TransactionManager manager() {
-      return new StubThreadLocalTransactionManager();
+    JdbcTransactionManager<SimpleTransaction<Void>> manager() {
+      return new StubThreadLocalJdbcTransactionManager<>(
+          () -> new SimpleTransaction<>(Mockito.mock(Connection.class), null));
     }
 
     @Provides
     @Singleton
-    TransactionOutbox outbox(Injector injector, TransactionManager transactionManager) {
+    TransactionOutbox outbox(
+        Injector injector, JdbcTransactionManager<SimpleTransaction<Void>> transactionManager) {
       return TransactionOutbox.builder()
           .instantiator(GuiceInstantiator.builder().injector(injector).build())
           .persistor(StubPersistor.builder().build())

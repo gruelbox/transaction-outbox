@@ -1,14 +1,14 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
-import com.gruelbox.transactionoutbox.DefaultPersistor;
-import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.ExecutorSubmitter;
 import com.gruelbox.transactionoutbox.Instantiator;
-import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
+import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
+import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.sql.Connection;
 import java.time.Duration;
 import java.util.Currency;
@@ -38,7 +38,8 @@ class TestComplexConfigurationExample {
     Executor executor = ForkJoinPool.commonPool();
     EventPublisher eventPublisher = Mockito.mock(EventPublisher.class);
 
-    TransactionManager transactionManager = TransactionManager.fromDataSource(dataSource);
+    SimpleTransactionManager transactionManager =
+        SimpleTransactionManager.fromDataSource(dataSource);
 
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -54,7 +55,7 @@ class TestComplexConfigurationExample {
             .transactionManager(transactionManager)
             // Modify how requests are persisted to the database.
             .persistor(
-                DefaultPersistor.builder()
+                JdbcPersistor.builder()
                     // Selecting the right SQL dialect ensures that features such as SKIP LOCKED are
                     // used correctly.
                     .dialect(Dialect.POSTGRESQL_9)

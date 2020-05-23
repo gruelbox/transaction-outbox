@@ -3,10 +3,10 @@ package com.gruelbox.transactionoutbox.acceptance;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.gruelbox.transactionoutbox.ThreadLocalContextTransactionManager;
+import com.gruelbox.transactionoutbox.JooqTransaction;
+import com.gruelbox.transactionoutbox.JooqTransactionManager;
+import com.gruelbox.transactionoutbox.ThreadLocalJooqTransactionManager;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
-import com.gruelbox.transactionoutbox.Transaction;
-import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.UncheckedException;
 import java.sql.Statement;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +23,7 @@ class TestUtils {
   private static final Table<Record> TEST_TABLE = DSL.table("TEST_TABLE");
 
   @SuppressWarnings("SameParameterValue")
-  static void runSql(TransactionManager transactionManager, String sql) {
+  static void runSql(JooqTransactionManager transactionManager, String sql) {
     transactionManager.inTransaction(
         tx -> {
           try {
@@ -44,7 +44,7 @@ class TestUtils {
     }
   }
 
-  static <T> T uncheckAndThrow(Throwable e) {
+  private static <T> T uncheckAndThrow(Throwable e) {
     if (e instanceof RuntimeException) {
       throw (RuntimeException) e;
     }
@@ -65,13 +65,16 @@ class TestUtils {
     configuration.dsl().insertInto(TEST_TABLE).values(value).execute();
   }
 
-  static void writeRecord(Transaction transaction, int value) {
-    Configuration configuration = transaction.context();
-    writeRecord(configuration, value);
+  static void writeRecord(JooqTransaction transaction, int value) {
+    writeRecord(transaction.context(), value);
   }
 
-  static void writeRecord(ThreadLocalContextTransactionManager transactionManager, int value) {
-    transactionManager.requireTransaction(tx -> writeRecord(tx, value));
+  static void writeRecord(ThreadLocalJooqTransactionManager transactionManager, int value) {
+    transactionManager.requireTransactionReturns(
+        tx -> {
+          writeRecord(tx, value);
+          return null;
+        });
   }
 
   static void assertRecordExists(DSLContext dsl, int value) {

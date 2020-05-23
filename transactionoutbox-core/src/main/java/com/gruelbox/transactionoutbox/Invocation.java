@@ -10,17 +10,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 
 /**
- * Represents the invocation of a specific method on a named class (where the name is provided by an
- * {@link Instantiator}), with the specified arguments.
+ * Represents the invocation of a specific method on a named class, with the specified arguments.
  *
  * <p>Optimized for safe serialization via GSON.
  */
-@SuppressWarnings("WeakerAccess")
 @Value
 @Slf4j
-public class Invocation {
+public final class Invocation {
 
-  /** @return The class name (as provided/expected by an {@link Instantiator}). */
+  /** @return The class name. */
   @SuppressWarnings("JavaDoc")
   @SerializedName("c")
   String className;
@@ -51,7 +49,7 @@ public class Invocation {
   Map<String, String> mdc;
 
   /**
-   * @param className The class name (as provided/expected by an {@link Instantiator}).
+   * @param className The class name.
    * @param methodName The method name. Combined with {@link #parameterTypes}, uniquely identifies
    *     the method.
    * @param parameterTypes The method parameter types. Combined with {@link #methodName}, uniquely
@@ -63,7 +61,7 @@ public class Invocation {
   }
 
   /**
-   * @param className The class name (as provided/expected by an {@link Instantiator}).
+   * @param className The class name.
    * @param methodName The method name. Combined with {@link #parameterTypes}, uniquely identifies
    *     the method.
    * @param parameterTypes The method parameter types. Combined with {@link #methodName}, uniquely
@@ -84,7 +82,7 @@ public class Invocation {
     this.mdc = mdc;
   }
 
-  void invoke(Object instance)
+  public Object invoke(Object instance)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
     method.setAccessible(true);
@@ -95,7 +93,7 @@ public class Invocation {
       var oldMdc = MDC.getCopyOfContextMap();
       MDC.setContextMap(mdc);
       try {
-        method.invoke(instance, args);
+        return method.invoke(instance, args);
       } finally {
         if (oldMdc == null) {
           MDC.clear();
@@ -104,7 +102,7 @@ public class Invocation {
         }
       }
     } else {
-      method.invoke(instance, args);
+      return method.invoke(instance, args);
     }
   }
 }

@@ -1,24 +1,19 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
 import java.lang.reflect.Method;
 
 /**
- * A transaction manager which assumes there is a single "current" {@link Transaction} on a thread
- * (presumably saved in a {@link ThreadLocal}) which can be both used by {@link
- * TransactionOutbox#schedule(Class)} as the current context to write records using {@link
- * Persistor} <em>and</em> used by scheduled methods themselves to write changes within the
- * transaction started as a result of reading and locking the request.
- *
- * <p>Call pattern permitted:
- *
- * <pre>transactionManager.inTransaction(() -&gt; outbox.schedule(MyClass.ckass).myMethod("foo");
- * </pre>
- *
- * <p>Adds the {@link #requireTransactionReturns(ThrowingTransactionalSupplier)} and {@link
- * #requireTransaction(ThrowingTransactionalWork)} methods, which extract the current transaction
- * from the thread context and pass it on, throwing {@link NoTransactionActiveException} if there is
- * no current transaction.
+ * @deprecated If implementing a thread-local transaction manager, if you want or need the {@link
+ *     #requireTransaction(ThrowingTransactionalWork)}, simply extend {@link
+ *     com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager} and include these methods
+ *     directly in your implementation rather than inheriting from this interface. The {@link
+ *     #extractTransaction(Method, Object[])} and {@link #injectTransaction(Invocation,
+ *     Transaction)} methods can then be implemented as below. If you don't need those methods,
+ *     simply implement {@link #extractTransaction(Method, Object[])} to pull the transaction from
+ *     your thread local context directly.
  */
+@Deprecated
 public interface ThreadLocalContextTransactionManager extends TransactionManager {
 
   /**
@@ -30,8 +25,8 @@ public interface ThreadLocalContextTransactionManager extends TransactionManager
    * @throws E If any exception is thrown by {@link Runnable}.
    * @throws NoTransactionActiveException If a transaction is not currently active.
    */
-  default <E extends Exception> void requireTransaction(ThrowingTransactionalWork<E> work)
-      throws E, NoTransactionActiveException {
+  default <E extends Exception> void requireTransaction(
+      ThrowingTransactionalWork<E, Transaction> work) throws E, NoTransactionActiveException {
     requireTransactionReturns(ThrowingTransactionalSupplier.fromWork(work));
   }
 
@@ -48,36 +43,16 @@ public interface ThreadLocalContextTransactionManager extends TransactionManager
    * @throws UnsupportedOperationException If the transaction manager does not support thread-local
    *     context.
    */
-  <T, E extends Exception> T requireTransactionReturns(ThrowingTransactionalSupplier<T, E> work)
-      throws E, NoTransactionActiveException;
+  <T, E extends Exception> T requireTransactionReturns(
+      ThrowingTransactionalSupplier<T, E, Transaction> work) throws E, NoTransactionActiveException;
 
-  /**
-   * Obtains the active transaction by using {@link
-   * #requireTransactionReturns(ThrowingTransactionalSupplier)}, thus requiring nothing to be passed
-   * in the method invocation. No changes are made to the invocation.
-   *
-   * @param method The method called.
-   * @param args The method arguments.
-   * @return The transactional invocation.
-   */
   @Override
   default TransactionalInvocation extractTransaction(Method method, Object[] args) {
     return requireTransactionReturns(
         transaction ->
-            new TransactionalInvocation(
-                method.getDeclaringClass(),
-                method.getName(),
-                method.getParameterTypes(),
-                args,
-                transaction));
+            TransactionManagerSupport.toTransactionalInvocation(method, args, transaction));
   }
 
-  /**
-   * The transaction is not needed as part of an invocation, so the invocation is left unmodified.
-   *
-   * @param invocation The invocation.
-   * @return The unmodified invocation.
-   */
   @Override
   default Invocation injectTransaction(Invocation invocation, Transaction transaction) {
     return invocation;

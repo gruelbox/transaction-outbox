@@ -1,7 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-import lombok.extern.slf4j.Slf4j;
-import org.jooq.Configuration;
 import org.jooq.DSLContext;
 
 /**
@@ -9,30 +7,36 @@ import org.jooq.DSLContext;
  * org.jooq.impl.ThreadLocalTransactionProvider}. Relies on a {@link JooqTransactionListener} being
  * attached to the {@link DSLContext}.
  */
-@Slf4j
-final class ThreadLocalJooqTransactionManager
-    extends AbstractThreadLocalTransactionManager<SimpleTransaction>
-    implements JooqTransactionManager {
+public interface ThreadLocalJooqTransactionManager extends JooqTransactionManager {
 
-  private final DSLContext parentDsl;
-
-  ThreadLocalJooqTransactionManager(DSLContext parentDsl) {
-    this.parentDsl = parentDsl;
+  /**
+   * Runs the specified work in the context of the "current" transaction (the definition of which is
+   * up to the implementation).
+   *
+   * @param work Code which must be called while the transaction is active.
+   * @param <E> The exception type.
+   * @throws E If any exception is thrown by {@link Runnable}.
+   * @throws NoTransactionActiveException If a transaction is not currently active.
+   */
+  default <E extends Exception> void requireTransaction(
+      ThrowingTransactionalWork<E, JooqTransaction> work) throws E, NoTransactionActiveException {
+    requireTransactionReturns(ThrowingTransactionalSupplier.fromWork(work));
   }
 
-  @Override
-  public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E> work) {
-    DSLContext dsl =
-        peekTransaction()
-            .map(SimpleTransaction::context)
-            .map(Configuration.class::cast)
-            .map(Configuration::dsl)
-            .orElse(parentDsl);
-    return dsl.transactionResult(
-        config ->
-            config
-                .dsl()
-                .connectionResult(connection -> work.doWork(peekTransaction().orElseThrow())));
-  }
+  /**
+   * Runs the specified work in the context of the "current" transaction (the definition of which is
+   * up to the implementation).
+   *
+   * @param work Code which must be called while the transaction is active.
+   * @param <T> The type returned.
+   * @param <E> The exception type.
+   * @return The value returned by {@code work}.
+   * @throws E If any exception is thrown by {@link Runnable}.
+   * @throws NoTransactionActiveException If a transaction is not currently active.
+   * @throws UnsupportedOperationException If the transaction manager does not support thread-local
+   *     context.
+   */
+  <T, E extends Exception> T requireTransactionReturns(
+      ThrowingTransactionalSupplier<T, E, JooqTransaction> work)
+      throws E, NoTransactionActiveException;
 }
