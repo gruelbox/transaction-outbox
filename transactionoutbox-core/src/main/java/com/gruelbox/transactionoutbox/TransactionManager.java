@@ -133,7 +133,7 @@ public interface TransactionManager {
    * @param args The method arguments.
    * @return The extracted transaction and any modifications to the method and arguments.
    */
-  TransactionalInvocation extractTransaction(Method method, Object[] args);
+  TransactionalInvocation<Transaction> extractTransaction(Method method, Object[] args);
 
   /**
    * Makes any modifications to an invocation at runtime necessary to inject the current transaction
