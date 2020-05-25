@@ -11,12 +11,12 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.gruelbox.transactionoutbox.GuiceInstantiator;
 import com.gruelbox.transactionoutbox.StubPersistor;
-import com.gruelbox.transactionoutbox.StubThreadLocalTransactionManager;
 import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -85,7 +85,7 @@ class TestGuiceBinding {
     @Provides
     @Singleton
     TransactionManager manager() {
-      return new StubThreadLocalTransactionManager();
+      return new StubThreadLocalJdbcTransactionManager();
     }
 
     @Provides

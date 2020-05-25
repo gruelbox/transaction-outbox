@@ -1,8 +1,20 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.jdbc;
 
+import static com.gruelbox.transactionoutbox.Utils.toBlockingFuture;
+
+import com.gruelbox.transactionoutbox.AlreadyScheduledException;
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.Invocation;
+import com.gruelbox.transactionoutbox.InvocationSerializer;
+import com.gruelbox.transactionoutbox.OptimisticLockException;
+import com.gruelbox.transactionoutbox.Persistor;
+import com.gruelbox.transactionoutbox.TransactionManager;
+import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -13,6 +25,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import javax.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -21,11 +34,16 @@ import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * The default {@link Persistor} for {@link TransactionOutbox}.
+ * The default JDBC-based {@link Persistor} for {@link TransactionOutbox}.
  *
  * <p>Saves requests to a relational database table, by default called {@code TXNO_OUTBOX}. This can
- * optionally be automatically created and upgraded by {@link DefaultPersistor}, although this
+ * optionally be automatically created and upgraded by {@link JdbcPersistor}, although this
  * behaviour can be disabled if you wish.
+ *
+ * <p>All operations are blocking, despite returning {@link CompletableFuture}s. No attempt is made
+ * to farm off the I/O to additional threads, which would be unlikely to work with JDBC {@link
+ * java.sql.Connection}s. As a result, all methods should simply be called followed immediately with
+ * {@link CompletableFuture#get()} to obtain the results.
  *
  * <p>More significant changes can be achieved by subclassing, which is explicitly supported. If, on
  * the other hand, you want to use a completely non-relational underlying data store or do something
@@ -34,7 +52,18 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @SuperBuilder
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-public class DefaultPersistor implements Persistor {
+public class JdbcPersistor implements Persistor<Connection, JdbcTransaction<?>> {
+
+  /**
+   * Uses the default relational persistor. Shortcut for: <code>
+   * JdbcPersistor.builder().dialect(dialect).build();</code>
+   *
+   * @param dialect The database dialect.
+   * @return The persistor.
+   */
+  public static JdbcPersistor forDialect(Dialect dialect) {
+    return JdbcPersistor.builder().dialect(dialect).build();
+  }
 
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
@@ -80,13 +109,50 @@ public class DefaultPersistor implements Persistor {
       InvocationSerializer.createDefaultJsonSerializer();
 
   @Override
-  public void migrate(TransactionManager transactionManager) {
-    DefaultMigrationManager.migrate(transactionManager);
+  public CompletableFuture<Void> migrate(
+      TransactionManager<Connection, ?, ? extends JdbcTransaction<?>> transactionManager) {
+    return toBlockingFuture(
+        () -> JdbcMigrationManager.migrate((JdbcTransactionManager) transactionManager));
   }
 
   @Override
-  public void save(Transaction tx, TransactionOutboxEntry entry)
-      throws SQLException, AlreadyScheduledException {
+  public CompletableFuture<Void> save(JdbcTransaction<?> tx, TransactionOutboxEntry entry) {
+    return toBlockingFuture(() -> saveBlocking(tx, entry));
+  }
+
+  @Override
+  public CompletableFuture<Void> delete(JdbcTransaction<?> tx, TransactionOutboxEntry entry) {
+    return toBlockingFuture(() -> deleteBlocking(tx, entry));
+  }
+
+  @Override
+  public CompletableFuture<Void> update(JdbcTransaction<?> tx, TransactionOutboxEntry entry) {
+    return toBlockingFuture(() -> updateBlocking(tx, entry));
+  }
+
+  @Override
+  public CompletableFuture<Boolean> lock(JdbcTransaction<?> tx, TransactionOutboxEntry entry) {
+    return toBlockingFuture(() -> lockBlocking(tx, entry));
+  }
+
+  @Override
+  public CompletableFuture<Boolean> whitelist(JdbcTransaction<?> tx, String entryId) {
+    return toBlockingFuture(() -> whitelistBlocking(tx, entryId));
+  }
+
+  @Override
+  public CompletableFuture<List<TransactionOutboxEntry>> selectBatch(
+      JdbcTransaction<?> tx, int batchSize, Instant now) {
+    return toBlockingFuture(() -> selectBatchBlocking(tx, batchSize, now));
+  }
+
+  @Override
+  public CompletableFuture<Integer> deleteProcessedAndExpired(
+      JdbcTransaction<?> tx, int batchSize, Instant now) {
+    return toBlockingFuture(() -> deleteProcessedAndExpiredInner(tx, batchSize, now));
+  }
+
+  void saveBlocking(JdbcTransaction<?> tx, TransactionOutboxEntry entry) throws SQLException {
     var insertSql =
         "INSERT INTO "
             + tableName
@@ -129,8 +195,7 @@ public class DefaultPersistor implements Persistor {
     stmt.setInt(8, entry.getVersion());
   }
 
-  @Override
-  public void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception {
+  void deleteBlocking(JdbcTransaction<?> tx, TransactionOutboxEntry entry) throws Exception {
     try (PreparedStatement stmt =
         // language=MySQL
         tx.connection()
@@ -144,8 +209,7 @@ public class DefaultPersistor implements Persistor {
     }
   }
 
-  @Override
-  public void update(Transaction tx, TransactionOutboxEntry entry) throws Exception {
+  void updateBlocking(JdbcTransaction<?> tx, TransactionOutboxEntry entry) throws Exception {
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
@@ -170,8 +234,7 @@ public class DefaultPersistor implements Persistor {
     }
   }
 
-  @Override
-  public boolean lock(Transaction tx, TransactionOutboxEntry entry) throws Exception {
+  boolean lockBlocking(JdbcTransaction<?> tx, TransactionOutboxEntry entry) throws Exception {
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
@@ -189,8 +252,7 @@ public class DefaultPersistor implements Persistor {
     }
   }
 
-  @Override
-  public boolean whitelist(Transaction tx, String entryId) throws Exception {
+  boolean whitelistBlocking(JdbcTransaction<?> tx, String entryId) throws Exception {
     PreparedStatement stmt =
         tx.prepareBatchStatement(
             "UPDATE "
@@ -202,9 +264,8 @@ public class DefaultPersistor implements Persistor {
     return stmt.executeUpdate() != 0;
   }
 
-  @Override
-  public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
-      throws Exception {
+  List<TransactionOutboxEntry> selectBatchBlocking(
+      JdbcTransaction<?> tx, int batchSize, Instant now) throws Exception {
     String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
     try (PreparedStatement stmt =
         tx.connection()
@@ -220,8 +281,7 @@ public class DefaultPersistor implements Persistor {
     }
   }
 
-  @Override
-  public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now)
+  private int deleteProcessedAndExpiredInner(JdbcTransaction<?> tx, int batchSize, Instant now)
       throws Exception {
     try (PreparedStatement stmt =
         tx.connection()
@@ -275,7 +335,7 @@ public class DefaultPersistor implements Persistor {
   }
 
   // For testing. Assumed low volume.
-  void clear(Transaction tx) throws SQLException {
+  void clear(JdbcTransaction<?> tx) throws SQLException {
     try (Statement stmt = tx.connection().createStatement()) {
       stmt.execute("DELETE FROM " + tableName);
     }

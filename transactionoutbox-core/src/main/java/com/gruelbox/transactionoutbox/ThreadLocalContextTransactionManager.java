@@ -3,37 +3,24 @@ package com.gruelbox.transactionoutbox;
 import java.lang.reflect.Method;
 
 /**
- * A transaction manager which assumes there is a single "current" {@link Transaction} on a thread
- * (presumably saved in a {@link ThreadLocal}) which can be both used by {@link
- * TransactionOutbox#schedule(Class)} as the current context to write records using {@link
- * Persistor} <em>and</em> used by scheduled methods themselves to write changes within the
- * transaction started as a result of reading and locking the request.
+ * A transaction manager "mixin" which assumes a blocking {@link Persistor} and that there is a
+ * single "current" {@link Transaction} on a thread (presumably saved in a {@link ThreadLocal})
+ * which can be both used by {@link TransactionOutbox#schedule(Class)} as the current context to
+ * write records using {@link Persistor} <em>and</em> used by scheduled methods themselves to write
+ * changes within the transaction started as a result of reading and locking the request.
  *
  * <p>Call pattern permitted:
  *
  * <pre>transactionManager.inTransaction(() -&gt; outbox.schedule(MyClass.ckass).myMethod("foo");
  * </pre>
  *
- * <p>Adds the {@link #requireTransactionReturns(ThrowingTransactionalSupplier)} and {@link
- * #requireTransaction(ThrowingTransactionalWork)} methods, which extract the current transaction
- * from the thread context and pass it on, throwing {@link NoTransactionActiveException} if there is
- * no current transaction.
+ * <p>Adds the {@link #requireTransactionReturns(ThrowingTransactionalSupplier)} method, which
+ * extract the current transaction from the thread context and pass it on, throwing {@link
+ * NoTransactionActiveException} if there is no current transaction.
  */
-public interface ThreadLocalContextTransactionManager extends TransactionManager {
-
-  /**
-   * Runs the specified work in the context of the "current" transaction (the definition of which is
-   * up to the implementation).
-   *
-   * @param work Code which must be called while the transaction is active.
-   * @param <E> The exception type.
-   * @throws E If any exception is thrown by {@link Runnable}.
-   * @throws NoTransactionActiveException If a transaction is not currently active.
-   */
-  default <E extends Exception> void requireTransaction(ThrowingTransactionalWork<E> work)
-      throws E, NoTransactionActiveException {
-    requireTransactionReturns(ThrowingTransactionalSupplier.fromWork(work));
-  }
+public interface ThreadLocalContextTransactionManager<
+        CONNECTION, CONTEXT, TRANSACTION extends Transaction<CONNECTION, CONTEXT>>
+    extends TransactionManager<CONNECTION, CONTEXT, TRANSACTION> {
 
   /**
    * Runs the specified work in the context of the "current" transaction (the definition of which is
@@ -48,8 +35,8 @@ public interface ThreadLocalContextTransactionManager extends TransactionManager
    * @throws UnsupportedOperationException If the transaction manager does not support thread-local
    *     context.
    */
-  <T, E extends Exception> T requireTransactionReturns(ThrowingTransactionalSupplier<T, E> work)
-      throws E, NoTransactionActiveException;
+  <T, E extends Exception> T requireTransactionReturns(
+      ThrowingTransactionalSupplier<T, E, TRANSACTION> work) throws E, NoTransactionActiveException;
 
   /**
    * Obtains the active transaction by using {@link
@@ -61,7 +48,7 @@ public interface ThreadLocalContextTransactionManager extends TransactionManager
    * @return The transactional invocation.
    */
   @Override
-  default TransactionalInvocation<Transaction> extractTransaction(Method method, Object[] args) {
+  default TransactionalInvocation<TRANSACTION> extractTransaction(Method method, Object[] args) {
     return requireTransactionReturns(
         transaction ->
             new TransactionalInvocation<>(
@@ -79,7 +66,7 @@ public interface ThreadLocalContextTransactionManager extends TransactionManager
    * @return The unmodified invocation.
    */
   @Override
-  default Invocation injectTransaction(Invocation invocation, Transaction transaction) {
+  default Invocation injectTransaction(Invocation invocation, TRANSACTION transaction) {
     return invocation;
   }
 }

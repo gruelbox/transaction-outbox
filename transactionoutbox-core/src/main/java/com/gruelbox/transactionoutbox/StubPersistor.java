@@ -1,7 +1,10 @@
 package com.gruelbox.transactionoutbox;
 
+import static java.util.concurrent.CompletableFuture.completedFuture;
+
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import lombok.Builder;
 
 /** Stub implementation of {@link Persistor}. */
@@ -11,42 +14,44 @@ public class StubPersistor implements Persistor {
   StubPersistor() {}
 
   @Override
-  public void migrate(TransactionManager transactionManager) {
-    // No-op
+  public CompletableFuture<Void> migrate(TransactionManager transactionManager) {
+    return completedFuture(null);
   }
 
   @Override
-  public void save(Transaction tx, TransactionOutboxEntry entry) {
-    // No-op
+  public CompletableFuture<Void> save(Transaction tx, TransactionOutboxEntry entry) {
+    return completedFuture(null);
   }
 
   @Override
-  public void delete(Transaction tx, TransactionOutboxEntry entry) {
-    // No-op
+  public CompletableFuture<Void> delete(Transaction tx, TransactionOutboxEntry entry) {
+    return completedFuture(null);
   }
 
   @Override
-  public void update(Transaction tx, TransactionOutboxEntry entry) {
-    // No-op
+  public CompletableFuture<Void> update(Transaction tx, TransactionOutboxEntry entry) {
+    return completedFuture(null);
   }
 
   @Override
-  public boolean lock(Transaction tx, TransactionOutboxEntry entry) {
-    return true;
+  public CompletableFuture<Boolean> lock(Transaction tx, TransactionOutboxEntry entry) {
+    return completedFuture(true);
   }
 
   @Override
-  public boolean whitelist(Transaction tx, String entryId) {
-    return true;
+  public CompletableFuture<Boolean> whitelist(Transaction tx, String entryId) {
+    return completedFuture(true);
   }
 
   @Override
-  public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now) {
-    return List.of();
+  public CompletableFuture<List<TransactionOutboxEntry>> selectBatch(
+      Transaction tx, int batchSize, Instant now) {
+    return completedFuture(List.of());
   }
 
   @Override
-  public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now) {
-    return 0;
+  public CompletableFuture<Integer> deleteProcessedAndExpired(
+      Transaction tx, int batchSize, Instant now) {
+    return completedFuture(0);
   }
 }

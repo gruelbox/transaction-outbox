@@ -3,11 +3,12 @@ package com.gruelbox.transactionoutbox.acceptance;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.StubPersistor;
-import com.gruelbox.transactionoutbox.StubThreadLocalTransactionManager;
-import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
+import java.math.BigInteger;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
@@ -17,10 +18,15 @@ import org.slf4j.MDC;
 @Slf4j
 class TestMDC {
 
+  static {
+    Async.init();
+  }
+
   @Test
   final void testMDCPassedToTask() throws InterruptedException {
 
-    TransactionManager transactionManager = new StubThreadLocalTransactionManager();
+    StubThreadLocalJdbcTransactionManager transactionManager =
+        new StubThreadLocalJdbcTransactionManager();
 
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
@@ -40,6 +46,8 @@ class TestMDC {
 
     MDC.put("SESSION-KEY", "Foo");
     try {
+      BigInteger schedule = outbox.schedule(BigInteger.class);
+
       transactionManager.inTransaction(
           () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
     } finally {

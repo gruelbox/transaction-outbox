@@ -1,8 +1,10 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.jdbc;
 
 import static com.gruelbox.transactionoutbox.Utils.safelyClose;
 import static com.gruelbox.transactionoutbox.Utils.uncheck;
+import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
+import com.gruelbox.transactionoutbox.Beta;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -10,18 +12,20 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import lombok.AccessLevel;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+@Beta
 @Slf4j
-@AllArgsConstructor(access = AccessLevel.PROTECTED)
-class SimpleTransaction implements Transaction, AutoCloseable {
+@AllArgsConstructor
+public class SimpleTransaction<CONTEXT> implements JdbcTransaction<CONTEXT>, AutoCloseable {
 
-  private final List<Runnable> postCommitHooks = new ArrayList<>();
+  private final List<Supplier<CompletableFuture<Void>>> postCommitHooks = new ArrayList<>();
   private final Map<String, PreparedStatement> preparedStatements = new HashMap<>();
   private final Connection connection;
-  private final Object context;
+  private final CONTEXT context;
 
   @Override
   public final Connection connection() {
@@ -29,14 +33,14 @@ class SimpleTransaction implements Transaction, AutoCloseable {
   }
 
   @Override
-  public final void addPostCommitHook(Runnable runnable) {
-    postCommitHooks.add(runnable);
+  public void addPostCommitHook(Supplier<CompletableFuture<Void>> hook) {
+    postCommitHooks.add(hook);
   }
 
   @Override
   public final PreparedStatement prepareBatchStatement(String sql) {
     return preparedStatements.computeIfAbsent(
-        sql, s -> Utils.uncheckedly(() -> connection.prepareStatement(s)));
+        sql, s -> uncheckedly(() -> connection.prepareStatement(s)));
   }
 
   final void flushBatches() {
@@ -51,7 +55,7 @@ class SimpleTransaction implements Transaction, AutoCloseable {
   final void processHooks() {
     if (!postCommitHooks.isEmpty()) {
       log.debug("Running post-commit hooks");
-      postCommitHooks.forEach(Runnable::run);
+      postCommitHooks.stream().map(Supplier::get).forEach(hook -> uncheckedly(hook::get));
     }
   }
 
@@ -65,8 +69,8 @@ class SimpleTransaction implements Transaction, AutoCloseable {
 
   @SuppressWarnings("unchecked")
   @Override
-  public <T> T context() {
-    return (T) context;
+  public CONTEXT context() {
+    return context;
   }
 
   @Override

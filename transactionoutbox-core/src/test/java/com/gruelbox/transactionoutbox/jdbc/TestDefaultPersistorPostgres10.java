@@ -1,5 +1,6 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.jdbc;
 
+import com.gruelbox.transactionoutbox.Dialect;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.testcontainers.containers.JdbcDatabaseContainer;
@@ -17,22 +18,21 @@ class TestDefaultPersistorPostgres10 extends AbstractDefaultPersistorTest {
       (JdbcDatabaseContainer)
           new PostgreSQLContainer("postgres:10").withStartupTimeout(Duration.ofHours(1));
 
-  private DefaultPersistor persistor =
-      DefaultPersistor.builder().dialect(Dialect.POSTGRESQL_9).build();
-  private TransactionManager txManager =
-      TransactionManager.fromConnectionDetails(
+  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialect.POSTGRESQL_9).build();
+  private SimpleTransactionManager txManager =
+      SimpleTransactionManager.fromConnectionDetails(
           "org.postgresql.Driver",
           container.getJdbcUrl(),
           container.getUsername(),
           container.getPassword());
 
   @Override
-  protected DefaultPersistor persistor() {
+  protected JdbcPersistor persistor() {
     return persistor;
   }
 
   @Override
-  protected TransactionManager txManager() {
+  protected SimpleTransactionManager txManager() {
     return txManager;
   }
 

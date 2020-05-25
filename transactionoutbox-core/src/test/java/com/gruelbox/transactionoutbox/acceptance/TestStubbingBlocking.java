@@ -7,14 +7,15 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.isA;
 import static org.hamcrest.Matchers.notNullValue;
 
+import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.Instantiator;
-import com.gruelbox.transactionoutbox.StubParameterContextTransactionManager;
 import com.gruelbox.transactionoutbox.StubPersistor;
-import com.gruelbox.transactionoutbox.StubThreadLocalTransactionManager;
 import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.Transaction;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.jdbc.StubParameterContextJdbcTransactionManager;
+import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -29,11 +30,16 @@ import org.junit.jupiter.api.Test;
 
 /** Checks that stubbing {@link TransactionOutbox} works cleanly. */
 @Slf4j
-class TestStubbing {
+class TestStubbingBlocking {
+
+  static {
+    Async.init();
+  }
 
   @Test
   void testStubbingWithThreadLocalContext() {
-    StubThreadLocalTransactionManager transactionManager = new StubThreadLocalTransactionManager();
+    StubThreadLocalJdbcTransactionManager transactionManager =
+        new StubThreadLocalJdbcTransactionManager();
     TransactionOutbox outbox = createOutbox(transactionManager);
 
     Interface.invocations.clear();
@@ -63,8 +69,8 @@ class TestStubbing {
 
   @Test
   void testStubbingWithExplicitContextInvalidContext() {
-    StubParameterContextTransactionManager<Context> transactionManager =
-        new StubParameterContextTransactionManager<>(Context.class, () -> new Context(1L));
+    StubParameterContextJdbcTransactionManager<Context> transactionManager =
+        new StubParameterContextJdbcTransactionManager<>(Context.class, () -> new Context(1L));
     TransactionOutbox outbox = createOutbox(transactionManager);
 
     Assertions.assertThrows(
@@ -76,8 +82,8 @@ class TestStubbing {
 
   @Test
   void testStubbingWithExplicitContextPassingTransaction() {
-    StubParameterContextTransactionManager<Context> transactionManager =
-        new StubParameterContextTransactionManager<>(Context.class, () -> new Context(1L));
+    StubParameterContextJdbcTransactionManager<Context> transactionManager =
+        new StubParameterContextJdbcTransactionManager<>(Context.class, () -> new Context(1L));
     TransactionOutbox outbox = createOutbox(transactionManager);
 
     Interface.invocations.clear();
@@ -91,8 +97,8 @@ class TestStubbing {
 
   @Test
   void testStubbingWithExplicitContextPassingContext() {
-    StubParameterContextTransactionManager<Context> transactionManager =
-        new StubParameterContextTransactionManager<>(Context.class, () -> new Context(1L));
+    StubParameterContextJdbcTransactionManager<Context> transactionManager =
+        new StubParameterContextJdbcTransactionManager<>(Context.class, () -> new Context(1L));
     TransactionOutbox outbox = createOutbox(transactionManager);
 
     Interface.invocations.clear();
@@ -124,6 +130,7 @@ class TestStubbing {
     static List<List<Object>> invocations = new ArrayList<>();
 
     void doThing(int arg1, String arg2, BigDecimal[] arg3) {
+      log.info("Complex method invoked");
       ArrayList<Object> args = new ArrayList<>();
       args.add(arg1);
       args.add(arg2);
@@ -132,11 +139,13 @@ class TestStubbing {
     }
 
     void doThing(int arg1, Transaction transaction) {
+      log.info("Transaction method invoked");
       assertThat(transaction, notNullValue());
       invocations.add(List.of(arg1, transaction));
     }
 
     void doThing(int arg1, Context context) {
+      log.info("Context method invoked");
       assertThat(context, notNullValue());
       invocations.add(List.of(arg1, context));
     }

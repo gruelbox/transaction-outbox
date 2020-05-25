@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
 @FunctionalInterface
-public interface ThrowingTransactionalWork<E extends Exception> {
+public interface ThrowingTransactionalWork<E extends Exception, TX extends Transaction<?, ?>> {
 
-  void doWork(Transaction transaction) throws E;
+  void doWork(TX transaction) throws E;
 }

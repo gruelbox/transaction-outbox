@@ -1,11 +1,13 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.jdbc;
+
+import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
 import java.sql.Connection;
 import javax.sql.DataSource;
 import lombok.Builder;
 
 /**
- * A {@link ConnectionProvider} which requests connections from a {@link DataSource}. This is
+ * A {@link JdbcConnectionProvider} which requests connections from a {@link DataSource}. This is
  * suitable for applications using connection pools or container-provided JDBC.
  *
  * <p>Usage:
@@ -15,12 +17,12 @@ import lombok.Builder;
  *   .build()</pre>
  */
 @Builder
-final class DataSourceConnectionProvider implements ConnectionProvider {
+final class DataSourceJdbcConnectionProvider implements JdbcConnectionProvider {
 
   private final DataSource dataSource;
 
   @Override
   public Connection obtainConnection() {
-    return Utils.uncheckedly(dataSource::getConnection);
+    return uncheckedly(dataSource::getConnection);
   }
 }

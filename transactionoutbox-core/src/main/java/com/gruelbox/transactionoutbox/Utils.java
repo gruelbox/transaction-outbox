@@ -1,9 +1,15 @@
 package com.gruelbox.transactionoutbox;
 
+import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.concurrent.CompletableFuture.failedFuture;
+
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -14,16 +20,17 @@ import net.sf.cglib.proxy.MethodInterceptor;
 import org.objenesis.Objenesis;
 import org.objenesis.ObjenesisStd;
 import org.objenesis.instantiator.ObjectInstantiator;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
 @Slf4j
-class Utils {
+public class Utils {
 
   private static final Objenesis objenesis = new ObjenesisStd();
 
   @SuppressWarnings({"SameParameterValue", "WeakerAccess", "UnusedReturnValue"})
-  static boolean safelyRun(String gerund, ThrowingRunnable runnable) {
+  public static boolean safelyRun(String gerund, ThrowingRunnable runnable) {
     try {
       runnable.run();
       return true;
@@ -34,11 +41,11 @@ class Utils {
   }
 
   @SuppressWarnings("unused")
-  static void safelyClose(AutoCloseable... closeables) {
+  public static void safelyClose(AutoCloseable... closeables) {
     safelyClose(Arrays.asList(closeables));
   }
 
-  static void safelyClose(Iterable<? extends AutoCloseable> closeables) {
+  public static void safelyClose(Iterable<? extends AutoCloseable> closeables) {
     closeables.forEach(
         d -> {
           if (d == null) return;
@@ -46,7 +53,7 @@ class Utils {
         });
   }
 
-  static void uncheck(ThrowingRunnable runnable) {
+  public static void uncheck(ThrowingRunnable runnable) {
     try {
       runnable.run();
     } catch (Exception e) {
@@ -54,7 +61,7 @@ class Utils {
     }
   }
 
-  static <T> T uncheckedly(Callable<T> runnable) {
+  public static <T> T uncheckedly(Callable<T> runnable) {
     try {
       return runnable.call();
     } catch (Exception e) {
@@ -62,7 +69,7 @@ class Utils {
     }
   }
 
-  static <T> T uncheckAndThrow(Throwable e) {
+  public static <T> T uncheckAndThrow(Throwable e) {
     if (e instanceof RuntimeException) {
       throw (RuntimeException) e;
     }
@@ -72,8 +79,47 @@ class Utils {
     throw new UncheckedException(e);
   }
 
+  public static <T> CompletableFuture<T> toRunningFuture(Publisher<T> publisher) {
+    CompletableFuture<T> future = new CompletableFuture<>();
+    publisher.subscribe(
+        new AbstractSubscriber<T>(future) {
+          @Override
+          public void onNext(T result) {
+            future.complete(result);
+          }
+        });
+    return future;
+  }
+
+  public static <T> CompletableFuture<T> toBlockingFuture(Callable<T> callable) {
+    try {
+      return completedFuture(callable.call());
+    } catch (Exception e) {
+      return failedFuture(e);
+    }
+  }
+
+  public static CompletableFuture<Void> toBlockingFuture(ThrowingRunnable runnable) {
+    try {
+      runnable.run();
+      return completedFuture(null);
+    } catch (Exception e) {
+      return failedFuture(e);
+    }
+  }
+
+  public static <T> T blockingRun(Future<T> future) {
+    try {
+      return future.get();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    } catch (ExecutionException e) {
+      throw (RuntimeException) Utils.uncheckAndThrow(e.getCause());
+    }
+  }
+
   @SuppressWarnings({"unchecked", "cast"})
-  static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], Object> processor) {
+  public static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], Object> processor) {
     if (clazz.isInterface()) {
       // Fastest - we can just proxy an interface directly
       return (T)
@@ -106,7 +152,7 @@ class Utils {
     }
   }
 
-  static <T> T createLoggingProxy(Class<T> clazz) {
+  public static <T> T createLoggingProxy(Class<T> clazz) {
     return createProxy(
         clazz,
         (method, args) -> {
@@ -122,12 +168,12 @@ class Utils {
         });
   }
 
-  static <T> T firstNonNull(T one, Supplier<T> two) {
+  public static <T> T firstNonNull(T one, Supplier<T> two) {
     if (one == null) return two.get();
     return one;
   }
 
-  static void logAtLevel(Logger logger, Level level, String message, Object... args) {
+  public static void logAtLevel(Logger logger, Level level, String message, Object... args) {
     switch (level) {
       case ERROR:
         logger.error(message, args);

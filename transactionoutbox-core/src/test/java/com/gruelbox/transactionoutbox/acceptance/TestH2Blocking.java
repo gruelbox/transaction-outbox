@@ -3,7 +3,7 @@ package com.gruelbox.transactionoutbox.acceptance;
 import com.gruelbox.transactionoutbox.Dialect;
 
 @SuppressWarnings("WeakerAccess")
-class TestH2 extends AbstractAcceptanceTest {
+class TestH2Blocking extends AbstractBlockingAcceptanceTest {
 
   @Override
   protected ConnectionDetails connectionDetails() {

@@ -4,10 +4,10 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 
 /**
- * A transaction manager which makes no assumption of a "current" {@link Transaction}. This means
- * that {@link TransactionOutbox#schedule(Class)} needs to be given the transaction to use as part
- * of any invoked method's arguments. In turn, that method will need the transaction at the time it
- * is invoked.
+ * A transaction manager "mixin" which adds the behaviour to make no assumption of a "current"
+ * {@link Transaction}. This means that {@link TransactionOutbox#schedule(Class)} needs to be given
+ * the transaction to use as part of any invoked method's arguments. In turn, that method will need
+ * the transaction at the time it is invoked.
  *
  * <p>Call patterns permitted:
  *
@@ -20,9 +20,15 @@ import java.util.Arrays;
  * wibbleTransactionManager.doInATransaction(context -&gt;
  *   outbox.schedule(MyClass.class).myMethod("foo", context));
  * </pre>
+ *
+ * @param <CN> The type which the associated {@link Persistor} implementation will use to interact
+ *     with the data store.
+ * @param <CX> The type that the client code uses to interact with the transaction.
+ * @param <TX> The transaction type.
  */
 @Beta
-public interface ParameterContextTransactionManager<T> extends TransactionManager {
+public interface ParameterContextTransactionManager<CN, CX, TX extends Transaction<CN, CX>>
+    extends TransactionManager<CN, CX, TX> {
 
   /**
    * Given an implementation-specific transaction context, return the active {@link Transaction}.
@@ -31,10 +37,10 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
    *     #contextType()}.
    * @return The transaction, or null if the context is not known.
    */
-  Transaction transactionFromContext(T context);
+  TX transactionFromContext(CX context);
 
-  /** @return The type expected by {@link #transactionFromContext(Object)}. */
-  Class<T> contextType();
+  /** @return The type expected by {@link #transactionFromContext(CX)}. */
+  Class<CX> contextType();
 
   /**
    * Obtains the active transaction by parsing the method arguments for a {@link Transaction} or a
@@ -48,18 +54,18 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
    */
   @SuppressWarnings("unchecked")
   @Override
-  default TransactionalInvocation<Transaction> extractTransaction(Method method, Object[] args) {
+  default TransactionalInvocation<TX> extractTransaction(Method method, Object[] args) {
     args = Arrays.copyOf(args, args.length);
     var params = Arrays.copyOf(method.getParameterTypes(), method.getParameterCount());
-    Transaction transaction = null;
+    TX transaction = null;
     for (int i = 0; i < args.length; i++) {
       Object candidate = args[i];
       if (candidate instanceof Transaction) {
-        transaction = (Transaction) candidate;
+        transaction = (TX) candidate;
         args[i] = null;
       } else if (contextType().isInstance(candidate)) {
         if (transaction == null) {
-          transaction = transactionFromContext((T) candidate);
+          transaction = transactionFromContext((CX) candidate);
           if (transaction == null) {
             throw new IllegalArgumentException(
                 candidate.getClass().getName()
@@ -95,7 +101,7 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
    * @return The modified invocation.
    */
   @Override
-  default Invocation injectTransaction(Invocation invocation, Transaction transaction) {
+  default Invocation injectTransaction(Invocation invocation, TX transaction) {
     Object[] args = Arrays.copyOf(invocation.getArgs(), invocation.getArgs().length);
     Class<?>[] params =
         Arrays.copyOf(invocation.getParameterTypes(), invocation.getParameterTypes().length);

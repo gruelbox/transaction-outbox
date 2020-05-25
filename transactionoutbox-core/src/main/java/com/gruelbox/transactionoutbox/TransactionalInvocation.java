@@ -7,10 +7,10 @@ import lombok.Value;
  */
 @SuppressWarnings("WeakerAccess")
 @Value
-public class TransactionalInvocation<T> {
+public class TransactionalInvocation<TX extends Transaction<?, ?>> {
   Class<?> clazz;
   String methodName;
   Class<?>[] parameters;
   Object[] args;
-  T transaction;
+  TX transaction;
 }

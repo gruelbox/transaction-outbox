@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.jdbc;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -10,11 +10,11 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Simple database migration manager. Inspired by Flyway, Liquibase, Morf etc, just trimmed down for
- * minimum dependencies.
+ * Simple blocking SQL database migration manager using JDBC. Inspired by Flyway, Liquibase, Morf
+ * etc, just trimmed down for minimum dependencies.
  */
 @Slf4j
-class DefaultMigrationManager {
+class JdbcMigrationManager {
 
   /** Migrations are currently the same for all dialects so no disambiguation needed. */
   private static final List<Migration> MIGRATIONS =
@@ -41,7 +41,7 @@ class DefaultMigrationManager {
               "Add flush index",
               "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blacklisted, nextAttemptTime)"));
 
-  static void migrate(TransactionManager transactionManager) {
+  static void migrate(JdbcTransactionManager<?, ?> transactionManager) {
     transactionManager.inTransaction(
         transaction -> {
           try {

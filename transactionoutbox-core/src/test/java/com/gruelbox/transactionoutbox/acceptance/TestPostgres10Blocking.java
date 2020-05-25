@@ -9,13 +9,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SuppressWarnings("WeakerAccess")
 @Testcontainers
-class TestPostgres12 extends AbstractAcceptanceTest {
+class TestPostgres10Blocking extends AbstractBlockingAcceptanceTest {
 
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
       (JdbcDatabaseContainer)
-          new PostgreSQLContainer("postgres:12").withStartupTimeout(Duration.ofHours(1));
+          new PostgreSQLContainer("postgres:10").withStartupTimeout(Duration.ofHours(1));
 
   @Override
   protected ConnectionDetails connectionDetails() {

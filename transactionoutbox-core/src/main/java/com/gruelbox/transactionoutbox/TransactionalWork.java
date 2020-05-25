@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
 @FunctionalInterface
-public interface TransactionalWork {
+public interface TransactionalWork<TX extends Transaction<?, ?>> {
 
-  void doWork(Transaction transaction);
+  void doWork(TX transaction);
 }

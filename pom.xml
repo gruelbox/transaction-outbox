@@ -47,6 +47,18 @@
     <module>transactionoutbox-jooq</module>
   </modules>
 
+  <!-- TODO remove, rdbc-client -->
+  <repositories>
+    <repository>
+      <id>spring-milestones</id>
+      <name>Spring Milestones</name>
+      <url>https://repo.spring.io/milestone</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -83,6 +95,29 @@
         <groupId>org.glassfish</groupId>
         <artifactId>javax.el</artifactId>
         <version>3.0.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.ea.async</groupId>
+        <artifactId>ea-async</artifactId>
+        <version>1.2.3</version>
+        <scope>compile</scope>
+      </dependency>
+
+      <!-- TODO remove -->
+      <dependency>
+        <groupId>io.r2dbc</groupId>
+        <artifactId>r2dbc-postgresql</artifactId>
+        <version>0.8.2.RELEASE</version>
+      </dependency>
+      <dependency>
+        <groupId>io.r2dbc</groupId>
+        <artifactId>r2dbc-h2</artifactId>
+        <version>0.8.2.RELEASE</version>
+      </dependency>
+      <dependency>
+        <groupId>io.r2dbc</groupId>
+        <artifactId>r2dbc-client</artifactId>
+        <version>1.0.0.M6</version>
       </dependency>
 
       <dependency>
@@ -242,6 +277,19 @@
             <phase>clean</phase>
             <goals>
               <goal>clean</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.ea.async</groupId>
+        <artifactId>ea-async-maven-plugin</artifactId>
+        <version>1.2.3</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>instrument</goal>
+              <goal>instrument-test</goal>
             </goals>
           </execution>
         </executions>

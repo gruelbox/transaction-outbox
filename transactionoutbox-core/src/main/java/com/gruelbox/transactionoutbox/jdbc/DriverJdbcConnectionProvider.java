@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.jdbc;
 
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
@@ -9,7 +9,7 @@ import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * A {@link ConnectionProvider} which requests connections directly from {@link DriverManager}.
+ * A {@link JdbcConnectionProvider} which requests connections directly from {@link DriverManager}.
  *
  * <p>Unlikely to be suitable for most production applications since it doesn't use any sort of
  * connection pool.
@@ -25,14 +25,11 @@ import lombok.extern.slf4j.Slf4j;
  */
 @SuperBuilder
 @Slf4j
-final class DriverConnectionProvider implements ConnectionProvider {
+final class DriverJdbcConnectionProvider implements JdbcConnectionProvider {
 
   @NotBlank private final String driverClassName;
-
   @NotBlank private final String url;
-
   @NotBlank private final String user;
-
   @NotBlank private final String password;
 
   private volatile boolean initialized;
