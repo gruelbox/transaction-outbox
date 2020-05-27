@@ -10,14 +10,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Slf4j
 @Testcontainers
-class TestDefaultPersistorMySql8 extends AbstractDefaultPersistorTest {
+class TestJdbcPersistorMySql5 extends AbstractJdbcPersistorTest {
 
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      new MySQLContainer<>("mysql:8").withStartupTimeout(Duration.ofHours(1));
+      new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1));
 
-  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialect.MY_SQL_8).build();
+  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialect.MY_SQL_5).build();
   private SimpleTransactionManager txManager =
       SimpleTransactionManager.fromConnectionDetails(
           "com.mysql.cj.jdbc.Driver",

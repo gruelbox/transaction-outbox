@@ -10,7 +10,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Slf4j
 @Testcontainers
-class TestDefaultPersistorPostgres10 extends AbstractDefaultPersistorTest {
+class TestJdbcPersistorPostgres10 extends AbstractJdbcPersistorTest {
 
   @Container
   @SuppressWarnings("rawtypes")

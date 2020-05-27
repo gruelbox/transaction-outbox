@@ -6,7 +6,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Slf4j
 @Testcontainers
-class TestDefaultPersistorH2 extends AbstractDefaultPersistorTest {
+class TestJdbcPersistorH2 extends AbstractJdbcPersistorTest {
 
   private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialect.H2).build();
   private SimpleTransactionManager txManager =

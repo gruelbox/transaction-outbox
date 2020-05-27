@@ -21,6 +21,8 @@ import org.objenesis.Objenesis;
 import org.objenesis.ObjenesisStd;
 import org.objenesis.instantiator.ObjectInstantiator;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -69,7 +71,7 @@ public class Utils {
     }
   }
 
-  public static <T> T uncheckAndThrow(Throwable e) {
+  static <T> T uncheckAndThrow(Throwable e) {
     if (e instanceof RuntimeException) {
       throw (RuntimeException) e;
     }
@@ -82,9 +84,27 @@ public class Utils {
   public static <T> CompletableFuture<T> toRunningFuture(Publisher<T> publisher) {
     CompletableFuture<T> future = new CompletableFuture<>();
     publisher.subscribe(
-        new AbstractSubscriber<T>(future) {
+        new Subscriber<>() {
+
+          private volatile T result;
+
           @Override
-          public void onNext(T result) {
+          public void onSubscribe(Subscription s) {
+            s.request(Long.MAX_VALUE);
+          }
+
+          @Override
+          public void onNext(T t) {
+            result = t;
+          }
+
+          @Override
+          public void onError(Throwable t) {
+            future.completeExceptionally(t);
+          }
+
+          @Override
+          public void onComplete() {
             future.complete(result);
           }
         });
@@ -119,7 +139,7 @@ public class Utils {
   }
 
   @SuppressWarnings({"unchecked", "cast"})
-  public static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], Object> processor) {
+  static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], Object> processor) {
     if (clazz.isInterface()) {
       // Fastest - we can just proxy an interface directly
       return (T)
@@ -168,12 +188,12 @@ public class Utils {
         });
   }
 
-  public static <T> T firstNonNull(T one, Supplier<T> two) {
+  static <T> T firstNonNull(T one, Supplier<T> two) {
     if (one == null) return two.get();
     return one;
   }
 
-  public static void logAtLevel(Logger logger, Level level, String message, Object... args) {
+  static void logAtLevel(Logger logger, Level level, String message, Object... args) {
     switch (level) {
       case ERROR:
         logger.error(message, args);

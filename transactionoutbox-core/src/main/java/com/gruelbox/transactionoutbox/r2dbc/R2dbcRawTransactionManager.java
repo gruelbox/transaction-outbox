@@ -14,6 +14,7 @@ import io.r2dbc.spi.IsolationLevel;
 import io.r2dbc.spi.Statement;
 import io.r2dbc.spi.ValidationDepth;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
@@ -53,6 +54,9 @@ public class R2dbcRawTransactionManager
             T result = await(fn.apply(tx));
             await(toRunningFuture(connection.commitTransaction()));
             return completedFuture(result);
+          } catch (CompletionException e) {
+            await(toRunningFuture(connection.rollbackTransaction()));
+            return failedFuture(e.getCause());
           } catch (Exception e) {
             await(toRunningFuture(connection.rollbackTransaction()));
             return failedFuture(e);

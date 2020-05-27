@@ -36,7 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 @Slf4j
-public abstract class AbstractDefaultPersistorTest {
+public abstract class AbstractJdbcPersistorTest {
 
   static {
     Async.init();
