@@ -8,11 +8,12 @@
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox/badge)](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox)
 
-A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. `TransactionOutbox` has a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks. Every aspect is highly configurable or overridable. It features out-of-the-box support for **Spring DI**, **Spring Txn**, **Hibernate**, **Guice**, **MySQL 5 & 8**, **PostgreSQL 9-12** and **H2**.
+A [flexible](#key-benefits) implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java, providing a reliable means of [ensuring eventual consistency](#why-do-i-need-it) and [idempotency](#idempotency-protection) in Microservices architectures based on transactional databases.
 
 ## Contents
 
 1. [Why do I need it?](#why-do-i-need-it)
+1. [Key benefits](#key-benefits)
 1. [Installation](#installation)
    1. [Requirements](#requirements)
    1. [Stable releases](#stable-releases)
@@ -101,6 +102,27 @@ Our service is now resilient and explicitly eventually consistent, as long as al
 If you find yourself wondering _why bother with the queues now_? You're quite right. As we now have outgoing buffers, we already have most of the benefits of middleware (at least for some use cases). We could replace the calls to a message queue with direct queues to the other services' load balancers and switch to a peer-to-peer architecture, if we so choose.
 
 > Note that for the above example to work, `StockReductionEvent` and `IncomeEvent` need to be whitelisted for serialization. See [Configuration reference](#configuration-reference).
+
+## Key benefits
+
+Core library:
+
+- In heavy production use and tested at volume
+- A clean, extensible API
+- Very few dependencies
+- Highly configurable and extensible
+- Transparently **non-blocking core** suited to reactive applications
+- Supports any data manipulation API (JDBC, R2DBC, ADBA...)
+- Supports any transactional data store (SQL or noSQL)
+- Supports any transaction management framework
+- Supports any dependency injection or service locator framework
+
+In-built support for:
+
+- Data APIs: **JDBC** (blocking) and **R2DBC** (non-blocking)
+- SQL dialects: **MySQL 5 & 8**, **PostgreSQL 9-12** and **H2**
+- Transaction management: **Spring Txn**, **Hibernate** and **jOOQ**
+- Dependency injection: **Spring DI** and **Guice**.
 
 ## Installation
 
@@ -459,3 +481,9 @@ Mockito.verify(mockService).doAThing(1);
 ```
 
 Depending on the type of test, you may wish to use a real `Persistor` such as `DefaultPersistor` (if there's a real database available) or a real, multi-threaded `Submitter`. That's up to you.
+
+## Community
+
+Key contributors:
+
+<a href="https://www.goji.investments"><img src="https://www.goji.investments/wp-content/themes/goji/assets/images/logo.svg" width="80"/></a>
