@@ -1,39 +1,34 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-import static com.ea.async.Async.await;
 import static com.gruelbox.transactionoutbox.Utils.toRunningFuture;
-import static java.util.concurrent.CompletableFuture.completedFuture;
-import static java.util.concurrent.CompletableFuture.failedFuture;
 
+import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.Invocation;
-import com.gruelbox.transactionoutbox.InvocationSerializer;
-import com.gruelbox.transactionoutbox.OptimisticLockException;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
+import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException;
-import io.r2dbc.spi.Result;
 import io.r2dbc.spi.Row;
-import io.r2dbc.spi.Statement;
-import java.io.StringReader;
-import java.io.StringWriter;
+import io.r2dbc.spi.RowMetadata;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.stream.Collectors;
-import javax.validation.constraints.NotNull;
-import lombok.Builder;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import lombok.Value;
+import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -48,12 +43,12 @@ import reactor.core.publisher.Mono;
  * the other hand, you want to use a completely non-relational underlying data store or do something
  * equally esoteric, you may prefer to implement {@link Persistor} from the ground up.
  */
-@Builder
+@SuperBuilder
 @Slf4j
-public class R2dbcPersistor implements Persistor<Connection, R2dbcTransaction<?>> {
+public class R2dbcPersistor extends AbstractSqlPersistor<Connection, R2dbcTransaction<?>> {
 
   /**
-   * Uses the default relational non-blocking persistor. Shortcut for: <code>
+   * Uses the default relational persistor. Shortcut for: <code>
    * R2dbcPersistor.builder().dialect(dialect).build();</code>
    *
    * @param dialect The database dialect.
@@ -63,49 +58,6 @@ public class R2dbcPersistor implements Persistor<Connection, R2dbcTransaction<?>
     return R2dbcPersistor.builder().dialect(dialect).build();
   }
 
-  /**
-   * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
-   *     lock. There's no point making this long; it's always better to just back off as quickly as
-   *     possible and try another record. Generally these lock timeouts only kick in if {@link
-   *     Dialect#isSupportsSkipLock()} is false.
-   */
-  @SuppressWarnings("JavaDoc")
-  @Builder.Default
-  @NotNull
-  private final int writeLockTimeoutSeconds = 2;
-
-  /** @param dialect The database dialect to use. Required. */
-  @SuppressWarnings("JavaDoc")
-  @NotNull
-  private final Dialect dialect;
-
-  /** @param tableName The database table name. The default is {@code TXNO_OUTBOX}. */
-  @SuppressWarnings("JavaDoc")
-  @Builder.Default
-  @NotNull
-  private final String tableName = "TXNO_OUTBOX";
-
-  /**
-   * @param migrate Set to false to disable automatic database migrations. This may be preferred if
-   *     the default migration behaviour interferes with your existing toolset, and you prefer to
-   *     manage the migrations explicitly (e.g. using FlyWay or Liquibase), or your do not give the
-   *     application DDL permissions at runtime.
-   */
-  @SuppressWarnings("JavaDoc")
-  @Builder.Default
-  @NotNull
-  private final boolean migrate = true;
-
-  /**
-   * @param serializer The serializer to use for {@link Invocation}s. See {@link
-   *     InvocationSerializer} for more information. Defaults to {@link
-   *     InvocationSerializer#createDefaultJsonSerializer()} with no whitelisted classes..
-   */
-  @SuppressWarnings("JavaDoc")
-  @Builder.Default
-  private final InvocationSerializer serializer =
-      InvocationSerializer.createDefaultJsonSerializer();
-
   @Override
   public CompletableFuture<Void> migrate(
       TransactionManager<Connection, ?, ? extends R2dbcTransaction<?>> transactionManager) {
@@ -113,131 +65,130 @@ public class R2dbcPersistor implements Persistor<Connection, R2dbcTransaction<?>
   }
 
   @Override
-  public CompletableFuture<Void> save(R2dbcTransaction<?> tx, TransactionOutboxEntry entry) {
-    var writer = new StringWriter();
-    serializer.serializeInvocation(entry.getInvocation(), writer);
-    try {
-      await(
-          execute(
-              tx,
-              "INSERT INTO "
-                  + tableName
-                  + " (id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version) "
-                  + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-              entry.getId(),
-              entry.getUniqueRequestId(),
-              writer.toString(),
-              LocalDateTime.ofInstant(entry.getNextAttemptTime(), ZoneId.of("Z")),
-              entry.getAttempts(),
-              entry.isBlacklisted(),
-              entry.isProcessed(),
-              entry.getVersion()));
-      log.debug("Inserted {} immediately", entry.description());
-      return completedFuture(null);
-    } catch (CompletionException e) {
-      if (e.getCause() instanceof R2dbcDataIntegrityViolationException) {
-        return failedFuture(
-            new AlreadyScheduledException("Request " + entry.description() + " already exists", e));
-      }
-      return failedFuture(e.getCause());
+  public CompletableFuture<Void> save(
+      R2dbcTransaction<?> r2dbcTransaction, TransactionOutboxEntry entry) {
+
+    // TODO remove hack https://github.com/mirromutth/r2dbc-mysql/issues/111
+    if (dialect.equals(Dialect.MY_SQL_5) || dialect.equals(Dialect.MY_SQL_8)) {
+      entry.setNextAttemptTime(entry.getNextAttemptTime().truncatedTo(ChronoUnit.SECONDS));
     }
+
+    return super.save(r2dbcTransaction, entry)
+        .exceptionally(
+            t -> {
+              try {
+                if (t instanceof CompletionException) {
+                  throw t.getCause();
+                } else {
+                  throw t;
+                }
+              } catch (R2dbcDataIntegrityViolationException e) {
+                throw new AlreadyScheduledException(
+                    "Request " + entry.description() + " already exists", e);
+              } catch (Throwable e) {
+                throw (RuntimeException) Utils.uncheckAndThrow(e);
+              }
+            });
   }
 
   @Override
-  public CompletableFuture<Void> delete(R2dbcTransaction<?> tx, TransactionOutboxEntry entry) {
-    Result result =
-        await(
-            execute(
-                tx,
-                "DELETE FROM " + tableName + " WHERE id = ? and version = ?",
-                entry.getId(),
-                entry.getVersion()));
-    Integer rowsUpdated = await(toRunningFuture(result.getRowsUpdated()));
-    if (rowsUpdated != 1) {
-      return failedFuture(new OptimisticLockException());
+  protected String preParse(String sql) {
+    if (!dialect.equals(Dialect.POSTGRESQL_9)) {
+      return super.preParse(sql);
     }
-    log.debug("Deleted {}", entry.description());
-    return completedFuture(null);
-  }
-
-  @Override
-  public CompletableFuture<Void> update(R2dbcTransaction<?> tx, TransactionOutboxEntry entry) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public CompletableFuture<Boolean> lock(R2dbcTransaction<?> tx, TransactionOutboxEntry entry) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public CompletableFuture<Boolean> whitelist(R2dbcTransaction<?> tx, String entryId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public CompletableFuture<List<TransactionOutboxEntry>> selectBatch(
-      R2dbcTransaction<?> tx, int batchSize, Instant now) {
-    String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
-    String sql =
-        "SELECT id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version FROM "
-            + tableName
-            + " WHERE nextAttemptTime < ? AND blacklisted = false AND processed = false LIMIT ?"
-            + forUpdate;
-    return executeQuery(tx, sql, LocalDateTime.now(ZoneOffset.UTC), batchSize)
-        .map(this::map)
-        .collect(Collectors.toList())
-        .toFuture();
-  }
-
-  @Override
-  public CompletableFuture<Integer> deleteProcessedAndExpired(
-      R2dbcTransaction<?> tx, int batchSize, Instant now) {
-    throw new UnsupportedOperationException();
-  }
-
-  private CompletableFuture<? extends Result> execute(
-      R2dbcTransaction<?> tx, String sql, Object... args) {
-    Statement statement = buildStatement(tx, sql, args);
-    return toRunningFuture(statement.execute());
-  }
-
-  private Flux<Row> executeQuery(R2dbcTransaction<?> tx, String sql, Object... args) {
-    return Mono.from(buildStatement(tx, sql, args).execute())
-        .flatMapMany(result -> Flux.from(result.map((row, meta) -> row)));
-  }
-
-  private Statement buildStatement(R2dbcTransaction<?> tx, String sql, Object[] args) {
-    var statement = tx.connection().createStatement(sql);
-    for (int i = 0; i < args.length; i++) {
-      Object arg = args[i];
-      if (arg == null) {
-        statement = statement.bindNull(i, String.class); // Lazy, but does what we need here
+    // Blunt, not general purpose, but only needs to work for the known use cases
+    StringBuilder builder = new StringBuilder();
+    int paramIndex = 1;
+    for (int i = 0; i < sql.length(); i++) {
+      char c = sql.charAt(i);
+      if (c == '?') {
+        builder.append('$').append(paramIndex++);
       } else {
-        statement = statement.bind(i, arg);
+        builder.append(c);
       }
     }
-    return statement;
+    return builder.toString();
   }
 
-  @SuppressWarnings("ConstantConditions")
-  private TransactionOutboxEntry map(Row rs) {
-    return TransactionOutboxEntry.builder()
-        .id(rs.get("id", String.class))
-        .uniqueRequestId(rs.get("uniqueRequestId", String.class))
-        .invocation(
-            serializer.deserializeInvocation(new StringReader(rs.get("invocation", String.class))))
-        .nextAttemptTime(rs.get("nextAttemptTime", LocalDateTime.class).toInstant(ZoneOffset.UTC))
-        .attempts(rs.get("attempts", Integer.class))
-        .blacklisted(rs.get("blacklisted", Boolean.class))
-        .processed(rs.get("processed", Boolean.class))
-        .version(rs.get("version", Integer.class))
-        .build();
+  @Override
+  protected <T> T statement(
+      R2dbcTransaction<?> tx, String sql, boolean batchable, Function<Binder, T> binding) {
+    var statement = tx.connection().createStatement(sql);
+    return binding.apply(
+        new Binder() {
+
+          @Override
+          public Binder bind(int i, Object arg) {
+            // TODO suggest Instant support to R2DBC
+            if (arg instanceof Instant) {
+              statement.bind(i, LocalDateTime.ofInstant((Instant) arg, ZoneOffset.UTC));
+            } else {
+              if (arg == null) {
+                // TODO highlight this as a problem with the R2DBC API
+                statement.bindNull(i, String.class); // Lazy, but does what we need here
+              } else {
+                statement.bind(i, arg);
+              }
+            }
+            return this;
+          }
+
+          @Override
+          public CompletableFuture<Result> execute() {
+            return toRunningFuture(statement.execute())
+                .thenApply(result -> () -> toRunningFuture(result.getRowsUpdated()));
+          }
+
+          @Override
+          @SuppressWarnings({"unchecked", "ConstantConditions"})
+          public <T> CompletableFuture<List<T>> executeQuery(
+              int expectedRowCount, Function<ResultRow, T> rowMapper) {
+            return Mono.from(statement.execute())
+                .flatMapMany(result -> result.map(RowAndMeta::new))
+                .map(
+                    row ->
+                        new ResultRow() {
+                          @Override
+                          public <U> U get(int index, Class<U> type) {
+                            try {
+                              // TODO suggest Instant support to R2DBC
+                              if (Instant.class.equals(type)) {
+                                return (U)
+                                    Objects.requireNonNull(
+                                            row.getRow().get(index, LocalDateTime.class))
+                                        .toInstant(ZoneOffset.UTC);
+                                // TODO remove hack regarding data types
+                              } else if (Boolean.class.equals(type)
+                                  && (dialect.equals(Dialect.MY_SQL_5)
+                                      || dialect.equals(Dialect.MY_SQL_8))) {
+                                return (U)
+                                    Boolean.valueOf(row.getRow().get(index, Short.class) == 1);
+                              } else {
+                                return row.getRow().get(index, type);
+                              }
+                            } catch (Exception e) {
+                              throw new IllegalArgumentException(
+                                  "Failed to fetch field ["
+                                      + index
+                                      + "] from row "
+                                      + row.getMeta()
+                                      + "in "
+                                      + sql,
+                                  e);
+                            }
+                          }
+                        })
+                .map(rowMapper)
+                .collect(
+                    () -> new ArrayList<>(expectedRowCount), (BiConsumer<List<T>, T>) List::add)
+                .toFuture();
+          }
+        });
   }
 
-  // For testing. Assumed low volume.
-  CompletableFuture<Void> clear(R2dbcTransaction<?> tx) {
-    return toRunningFuture(tx.connection().createStatement("DELETE FROM " + tableName).execute())
-        .thenApply(__ -> null);
+  @Value
+  private static class RowAndMeta {
+    Row row;
+    RowMetadata meta;
   }
 }

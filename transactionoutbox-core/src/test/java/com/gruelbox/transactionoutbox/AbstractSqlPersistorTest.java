@@ -1,95 +1,92 @@
-package com.gruelbox.transactionoutbox.r2dbc;
+package com.gruelbox.transactionoutbox;
 
 import static com.ea.async.Async.await;
 import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.isA;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.ea.async.Async;
-import com.gruelbox.transactionoutbox.AlreadyScheduledException;
-import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.Invocation;
-import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
-import io.r2dbc.h2.H2ConnectionConfiguration;
-import io.r2dbc.h2.H2ConnectionFactory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Hooks;
 
 @Slf4j
-class R2dbcPersistorTest {
+public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>> {
 
-  private Instant now = now();
+  protected Instant now = now();
 
-  private final Dialect dialect = Dialect.H2;
-  private final R2dbcPersistor persistor = R2dbcPersistor.forDialect(dialect);
-  private final ConnectionFactoryWrapper connectionFactory =
-      R2dbcRawTransactionManager.wrapConnectionFactory(
-          new H2ConnectionFactory(
-              H2ConnectionConfiguration.builder()
-                  .inMemory("test")
-                  .option("DB_CLOSE_DELAY=-1")
-                  .build()));
-  private final R2dbcRawTransactionManager txManager =
-      new R2dbcRawTransactionManager(connectionFactory);
+  protected abstract Dialect dialect();
+
+  protected abstract AbstractSqlPersistor<CN, TX> persistor();
+
+  protected abstract TransactionManager<CN, ?, TX> txManager();
 
   @BeforeEach
-  void beforeAll() throws ExecutionException, InterruptedException {
+  void beforeAll() {
     Async.init();
-    persistor
-        .migrate(txManager)
-        .thenCompose(__ -> txManager.transactionally(persistor::clear))
-        .get();
+    Hooks.onOperatorDebug();
+    persistor()
+        .migrate(txManager())
+        .thenCompose(__ -> txManager().transactionally(persistor()::clear))
+        .join();
   }
 
   @Test
-  void testInsertAndSelect() throws ExecutionException, InterruptedException {
+  void testInsertAndSelect() {
     TransactionOutboxEntry entry = createEntry("FOO", now, false);
     List<TransactionOutboxEntry> entries =
-        txManager
-            .transactionally(tx -> persistor.save(tx, entry))
+        txManager()
+            .transactionally(tx -> persistor().save(tx, entry))
             .thenCompose(
                 __ ->
-                    txManager.transactionally(
-                        tx -> persistor.selectBatch(tx, 100, now.plusMillis(1))))
-            .get();
+                    txManager()
+                        .transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1))))
+            .join();
+    assertThat(entries, hasSize(1));
     assertThat(entries, contains(entry));
   }
 
   @Test
   void testInsertDuplicate() {
     TransactionOutboxEntry entry1 = createEntry("FOO1", now, false, "context-clientkey1");
-    await(txManager.transactionally(tx -> persistor.save(tx, entry1)));
+    await(txManager().transactionally(tx -> persistor().save(tx, entry1)));
     List<TransactionOutboxEntry> entries =
-        await(txManager.transactionally(tx -> persistor.selectBatch(tx, 100, now.plusMillis(1))));
+        txManager()
+            .transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1)))
+            .join();
     assertThat(entries, contains(entry1));
 
     TransactionOutboxEntry entry2 = createEntry("FOO2", now, false, "context-clientkey2");
-    await(txManager.transactionally(tx -> persistor.save(tx, entry2)));
+    await(txManager().transactionally(tx -> persistor().save(tx, entry2)));
     entries =
-        await(txManager.transactionally(tx -> persistor.selectBatch(tx, 100, now.plusMillis(1))));
+        txManager()
+            .transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1)))
+            .join();
     assertThat(entries, contains(entry1, entry2));
 
     TransactionOutboxEntry entry3 = createEntry("FOO3", now, false, "context-clientkey1");
-    assertThat(
+
+    Throwable cause =
         assertThrows(
                 CompletionException.class,
-                () -> await(txManager.transactionally(tx -> persistor.save(tx, entry3))))
-            .getCause(),
-        isA(AlreadyScheduledException.class));
+                () -> txManager().transactionally(tx -> persistor().save(tx, entry3)).join())
+            .getCause();
+
+    assertThat(cause, isA(AlreadyScheduledException.class));
 
     entries =
-        await(txManager.transactionally(tx -> persistor.selectBatch(tx, 100, now.plusMillis(1))));
+        (txManager().transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1))))
+            .join();
     assertThat(entries, contains(entry1, entry2));
   }
   //
@@ -377,7 +374,7 @@ class R2dbcPersistorTest {
   //    }
   //  }
   //
-  private TransactionOutboxEntry createEntry(
+  protected TransactionOutboxEntry createEntry(
       String id, Instant nextAttemptTime, boolean blacklisted) {
     return TransactionOutboxEntry.builder()
         .id(id)
@@ -387,7 +384,7 @@ class R2dbcPersistorTest {
         .build();
   }
 
-  private TransactionOutboxEntry createEntry(
+  protected TransactionOutboxEntry createEntry(
       String id, Instant nextAttemptTime, boolean blacklisted, String uniqueId) {
     return TransactionOutboxEntry.builder()
         .id(id)

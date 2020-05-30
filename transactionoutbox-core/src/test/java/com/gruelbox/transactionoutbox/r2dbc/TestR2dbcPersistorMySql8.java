@@ -1,0 +1,59 @@
+package com.gruelbox.transactionoutbox.r2dbc;
+
+
+import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
+import com.gruelbox.transactionoutbox.AbstractSqlPersistorTest;
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.Persistor;
+import com.gruelbox.transactionoutbox.TransactionManager;
+import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
+import dev.miku.r2dbc.mysql.MySqlConnectionConfiguration;
+import dev.miku.r2dbc.mysql.MySqlConnectionFactory;
+import io.r2dbc.spi.Connection;
+import java.time.Duration;
+import lombok.extern.slf4j.Slf4j;
+import org.testcontainers.containers.JdbcDatabaseContainer;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+@Slf4j
+@Testcontainers
+class TestR2dbcPersistorMySql8 extends AbstractSqlPersistorTest<Connection, R2dbcRawTransaction> {
+
+  @Container
+  @SuppressWarnings("rawtypes")
+  private static final JdbcDatabaseContainer container =
+      new MySQLContainer<>("mysql:8").withStartupTimeout(Duration.ofHours(1));
+
+  private final R2dbcPersistor persistor = R2dbcPersistor.forDialect(Dialect.MY_SQL_8);
+  private final ConnectionFactoryWrapper connectionFactory =
+      R2dbcRawTransactionManager.wrapConnectionFactory(
+          MySqlConnectionFactory.from(
+              MySqlConnectionConfiguration.builder()
+                  .host(container.getHost())
+                  .username(container.getUsername())
+                  .password(container.getPassword())
+                  .port(container.getFirstMappedPort())
+                  .database(container.getDatabaseName())
+                  .build()));
+  private final R2dbcRawTransactionManager txManager =
+      new R2dbcRawTransactionManager(connectionFactory);
+
+  @Override
+  protected Dialect dialect() {
+    return Dialect.MY_SQL_8;
+  }
+
+  @SuppressWarnings("unchecked")
+  @Override
+  protected AbstractSqlPersistor<Connection, R2dbcRawTransaction> persistor() {
+    Persistor result = persistor;
+    return (AbstractSqlPersistor<Connection, R2dbcRawTransaction>) result;
+  }
+
+  @Override
+  protected TransactionManager<Connection, ?, R2dbcRawTransaction> txManager() {
+    return txManager;
+  }
+}

@@ -47,15 +47,10 @@
     <module>transactionoutbox-jooq</module>
   </modules>
 
-  <!-- TODO remove, rdbc-client -->
   <repositories>
     <repository>
-      <id>spring-milestones</id>
-      <name>Spring Milestones</name>
-      <url>https://repo.spring.io/milestone</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
+      <id>projectlombok.org</id>
+      <url>https://projectlombok.org/edge-releases</url>
     </repository>
   </repositories>
 
@@ -97,34 +92,47 @@
         <version>3.0.0</version>
       </dependency>
       <dependency>
-        <groupId>com.ea.async</groupId>
-        <artifactId>ea-async</artifactId>
-        <version>1.2.3</version>
-        <scope>compile</scope>
-      </dependency>
 
-      <!-- TODO remove -->
+      <!-- TODO move to new module -->
+        <groupId>io.projectreactor</groupId>
+        <artifactId>reactor-core</artifactId>
+        <version>3.3.5.RELEASE</version>
+      </dependency>
       <dependency>
         <groupId>io.r2dbc</groupId>
-        <artifactId>r2dbc-postgresql</artifactId>
+        <artifactId>r2dbc-spi</artifactId>
         <version>0.8.2.RELEASE</version>
       </dependency>
       <dependency>
         <groupId>io.r2dbc</groupId>
         <artifactId>r2dbc-h2</artifactId>
         <version>0.8.2.RELEASE</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>io.r2dbc</groupId>
-        <artifactId>r2dbc-client</artifactId>
-        <version>1.0.0.M6</version>
+        <artifactId>r2dbc-postgresql</artifactId>
+        <version>0.8.2.RELEASE</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>dev.miku</groupId>
+        <artifactId>r2dbc-mysql</artifactId>
+        <version>0.8.1.RELEASE</version>
+        <scope>test</scope>
       </dependency>
 
       <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
-        <version>1.18.12</version>
+        <version>edge-SNAPSHOT</version>
         <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.ea.async</groupId>
+        <artifactId>ea-async</artifactId>
+        <version>1.2.3</version>
+        <scope>compile</scope>
       </dependency>
 
       <dependency>

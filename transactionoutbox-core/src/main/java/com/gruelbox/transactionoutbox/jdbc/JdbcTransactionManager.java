@@ -1,9 +1,8 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
+import static com.gruelbox.transactionoutbox.Utils.toBlockingFuture;
 import static com.gruelbox.transactionoutbox.Utils.uncheck;
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
-import static java.util.concurrent.CompletableFuture.completedFuture;
-import static java.util.concurrent.CompletableFuture.failedFuture;
 
 import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.ThrowingTransactionalWork;
@@ -12,6 +11,7 @@ import com.gruelbox.transactionoutbox.TransactionalSupplier;
 import com.gruelbox.transactionoutbox.TransactionalWork;
 import java.sql.Connection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 
 /**
@@ -78,12 +78,18 @@ public interface JdbcTransactionManager<CX, TX extends JdbcTransaction<CX>>
 
   @Override
   default <T> CompletableFuture<T> transactionally(Function<TX, CompletableFuture<T>> work) {
-    return inTransactionReturns(
-        tx -> {
+    return toBlockingFuture(
+        () -> {
           try {
-            return completedFuture(work.apply(tx).get());
-          } catch (Exception e) {
-            return failedFuture(e);
+            return inTransactionReturnsThrows(tx -> work.apply(tx).join());
+          } catch (CompletionException e) {
+            if (e.getCause() instanceof Exception) {
+              throw (Exception) e.getCause();
+            } else if (e.getCause() instanceof Error) {
+              throw (Error) e.getCause();
+            } else {
+              throw new RuntimeException(e);
+            }
           }
         });
   }

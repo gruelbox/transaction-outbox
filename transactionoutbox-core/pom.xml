@@ -52,10 +52,14 @@
       <artifactId>ea-async</artifactId>
     </dependency>
 
-    <!-- TODO remove these or lower to test -->
+    <!-- TODO move to module -->
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-core</artifactId>
+    </dependency>
     <dependency>
       <groupId>io.r2dbc</groupId>
-      <artifactId>r2dbc-postgresql</artifactId>
+      <artifactId>r2dbc-spi</artifactId>
     </dependency>
     <dependency>
       <groupId>io.r2dbc</groupId>
@@ -63,7 +67,11 @@
     </dependency>
     <dependency>
       <groupId>io.r2dbc</groupId>
-      <artifactId>r2dbc-client</artifactId>
+      <artifactId>r2dbc-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.miku</groupId>
+      <artifactId>r2dbc-mysql</artifactId>
     </dependency>
 
     <!-- Compile time -->

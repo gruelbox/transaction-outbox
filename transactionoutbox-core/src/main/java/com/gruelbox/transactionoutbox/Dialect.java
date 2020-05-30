@@ -15,10 +15,16 @@ import lombok.Getter;
 public enum Dialect {
   MY_SQL_5(false, Constants.DEFAULT_DELETE_EXPIRED_STMT),
   MY_SQL_8(true, Constants.DEFAULT_DELETE_EXPIRED_STMT),
+  H2(false, Constants.DEFAULT_DELETE_EXPIRED_STMT),
   POSTGRESQL_9(
       true,
-      "DELETE FROM {{table}} WHERE ctid IN (SELECT ctid FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blacklisted = false LIMIT ?)"),
-  H2(false, Constants.DEFAULT_DELETE_EXPIRED_STMT);
+      "DELETE FROM {{table}} "
+          + "WHERE id IN ("
+          + "  SELECT id FROM {{table}} "
+          + "  WHERE nextAttemptTime < ? AND "
+          + "        processed = true AND "
+          + "        blacklisted = false "
+          + "  LIMIT ?)");
 
   /**
    * @return True if hot row support ({@code SKIP LOCKED}) is available, increasing performance when

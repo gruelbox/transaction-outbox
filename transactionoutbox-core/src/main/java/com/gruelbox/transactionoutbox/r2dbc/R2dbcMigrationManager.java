@@ -62,11 +62,11 @@ class R2dbcMigrationManager {
 
   private static CompletableFuture<Void> runMigration(Connection connection, Migration migration) {
     log.info("Running migration: {}", migration.name);
-    await(runSql(connection, migration.sql));
+    await(runUpdate(connection, migration.sql));
     int versionUpdateRowsAffected =
         await(runUpdate(connection, "UPDATE TXNO_VERSION SET version = " + migration.version));
     if (versionUpdateRowsAffected != 1) {
-      await(runSql(connection, "INSERT INTO TXNO_VERSION VALUES (" + migration.version + ")"));
+      await(runUpdate(connection, "INSERT INTO TXNO_VERSION VALUES (" + migration.version + ")"));
     }
     return completedFuture(null);
   }
@@ -94,7 +94,7 @@ class R2dbcMigrationManager {
   }
 
   private static CompletableFuture<?> createVersionTableIfNotExists(Connection connection) {
-    return runSql(connection, "CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
+    return runUpdate(connection, "CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
   }
 
   @AllArgsConstructor

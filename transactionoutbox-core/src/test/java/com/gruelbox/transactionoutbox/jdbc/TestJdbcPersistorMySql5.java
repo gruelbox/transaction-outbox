@@ -1,6 +1,10 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
+import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
+import com.gruelbox.transactionoutbox.AbstractSqlPersistorTest;
 import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.Persistor;
+import java.sql.Connection;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.testcontainers.containers.JdbcDatabaseContainer;
@@ -10,7 +14,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Slf4j
 @Testcontainers
-class TestJdbcPersistorMySql5 extends AbstractJdbcPersistorTest {
+class TestJdbcPersistorMySql5
+    extends AbstractSqlPersistorTest<Connection, SimpleTransaction<Void>> {
 
   @Container
   @SuppressWarnings("rawtypes")
@@ -26,17 +31,19 @@ class TestJdbcPersistorMySql5 extends AbstractJdbcPersistorTest {
           container.getPassword());
 
   @Override
-  protected JdbcPersistor persistor() {
-    return persistor;
+  protected Dialect dialect() {
+    return Dialect.H2;
+  }
+
+  @SuppressWarnings("unchecked")
+  @Override
+  protected AbstractSqlPersistor<Connection, SimpleTransaction<Void>> persistor() {
+    Persistor result = persistor;
+    return (AbstractSqlPersistor<Connection, SimpleTransaction<Void>>) result;
   }
 
   @Override
   protected SimpleTransactionManager txManager() {
     return txManager;
-  }
-
-  @Override
-  protected Dialect dialect() {
-    return Dialect.MY_SQL_5;
   }
 }

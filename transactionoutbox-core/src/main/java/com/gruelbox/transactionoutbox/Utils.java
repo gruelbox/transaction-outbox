@@ -71,7 +71,7 @@ public class Utils {
     }
   }
 
-  static <T> T uncheckAndThrow(Throwable e) {
+  public static <T> T uncheckAndThrow(Throwable e) {
     if (e instanceof RuntimeException) {
       throw (RuntimeException) e;
     }

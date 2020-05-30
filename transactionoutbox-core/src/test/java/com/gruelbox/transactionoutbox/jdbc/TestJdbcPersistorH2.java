@@ -1,12 +1,16 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
+import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
+import com.gruelbox.transactionoutbox.AbstractSqlPersistorTest;
 import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.Persistor;
+import java.sql.Connection;
 import lombok.extern.slf4j.Slf4j;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Slf4j
 @Testcontainers
-class TestJdbcPersistorH2 extends AbstractJdbcPersistorTest {
+class TestJdbcPersistorH2 extends AbstractSqlPersistorTest<Connection, SimpleTransaction<Void>> {
 
   private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialect.H2).build();
   private SimpleTransactionManager txManager =
@@ -17,17 +21,19 @@ class TestJdbcPersistorH2 extends AbstractJdbcPersistorTest {
           "test");
 
   @Override
-  protected JdbcPersistor persistor() {
-    return persistor;
+  protected Dialect dialect() {
+    return Dialect.H2;
+  }
+
+  @SuppressWarnings("unchecked")
+  @Override
+  protected AbstractSqlPersistor<Connection, SimpleTransaction<Void>> persistor() {
+    Persistor result = persistor;
+    return (AbstractSqlPersistor<Connection, SimpleTransaction<Void>>) result;
   }
 
   @Override
   protected SimpleTransactionManager txManager() {
     return txManager;
-  }
-
-  @Override
-  protected Dialect dialect() {
-    return Dialect.H2;
   }
 }

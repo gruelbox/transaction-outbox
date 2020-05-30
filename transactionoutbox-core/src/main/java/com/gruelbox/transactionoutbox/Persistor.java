@@ -8,10 +8,11 @@ import java.util.concurrent.CompletableFuture;
  * Saves and loads {@link TransactionOutboxEntry}s. Intentially non-blocking API which can be
  * implemented in a blocking manner for intrinsically blocking datastore APIs such as JDBC.
  *
- * @param <CX> The type that the client code uses to interact with the transaction.
+ * @param <CN> The type which the associated {@link Persistor} implementation will use to interact
+ *     with the data store.
  * @param <TX> The transaction type
  */
-public interface Persistor<CX, TX extends Transaction<CX, ?>> {
+public interface Persistor<CN, TX extends Transaction<CN, ?>> {
 
   /**
    * Upgrades any database schema used by the persistor to the latest version. Called on creation of
@@ -19,7 +20,7 @@ public interface Persistor<CX, TX extends Transaction<CX, ?>> {
    *
    * @param transactionManager The transactoin manager.
    */
-  CompletableFuture<Void> migrate(TransactionManager<CX, ?, ? extends TX> transactionManager);
+  CompletableFuture<Void> migrate(TransactionManager<CN, ?, ? extends TX> transactionManager);
 
   /**
    * Saves a new {@link TransactionOutboxEntry}. Should emit {@link AlreadyScheduledException} if
