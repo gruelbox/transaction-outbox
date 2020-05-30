@@ -90,7 +90,8 @@ public void createWidget(@PathParam("id") SaleId saleId, Sale sale) {
 
 Here's what happens:
 
-- [`TransactionOutbox`](https://www.javadoc.io/static/com.gruelbox/transactionoutbox-core/0.1.57/com/gruelbox/transactionoutbox/TransactionOutbox.html) creates a proxy of `MessageQueue`. Any method calls on the proxy are serialized and written to a database table _in the same transaction_ as the `SaleRepository` call. The call returns immediately rather than actually invoking the real method.
+- When you create an instance of [`TransactionOutbox`](https://www.javadoc.io/static/com.gruelbox/transactionoutbox-core/0.1.57/com/gruelbox/transactionoutbox/TransactionOutbox.html) (see [[Basic Configuration](#basic-configuration)), it will, by default, automatically create two database tables, `TXNO_OUTBOX` and `TXNO_VERSION`, and then keep these synchronized with schema changes as new versions are released. _Note: this is the default behaviour on a SQL database, but is completely overridable if you are using a different type of data store or don't want a third party library managing your database schema. See [Configuration reference](#configuration-reference)_. 
+- [`TransactionOutbox`](https://www.javadoc.io/static/com.gruelbox/transactionoutbox-core/0.1.57/com/gruelbox/transactionoutbox/TransactionOutbox.html) creates a proxy of `MessageQueue`. Any method calls on the proxy are serialized and written to the `TXNO_OUTBOX` table (by default) _in the same transaction_ as the `SaleRepository` call. The call returns immediately rather than actually invoking the real method.
 - If the transaction rolls back, so do the serialized requests.
 - Immediately after the transaction is successfully committed, another thread will attempt to make the _real_ call to `MessageQueue` asynchronously.
 - If that call fails, or the application dies before the call is attempted, a [background "mop-up" thread](#set-up-the-background-worker) will re-attempt the call a configurable number of times, with configurable time between each, before [blacklisting](#managing-the-dead-letter-queue) the request and firing and event for it to be investigated (similar to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue)).
@@ -352,7 +353,8 @@ TransactionOutbox outbox = TransactionOutbox.builder()
     // Or, if you have no formal transaction management at the moment, why not start, using transaction-outbox's
     // built-in one?
     .transactionManager(transactionManager)
-    // Modify how requests are persisted to the database.
+    // Modify how requests are persisted to the database. For more complex modifications, you may wish to subclass
+    // DefaultPersistor, or create a completely new Persistor implementation.
     .persistor(DefaultPersistor.builder()
         // Selecting the right SQL dialect ensures that features such as SKIP LOCKED are used correctly.
         .dialect(Dialect.POSTGRESQL_9)
