@@ -31,6 +31,8 @@ public class Utils {
 
   private static final Objenesis objenesis = new ObjenesisStd();
 
+  private Utils() {}
+
   @SuppressWarnings({"SameParameterValue", "WeakerAccess", "UnusedReturnValue"})
   public static boolean safelyRun(String gerund, ThrowingRunnable runnable) {
     try {

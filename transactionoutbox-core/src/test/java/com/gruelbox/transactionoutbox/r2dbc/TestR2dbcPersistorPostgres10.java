@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-
 import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
 import com.gruelbox.transactionoutbox.AbstractSqlPersistorTest;
 import com.gruelbox.transactionoutbox.Dialect;
@@ -12,10 +11,13 @@ import io.r2dbc.postgresql.PostgresqlConnectionFactory;
 import io.r2dbc.spi.Connection;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import reactor.core.publisher.Hooks;
 
 @Slf4j
 @Testcontainers
@@ -42,6 +44,11 @@ class TestR2dbcPersistorPostgres10
   private final R2dbcRawTransactionManager txManager =
       new R2dbcRawTransactionManager(connectionFactory);
 
+  @BeforeAll
+  static void initHooks() {
+    Hooks.onOperatorDebug();
+  }
+
   @Override
   protected Dialect dialect() {
     return Dialect.POSTGRESQL_9;
@@ -57,5 +64,10 @@ class TestR2dbcPersistorPostgres10
   @Override
   protected TransactionManager<Connection, ?, R2dbcRawTransaction> txManager() {
     return txManager;
+  }
+
+  @Override
+  protected void validateState() {
+    Assertions.assertEquals(0, txManager.getOpenTransactionCount());
   }
 }

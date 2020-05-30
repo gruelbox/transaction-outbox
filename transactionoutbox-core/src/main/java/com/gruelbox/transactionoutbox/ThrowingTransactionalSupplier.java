@@ -1,5 +1,9 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.jdbc.ThrowingTransactionalWork;
+import com.gruelbox.transactionoutbox.jdbc.TransactionalSupplier;
+import com.gruelbox.transactionoutbox.jdbc.TransactionalWork;
+
 @FunctionalInterface
 public interface ThrowingTransactionalSupplier<
     T, E extends Exception, TX extends Transaction<?, ?>> {

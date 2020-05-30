@@ -18,9 +18,9 @@ public interface Persistor<CN, TX extends Transaction<CN, ?>> {
    * Upgrades any database schema used by the persistor to the latest version. Called on creation of
    * a {@link TransactionOutbox}.
    *
-   * @param transactionManager The transactoin manager.
+   * @param transactionManager The transaction manager.
    */
-  CompletableFuture<Void> migrate(TransactionManager<CN, ?, ? extends TX> transactionManager);
+  void migrate(TransactionManager<CN, ?, ? extends TX> transactionManager);
 
   /**
    * Saves a new {@link TransactionOutboxEntry}. Should emit {@link AlreadyScheduledException} if
@@ -76,7 +76,7 @@ public interface Persistor<CN, TX extends Transaction<CN, ?>> {
   CompletableFuture<Boolean> whitelist(TX tx, String entryId);
 
   /**
-   * ` Selects up to a specified maximum number of non-blacklisted records which have passed their
+   * Selects up to a specified maximum number of non-blacklisted records which have passed their
    * {@link TransactionOutboxEntry#getNextAttemptTime()}. Until a subsequent call to {@link
    * #lock(Transaction, TransactionOutboxEntry)}, these records may be selected by another instance
    * for processing.
@@ -88,5 +88,14 @@ public interface Persistor<CN, TX extends Transaction<CN, ?>> {
    */
   CompletableFuture<List<TransactionOutboxEntry>> selectBatch(TX tx, int batchSize, Instant now);
 
+  /**
+   * Cleans up records which have been marked as processed but not deleted, and which have passed
+   * their next process date/time.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param batchSize The number of records to select.
+   * @param now The time to use when selecting records.
+   * @return The number of records affected.
+   */
   CompletableFuture<Integer> deleteProcessedAndExpired(TX tx, int batchSize, Instant now);
 }

@@ -1,10 +1,10 @@
 package com.gruelbox.transactionoutbox;
 
-import static com.ea.async.Async.await;
 import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.isA;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -14,11 +14,14 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import reactor.core.publisher.Hooks;
 
 @Slf4j
 public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>> {
@@ -31,14 +34,20 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
 
   protected abstract TransactionManager<CN, ?, TX> txManager();
 
-  @BeforeEach
-  void beforeAll() {
+  protected void validateState() {}
+
+  @BeforeAll
+  static void beforeAll() {
     Async.init();
-    Hooks.onOperatorDebug();
-    persistor()
-        .migrate(txManager())
-        .thenCompose(__ -> txManager().transactionally(persistor()::clear))
-        .join();
+  }
+
+  @BeforeEach
+  void beforeEach() throws InterruptedException, ExecutionException, TimeoutException {
+    persistor().migrate(txManager());
+    log.info("Validating state");
+    validateState();
+    log.info("Clearing old records");
+    txManager().transactionally(persistor()::clear).get(10, TimeUnit.SECONDS);
   }
 
   @Test
@@ -58,37 +67,42 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
 
   @Test
   void testInsertDuplicate() {
+    log.info("Inserting FOO1");
     TransactionOutboxEntry entry1 = createEntry("FOO1", now, false, "context-clientkey1");
-    await(txManager().transactionally(tx -> persistor().save(tx, entry1)));
+    txManager().transactionally(tx -> persistor().save(tx, entry1)).join();
+    log.info("Checking DB");
     List<TransactionOutboxEntry> entries =
         txManager()
             .transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1)))
             .join();
     assertThat(entries, contains(entry1));
 
+    log.info("Inserting FOO2");
     TransactionOutboxEntry entry2 = createEntry("FOO2", now, false, "context-clientkey2");
-    await(txManager().transactionally(tx -> persistor().save(tx, entry2)));
+    log.info("Checking DB");
+    txManager().transactionally(tx -> persistor().save(tx, entry2)).join();
     entries =
         txManager()
             .transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1)))
             .join();
-    assertThat(entries, contains(entry1, entry2));
+    assertThat(entries, containsInAnyOrder(entry1, entry2));
 
+    log.info("Inserting FOO3");
     TransactionOutboxEntry entry3 = createEntry("FOO3", now, false, "context-clientkey1");
-
     Throwable cause =
         assertThrows(
                 CompletionException.class,
                 () -> txManager().transactionally(tx -> persistor().save(tx, entry3)).join())
             .getCause();
-
     assertThat(cause, isA(AlreadyScheduledException.class));
 
+    log.info("Checking DB");
     entries =
         (txManager().transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1))))
             .join();
-    assertThat(entries, contains(entry1, entry2));
+    assertThat(entries, containsInAnyOrder(entry1, entry2));
   }
+
   //
   //  @Test
   //  void testBatchLimitUnderThreshold() throws Exception {

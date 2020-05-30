@@ -30,7 +30,7 @@ public abstract class AbstractSqlPersistor<CN, TX extends Transaction<CN, ?>>
   @SuppressWarnings("JavaDoc")
   @Builder.Default
   @NotNull
-  private final int writeLockTimeoutSeconds = 2;
+  protected final int writeLockTimeoutSeconds = 2;
 
   /** @param dialect The database dialect to use. Required. */
   @SuppressWarnings("JavaDoc")
@@ -52,7 +52,7 @@ public abstract class AbstractSqlPersistor<CN, TX extends Transaction<CN, ?>>
   @SuppressWarnings("JavaDoc")
   @Builder.Default
   @NotNull
-  private final boolean migrate = true;
+  protected final boolean migrate = true;
 
   /**
    * @param serializer The serializer to use for {@link Invocation}s. See {@link
@@ -208,7 +208,7 @@ public abstract class AbstractSqlPersistor<CN, TX extends Transaction<CN, ?>>
   }
 
   // For testing. Assumed low volume.
-  public final CompletableFuture<Void> clear(TX tx) {
+  final CompletableFuture<Void> clear(TX tx) {
     return statement(tx, "DELETE FROM " + tableName, false, Binder::execute).thenApply(__ -> null);
   }
 
@@ -229,7 +229,7 @@ public abstract class AbstractSqlPersistor<CN, TX extends Transaction<CN, ?>>
   protected interface Binder {
     Binder bind(int index, Object value);
 
-    CompletableFuture<Result> execute();
+    CompletableFuture<? extends Result> execute();
 
     <T> CompletableFuture<List<T>> executeQuery(
         int expectedRowCount, Function<ResultRow, T> rowMapper);

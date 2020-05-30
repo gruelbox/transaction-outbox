@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-
 import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
 import com.gruelbox.transactionoutbox.AbstractSqlPersistorTest;
 import com.gruelbox.transactionoutbox.Dialect;
@@ -12,10 +11,12 @@ import dev.miku.r2dbc.mysql.MySqlConnectionFactory;
 import io.r2dbc.spi.Connection;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import reactor.core.publisher.Hooks;
 
 @Slf4j
 @Testcontainers
@@ -39,6 +40,11 @@ class TestR2dbcPersistorMySql8 extends AbstractSqlPersistorTest<Connection, R2db
                   .build()));
   private final R2dbcRawTransactionManager txManager =
       new R2dbcRawTransactionManager(connectionFactory);
+
+  @BeforeAll
+  static void initHooks() {
+    Hooks.onOperatorDebug();
+  }
 
   @Override
   protected Dialect dialect() {

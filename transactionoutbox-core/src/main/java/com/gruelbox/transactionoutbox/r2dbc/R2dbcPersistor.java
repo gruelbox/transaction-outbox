@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-import static com.gruelbox.transactionoutbox.Utils.toRunningFuture;
+import static com.gruelbox.transactionoutbox.r2dbc.Utils.EMPTY_RESULT;
 
 import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
@@ -13,6 +13,7 @@ import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException;
+import io.r2dbc.spi.Result;
 import io.r2dbc.spi.Row;
 import io.r2dbc.spi.RowMetadata;
 import java.time.Instant;
@@ -59,9 +60,11 @@ public class R2dbcPersistor extends AbstractSqlPersistor<Connection, R2dbcTransa
   }
 
   @Override
-  public CompletableFuture<Void> migrate(
+  public void migrate(
       TransactionManager<Connection, ?, ? extends R2dbcTransaction<?>> transactionManager) {
-    return R2dbcMigrationManager.migrate(transactionManager);
+    if (migrate) {
+      R2dbcMigrationManager.migrate(transactionManager);
+    }
   }
 
   @Override
@@ -119,6 +122,7 @@ public class R2dbcPersistor extends AbstractSqlPersistor<Connection, R2dbcTransa
 
           @Override
           public Binder bind(int i, Object arg) {
+            log.trace("Binding {} -> {}", i, arg);
             // TODO suggest Instant support to R2DBC
             if (arg instanceof Instant) {
               statement.bind(i, LocalDateTime.ofInstant((Instant) arg, ZoneOffset.UTC));
@@ -134,26 +138,40 @@ public class R2dbcPersistor extends AbstractSqlPersistor<Connection, R2dbcTransa
           }
 
           @Override
-          public CompletableFuture<Result> execute() {
-            return toRunningFuture(statement.execute())
-                .thenApply(result -> () -> toRunningFuture(result.getRowsUpdated()));
+          public CompletableFuture<? extends Result> execute() {
+            return Mono.from(statement.execute())
+                .map(r -> (io.r2dbc.spi.Result) r)
+                .defaultIfEmpty(EMPTY_RESULT)
+                .doOnNext(__ -> log.debug("Executed SQL: {}", sql))
+                .map(
+                    result ->
+                        new Result() {
+                          @Override
+                          public CompletableFuture<Integer> rowsUpdated() {
+                            return Mono.from(result.getRowsUpdated()).defaultIfEmpty(0).toFuture();
+                          }
+                        })
+                .toFuture();
           }
 
           @Override
           @SuppressWarnings({"unchecked", "ConstantConditions"})
-          public <T> CompletableFuture<List<T>> executeQuery(
-              int expectedRowCount, Function<ResultRow, T> rowMapper) {
+          public <U> CompletableFuture<List<U>> executeQuery(
+              int expectedRowCount, Function<ResultRow, U> rowMapper) {
             return Mono.from(statement.execute())
+                .map(r -> (io.r2dbc.spi.Result) r)
+                .defaultIfEmpty(EMPTY_RESULT)
+                .doOnNext(__ -> log.debug("Executed SQL: {}", sql))
                 .flatMapMany(result -> result.map(RowAndMeta::new))
                 .map(
                     row ->
                         new ResultRow() {
                           @Override
-                          public <U> U get(int index, Class<U> type) {
+                          public <V> V get(int index, Class<V> type) {
                             try {
                               // TODO suggest Instant support to R2DBC
                               if (Instant.class.equals(type)) {
-                                return (U)
+                                return (V)
                                     Objects.requireNonNull(
                                             row.getRow().get(index, LocalDateTime.class))
                                         .toInstant(ZoneOffset.UTC);
@@ -161,7 +179,7 @@ public class R2dbcPersistor extends AbstractSqlPersistor<Connection, R2dbcTransa
                               } else if (Boolean.class.equals(type)
                                   && (dialect.equals(Dialect.MY_SQL_5)
                                       || dialect.equals(Dialect.MY_SQL_8))) {
-                                return (U)
+                                return (V)
                                     Boolean.valueOf(row.getRow().get(index, Short.class) == 1);
                               } else {
                                 return row.getRow().get(index, type);
@@ -180,7 +198,7 @@ public class R2dbcPersistor extends AbstractSqlPersistor<Connection, R2dbcTransa
                         })
                 .map(rowMapper)
                 .collect(
-                    () -> new ArrayList<>(expectedRowCount), (BiConsumer<List<T>, T>) List::add)
+                    () -> new ArrayList<>(expectedRowCount), (BiConsumer<List<U>, U>) List::add)
                 .toFuture();
           }
         });

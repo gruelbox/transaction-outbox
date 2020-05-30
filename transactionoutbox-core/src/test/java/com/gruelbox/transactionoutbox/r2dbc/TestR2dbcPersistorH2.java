@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-
 import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
 import com.gruelbox.transactionoutbox.AbstractSqlPersistorTest;
 import com.gruelbox.transactionoutbox.Dialect;
@@ -11,6 +10,8 @@ import io.r2dbc.h2.H2ConnectionConfiguration;
 import io.r2dbc.h2.H2ConnectionFactory;
 import io.r2dbc.spi.Connection;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.BeforeAll;
+import reactor.core.publisher.Hooks;
 
 @Slf4j
 class TestR2dbcPersistorH2 extends AbstractSqlPersistorTest<Connection, R2dbcRawTransaction> {
@@ -25,6 +26,11 @@ class TestR2dbcPersistorH2 extends AbstractSqlPersistorTest<Connection, R2dbcRaw
                   .build()));
   private final R2dbcRawTransactionManager txManager =
       new R2dbcRawTransactionManager(connectionFactory);
+
+  @BeforeAll
+  static void initHooks() {
+    Hooks.onOperatorDebug();
+  }
 
   @Override
   protected Dialect dialect() {

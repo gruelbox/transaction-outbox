@@ -58,10 +58,11 @@ public class JdbcPersistor extends AbstractSqlPersistor<Connection, JdbcTransact
   }
 
   @Override
-  public CompletableFuture<Void> migrate(
+  public void migrate(
       TransactionManager<Connection, ?, ? extends JdbcTransaction<?>> transactionManager) {
-    return toBlockingFuture(
-        () -> JdbcMigrationManager.migrate((JdbcTransactionManager) transactionManager));
+    if (migrate) {
+      JdbcMigrationManager.migrate((JdbcTransactionManager) transactionManager);
+    }
   }
 
   @Override

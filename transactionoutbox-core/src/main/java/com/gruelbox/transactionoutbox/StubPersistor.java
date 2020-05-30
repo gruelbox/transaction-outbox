@@ -14,8 +14,8 @@ public class StubPersistor implements Persistor {
   StubPersistor() {}
 
   @Override
-  public CompletableFuture<Void> migrate(TransactionManager transactionManager) {
-    return completedFuture(null);
+  public void migrate(TransactionManager transactionManager) {
+    // No-op
   }
 
   @Override

@@ -1,10 +1,5 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-import static com.ea.async.Async.await;
-import static com.gruelbox.transactionoutbox.Utils.toRunningFuture;
-import static java.util.concurrent.CompletableFuture.completedFuture;
-import static java.util.concurrent.CompletableFuture.failedFuture;
-
 import io.r2dbc.spi.Batch;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.ConnectionFactory;
@@ -14,13 +9,14 @@ import io.r2dbc.spi.IsolationLevel;
 import io.r2dbc.spi.Statement;
 import io.r2dbc.spi.ValidationDepth;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -33,6 +29,7 @@ public class R2dbcRawTransactionManager
     implements R2dbcTransactionManager<Connection, R2dbcRawTransaction> {
 
   private final ConnectionFactoryWrapper cf;
+  private final AtomicInteger openTransactionCount = new AtomicInteger();
 
   public R2dbcRawTransactionManager(ConnectionFactoryWrapper cf) {
     this.cf = cf;
@@ -43,34 +40,54 @@ public class R2dbcRawTransactionManager
     return new ConnectionFactoryWrapper(connectionFactory);
   }
 
+  // For testing
+  int getOpenTransactionCount() {
+    return openTransactionCount.get();
+  }
+
   @Override
   public <T> CompletableFuture<T> transactionally(
       Function<R2dbcRawTransaction, CompletableFuture<T>> fn) {
     return withConnection(
-        connection -> {
-          var tx = transactionFromContext(connection);
-          await(toRunningFuture(connection.beginTransaction()));
-          try {
-            T result = await(fn.apply(tx));
-            await(toRunningFuture(connection.commitTransaction()));
-            return completedFuture(result);
-          } catch (CompletionException e) {
-            await(toRunningFuture(connection.rollbackTransaction()));
-            return failedFuture(e.getCause());
-          } catch (Exception e) {
-            await(toRunningFuture(connection.rollbackTransaction()));
-            return failedFuture(e);
-          }
-        });
+            conn ->
+                Mono.from(conn.beginTransaction())
+                    .then(Mono.fromCompletionStage(fn.apply(transactionFromContext(conn))))
+                    .concatWith(commit(conn))
+                    .onErrorResume(t -> rollback(conn, t))
+                    .next())
+        .toFuture();
   }
 
-  private <T> CompletableFuture<T> withConnection(Function<Connection, CompletableFuture<T>> fn) {
-    Connection connection = await(toRunningFuture(cf.create()));
-    try {
-      return completedFuture(await(fn.apply(connection)));
-    } finally {
-      await(toRunningFuture(connection.close()));
-    }
+  private <T> Mono<T> commit(Connection conn) {
+    return Mono.from(conn.commitTransaction()).then(Mono.empty());
+  }
+
+  private <T> Mono<T> rollback(Connection conn, Throwable e) {
+    return Mono.fromRunnable(
+            () ->
+                log.warn(
+                    "Exception in transactional block ({}{}). Rolling back. See later messages for detail",
+                    e.getClass().getSimpleName(),
+                    e.getMessage() == null ? "" : (" - " + e.getMessage())))
+        .concatWith(conn.rollbackTransaction())
+        .then(Mono.error(e));
+  }
+
+  private <T> Mono<T> withConnection(Function<Connection, Mono<T>> fn) {
+    return Mono.from(cf.create())
+        .flatMapMany(
+            conn ->
+                Mono.fromRunnable(openTransactionCount::incrementAndGet)
+                    .then(fn.apply(conn))
+                    .concatWith(
+                        Flux.from(conn.close())
+                            .then(Mono.fromRunnable(openTransactionCount::decrementAndGet)))
+                    .onErrorResume(
+                        t ->
+                            Flux.from(conn.close())
+                                .then(Mono.fromRunnable(openTransactionCount::decrementAndGet))
+                                .then(Mono.error(t))))
+        .next();
   }
 
   @Override
