@@ -37,6 +37,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   private final String insertSql;
   private final String selectBatchSql;
   private final String deleteSql;
+  private final String updateSql;
   private final String clearSql;
 
   private SqlPersistor(
@@ -72,6 +73,14 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
     this.deleteSql =
         handler.preprocessSql(
             dialect, "DELETE FROM " + this.tableName + " WHERE id = ? and version = ?");
+    this.updateSql =
+        handler.preprocessSql(
+            dialect,
+            "UPDATE "
+                + this.tableName
+                + " SET nextAttemptTime = ?, attempts = ?,"
+                + " blacklisted = ?, processed = ?, version = ?"
+                + " WHERE id = ? and version = ?");
     this.clearSql = handler.preprocessSql(dialect, "DELETE FROM " + this.tableName);
   }
 
@@ -216,7 +225,37 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
 
   @Override
   public final CompletableFuture<Void> update(TX tx, TransactionOutboxEntry entry) {
-    throw new UnsupportedOperationException();
+    try {
+      return handler
+          .statement(
+              tx,
+              dialect,
+              updateSql,
+              writeLockTimeoutSeconds,
+              false,
+              binder ->
+                  binder
+                      .bind(0, entry.getNextAttemptTime())
+                      .bind(1, entry.getAttempts())
+                      .bind(2, entry.isBlacklisted())
+                      .bind(3, entry.isProcessed())
+                      .bind(4, entry.getVersion() + 1)
+                      .bind(5, entry.getId())
+                      .bind(6, entry.getVersion())
+                      .execute())
+          .thenApply(
+              rows -> {
+                if (rows != 1) {
+                  throw new OptimisticLockException();
+                } else {
+                  log.debug("Updated {}", entry.description());
+                  entry.setVersion(entry.getVersion() + 1);
+                  return null;
+                }
+              });
+    } catch (Exception e) {
+      return failedFuture(e);
+    }
   }
 
   @Override
@@ -271,7 +310,8 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
 
   @Override
   public final CompletableFuture<Integer> clear(TX tx) {
-    return handler.statement(tx, dialect, clearSql, writeLockTimeoutSeconds,false, Binder::execute);
+    return handler.statement(
+        tx, dialect, clearSql, writeLockTimeoutSeconds, false, Binder::execute);
   }
 
   @Beta
@@ -281,7 +321,12 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
     }
 
     <T> T statement(
-        TX tx, Dialect dialect, String sql, int writeLockTimeoutSeconds, boolean batchable, Function<Binder, T> binding);
+        TX tx,
+        Dialect dialect,
+        String sql,
+        int writeLockTimeoutSeconds,
+        boolean batchable,
+        Function<Binder, T> binding);
 
     default void interceptNew(Dialect dialect, TransactionOutboxEntry entry) {
       // No-op
@@ -389,46 +434,6 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
           + ")";
     }
   }
-
-  //  void deleteBlocking(JdbcTransaction<?> tx, TransactionOutboxEntry entry) throws Exception {
-  //    try (PreparedStatement stmt =
-  //        // language=MySQL
-  //        tx.connection()
-  //            .prepareStatement("DELETE FROM " + tableName + " WHERE id = ? and version = ?")) {
-  //      stmt.setString(1, entry.getId());
-  //      stmt.setInt(2, entry.getVersion());
-  //      if (stmt.executeUpdate() != 1) {
-  //        throw new OptimisticLockException();
-  //      }
-  //      log.debug("Deleted {}", entry.description());
-  //    }
-  //  }
-  //
-  //  void updateBlocking(JdbcTransaction<?> tx, TransactionOutboxEntry entry) throws Exception {
-  //    try (PreparedStatement stmt =
-  //        tx.connection()
-  //            .prepareStatement(
-  //                // language=MySQL
-  //                "UPDATE "
-  //                    + tableName
-  //                    + " "
-  //                    + "SET nextAttemptTime = ?, attempts = ?, blacklisted = ?, processed = ?,
-  // version = ? "
-  //                    + "WHERE id = ? and version = ?")) {
-  //      stmt.setTimestamp(1, Timestamp.from(entry.getNextAttemptTime()));
-  //      stmt.setInt(2, entry.getAttempts());
-  //      stmt.setBoolean(3, entry.isBlacklisted());
-  //      stmt.setBoolean(4, entry.isProcessed());
-  //      stmt.setInt(5, entry.getVersion() + 1);
-  //      stmt.setString(6, entry.getId());
-  //      stmt.setInt(7, entry.getVersion());
-  //      if (stmt.executeUpdate() != 1) {
-  //        throw new OptimisticLockException();
-  //      }
-  //      entry.setVersion(entry.getVersion() + 1);
-  //      log.debug("Updated {}", entry.description());
-  //    }
-  //  }
   //
   //  boolean lockBlocking(JdbcTransaction<?> tx, TransactionOutboxEntry entry) throws Exception {
   //    try (PreparedStatement stmt =
@@ -493,7 +498,8 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
 
   private <T> CompletableFuture<List<T>> executeQuery(
       TX tx, String sql, Function<ResultRow, T> mapper) {
-    return handler.statement(tx, dialect, sql, writeLockTimeoutSeconds, false, binder -> binder.executeQuery(1, mapper));
+    return handler.statement(
+        tx, dialect, sql, writeLockTimeoutSeconds, false, binder -> binder.executeQuery(1, mapper));
   }
 
   private CompletableFuture<Integer> executeUpdate(TX tx, String sql) {

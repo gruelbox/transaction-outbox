@@ -2,7 +2,6 @@ package com.gruelbox.transactionoutbox;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
-import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcTransactionManager;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -63,15 +62,6 @@ class TestGlobalArchitecture {
         .should()
         .onlyAccessClassesThat()
         .resideOutsideOfPackage("reactor.core..")
-        .check(all);
-  }
-
-  @Test
-  void no_use_of_async_await() {
-    classes()
-        .should()
-        .onlyAccessClassesThat()
-        .resideOutsideOfPackage(Async.class.getPackageName())
         .check(all);
   }
 }

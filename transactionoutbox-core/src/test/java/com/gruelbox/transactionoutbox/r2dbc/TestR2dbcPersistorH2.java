@@ -21,6 +21,8 @@ class TestR2dbcPersistorH2 extends AbstractSqlPersistorTest<Connection, R2dbcRaw
           new H2ConnectionFactory(
               H2ConnectionConfiguration.builder()
                   .inMemory("test")
+                  .username("test")
+                  .password("test")
                   .option("DB_CLOSE_DELAY=-1")
                   .build()));
   private final R2dbcRawTransactionManager txManager =

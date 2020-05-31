@@ -23,7 +23,7 @@ class R2dbcStatement implements Binder {
 
   private final Statement statement;
   private final Dialect dialect;
-  private final int timeoutSeconds;
+  private final int timeoutSeconds; // TODO implement this
   private final String sql;
 
   R2dbcStatement(R2dbcTransaction<?> tx, Dialect dialect, int timeoutSeconds, String sql) {

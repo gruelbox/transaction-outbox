@@ -2,9 +2,11 @@ package com.gruelbox.transactionoutbox;
 
 import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.MILLIS;
+import static java.util.stream.Collectors.toList;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.isA;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -13,10 +15,12 @@ import com.ea.async.Async;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeAll;
@@ -26,7 +30,7 @@ import org.junit.jupiter.api.Test;
 @Slf4j
 public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>> {
 
-  protected Instant now = now();
+  private Instant now = now();
 
   protected abstract Dialect dialect();
 
@@ -59,7 +63,8 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
             .thenCompose(
                 __ ->
                     txManager()
-                        .transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1))))
+                        .transactionally(
+                            tx -> persistor().selectBatch(tx, 100, now.plusSeconds(1))))
             .join();
     assertThat(entries, hasSize(1));
     assertThat(entries, contains(entry));
@@ -67,27 +72,22 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
 
   @Test
   void testInsertDuplicate() {
-    log.info("Inserting FOO1");
     TransactionOutboxEntry entry1 = createEntry("FOO1", now, false, "context-clientkey1");
     txManager().transactionally(tx -> persistor().save(tx, entry1)).join();
-    log.info("Checking DB");
     List<TransactionOutboxEntry> entries =
         txManager()
-            .transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1)))
+            .transactionally(tx -> persistor().selectBatch(tx, 100, now.plusSeconds(1)))
             .join();
     assertThat(entries, contains(entry1));
 
-    log.info("Inserting FOO2");
     TransactionOutboxEntry entry2 = createEntry("FOO2", now, false, "context-clientkey2");
-    log.info("Checking DB");
     txManager().transactionally(tx -> persistor().save(tx, entry2)).join();
     entries =
         txManager()
-            .transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1)))
+            .transactionally(tx -> persistor().selectBatch(tx, 100, now.plusSeconds(1)))
             .join();
     assertThat(entries, containsInAnyOrder(entry1, entry2));
 
-    log.info("Inserting FOO3");
     TransactionOutboxEntry entry3 = createEntry("FOO3", now, false, "context-clientkey1");
     Throwable cause =
         assertThrows(
@@ -96,151 +96,199 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
             .getCause();
     assertThat(cause, isA(AlreadyScheduledException.class));
 
-    log.info("Checking DB");
     entries =
-        (txManager().transactionally(tx -> persistor().selectBatch(tx, 100, now.plusMillis(1))))
+        (txManager().transactionally(tx -> persistor().selectBatch(tx, 100, now.plusSeconds(1))))
             .join();
     assertThat(entries, containsInAnyOrder(entry1, entry2));
   }
 
-  //
-  //  @Test
-  //  void testBatchLimitUnderThreshold() throws Exception {
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx -> {
-  //              persistor().saveBlocking(tx, createEntry("FOO1", now, false));
-  //              persistor().saveBlocking(tx, createEntry("FOO2", now, false));
-  //              persistor().saveBlocking(tx, createEntry("FOO3", now, false));
-  //            });
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx ->
-  //                assertThat(persistor().selectBatchBlocking(tx, 2, now.plusMillis(1)),
-  // hasSize(2)));
-  //  }
-  //
-  //  @Test
-  //  void testBatchLimitMatchingThreshold() throws Exception {
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx -> {
-  //              persistor().saveBlocking(tx, createEntry("FOO1", now, false));
-  //              persistor().saveBlocking(tx, createEntry("FOO2", now, false));
-  //              persistor().saveBlocking(tx, createEntry("FOO3", now, false));
-  //            });
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx ->
-  //                assertThat(persistor().selectBatchBlocking(tx, 3, now.plusMillis(1)),
-  // hasSize(3)));
-  //  }
-  //
-  //  @Test
-  //  void testBatchLimitOverThreshold() throws Exception {
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx -> {
-  //              persistor().saveBlocking(tx, createEntry("FOO1", now, false));
-  //              persistor().saveBlocking(tx, createEntry("FOO2", now, false));
-  //              persistor().saveBlocking(tx, createEntry("FOO3", now, false));
-  //            });
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx ->
-  //                assertThat(persistor().selectBatchBlocking(tx, 4, now.plusMillis(1)),
-  // hasSize(3)));
-  //  }
-  //
-  //  @Test
-  //  void testBatchHorizon() throws Exception {
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx -> {
-  //              persistor().saveBlocking(tx, createEntry("FOO1", now, false));
-  //              persistor().saveBlocking(tx, createEntry("FOO2", now, false));
-  //              persistor().saveBlocking(tx, createEntry("FOO3", now.plusMillis(2), false));
-  //            });
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx ->
-  //                assertThat(persistor().selectBatchBlocking(tx, 3, now.plusMillis(1)),
-  // hasSize(2)));
-  //  }
-  //
-  //  @Test
-  //  void testBlacklistedExcluded() throws Exception {
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx -> {
-  //              persistor().saveBlocking(tx, createEntry("FOO1", now, false));
-  //              persistor().saveBlocking(tx, createEntry("FOO2", now, false));
-  //              persistor().saveBlocking(tx, createEntry("FOO3", now, true));
-  //            });
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx ->
-  //                assertThat(persistor().selectBatchBlocking(tx, 3, now.plusMillis(1)),
-  // hasSize(2)));
-  //  }
-  //
-  //  @Test
-  //  void testUpdate() throws Exception {
-  //    var entry = createEntry("FOO1", now, false);
-  //    txManager().inTransactionThrows(tx -> persistor().saveBlocking(tx, entry));
-  //    entry.setAttempts(1);
-  //    txManager()
-  //        .inTransaction(tx -> assertDoesNotThrow(() -> persistor().updateBlocking(tx, entry)));
-  //    entry.setAttempts(2);
-  //    txManager()
-  //        .inTransaction(tx -> assertDoesNotThrow(() -> persistor().updateBlocking(tx, entry)));
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx ->
-  //                assertThat(
-  //                    persistor().selectBatchBlocking(tx, 1, now.plusMillis(1)),
-  // contains(entry)));
-  //  }
-  //
-  //  @Test
-  //  void testUpdateOptimisticLockFailure() throws Exception {
-  //    TransactionOutboxEntry entry = createEntry("FOO1", now, false);
-  //    txManager().inTransactionThrows(tx -> persistor().saveBlocking(tx, entry));
-  //    TransactionOutboxEntry original = entry.toBuilder().build();
-  //    entry.setAttempts(1);
-  //    txManager()
-  //        .inTransaction(tx -> assertDoesNotThrow(() -> persistor().updateBlocking(tx, entry)));
-  //    original.setAttempts(2);
-  //    txManager()
-  //        .inTransaction(
-  //            tx ->
-  //                assertThrows(
-  //                    OptimisticLockException.class, () -> persistor().updateBlocking(tx,
-  // original)));
-  //  }
-  //
-  //  @Test
-  //  void testDelete() throws Exception {
-  //    TransactionOutboxEntry entry = createEntry("FOO1", now, false);
-  //    txManager().inTransactionThrows(tx -> persistor().saveBlocking(tx, entry));
-  //    txManager()
-  //        .inTransaction(tx -> assertDoesNotThrow(() -> persistor().deleteBlocking(tx, entry)));
-  //  }
-  //
-  //  @Test
-  //  void testDeleteOptimisticLockFailure() throws Exception {
-  //    TransactionOutboxEntry entry = createEntry("FOO1", now, false);
-  //    txManager().inTransactionThrows(tx -> persistor().saveBlocking(tx, entry));
-  //    txManager()
-  //        .inTransaction(tx -> assertDoesNotThrow(() -> persistor().deleteBlocking(tx, entry)));
-  //    txManager()
-  //        .inTransaction(
-  //            tx ->
-  //                assertThrows(
-  //                    OptimisticLockException.class, () -> persistor().deleteBlocking(tx,
-  // entry)));
-  //  }
-  //
+  @Test
+  void testBatchLimitUnderThreshold() {
+    List<TransactionOutboxEntry> entries =
+        txManager()
+            .transactionally(
+                tx ->
+                    CompletableFuture.allOf(
+                        persistor().save(tx, createEntry("FOO1", now, false)),
+                        persistor().save(tx, createEntry("FOO2", now, false)),
+                        persistor().save(tx, createEntry("FOO3", now, false))))
+            .thenCompose(
+                __ ->
+                    txManager()
+                        .transactionally(tx -> persistor().selectBatch(tx, 2, now.plusSeconds(1))))
+            .join();
+    assertThat(entries, hasSize(2));
+  }
+
+  @Test
+  void testBatchLimitMatchingThreshold() {
+    List<TransactionOutboxEntry> entries =
+        txManager()
+            .transactionally(
+                tx ->
+                    CompletableFuture.allOf(
+                        persistor().save(tx, createEntry("FOO1", now, false)),
+                        persistor().save(tx, createEntry("FOO2", now, false)),
+                        persistor().save(tx, createEntry("FOO3", now, false))))
+            .thenCompose(
+                __ ->
+                    txManager()
+                        .transactionally(tx -> persistor().selectBatch(tx, 3, now.plusSeconds(1))))
+            .join();
+    assertThat(entries, hasSize(3));
+  }
+
+  @Test
+  void testBatchLimitOverThreshold() {
+    List<TransactionOutboxEntry> entries =
+        txManager()
+            .transactionally(
+                tx ->
+                    CompletableFuture.allOf(
+                        persistor().save(tx, createEntry("FOO1", now, false)),
+                        persistor().save(tx, createEntry("FOO2", now, false)),
+                        persistor().save(tx, createEntry("FOO3", now, false))))
+            .thenCompose(
+                __ ->
+                    txManager()
+                        .transactionally(tx -> persistor().selectBatch(tx, 4, now.plusSeconds(1))))
+            .join();
+    assertThat(entries, hasSize(3));
+  }
+
+  @Test
+  void testBatchHorizon() {
+    List<TransactionOutboxEntry> entries =
+        txManager()
+            .transactionally(
+                tx ->
+                    CompletableFuture.allOf(
+                        persistor().save(tx, createEntry("FOO1", now, false)),
+                        persistor().save(tx, createEntry("FOO2", now, false)),
+                        persistor().save(tx, createEntry("FOO3", now.plusSeconds(2), false))))
+            .thenCompose(
+                __ ->
+                    txManager()
+                        .transactionally(tx -> persistor().selectBatch(tx, 3, now.plusSeconds(1))))
+            .join();
+    assertThat(
+        entries.stream().map(TransactionOutboxEntry::getId).collect(toList()),
+        containsInAnyOrder("FOO1", "FOO2"));
+  }
+
+  @Test
+  void testBatchOverHorizon() {
+    List<TransactionOutboxEntry> entries =
+        txManager()
+            .transactionally(
+                tx ->
+                    CompletableFuture.allOf(
+                        persistor().save(tx, createEntry("FOO1", now.plusSeconds(2), false)),
+                        persistor().save(tx, createEntry("FOO2", now, false)),
+                        persistor().save(tx, createEntry("FOO3", now.plusSeconds(2), false))))
+            .thenCompose(
+                __ ->
+                    txManager()
+                        .transactionally(tx -> persistor().selectBatch(tx, 3, now.plusSeconds(1))))
+            .join();
+    assertThat(
+        entries.stream().map(TransactionOutboxEntry::getId).collect(toList()),
+        containsInAnyOrder("FOO2"));
+  }
+
+  @Test
+  void testBlacklistedExcluded() {
+    List<TransactionOutboxEntry> entries =
+        txManager()
+            .transactionally(
+                tx ->
+                    CompletableFuture.allOf(
+                        persistor().save(tx, createEntry("FOO1", now, false)),
+                        persistor().save(tx, createEntry("FOO2", now, true)),
+                        persistor().save(tx, createEntry("FOO3", now, false))))
+            .thenCompose(
+                __ ->
+                    txManager()
+                        .transactionally(tx -> persistor().selectBatch(tx, 3, now.plusSeconds(1))))
+            .join();
+    assertThat(
+        entries.stream().map(TransactionOutboxEntry::getId).collect(toList()),
+        containsInAnyOrder("FOO1", "FOO3"));
+  }
+
+  @Test
+  void testUpdate() {
+    var entry = createEntry("FOO1", now, false);
+    List<TransactionOutboxEntry> entries =
+        txManager()
+            .transactionally(tx -> persistor().save(tx, entry))
+            .thenRun(() -> entry.setAttempts(1))
+            .thenCompose(__ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
+            .thenRun(() -> entry.setAttempts(2))
+            .thenCompose(__ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
+            .thenCompose(
+                __ ->
+                    txManager()
+                        .transactionally(tx -> persistor().selectBatch(tx, 1, now.plusSeconds(1))))
+            .join();
+    assertThat(entries, containsInAnyOrder(entry));
+  }
+
+  @Test
+  void testUpdateOptimisticLockFailure() {
+    var entry = createEntry("FOO1", now, false);
+    AtomicReference<TransactionOutboxEntry> original = new AtomicReference<>();
+    CompletionException completionException =
+        assertThrows(
+            CompletionException.class,
+            () ->
+                txManager()
+                    .transactionally(tx -> persistor().save(tx, entry))
+                    .thenRun(() -> original.set(entry.toBuilder().build()))
+                    .thenRun(() -> entry.setAttempts(1))
+                    .thenCompose(
+                        __ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
+                    .thenRun(() -> original.get().setAttempts(2))
+                    .thenCompose(
+                        __ ->
+                            txManager()
+                                .transactionally(tx -> persistor().update(tx, original.get())))
+                    .join());
+    assertThat(completionException.getCause(), isA(OptimisticLockException.class));
+  }
+
+  @Test
+  void testDelete() {
+    var entry = createEntry("FOO1", now, false);
+    List<TransactionOutboxEntry> entries =
+        txManager()
+            .transactionally(tx -> persistor().save(tx, entry))
+            .thenCompose(__ -> txManager().transactionally(tx -> persistor().delete(tx, entry)))
+            .thenCompose(
+                __ ->
+                    txManager()
+                        .transactionally(tx -> persistor().selectBatch(tx, 1, now.plusSeconds(1))))
+            .join();
+    assertThat(entries, empty());
+  }
+
+  @Test
+  void testDeleteOptimisticLockFailure() {
+    var entry = createEntry("FOO1", now, false);
+    CompletionException completionException =
+        assertThrows(
+            CompletionException.class,
+            () ->
+                txManager()
+                    .transactionally(tx -> persistor().save(tx, entry))
+                    .thenCompose(
+                        __ -> txManager().transactionally(tx -> persistor().delete(tx, entry)))
+                    .thenCompose(
+                        __ -> txManager().transactionally(tx -> persistor().delete(tx, entry)))
+                    .join());
+    assertThat(completionException.getCause(), isA(OptimisticLockException.class));
+  }
+
   //  @Test
   //  void testLock() throws Exception {
   //    TransactionOutboxEntry entry = createEntry("FOO1", now, false);
