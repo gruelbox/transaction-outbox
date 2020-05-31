@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.jdbc;
+package com.gruelbox.transactionoutbox;
 
 import com.gruelbox.transactionoutbox.Transaction;
 
