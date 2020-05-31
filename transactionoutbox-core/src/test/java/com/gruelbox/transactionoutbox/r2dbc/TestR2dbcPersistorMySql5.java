@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
 import com.gruelbox.transactionoutbox.AbstractSqlPersistorTest;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
@@ -53,9 +52,8 @@ class TestR2dbcPersistorMySql5 extends AbstractSqlPersistorTest<Connection, R2db
 
   @SuppressWarnings("unchecked")
   @Override
-  protected AbstractSqlPersistor<Connection, R2dbcRawTransaction> persistor() {
-    Persistor result = persistor;
-    return (AbstractSqlPersistor<Connection, R2dbcRawTransaction>) result;
+  protected Persistor<Connection, R2dbcRawTransaction> persistor() {
+    return (Persistor) persistor;
   }
 
   @Override

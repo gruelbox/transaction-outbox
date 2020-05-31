@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
-import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
 import com.gruelbox.transactionoutbox.AbstractSqlPersistorTest;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
@@ -27,9 +26,8 @@ class TestJdbcPersistorH2 extends AbstractSqlPersistorTest<Connection, SimpleTra
 
   @SuppressWarnings("unchecked")
   @Override
-  protected AbstractSqlPersistor<Connection, SimpleTransaction<Void>> persistor() {
-    Persistor result = persistor;
-    return (AbstractSqlPersistor<Connection, SimpleTransaction<Void>>) result;
+  protected Persistor<Connection, SimpleTransaction<Void>> persistor() {
+    return (Persistor) persistor;
   }
 
   @Override

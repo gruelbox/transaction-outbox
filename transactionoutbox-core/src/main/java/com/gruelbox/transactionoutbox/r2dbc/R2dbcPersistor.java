@@ -1,36 +1,13 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-import static com.gruelbox.transactionoutbox.r2dbc.Utils.EMPTY_RESULT;
-
-import com.gruelbox.transactionoutbox.AbstractSqlPersistor;
-import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.TransactionManager;
+import com.gruelbox.transactionoutbox.PersistorWrapper;
+import com.gruelbox.transactionoutbox.SqlPersistor;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
-import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import io.r2dbc.spi.Connection;
-import io.r2dbc.spi.R2dbcDataIntegrityViolationException;
-import io.r2dbc.spi.Result;
-import io.r2dbc.spi.Row;
-import io.r2dbc.spi.RowMetadata;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import lombok.Value;
-import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Mono;
 
 /**
  * An R2DBC-based {@link Persistor} for {@link TransactionOutbox}, using purely the low-level R2DBC
@@ -39,174 +16,31 @@ import reactor.core.publisher.Mono;
  * <p>Saves requests to a relational database table, by default called {@code TXNO_OUTBOX}. This can
  * optionally be automatically created and upgraded by {@link JdbcPersistor}, although this
  * behaviour can be disabled if you wish.
- *
- * <p>More significant changes can be achieved by subclassing, which is explicitly supported. If, on
- * the other hand, you want to use a completely non-relational underlying data store or do something
- * equally esoteric, you may prefer to implement {@link Persistor} from the ground up.
  */
-@SuperBuilder
 @Slf4j
-public class R2dbcPersistor extends AbstractSqlPersistor<Connection, R2dbcTransaction<?>> {
+public class R2dbcPersistor extends PersistorWrapper<Connection, R2dbcTransaction<?>> {
 
-  /**
-   * Uses the default relational persistor. Shortcut for: <code>
-   * R2dbcPersistor.builder().dialect(dialect).build();</code>
-   *
-   * @param dialect The database dialect.
-   * @return The persistor.
-   */
   public static R2dbcPersistor forDialect(Dialect dialect) {
-    return R2dbcPersistor.builder().dialect(dialect).build();
+    return builder().dialect(dialect).build();
   }
 
-  @Override
-  public void migrate(
-      TransactionManager<Connection, ?, ? extends R2dbcTransaction<?>> transactionManager) {
-    if (migrate) {
-      R2dbcMigrationManager.migrate(transactionManager);
-    }
+  public static R2dbcPersistorBuilder builder() {
+    return new R2dbcPersistorBuilder();
   }
 
-  @Override
-  public CompletableFuture<Void> save(
-      R2dbcTransaction<?> r2dbcTransaction, TransactionOutboxEntry entry) {
+  private R2dbcPersistor(SqlPersistor<Connection, R2dbcTransaction<?>> delegate) {
+    super(delegate);
+  }
 
-    // TODO remove hack https://github.com/mirromutth/r2dbc-mysql/issues/111
-    if (dialect.equals(Dialect.MY_SQL_5) || dialect.equals(Dialect.MY_SQL_8)) {
-      entry.setNextAttemptTime(entry.getNextAttemptTime().truncatedTo(ChronoUnit.SECONDS));
+  public static final class R2dbcPersistorBuilder
+      extends SqlPersistor.SqlPersistorBuilder<
+          Connection, R2dbcTransaction<?>, R2dbcPersistorBuilder> {
+    private R2dbcPersistorBuilder() {
+      super(new R2dbcSqlHandler());
     }
 
-    return super.save(r2dbcTransaction, entry)
-        .exceptionally(
-            t -> {
-              try {
-                if (t instanceof CompletionException) {
-                  throw t.getCause();
-                } else {
-                  throw t;
-                }
-              } catch (R2dbcDataIntegrityViolationException e) {
-                throw new AlreadyScheduledException(
-                    "Request " + entry.description() + " already exists", e);
-              } catch (Throwable e) {
-                throw (RuntimeException) Utils.uncheckAndThrow(e);
-              }
-            });
-  }
-
-  @Override
-  protected String preParse(String sql) {
-    if (!dialect.equals(Dialect.POSTGRESQL_9)) {
-      return super.preParse(sql);
+    public R2dbcPersistor build() {
+      return new R2dbcPersistor(super.buildGeneric());
     }
-    // Blunt, not general purpose, but only needs to work for the known use cases
-    StringBuilder builder = new StringBuilder();
-    int paramIndex = 1;
-    for (int i = 0; i < sql.length(); i++) {
-      char c = sql.charAt(i);
-      if (c == '?') {
-        builder.append('$').append(paramIndex++);
-      } else {
-        builder.append(c);
-      }
-    }
-    return builder.toString();
-  }
-
-  @Override
-  protected <T> T statement(
-      R2dbcTransaction<?> tx, String sql, boolean batchable, Function<Binder, T> binding) {
-    var statement = tx.connection().createStatement(sql);
-    return binding.apply(
-        new Binder() {
-
-          @Override
-          public Binder bind(int i, Object arg) {
-            log.trace("Binding {} -> {}", i, arg);
-            // TODO suggest Instant support to R2DBC
-            if (arg instanceof Instant) {
-              statement.bind(i, LocalDateTime.ofInstant((Instant) arg, ZoneOffset.UTC));
-            } else {
-              if (arg == null) {
-                // TODO highlight this as a problem with the R2DBC API
-                statement.bindNull(i, String.class); // Lazy, but does what we need here
-              } else {
-                statement.bind(i, arg);
-              }
-            }
-            return this;
-          }
-
-          @Override
-          public CompletableFuture<? extends Result> execute() {
-            return Mono.from(statement.execute())
-                .map(r -> (io.r2dbc.spi.Result) r)
-                .defaultIfEmpty(EMPTY_RESULT)
-                .doOnNext(__ -> log.debug("Executed SQL: {}", sql))
-                .map(
-                    result ->
-                        new Result() {
-                          @Override
-                          public CompletableFuture<Integer> rowsUpdated() {
-                            return Mono.from(result.getRowsUpdated()).defaultIfEmpty(0).toFuture();
-                          }
-                        })
-                .toFuture();
-          }
-
-          @Override
-          @SuppressWarnings({"unchecked", "ConstantConditions"})
-          public <U> CompletableFuture<List<U>> executeQuery(
-              int expectedRowCount, Function<ResultRow, U> rowMapper) {
-            return Mono.from(statement.execute())
-                .map(r -> (io.r2dbc.spi.Result) r)
-                .defaultIfEmpty(EMPTY_RESULT)
-                .doOnNext(__ -> log.debug("Executed SQL: {}", sql))
-                .flatMapMany(result -> result.map(RowAndMeta::new))
-                .map(
-                    row ->
-                        new ResultRow() {
-                          @Override
-                          public <V> V get(int index, Class<V> type) {
-                            try {
-                              // TODO suggest Instant support to R2DBC
-                              if (Instant.class.equals(type)) {
-                                return (V)
-                                    Objects.requireNonNull(
-                                            row.getRow().get(index, LocalDateTime.class))
-                                        .toInstant(ZoneOffset.UTC);
-                                // TODO remove hack regarding data types
-                              } else if (Boolean.class.equals(type)
-                                  && (dialect.equals(Dialect.MY_SQL_5)
-                                      || dialect.equals(Dialect.MY_SQL_8))) {
-                                return (V)
-                                    Boolean.valueOf(row.getRow().get(index, Short.class) == 1);
-                              } else {
-                                return row.getRow().get(index, type);
-                              }
-                            } catch (Exception e) {
-                              throw new IllegalArgumentException(
-                                  "Failed to fetch field ["
-                                      + index
-                                      + "] from row "
-                                      + row.getMeta()
-                                      + "in "
-                                      + sql,
-                                  e);
-                            }
-                          }
-                        })
-                .map(rowMapper)
-                .collect(
-                    () -> new ArrayList<>(expectedRowCount), (BiConsumer<List<U>, U>) List::add)
-                .toFuture();
-          }
-        });
-  }
-
-  @Value
-  private static class RowAndMeta {
-    Row row;
-    RowMetadata meta;
   }
 }

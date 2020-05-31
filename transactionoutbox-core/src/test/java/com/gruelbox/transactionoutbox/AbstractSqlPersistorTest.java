@@ -30,7 +30,7 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
 
   protected abstract Dialect dialect();
 
-  protected abstract AbstractSqlPersistor<CN, TX> persistor();
+  protected abstract Persistor<CN, TX> persistor();
 
   protected abstract TransactionManager<CN, ?, TX> txManager();
 
@@ -388,7 +388,7 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
   //    }
   //  }
   //
-  protected TransactionOutboxEntry createEntry(
+  private TransactionOutboxEntry createEntry(
       String id, Instant nextAttemptTime, boolean blacklisted) {
     return TransactionOutboxEntry.builder()
         .id(id)
@@ -398,7 +398,7 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
         .build();
   }
 
-  protected TransactionOutboxEntry createEntry(
+  private TransactionOutboxEntry createEntry(
       String id, Instant nextAttemptTime, boolean blacklisted, String uniqueId) {
     return TransactionOutboxEntry.builder()
         .id(id)

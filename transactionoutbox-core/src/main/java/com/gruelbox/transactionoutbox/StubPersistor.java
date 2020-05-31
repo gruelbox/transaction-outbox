@@ -54,4 +54,9 @@ public class StubPersistor implements Persistor {
       Transaction tx, int batchSize, Instant now) {
     return completedFuture(0);
   }
+
+  @Override
+  public CompletableFuture<Integer> clear(Transaction transaction) {
+    return completedFuture(0);
+  }
 }

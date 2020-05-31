@@ -8,6 +8,7 @@ import io.r2dbc.spi.ConnectionMetadata;
 import io.r2dbc.spi.IsolationLevel;
 import io.r2dbc.spi.Statement;
 import io.r2dbc.spi.ValidationDepth;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -50,16 +51,25 @@ public class R2dbcRawTransactionManager
       Function<R2dbcRawTransaction, CompletableFuture<T>> fn) {
     return withConnection(
             conn ->
-                Mono.from(conn.beginTransaction())
-                    .then(Mono.fromCompletionStage(fn.apply(transactionFromContext(conn))))
+                begin(conn)
+                    .thenMany(
+                        Mono.fromCompletionStage(
+                            fn.apply(transactionFromContext(conn)).thenApply(Optional::ofNullable)))
                     .concatWith(commit(conn))
-                    .onErrorResume(t -> rollback(conn, t))
-                    .next())
-        .toFuture();
+                    .onErrorResume(t -> rollback(conn, t)))
+        .last(Optional.empty())
+        .toFuture()
+        .thenApply(opt -> opt.orElse(null));
+  }
+
+  private Mono<Object> begin(Connection conn) {
+    return Mono.from(conn.beginTransaction())
+        .then(Mono.fromRunnable(() -> log.debug("Started transaction")));
   }
 
   private <T> Mono<T> commit(Connection conn) {
-    return Mono.from(conn.commitTransaction()).then(Mono.empty());
+    return Mono.from(conn.commitTransaction())
+        .then(Mono.fromRunnable(() -> log.debug("Committed transaction")));
   }
 
   private <T> Mono<T> rollback(Connection conn, Throwable e) {
@@ -69,25 +79,24 @@ public class R2dbcRawTransactionManager
                     "Exception in transactional block ({}{}). Rolling back. See later messages for detail",
                     e.getClass().getSimpleName(),
                     e.getMessage() == null ? "" : (" - " + e.getMessage())))
-        .concatWith(conn.rollbackTransaction())
+        .concatWith(Mono.from(conn.rollbackTransaction()).then(Mono.empty()))
         .then(Mono.error(e));
   }
 
-  private <T> Mono<T> withConnection(Function<Connection, Mono<T>> fn) {
+  private <T> Flux<T> withConnection(Function<Connection, Flux<T>> fn) {
     return Mono.from(cf.create())
         .flatMapMany(
             conn ->
                 Mono.fromRunnable(openTransactionCount::incrementAndGet)
-                    .then(fn.apply(conn))
+                    .thenMany(fn.apply(conn))
                     .concatWith(
-                        Flux.from(conn.close())
+                        Mono.from(conn.close())
                             .then(Mono.fromRunnable(openTransactionCount::decrementAndGet)))
                     .onErrorResume(
                         t ->
-                            Flux.from(conn.close())
+                            Mono.from(conn.close())
                                 .then(Mono.fromRunnable(openTransactionCount::decrementAndGet))
-                                .then(Mono.error(t))))
-        .next();
+                                .then(Mono.error(t))));
   }
 
   @Override

@@ -98,4 +98,14 @@ public interface Persistor<CN, TX extends Transaction<CN, ?>> {
    * @return The number of records affected.
    */
   CompletableFuture<Integer> deleteProcessedAndExpired(TX tx, int batchSize, Instant now);
+
+  /**
+   * Clears all scheduled tasks. Does not need to be high-performance or support high volume; only
+   * used for tests.
+   *
+   * @param tx The current {@link Transaction}.
+   * @return The number of records affected.
+   */
+  @Beta
+  CompletableFuture<Integer> clear(TX tx);
 }
