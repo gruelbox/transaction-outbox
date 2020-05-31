@@ -87,8 +87,8 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
             dialect,
             dialect.isSupportsSkipLock()
                 ? "SELECT id FROM "
-                + this.tableName
-                + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
+                    + this.tableName
+                    + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
                 : "SELECT id FROM " + this.tableName + " WHERE id = ? AND version = ? FOR UPDATE");
     this.clearSql = handler.preprocessSql(dialect, "DELETE FROM " + this.tableName);
   }

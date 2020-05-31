@@ -293,30 +293,32 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
   @Test
   void testLock() {
     var entry = createEntry("FOO1", now, false);
-    Boolean lockSuccess = txManager()
-        .transactionally(tx -> persistor().save(tx, entry))
-        .thenRun(() -> entry.setAttempts(1))
-        .thenCompose(
-            __ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
-        .thenCompose(
-            __ -> txManager().transactionally(tx -> persistor().lock(tx, entry)))
-        .join();
+    Boolean lockSuccess =
+        txManager()
+            .transactionally(tx -> persistor().save(tx, entry))
+            .thenRun(() -> entry.setAttempts(1))
+            .thenCompose(__ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
+            .thenCompose(__ -> txManager().transactionally(tx -> persistor().lock(tx, entry)))
+            .join();
     assertThat(lockSuccess, equalTo(true));
   }
 
-  //  @Test
-  //  void testLockOptimisticLockFailure() throws Exception {
-  //    TransactionOutboxEntry entry = createEntry("FOO1", now, false);
-  //    txManager().inTransactionThrows(tx -> persistor().saveBlocking(tx, entry));
-  //    TransactionOutboxEntry original = entry.toBuilder().build();
-  //    entry.setAttempts(1);
-  //    txManager()
-  //        .inTransaction(tx -> assertDoesNotThrow(() -> persistor().updateBlocking(tx, entry)));
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx -> assertThat(persistor().lockBlocking(tx, original), equalTo(false)));
-  //  }
-  //
+  @Test
+  void testLockOptimisticLockFailure() {
+    var entry = createEntry("FOO1", now, false);
+    AtomicReference<TransactionOutboxEntry> original = new AtomicReference<>();
+    boolean lockSuccess =
+        txManager()
+            .transactionally(tx -> persistor().save(tx, entry))
+            .thenRun(() -> original.set(entry.toBuilder().build()))
+            .thenRun(() -> entry.setAttempts(1))
+            .thenCompose(__ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
+            .thenCompose(
+                __ -> txManager().transactionally(tx -> persistor().lock(tx, original.get())))
+            .join();
+    assertThat(lockSuccess, equalTo(false));
+  }
+
   //  @Test
   //  void testSkipLocked() throws Exception {
   //    Assumptions.assumeTrue(dialect().isSupportsSkipLock());
