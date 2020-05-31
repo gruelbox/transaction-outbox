@@ -32,13 +32,14 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
       JdbcTransaction<?> tx,
       Dialect dialect,
       String sql,
+      int timeoutSeconds,
       boolean batchable,
       Function<Binder, T> binding) {
     log.debug("Executing: {}", sql);
     if (batchable) {
-      return executeWithSharedStatement(tx, sql, binding);
+      return executeWithSharedStatement(tx, sql, timeoutSeconds, binding);
     } else {
-      return executeWithStandaloneStatement(tx, sql, binding);
+      return executeWithStandaloneStatement(tx, sql, timeoutSeconds, binding);
     }
   }
 
@@ -63,8 +64,9 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
   }
 
   private <T> T executeWithStandaloneStatement(
-      JdbcTransaction<?> tx, String sql, Function<Binder, T> binding) {
+      JdbcTransaction<?> tx, String sql, int timeoutSeconds, Function<Binder, T> binding) {
     try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
+      statement.setQueryTimeout(timeoutSeconds);
       return binding.apply(executeAndMap(statement));
     } catch (SQLException e) {
       throw new RuntimeException(e);
@@ -72,8 +74,13 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
   }
 
   private <T> T executeWithSharedStatement(
-      JdbcTransaction<?> tx, String sql, Function<Binder, T> binding) {
+      JdbcTransaction<?> tx, String sql, int timeoutSeconds, Function<Binder, T> binding) {
     PreparedStatement statement = tx.prepareBatchStatement(sql);
+    try {
+      statement.setQueryTimeout(timeoutSeconds);
+    } catch (SQLException e) {
+      Utils.uncheckAndThrow(e);
+    }
     return binding.apply(executeAndMap(statement));
   }
 

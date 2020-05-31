@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
 import com.gruelbox.transactionoutbox.Transaction;
+import com.gruelbox.transactionoutbox.TransactionalWork;
 
 @FunctionalInterface
 public interface TransactionalSupplier<T, TX extends Transaction<?, ?>> {

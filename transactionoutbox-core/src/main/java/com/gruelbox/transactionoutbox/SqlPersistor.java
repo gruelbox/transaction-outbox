@@ -1,10 +1,13 @@
 package com.gruelbox.transactionoutbox;
 
+import static com.ea.async.Async.*;
+import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.failedFuture;
 
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.Instant;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -12,6 +15,14 @@ import java.util.function.Function;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Provides support for persistors using a SQL database, regardless of the *DBC API in use.
+ *
+ * <p>Not intended for direct use.
+ *
+ * @param <CN> The type that the persistor uses to interact with an active connection.
+ * @param <TX> The transaction type.
+ */
 @Beta
 @Slf4j
 public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Persistor<CN, TX> {
@@ -64,6 +75,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
     this.clearSql = handler.preprocessSql(dialect, "DELETE FROM " + this.tableName);
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public void migrate(TransactionManager<CN, ?, ? extends TX> tm) {
     if (!migrate) {
@@ -74,7 +86,9 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
             new Migration(
                 1,
                 "Create outbox table",
-                "CREATE TABLE " + tableName + " (\n"
+                "CREATE TABLE "
+                    + tableName
+                    + " (\n"
                     + "    id VARCHAR(36) PRIMARY KEY,\n"
                     + "    invocation TEXT,\n"
                     + "    nextAttemptTime TIMESTAMP(6),\n"
@@ -85,34 +99,52 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
             new Migration(
                 2,
                 "Add unique request id",
-                "ALTER TABLE " + tableName + " ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE"),
+                "ALTER TABLE "
+                    + tableName
+                    + " ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE"),
             new Migration(
-                3, "Add processed flag", "ALTER TABLE " + tableName + " ADD COLUMN processed BOOLEAN"),
+                3,
+                "Add processed flag",
+                "ALTER TABLE " + tableName + " ADD COLUMN processed BOOLEAN"),
             new Migration(
                 4,
                 "Add flush index",
-                "CREATE INDEX IX_" + tableName + "_1 ON " + tableName + " (processed, blacklisted, nextAttemptTime)"));
-
-    // TODO block multiple nodes doing this somehow in a way that allows blocking...
-    runSimpleSqlBlocking(tm, "CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
-    Integer currentVersion =
-        runSimpleQueryBlocking(
-                tm, "SELECT version FROM TXNO_VERSION FOR UPDATE", row -> row.get(0, Integer.class))
-            .stream()
-            .findFirst()
-            .orElse(0);
-    allMigrations.stream()
-        .filter(it -> it.version > currentVersion)
-        .forEach(
-            migration -> {
-              log.info("Running migration: {}", migration.name);
-              runSimpleSqlBlocking(tm, migration.sql);
-              if (runSimpleSqlBlocking(tm, "UPDATE TXNO_VERSION SET version = " + migration.version)
-                  == 0) {
-                runSimpleSqlBlocking(
-                    tm, "INSERT INTO TXNO_VERSION VALUES (" + migration.version + ")");
+                "CREATE INDEX IX_"
+                    + tableName
+                    + "_1 "
+                    + "ON "
+                    + tableName
+                    + " (processed, blacklisted, nextAttemptTime)"));
+    tm.transactionally(
+            tx -> {
+              await(
+                  executeUpdate(
+                      tx,
+                      "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
+                          + dialect.getIntegerCastType()
+                          + ") AS version"));
+              List<Integer> versionResult =
+                  await(
+                      executeQuery(
+                          tx,
+                          "SELECT version FROM TXNO_VERSION FOR UPDATE",
+                          row -> row.get(0, Integer.class)));
+              if (versionResult.size() != 1) {
+                throw new IllegalStateException(
+                    "Unexpected number of version records: " + versionResult.size());
               }
-            });
+              int currentVersion = versionResult.get(0);
+              Iterator<Migration> migrationIterator =
+                  allMigrations.stream().filter(it -> it.version > currentVersion).iterator();
+              while (migrationIterator.hasNext()) {
+                var mig = migrationIterator.next();
+                log.info("Running migration {}: {}", mig.version, mig.name);
+                await(executeUpdate(tx, mig.sql));
+                await(executeUpdate(tx, "UPDATE TXNO_VERSION SET version = " + mig.version));
+              }
+              return completedFuture(null);
+            })
+        .join();
     log.info("Migrations complete");
   }
 
@@ -127,6 +159,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
               tx,
               dialect,
               insertSql,
+              writeLockTimeoutSeconds,
               entry.getUniqueRequestId() == null,
               binder ->
                   binder
@@ -164,6 +197,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
               tx,
               dialect,
               deleteSql,
+              writeLockTimeoutSeconds,
               false,
               binder -> binder.bind(0, entry.getId()).bind(1, entry.getVersion()).execute())
           .thenApply(
@@ -203,6 +237,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
           tx,
           dialect,
           selectBatchSql,
+          writeLockTimeoutSeconds,
           false,
           binder ->
               binder
@@ -236,7 +271,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
 
   @Override
   public final CompletableFuture<Integer> clear(TX tx) {
-    return handler.statement(tx, dialect, clearSql, false, Binder::execute);
+    return handler.statement(tx, dialect, clearSql, writeLockTimeoutSeconds,false, Binder::execute);
   }
 
   @Beta
@@ -246,7 +281,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
     }
 
     <T> T statement(
-        TX tx, Dialect dialect, String sql, boolean batchable, Function<Binder, T> binding);
+        TX tx, Dialect dialect, String sql, int writeLockTimeoutSeconds, boolean batchable, Function<Binder, T> binding);
 
     default void interceptNew(Dialect dialect, TransactionOutboxEntry entry) {
       // No-op
@@ -334,7 +369,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
     }
 
     protected SqlPersistor<CN, TX> buildGeneric() {
-      return new SqlPersistor<CN, TX>(
+      return new SqlPersistor<>(
           writeLockTimeoutSeconds, dialect, tableName, migrate, serializer, statementProcessor);
     }
 
@@ -456,23 +491,13 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   //    }
   //  }
 
-  private <T> List<T> runSimpleQueryBlocking(
-      TransactionManager<CN, ?, ? extends TX> transactionManager,
-      String sql,
-      Function<ResultRow, T> mapper) {
-    return transactionManager
-        .transactionally(
-            tx ->
-                handler.statement(
-                    tx, dialect, sql, false, binder -> binder.executeQuery(1, mapper)))
-        .join();
+  private <T> CompletableFuture<List<T>> executeQuery(
+      TX tx, String sql, Function<ResultRow, T> mapper) {
+    return handler.statement(tx, dialect, sql, writeLockTimeoutSeconds, false, binder -> binder.executeQuery(1, mapper));
   }
 
-  private int runSimpleSqlBlocking(
-      TransactionManager<CN, ?, ? extends TX> transactionManager, String sql) {
-    return transactionManager
-        .transactionally(tx -> handler.statement(tx, dialect, sql, false, Binder::execute))
-        .join();
+  private CompletableFuture<Integer> executeUpdate(TX tx, String sql) {
+    return handler.statement(tx, dialect, sql, writeLockTimeoutSeconds, false, Binder::execute);
   }
 
   @AllArgsConstructor

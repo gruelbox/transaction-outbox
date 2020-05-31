@@ -2,13 +2,10 @@ package com.gruelbox.transactionoutbox.r2dbc;
 
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.SqlPersistor.Binder;
 import com.gruelbox.transactionoutbox.SqlPersistor.Handler;
-import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.Utils;
-import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException;
 import java.time.temporal.ChronoUnit;
@@ -66,8 +63,9 @@ class R2dbcSqlHandler implements Handler<Connection, R2dbcTransaction<?>> {
       R2dbcTransaction<?> tx,
       Dialect dialect,
       String sql,
+      int timeoutSeconds,
       boolean batchable,
       Function<Binder, T> binding) {
-    return binding.apply(new R2dbcStatement(tx, dialect, sql));
+    return binding.apply(new R2dbcStatement(tx, dialect, timeoutSeconds, sql));
   }
 }

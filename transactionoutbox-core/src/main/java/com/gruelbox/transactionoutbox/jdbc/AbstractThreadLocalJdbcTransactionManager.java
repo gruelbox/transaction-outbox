@@ -3,6 +3,8 @@ package com.gruelbox.transactionoutbox.jdbc;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
 import com.gruelbox.transactionoutbox.ThreadLocalContextTransactionManager;
 import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
+import com.gruelbox.transactionoutbox.ThrowingTransactionalWork;
+import com.gruelbox.transactionoutbox.TransactionalWork;
 import java.sql.Connection;
 import java.util.Deque;
 import java.util.LinkedList;

@@ -8,14 +8,20 @@ import lombok.Getter;
  * is available, so using the wrong dialect may work for unsupported database platforms. However, in
  * future this is likely to extend to other SQL features and possibly be expanded to an interface to
  * allow easier extension.
+ *
+ * <p>Note that all properties of the dialect are very much under iteration; not much design has
+ * gone into them; they've only need added as necessary to make things work.
  */
 @AllArgsConstructor
 @Getter
 @Beta
 public enum Dialect {
-  MY_SQL_5(false, Constants.DEFAULT_DELETE_EXPIRED_STMT),
-  MY_SQL_8(true, Constants.DEFAULT_DELETE_EXPIRED_STMT),
-  H2(false, Constants.DEFAULT_DELETE_EXPIRED_STMT),
+  MY_SQL_5(false, Constants.DEFAULT_DELETE_EXPIRED_STMT, "SIGNED"),
+
+  MY_SQL_8(true, Constants.DEFAULT_DELETE_EXPIRED_STMT, "SIGNED"),
+
+  H2(false, Constants.DEFAULT_DELETE_EXPIRED_STMT, "INT"),
+
   POSTGRESQL_9(
       true,
       "DELETE FROM {{table}} "
@@ -24,7 +30,8 @@ public enum Dialect {
           + "  WHERE nextAttemptTime < ? AND "
           + "        processed = true AND "
           + "        blacklisted = false "
-          + "  LIMIT ?)");
+          + "  LIMIT ?)",
+      "INTEGER");
 
   /**
    * @return True if hot row support ({@code SKIP LOCKED}) is available, increasing performance when
@@ -37,6 +44,10 @@ public enum Dialect {
   /** @return Format string for the SQL required to delete expired retained records. */
   @SuppressWarnings("JavaDoc")
   private final String deleteExpired;
+
+  /** @return The type to use for a cast to integer. */
+  @SuppressWarnings("JavaDoc")
+  private final String integerCastType;
 
   private static class Constants {
     static final String DEFAULT_DELETE_EXPIRED_STMT =
