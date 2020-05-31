@@ -7,6 +7,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.isA;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -289,18 +290,20 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
     assertThat(completionException.getCause(), isA(OptimisticLockException.class));
   }
 
-  //  @Test
-  //  void testLock() throws Exception {
-  //    TransactionOutboxEntry entry = createEntry("FOO1", now, false);
-  //    txManager().inTransactionThrows(tx -> persistor().saveBlocking(tx, entry));
-  //    entry.setAttempts(1);
-  //    txManager()
-  //        .inTransaction(tx -> assertDoesNotThrow(() -> persistor().updateBlocking(tx, entry)));
-  //    txManager()
-  //        .inTransactionThrows(tx -> assertThat(persistor().lockBlocking(tx, entry),
-  // equalTo(true)));
-  //  }
-  //
+  @Test
+  void testLock() {
+    var entry = createEntry("FOO1", now, false);
+    Boolean lockSuccess = txManager()
+        .transactionally(tx -> persistor().save(tx, entry))
+        .thenRun(() -> entry.setAttempts(1))
+        .thenCompose(
+            __ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
+        .thenCompose(
+            __ -> txManager().transactionally(tx -> persistor().lock(tx, entry)))
+        .join();
+    assertThat(lockSuccess, equalTo(true));
+  }
+
   //  @Test
   //  void testLockOptimisticLockFailure() throws Exception {
   //    TransactionOutboxEntry entry = createEntry("FOO1", now, false);

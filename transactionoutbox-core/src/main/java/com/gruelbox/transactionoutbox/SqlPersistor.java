@@ -38,6 +38,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   private final String selectBatchSql;
   private final String deleteSql;
   private final String updateSql;
+  private final String lockSql;
   private final String clearSql;
 
   private SqlPersistor(
@@ -81,6 +82,14 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
                 + " SET nextAttemptTime = ?, attempts = ?,"
                 + " blacklisted = ?, processed = ?, version = ?"
                 + " WHERE id = ? and version = ?");
+    this.lockSql =
+        handler.preprocessSql(
+            dialect,
+            dialect.isSupportsSkipLock()
+                ? "SELECT id FROM "
+                + this.tableName
+                + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
+                : "SELECT id FROM " + this.tableName + " WHERE id = ? AND version = ? FOR UPDATE");
     this.clearSql = handler.preprocessSql(dialect, "DELETE FROM " + this.tableName);
   }
 
@@ -260,7 +269,23 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
 
   @Override
   public final CompletableFuture<Boolean> lock(TX tx, TransactionOutboxEntry entry) {
-    throw new UnsupportedOperationException();
+    try {
+      return handler
+          .statement(
+              tx,
+              dialect,
+              lockSql,
+              writeLockTimeoutSeconds,
+              false,
+              binder ->
+                  binder
+                      .bind(0, entry.getId())
+                      .bind(1, entry.getVersion())
+                      .executeQuery(1, row -> 1))
+          .thenApply(list -> !list.isEmpty());
+    } catch (Exception e) {
+      return failedFuture(e);
+    }
   }
 
   @Override
@@ -434,26 +459,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
           + ")";
     }
   }
-  //
-  //  boolean lockBlocking(JdbcTransaction<?> tx, TransactionOutboxEntry entry) throws Exception {
-  //    try (PreparedStatement stmt =
-  //        tx.connection()
-  //            .prepareStatement(
-  //                dialect.isSupportsSkipLock()
-  //                    // language=MySQL
-  //                    ? "SELECT id FROM "
-  //                    + tableName
-  //                    + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
-  //                    // language=MySQL
-  //                    : "SELECT id FROM " + tableName + " WHERE id = ? AND version = ? FOR
-  // UPDATE")) {
-  //      stmt.setString(1, entry.getId());
-  //      stmt.setInt(2, entry.getVersion());
-  //      stmt.setQueryTimeout(writeLockTimeoutSeconds);
-  //      return gotRecord(entry, stmt);
-  //    }
-  //  }
-  //
+
   //  boolean whitelistBlocking(JdbcTransaction<?> tx, String entryId) throws Exception {
   //    PreparedStatement stmt =
   //        tx.prepareBatchStatement(
@@ -464,25 +470,6 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   //    stmt.setString(1, entryId);
   //    stmt.setQueryTimeout(writeLockTimeoutSeconds);
   //    return stmt.executeUpdate() != 0;
-  //  }
-  //
-  //  List<TransactionOutboxEntry> selectBatchBlocking(
-  //      JdbcTransaction<?> tx, int batchSize, Instant now) throws Exception {
-  //    String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
-  //    try (PreparedStatement stmt =
-  //        tx.connection()
-  //            .prepareStatement(
-  //                // language=MySQL
-  //                "SELECT id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted,
-  // processed, version FROM "
-  //                    + tableName
-  //                    + " WHERE nextAttemptTime < ? AND blacklisted = false AND processed = false
-  // LIMIT ?"
-  //                    + forUpdate)) {
-  //      stmt.setTimestamp(1, Timestamp.from(now));
-  //      stmt.setInt(2, batchSize);
-  //      return gatherResults(batchSize, stmt);
-  //    }
   //  }
   //
   //  private int deleteProcessedAndExpiredInner(JdbcTransaction<?> tx, int batchSize, Instant now)
