@@ -98,8 +98,8 @@ public class TransactionOutboxEntry {
   @Setter
   private int version;
 
-  @EqualsAndHashCode.Exclude @ToString.Exclude private volatile boolean initialized;
-  @EqualsAndHashCode.Exclude @ToString.Exclude private String description;
+  @EqualsAndHashCode.Exclude @ToString.Exclude private transient volatile boolean initialized;
+  @EqualsAndHashCode.Exclude @ToString.Exclude private transient String description;
 
   /** @return A textual description of the task. */
   public String description() {

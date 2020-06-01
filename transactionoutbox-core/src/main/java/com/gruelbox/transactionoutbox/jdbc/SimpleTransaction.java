@@ -67,7 +67,6 @@ public class SimpleTransaction<CONTEXT> implements JdbcTransaction<CONTEXT>, Aut
     connection.rollback();
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public CONTEXT context() {
     return context;

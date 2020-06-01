@@ -19,7 +19,7 @@ import org.slf4j.event.Level;
 public interface TransactionOutbox {
 
   /** @return A builder for creating a new instance of {@link TransactionOutbox}. */
-  public static TransactionOutboxBuilder builder() {
+  static TransactionOutboxBuilder builder() {
     return new TransactionOutboxBuilder();
   }
 

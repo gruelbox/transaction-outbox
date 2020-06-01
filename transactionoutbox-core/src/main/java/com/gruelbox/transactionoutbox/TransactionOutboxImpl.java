@@ -114,7 +114,7 @@ class TransactionOutboxImpl<CN, CX, TX extends Transaction<CN, CX>> implements T
     }
   }
 
-  @SuppressWarnings({"unchecked", "rawtypes", "unused"})
+  @SuppressWarnings({"unchecked", "rawtypes"})
   @Override
   public CompletableFuture<Boolean> whitelist(String entryId, Object transactionContext) {
     // TODO needs testing

@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.isA;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -43,6 +44,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Any implementation of {@link Persistor} should be accompanied by a subclass of this test
+ * to ensure that it delivers against the contract.
+ *
+ * @param <CN> The connection type.
+ * @param <TX> The transaction type.
+ */
 @Slf4j
 public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>> {
 
@@ -227,6 +235,52 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
                     txManager()
                         .transactionally(tx -> persistor().selectBatch(tx, 3, now.plusSeconds(1))))
             .join();
+    assertThat(
+        entries.stream().map(TransactionOutboxEntry::getId).collect(toList()),
+        containsInAnyOrder("FOO1", "FOO3"));
+  }
+
+  @Test
+  void testDeleteProcessedAndExpired() {
+    var entry1 = createEntry("FOO1", now, false);
+    var entry2 = createEntry("FOO2", now, false);
+    entry2.setProcessed(true);
+    var entry3 = createEntry("FOO3", now.plusSeconds(5), false);
+    entry3.setProcessed(true);
+    var entry4 = createEntry("FOO4", now.plusSeconds(3), false);
+    entry4.setProcessed(true);
+
+    txManager()
+        .transactionally(
+            tx ->
+                CompletableFuture.allOf(
+                    persistor().save(tx, entry1),
+                    persistor().save(tx, entry2),
+                    persistor().save(tx, entry3),
+                    persistor().save(tx, entry4))).join();
+
+    Integer records = txManager()
+        .transactionally(tx -> persistor().deleteProcessedAndExpired(tx, 10, now.plusSeconds(4)))
+        .join();
+    assertThat(records, equalTo(2));
+
+    entry2.setProcessed(false);
+    entry3.setProcessed(false);
+    entry4.setProcessed(false);
+    assertThat(
+        assertThrows(CompletionException.class, ()
+            -> txManager().transactionally(tx -> persistor().update(tx, entry2)).join()).getCause(),
+        isA(OptimisticLockException.class));
+    assertThat(
+        assertThrows(CompletionException.class, ()
+            -> txManager().transactionally(tx -> persistor().update(tx, entry4)).join()).getCause(),
+        isA(OptimisticLockException.class));
+    assertDoesNotThrow(()
+        -> txManager().transactionally(tx -> persistor().update(tx, entry3)).join());
+
+    List<TransactionOutboxEntry> entries = txManager()
+        .transactionally(tx -> persistor().selectBatch(tx, 10, now.plusSeconds(10))).join();
+
     assertThat(
         entries.stream().map(TransactionOutboxEntry::getId).collect(toList()),
         containsInAnyOrder("FOO1", "FOO3"));

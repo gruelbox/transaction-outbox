@@ -49,6 +49,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   private final String deleteSql;
   private final String updateSql;
   private final String lockSql;
+  private final String whitelistSql;
   private final String clearSql;
 
   private SqlPersistor(
@@ -99,6 +100,13 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
                 + this.tableName
                 + " WHERE id = ? AND version = ? FOR UPDATE"
                 + (dialect.isSupportsSkipLock() ? " SKIP LOCKED" : ""));
+    this.whitelistSql =
+        handler.preprocessSql(
+            dialect,
+            "UPDATE "
+                + this.tableName
+                + " SET attempts = 0, blacklisted = false "
+                + "WHERE blacklisted = true AND processed = false AND id = ?");
     this.clearSql = handler.preprocessSql(dialect, "DELETE FROM " + this.tableName);
   }
 
@@ -305,14 +313,21 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
     }
   }
 
-  @SneakyThrows
-  private RuntimeException sneakyRethrow(Throwable t) {
-    throw t;
-  }
-
   @Override
   public final CompletableFuture<Boolean> whitelist(TX tx, String entryId) {
-    throw new UnsupportedOperationException();
+    try {
+      return handler
+          .statement(
+              tx,
+              dialect,
+              whitelistSql,
+              writeLockTimeoutSeconds,
+              false,
+              binder -> binder.bind(0, entryId).execute())
+          .thenApply(rows -> rows != 0);
+    } catch (Exception e) {
+      return failedFuture(e);
+    }
   }
 
   @Override
@@ -352,12 +367,38 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   @Override
   public final CompletableFuture<Integer> deleteProcessedAndExpired(
       TX tx, int batchSize, Instant now) {
-    throw new UnsupportedOperationException();
+    try {
+      return handler.statement(
+          tx,
+          dialect,
+          handler.preprocessSql(
+              dialect, dialect.getDeleteExpired().replace("{{table}}", tableName)),
+          writeLockTimeoutSeconds,
+          false,
+          binder -> binder.bind(0, now).bind(1, batchSize).execute());
+    } catch (Exception e) {
+      return failedFuture(e);
+    }
   }
 
   @Override
   public final CompletableFuture<Integer> clear(TX tx) {
     return handler.statement(tx, dialect, clearSql, 0, false, Binder::execute);
+  }
+
+  private <T> CompletableFuture<List<T>> executeQuery(
+      TX tx, String sql, Function<ResultRow, T> mapper) {
+    return handler.statement(
+        tx, dialect, sql, writeLockTimeoutSeconds, false, binder -> binder.executeQuery(1, mapper));
+  }
+
+  private CompletableFuture<Integer> executeUpdate(TX tx, String sql) {
+    return handler.statement(tx, dialect, sql, writeLockTimeoutSeconds, false, Binder::execute);
+  }
+
+  @SneakyThrows
+  private RuntimeException sneakyRethrow(Throwable t) {
+    throw t;
   }
 
   @Beta
@@ -481,39 +522,6 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
           + this.statementProcessor
           + ")";
     }
-  }
-
-  //  boolean whitelistBlocking(JdbcTransaction<?> tx, String entryId) throws Exception {
-  //    PreparedStatement stmt =
-  //        tx.prepareBatchStatement(
-  //            "UPDATE "
-  //                + tableName
-  //                + " SET attempts = 0, blacklisted = false "
-  //                + "WHERE blacklisted = true AND processed = false AND id = ?");
-  //    stmt.setString(1, entryId);
-  //    stmt.setQueryTimeout(writeLockTimeoutSeconds);
-  //    return stmt.executeUpdate() != 0;
-  //  }
-  //
-  //  private int deleteProcessedAndExpiredInner(JdbcTransaction<?> tx, int batchSize, Instant now)
-  //      throws Exception {
-  //    try (PreparedStatement stmt =
-  //        tx.connection()
-  //            .prepareStatement(dialect.getDeleteExpired().replace("{{table}}", tableName))) {
-  //      stmt.setTimestamp(1, Timestamp.from(now));
-  //      stmt.setInt(2, batchSize);
-  //      return stmt.executeUpdate();
-  //    }
-  //  }
-
-  private <T> CompletableFuture<List<T>> executeQuery(
-      TX tx, String sql, Function<ResultRow, T> mapper) {
-    return handler.statement(
-        tx, dialect, sql, writeLockTimeoutSeconds, false, binder -> binder.executeQuery(1, mapper));
-  }
-
-  private CompletableFuture<Integer> executeUpdate(TX tx, String sql) {
-    return handler.statement(tx, dialect, sql, writeLockTimeoutSeconds, false, Binder::execute);
   }
 
   @AllArgsConstructor

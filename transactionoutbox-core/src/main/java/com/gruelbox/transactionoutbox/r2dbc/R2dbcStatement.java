@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
@@ -121,6 +120,6 @@ class R2dbcStatement implements Binder {
                   }
                 })
         .map(rowMapper)
-        .collect(() -> new ArrayList<>(expectedRowCount), (BiConsumer<List<U>, U>) List::add);
+        .collect(() -> new ArrayList<>(expectedRowCount), List::add);
   }
 }

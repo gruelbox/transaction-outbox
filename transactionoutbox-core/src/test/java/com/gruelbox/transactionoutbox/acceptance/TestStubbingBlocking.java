@@ -104,7 +104,7 @@ class TestStubbingBlocking {
     Interface.invocations.clear();
 
     transactionManager.inTransaction(
-        tx -> outbox.schedule(Interface.class).doThing(1, (Context) tx.context()));
+        tx -> outbox.schedule(Interface.class).doThing(1, tx.context()));
 
     assertThat(Interface.invocations, hasSize(1));
     assertThat(Interface.invocations.get(0).get(0), equalTo(1));
