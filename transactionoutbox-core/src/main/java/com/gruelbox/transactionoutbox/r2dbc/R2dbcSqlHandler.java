@@ -1,14 +1,14 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-import static com.gruelbox.transactionoutbox.DialectFamily.MY_SQL;
-import static com.gruelbox.transactionoutbox.DialectFamily.POSTGRESQL;
+import static com.gruelbox.transactionoutbox.sql.DialectFamily.MY_SQL;
+import static com.gruelbox.transactionoutbox.sql.DialectFamily.POSTGRESQL;
 
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
-import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.SqlPersistor.Binder;
-import com.gruelbox.transactionoutbox.SqlPersistor.Handler;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.Utils;
+import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.SqlPersistor.Binder;
+import com.gruelbox.transactionoutbox.sql.SqlPersistor.Handler;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException;
 import io.r2dbc.spi.R2dbcNonTransientResourceException;

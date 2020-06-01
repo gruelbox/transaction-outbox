@@ -1,10 +1,10 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-import com.gruelbox.transactionoutbox.AbstractSqlPersistorTest;
-import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
+import com.gruelbox.transactionoutbox.sql.AbstractSqlPersistorTest;
+import com.gruelbox.transactionoutbox.sql.Dialect;
 import io.r2dbc.postgresql.PostgresqlConnectionConfiguration;
 import io.r2dbc.postgresql.PostgresqlConnectionFactory;
 import io.r2dbc.spi.Connection;

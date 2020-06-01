@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
-import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.sql.Dialect;
 
 @SuppressWarnings("WeakerAccess")
 class TestH2Blocking extends AbstractBlockingAcceptanceTest {

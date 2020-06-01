@@ -1,5 +1,6 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.sql;
 
+import com.gruelbox.transactionoutbox.Beta;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 

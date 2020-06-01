@@ -3,12 +3,12 @@ package com.gruelbox.transactionoutbox.jdbc;
 import static com.gruelbox.transactionoutbox.Utils.toBlockingFuture;
 
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
-import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.SqlPersistor;
-import com.gruelbox.transactionoutbox.SqlPersistor.Binder;
-import com.gruelbox.transactionoutbox.SqlPersistor.ResultRow;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.Utils;
+import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.SqlPersistor;
+import com.gruelbox.transactionoutbox.sql.SqlPersistor.Binder;
+import com.gruelbox.transactionoutbox.sql.SqlPersistor.ResultRow;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

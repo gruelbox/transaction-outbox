@@ -1,8 +1,8 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
-import com.gruelbox.transactionoutbox.AbstractSqlPersistorTest;
-import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
+import com.gruelbox.transactionoutbox.sql.AbstractSqlPersistorTest;
+import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.sql.Connection;
 import lombok.extern.slf4j.Slf4j;
 import org.testcontainers.junit.jupiter.Testcontainers;

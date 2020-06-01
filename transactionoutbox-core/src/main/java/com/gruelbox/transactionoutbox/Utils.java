@@ -190,7 +190,7 @@ public class Utils {
         });
   }
 
-  static <T> T firstNonNull(T one, Supplier<T> two) {
+  public static <T> T firstNonNull(T one, Supplier<T> two) {
     if (one == null) return two.get();
     return one;
   }

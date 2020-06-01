@@ -1,7 +1,6 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
-import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.ExecutorSubmitter;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
@@ -9,6 +8,7 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
+import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.sql.Connection;
 import java.time.Duration;
 import java.util.Currency;

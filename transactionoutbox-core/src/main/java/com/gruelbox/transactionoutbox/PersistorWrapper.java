@@ -7,9 +7,9 @@ import java.util.concurrent.CompletableFuture;
 @Beta
 public class PersistorWrapper<CN, TX extends Transaction<CN, ?>> implements Persistor<CN, TX> {
 
-  private final SqlPersistor<CN, TX> delegate;
+  private final Persistor<CN, TX> delegate;
 
-  public PersistorWrapper(SqlPersistor<CN, TX> delegate) {
+  public PersistorWrapper(Persistor<CN, TX> delegate) {
     this.delegate = delegate;
   }
 

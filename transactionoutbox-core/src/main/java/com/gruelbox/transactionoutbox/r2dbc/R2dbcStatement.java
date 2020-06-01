@@ -2,9 +2,9 @@ package com.gruelbox.transactionoutbox.r2dbc;
 
 import static com.gruelbox.transactionoutbox.r2dbc.Utils.EMPTY_RESULT;
 
-import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.SqlPersistor.Binder;
-import com.gruelbox.transactionoutbox.SqlPersistor.ResultRow;
+import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.SqlPersistor.Binder;
+import com.gruelbox.transactionoutbox.sql.SqlPersistor.ResultRow;
 import io.r2dbc.spi.Statement;
 import java.time.Instant;
 import java.time.LocalDateTime;

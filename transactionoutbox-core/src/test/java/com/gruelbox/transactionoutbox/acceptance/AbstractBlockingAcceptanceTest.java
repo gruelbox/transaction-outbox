@@ -10,7 +10,6 @@ import static org.junit.Assert.fail;
 
 import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
-import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
@@ -19,6 +18,7 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
+import com.gruelbox.transactionoutbox.sql.Dialect;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Clock;

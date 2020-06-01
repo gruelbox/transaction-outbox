@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcTransactionManager;
+import com.gruelbox.transactionoutbox.sql.SqlPersistor;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import org.junit.jupiter.api.Test;
@@ -40,7 +41,7 @@ class TestGlobalArchitecture {
   }
 
   @Test
-  void no_core_access_to_jdbc_or_r2dbc() {
+  void no_core_access_to_sql_or_jdbc_or_r2dbc() {
     classes()
         .that()
         .resideInAPackage(TransactionManager.class.getPackageName())
@@ -49,6 +50,7 @@ class TestGlobalArchitecture {
         .resideOutsideOfPackages(
             JdbcTransactionManager.class.getPackageName(),
             R2dbcTransactionManager.class.getPackageName(),
+            SqlPersistor.class.getPackageName(),
             "java.sql..",
             "io.r2dbc..")
         .check(all);

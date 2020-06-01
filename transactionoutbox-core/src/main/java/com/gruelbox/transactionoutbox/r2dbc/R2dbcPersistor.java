@@ -1,11 +1,11 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.PersistorWrapper;
-import com.gruelbox.transactionoutbox.SqlPersistor;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
+import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.SqlPersistor;
 import io.r2dbc.spi.Connection;
 import lombok.extern.slf4j.Slf4j;
 
