@@ -24,7 +24,8 @@ class TestR2dbcPersistorMySql5 extends AbstractSqlPersistorTest<Connection, R2db
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1));
+      new MySQLContainer<>("mysql:5")
+          .withStartupTimeout(Duration.ofHours(1));
 
   private final R2dbcPersistor persistor = R2dbcPersistor.forDialect(Dialect.MY_SQL_5);
   private final ConnectionFactoryWrapper connectionFactory =

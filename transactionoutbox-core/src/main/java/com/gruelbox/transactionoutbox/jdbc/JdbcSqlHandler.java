@@ -14,6 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
+import java.sql.SQLTimeoutException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -60,6 +61,15 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
             "Request " + entry.description() + " already exists", e.getCause());
       }
       throw (RuntimeException) Utils.uncheckAndThrow(e);
+    }
+  }
+
+  @Override
+  public List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t) throws Throwable {
+    if (t instanceof SQLTimeoutException) {
+      return List.of();
+    } else {
+      throw t;
     }
   }
 

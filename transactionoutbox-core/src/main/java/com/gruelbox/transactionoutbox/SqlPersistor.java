@@ -6,6 +6,7 @@ import static java.util.concurrent.CompletableFuture.failedFuture;
 
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.sql.SQLTimeoutException;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import lombok.AllArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -85,11 +87,10 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
     this.lockSql =
         handler.preprocessSql(
             dialect,
-            dialect.isSupportsSkipLock()
-                ? "SELECT id FROM "
-                    + this.tableName
-                    + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
-                : "SELECT id FROM " + this.tableName + " WHERE id = ? AND version = ? FOR UPDATE");
+            "SELECT id FROM "
+                + this.tableName
+                + " WHERE id = ? AND version = ? FOR UPDATE"
+                + (dialect.isSupportsSkipLock() ? " SKIP LOCKED" : ""));
     this.clearSql = handler.preprocessSql(dialect, "DELETE FROM " + this.tableName);
   }
 
@@ -193,7 +194,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
           .exceptionally(
               e -> {
                 handler.handleSaveException(entry, e);
-                return null;
+                throw sneakyRethrow(e);
               })
           .thenApply(
               rows -> {
@@ -282,10 +283,23 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
                       .bind(0, entry.getId())
                       .bind(1, entry.getVersion())
                       .executeQuery(1, row -> 1))
-          .thenApply(list -> !list.isEmpty());
+          .exceptionally(
+              e -> {
+                try {
+                  return handler.handleLockException(entry, e);
+                } catch (Throwable t) {
+                  throw sneakyRethrow(t);
+                }
+              })
+          .thenApply(list ->!list.isEmpty());
     } catch (Exception e) {
       return failedFuture(e);
     }
+  }
+
+  @SneakyThrows
+  private RuntimeException sneakyRethrow(Throwable t) {
+    throw t;
   }
 
   @Override
@@ -301,7 +315,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
           tx,
           dialect,
           selectBatchSql,
-          writeLockTimeoutSeconds,
+          0,
           false,
           binder ->
               binder
@@ -336,7 +350,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   @Override
   public final CompletableFuture<Integer> clear(TX tx) {
     return handler.statement(
-        tx, dialect, clearSql, writeLockTimeoutSeconds, false, Binder::execute);
+        tx, dialect, clearSql, 0, false, Binder::execute);
   }
 
   @Beta
@@ -358,6 +372,8 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
     }
 
     void handleSaveException(TransactionOutboxEntry entry, Throwable t);
+
+    List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t) throws Throwable;
   }
 
   @Beta

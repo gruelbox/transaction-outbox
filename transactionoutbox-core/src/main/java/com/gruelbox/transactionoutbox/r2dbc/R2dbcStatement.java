@@ -1,11 +1,14 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
 import static com.gruelbox.transactionoutbox.r2dbc.Utils.EMPTY_RESULT;
+import static com.gruelbox.transactionoutbox.r2dbc.Utils.TIMEOUT_RESULT;
 
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.SqlPersistor.Binder;
 import com.gruelbox.transactionoutbox.SqlPersistor.ResultRow;
+import io.r2dbc.spi.R2dbcTimeoutException;
 import io.r2dbc.spi.Statement;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -23,7 +26,7 @@ class R2dbcStatement implements Binder {
 
   private final Statement statement;
   private final Dialect dialect;
-  private final int timeoutSeconds; // TODO implement this
+  private final int timeoutSeconds;
   private final String sql;
 
   R2dbcStatement(R2dbcTransaction<?> tx, Dialect dialect, int timeoutSeconds, String sql) {
@@ -52,10 +55,23 @@ class R2dbcStatement implements Binder {
 
   @Override
   public CompletableFuture<Integer> execute() {
-    return Mono.from(statement.execute())
+    Mono<Integer> timeout = timeoutSeconds > 0
+        ? Mono.just(Integer.MIN_VALUE)
+            .delayElement(Duration.ofSeconds(timeoutSeconds))
+            .doOnNext(it -> log.warn("Query timeout: {}", sql))
+        : Mono.empty();
+    Mono<Integer> execute = Mono.from(statement.execute())
         .flatMap(result -> Mono.from(result.getRowsUpdated()))
-        .defaultIfEmpty(0)
-        .doOnNext(__ -> log.debug("Executed SQL: {}", sql))
+        .defaultIfEmpty(0);
+    return execute
+        .mergeWith(timeout)
+        .next()
+        .map(i -> {
+          if (i == Integer.MIN_VALUE) {
+            throw new R2dbcTimeoutException();
+          }
+          return i;
+        })
         .toFuture();
   }
 
@@ -63,10 +79,17 @@ class R2dbcStatement implements Binder {
   @SuppressWarnings({"unchecked", "ConstantConditions"})
   public <U> CompletableFuture<List<U>> executeQuery(
       int expectedRowCount, Function<ResultRow, U> rowMapper) {
-    return Mono.from(statement.execute())
+    Mono<io.r2dbc.spi.Result> timeout = timeoutSeconds > 0
+        ? Mono.just(TIMEOUT_RESULT)
+            .delayElement(Duration.ofSeconds(timeoutSeconds))
+            .doOnNext(it -> log.info("Query timeout: {}", sql))
+        : Mono.empty();
+    Mono<io.r2dbc.spi.Result> execute = Mono.from(statement.execute())
         .map(r -> (io.r2dbc.spi.Result) r)
-        .defaultIfEmpty(EMPTY_RESULT)
-        .doOnNext(__ -> log.debug("Executed SQL: {}", sql))
+        .defaultIfEmpty(EMPTY_RESULT);
+    return execute
+        .mergeWith(timeout)
+        .next()
         .flatMapMany(result -> result.map((r, m) -> r))
         .map(
             row ->

@@ -32,7 +32,7 @@ class TestJdbcPersistorPostgres10
 
   @Override
   protected Dialect dialect() {
-    return Dialect.H2;
+    return Dialect.POSTGRESQL_9;
   }
 
   @SuppressWarnings("unchecked")

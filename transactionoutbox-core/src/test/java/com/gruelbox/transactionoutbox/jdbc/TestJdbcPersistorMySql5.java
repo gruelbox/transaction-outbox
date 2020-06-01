@@ -31,7 +31,7 @@ class TestJdbcPersistorMySql5
 
   @Override
   protected Dialect dialect() {
-    return Dialect.H2;
+    return Dialect.MY_SQL_5;
   }
 
   @SuppressWarnings("unchecked")

@@ -1,5 +1,7 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
+import static io.r2dbc.spi.IsolationLevel.READ_COMMITTED;
+
 import io.r2dbc.spi.Batch;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.ConnectionFactory;
@@ -13,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,8 +55,8 @@ public class R2dbcRawTransactionManager
     return withConnection(
             conn ->
                 begin(conn)
-                    .thenMany(
-                        Mono.fromCompletionStage(
+                    .then(
+                        Mono.fromCompletionStage(() ->
                             fn.apply(transactionFromContext(conn)).thenApply(Optional::ofNullable)))
                     .concatWith(commit(conn))
                     .onErrorResume(t -> rollback(conn, t)))
@@ -62,14 +65,14 @@ public class R2dbcRawTransactionManager
         .thenApply(opt -> opt.orElse(null));
   }
 
-  private Mono<Object> begin(Connection conn) {
+  private <T> Mono<T> begin(Connection conn) {
     return Mono.from(conn.beginTransaction())
-        .then(Mono.fromRunnable(() -> log.debug("Started transaction")));
+        .then(Mono.fromRunnable(() -> log.debug("Started transaction on {}", conn)));
   }
 
   private <T> Mono<T> commit(Connection conn) {
     return Mono.from(conn.commitTransaction())
-        .then(Mono.fromRunnable(() -> log.debug("Committed transaction")));
+        .then(Mono.fromRunnable(() -> log.debug("Committed transaction on {}", conn)));
   }
 
   private <T> Mono<T> rollback(Connection conn, Throwable e) {
@@ -80,6 +83,7 @@ public class R2dbcRawTransactionManager
                     e.getClass().getSimpleName(),
                     e.getMessage() == null ? "" : (" - " + e.getMessage())))
         .concatWith(Mono.from(conn.rollbackTransaction()).then(Mono.empty()))
+        .concatWith(Mono.fromRunnable(() -> log.info("Rollback complete")))
         .then(Mono.error(e));
   }
 
@@ -88,6 +92,8 @@ public class R2dbcRawTransactionManager
         .flatMapMany(
             conn ->
                 Mono.fromRunnable(openTransactionCount::incrementAndGet)
+                    .then(Mono.from(conn.setTransactionIsolationLevel(READ_COMMITTED)))
+                    .then(Mono.from(conn.setAutoCommit(false)))
                     .thenMany(fn.apply(conn))
                     .concatWith(
                         Mono.from(conn.close())
@@ -133,10 +139,12 @@ public class R2dbcRawTransactionManager
       return delegate.getMetadata();
     }
 
+    private static final AtomicLong nextId = new AtomicLong(1);
     @SuppressWarnings("NullableProblems")
     private class WrappedConnection implements Connection {
 
       private final Connection conn;
+      private final long id = nextId.getAndIncrement();
 
       WrappedConnection(Connection conn) {
         this.conn = conn;
@@ -222,6 +230,11 @@ public class R2dbcRawTransactionManager
       @Override
       public Publisher<Boolean> validate(ValidationDepth depth) {
         return conn.validate(depth);
+      }
+
+      @Override
+      public String toString() {
+        return "WrappedConnection[" + id + "]";
       }
     }
   }

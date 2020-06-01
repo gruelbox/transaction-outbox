@@ -10,7 +10,9 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.isA;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ea.async.Async;
 import java.math.BigDecimal;
@@ -18,12 +20,18 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -319,128 +327,197 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
     assertThat(lockSuccess, equalTo(false));
   }
 
-  //  @Test
-  //  void testSkipLocked() throws Exception {
-  //    Assumptions.assumeTrue(dialect().isSupportsSkipLock());
-  //
-  //    var entry1 = createEntry("FOO1", now.minusSeconds(1), false);
-  //    var entry2 = createEntry("FOO2", now.minusSeconds(1), false);
-  //    var entry3 = createEntry("FOO3", now.minusSeconds(1), false);
-  //    var entry4 = createEntry("FOO4", now.minusSeconds(1), false);
-  //
-  //    txManager()
-  //        .inTransactionThrows(
-  //            tx -> {
-  //              persistor().saveBlocking(tx, entry1);
-  //              persistor().saveBlocking(tx, entry2);
-  //              persistor().saveBlocking(tx, entry3);
-  //              persistor().saveBlocking(tx, entry4);
-  //            });
-  //
-  //    var gotLockLatch = new CountDownLatch(1);
-  //    var executorService = Executors.newFixedThreadPool(1);
-  //    try {
-  //      Future<?> future =
-  //          executorService.submit(
-  //              () -> {
-  //                log.info("Background thread starting");
-  //                txManager()
-  //                    .inTransactionThrows(
-  //                        tx -> {
-  //                          log.info("Background thread attempting select batch");
-  //                          var batch = persistor().selectBatchBlocking(tx, 2, now);
-  //                          assertThat(batch, hasSize(2));
-  //                          log.info("Background thread obtained locks, going to sleep");
-  //                          gotLockLatch.countDown();
-  //                          expectTobeInterrupted();
-  //                          for (TransactionOutboxEntry entry : batch) {
-  //                            persistor().delete(tx, entry);
-  //                          }
-  //                        });
-  //                return null;
-  //              });
-  //
-  //      // Wait for the background thread to have obtained the lock
-  //      log.info("Waiting for background thread to obtain lock");
-  //      assertTrue(gotLockLatch.await(10, TimeUnit.SECONDS));
-  //
-  //      // Now try and select all four - we should only get two
-  //      log.info("Attempting to obtain duplicate locks");
-  //      txManager()
-  //          .inTransactionThrows(
-  //              tx -> {
-  //                var batch = persistor().selectBatchBlocking(tx, 4, now);
-  //                assertThat(batch, hasSize(2));
-  //                for (TransactionOutboxEntry entry : batch) {
-  //                  persistor().delete(tx, entry);
-  //                }
-  //              });
-  //
-  //      // Kill the other thread
-  //      log.info("Shutting down");
-  //      future.cancel(true);
-  //
-  //      // Make sure any assertions from the other thread are propagated
-  //      assertThrows(CancellationException.class, future::get);
-  //
-  //      // Ensure that all the records are processed
-  //      txManager()
-  //          .inTransactionThrows(
-  //              tx -> assertThat(persistor().selectBatchBlocking(tx, 100, now), empty()));
-  //
-  //    } finally {
-  //      executorService.shutdown();
-  //      assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS));
-  //    }
-  //  }
-  //
-  //  @Test
-  //  void testLockPessimisticLockFailure() throws Exception {
-  //    TransactionOutboxEntry entry = createEntry("FOO1", now, false);
-  //    txManager().inTransactionThrows(tx -> persistor().saveBlocking(tx, entry));
-  //
-  //    CountDownLatch gotLockLatch = new CountDownLatch(1);
-  //    ExecutorService executorService = Executors.newFixedThreadPool(1);
-  //    try {
-  //
-  //      // Submit another thread which will take a lock and hold it. If it is not
-  //      // told to stop after 10 seconds it fails.
-  //      Future<?> future =
-  //          executorService.submit(
-  //              () -> {
-  //                log.info("Background thread starting");
-  //                txManager()
-  //                    .inTransactionThrows(
-  //                        tx -> {
-  //                          log.info("Background thread attempting lock");
-  //                          assertDoesNotThrow(() -> persistor().lockBlocking(tx, entry));
-  //                          log.info("Background thread obtained lock, going to sleep");
-  //                          gotLockLatch.countDown();
-  //                          expectTobeInterrupted();
-  //                        });
-  //              });
-  //
-  //      // Wait for the background thread to have obtained the lock
-  //      log.info("Waiting for background thread to obtain lock");
-  //      assertTrue(gotLockLatch.await(10, TimeUnit.SECONDS));
-  //
-  //      // Now try and take the lock, which should fail
-  //      log.info("Attempting to obtain duplicate lock");
-  //      txManager().inTransactionThrows(tx -> assertFalse(persistor().lockBlocking(tx, entry)));
-  //
-  //      // Kill the other thread
-  //      log.info("Shutting down");
-  //      future.cancel(true);
-  //
-  //      // Make sure any assertions from the other thread are propagated
-  //      assertThrows(CancellationException.class, future::get);
-  //
-  //    } finally {
-  //      executorService.shutdown();
-  //      assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS));
-  //    }
-  //  }
-  //
+  @Test
+  void testSkipLocked() throws InterruptedException, TimeoutException, ExecutionException {
+    Assumptions.assumeTrue(dialect().isSupportsSkipLock());
+
+    var entry1 = createEntry("FOO1", now.minusSeconds(1), false);
+    var entry2 = createEntry("FOO2", now.minusSeconds(1), false);
+    var entry3 = createEntry("FOO3", now.minusSeconds(1), false);
+    var entry4 = createEntry("FOO4", now.minusSeconds(1), false);
+
+    txManager()
+        .transactionally(
+            tx ->
+                CompletableFuture.allOf(
+                    persistor().save(tx, entry1),
+                    persistor().save(tx, entry2),
+                    persistor().save(tx, entry3),
+                    persistor().save(tx, entry4)))
+        .join();
+
+    var gotLockLatch = new CountDownLatch(1);
+    var releaseLatch = new CountDownLatch(1);
+    AtomicReference<List<TransactionOutboxEntry>> locked = new AtomicReference<>();
+
+    // Use a background thread to run the locking so it works for JDBC
+    ExecutorService executorService = Executors.newFixedThreadPool(2);
+    try {
+
+      Future<?> background =
+          executorService.submit(
+              () ->
+                  txManager()
+                      .transactionally(
+                          tx ->
+                              persistor()
+                                  .selectBatch(tx, 2, now)
+                                  .thenAccept(
+                                      batch -> {
+                                        assertThat(batch, hasSize(2));
+                                        log.info("Transaction thread obtained locks");
+                                        locked.set(batch);
+                                      })
+                                  .thenCompose(
+                                      batch ->
+                                          CompletableFuture.supplyAsync(
+                                              () -> {
+                                                gotLockLatch.countDown();
+                                                log.info("Waiter thread going to sleep");
+                                                try {
+                                                  assertTrue(
+                                                      releaseLatch.await(20, TimeUnit.SECONDS));
+                                                } catch (InterruptedException e) {
+                                                  Thread.currentThread().interrupt();
+                                                  throw new RuntimeException(e);
+                                                }
+                                                return batch;
+                                              },
+                                              executorService))
+                                  .thenCompose(
+                                      __ ->
+                                          CompletableFuture.allOf(
+                                              locked.get().stream()
+                                                  .map(entry -> persistor().delete(tx, entry))
+                                                  .toArray(CompletableFuture[]::new))))
+                      .join());
+
+      // Wait for the other thread to have obtained the lock
+      log.info("Waiting for background thread to obtain lock");
+      assertTrue(gotLockLatch.await(10, TimeUnit.SECONDS));
+
+      // Now try and select all four - we should only get two
+      log.info("Attempting to obtain duplicate locks");
+      txManager()
+          .transactionally(
+              tx ->
+                  persistor()
+                      .selectBatch(tx, 4, now)
+                      .thenCompose(
+                          batch -> {
+                            assertThat(batch, hasSize(2));
+                            return CompletableFuture.allOf(
+                                batch.stream()
+                                    .map(entry -> persistor().delete(tx, entry))
+                                    .toArray(CompletableFuture[]::new));
+                          }));
+
+      // Kill the other thread
+      log.info("Shutting down");
+      releaseLatch.countDown();
+
+      // Make sure any assertions from the other thread are propagated
+      background.get(10, TimeUnit.SECONDS);
+
+      // Ensure that all the records are processed
+      List<TransactionOutboxEntry> finalRecords =
+          txManager().transactionally(tx -> persistor().selectBatch(tx, 100, now)).join();
+      assertThat(finalRecords, empty());
+
+    } finally {
+      executorService.shutdown();
+      assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void testLockPessimisticLockFailure()
+      throws InterruptedException, TimeoutException, ExecutionException {
+    var entry = createEntry("FOO1", now.minusSeconds(1), false);
+
+    txManager().transactionally(tx -> persistor().save(tx, entry)).join();
+
+    var gotLockLatch = new CountDownLatch(1);
+    var releaseLatch = new CountDownLatch(1);
+
+    // Use a background thread to run the locking so it works for JDBC
+    ExecutorService executorService = Executors.newFixedThreadPool(2);
+    try {
+
+      Future<?> background =
+          executorService.submit(
+              () ->
+                  txManager()
+                      .transactionally(
+                          tx -> {
+                            log.info("Start of background transaction on {}", tx.connection());
+                            return persistor()
+                                .lock(tx, entry)
+                                .whenComplete((v, e) -> log.info("Lock result: {}", v))
+                                .thenAccept(Assertions::assertTrue)
+                                .thenRun(
+                                    () ->
+                                        log.info(
+                                            "Background thread obtained lock on {}",
+                                            tx.connection()))
+                                .thenCompose(
+                                    batch ->
+                                        CompletableFuture.supplyAsync(
+                                            () -> {
+                                              gotLockLatch.countDown();
+                                              log.info("Waiter thread going to sleep");
+                                              try {
+                                                assertTrue(releaseLatch.await(20, TimeUnit.SECONDS),
+                                                    "Background thread not released in time");
+                                              } catch (InterruptedException e) {
+                                                Thread.currentThread().interrupt();
+                                                throw new RuntimeException(e);
+                                              }
+                                              return batch;
+                                            },
+                                            executorService))
+                                .thenRun(
+                                    () ->
+                                        log.info(
+                                            "End of background transaction on {}",
+                                            tx.connection()));
+                          })
+                      .join());
+
+      // Wait for the other thread to have obtained the lock
+      log.info("Waiting for background thread to obtain lock");
+      assertTrue(gotLockLatch.await(10, TimeUnit.SECONDS));
+
+      // Now try and obtain the lock
+      log.info("Attempting to obtain duplicate lock");
+      boolean locked =
+          txManager()
+              .transactionally(tx ->
+                  persistor().lock(tx, entry)
+                      .thenApply(
+                          it -> {
+                            log.info("Foreground thread obtained lock: {}", it);
+                            return it;
+                          }))
+              .join();
+      log.info("Lock obtained: {}", locked);
+
+      // Kill the other thread
+      log.info("Shutting down");
+      releaseLatch.countDown();
+
+      // Make sure any assertions from the other thread are propagated
+      background.get(10, TimeUnit.SECONDS);
+
+      // Assert lock failed
+      assertFalse(locked);
+
+    } finally {
+      executorService.shutdown();
+      assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
   private TransactionOutboxEntry createEntry(
       String id, Instant nextAttemptTime, boolean blacklisted) {
     return TransactionOutboxEntry.builder()
@@ -469,17 +546,5 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
         "Bar",
         new Class<?>[] {int.class, BigDecimal.class, String.class},
         new Object[] {1, BigDecimal.TEN, null});
-  }
-
-  private void expectTobeInterrupted() {
-    try {
-      Thread.sleep(10000);
-      throw new RuntimeException("Background thread not killed within 10 seconds");
-    } catch (InterruptedException e) {
-      log.info("Background thread interrupted correctly");
-    } catch (Exception e) {
-      log.error("Background thread failed", e);
-      throw e;
-    }
   }
 }

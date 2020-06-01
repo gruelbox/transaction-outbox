@@ -8,7 +8,9 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.Utils;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException;
+import io.r2dbc.spi.R2dbcTimeoutException;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,15 @@ class R2dbcSqlHandler implements Handler<Connection, R2dbcTransaction<?>> {
       throw new AlreadyScheduledException("Request " + entry.description() + " already exists", e);
     } catch (Throwable e) {
       throw (RuntimeException) Utils.uncheckAndThrow(e);
+    }
+  }
+
+  @Override
+  public List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t) throws Throwable {
+    if (t instanceof R2dbcTimeoutException) {
+      return List.of();
+    } else {
+      throw t;
     }
   }
 
