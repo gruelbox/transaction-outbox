@@ -69,14 +69,17 @@ class R2dbcStatement implements Binder {
     if (timeoutSeconds <= 0) {
       return Mono.empty();
     }
-    String queryTimeoutSetup = dialect.getQueryTimeoutSetup();
+    var queryTimeoutSetup = dialect.getQueryTimeoutSetup();
     if (queryTimeoutSetup == null || queryTimeoutSetup.isEmpty()) {
       log.warn("Dialect {} not set up with query timeout support", dialect);
       return Mono.empty();
     }
-    return new R2dbcStatement(tx, dialect, 0, dialect.getQueryTimeoutSetup())
-        .bind(0, timeoutSeconds)
-        .executeInternal();
+    var sql = queryTimeoutSetup.replace("{{timeout}}", Integer.toString(timeoutSeconds));
+    if (sql.equals(queryTimeoutSetup)) {
+      return new R2dbcStatement(tx, dialect, 0, sql).bind(0, timeoutSeconds).executeInternal();
+    } else {
+      return new R2dbcStatement(tx, dialect, 0, sql).executeInternal();
+    }
   }
 
   private Mono<Integer> executeInternal() {

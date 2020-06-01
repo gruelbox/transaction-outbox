@@ -17,14 +17,23 @@ import lombok.Getter;
 @Beta
 public enum Dialect {
   MY_SQL_5(
-      false, Constants.DEFAULT_DELETE_EXPIRED_STMT, "SIGNED", "SET innodb_lock_wait_timeout = ?"),
+      DialectFamily.MY_SQL,
+      false,
+      Constants.DEFAULT_DELETE_EXPIRED_STMT,
+      "SIGNED",
+      "SET innodb_lock_wait_timeout = ?"),
 
   MY_SQL_8(
-      true, Constants.DEFAULT_DELETE_EXPIRED_STMT, "SIGNED", "SET innodb_lock_wait_timeout = ?"),
+      DialectFamily.MY_SQL,
+      true,
+      Constants.DEFAULT_DELETE_EXPIRED_STMT,
+      "SIGNED",
+      "SET innodb_lock_wait_timeout = ?"),
 
-  H2(false, Constants.DEFAULT_DELETE_EXPIRED_STMT, "INT", "SET QUERY_TIMEOUT ?"),
+  H2(DialectFamily.H2, false, Constants.DEFAULT_DELETE_EXPIRED_STMT, "INT", "SET QUERY_TIMEOUT ?"),
 
   POSTGRESQL_9(
+      DialectFamily.POSTGRESQL,
       true,
       "DELETE FROM {{table}} "
           + "WHERE id IN ("
@@ -34,7 +43,23 @@ public enum Dialect {
           + "        blacklisted = false "
           + "  LIMIT ?)",
       "INTEGER",
-      null);
+      "SET LOCAL lock_timeout = '{{timeout}}s'"),
+
+  @Deprecated
+  POSTGRESQL__TEST_NO_SKIP_LOCK(
+      DialectFamily.POSTGRESQL,
+      false,
+      "DELETE FROM {{table}} "
+          + "WHERE id IN ("
+          + "  SELECT id FROM {{table}} "
+          + "  WHERE nextAttemptTime < ? AND "
+          + "        processed = true AND "
+          + "        blacklisted = false "
+          + "  LIMIT ?)",
+      "INTEGER",
+      "SET LOCAL lock_timeout = '{{timeout}}s'");
+
+  private final DialectFamily family;
 
   /**
    * @return True if hot row support ({@code SKIP LOCKED}) is available, increasing performance when

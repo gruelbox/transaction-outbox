@@ -1,5 +1,8 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
+import static com.gruelbox.transactionoutbox.DialectFamily.MY_SQL;
+import static com.gruelbox.transactionoutbox.DialectFamily.POSTGRESQL;
+
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.SqlPersistor.Binder;
@@ -8,6 +11,7 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.Utils;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException;
+import io.r2dbc.spi.R2dbcNonTransientResourceException;
 import io.r2dbc.spi.R2dbcTimeoutException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -37,7 +41,11 @@ class R2dbcSqlHandler implements Handler<Connection, R2dbcTransaction<?>> {
   @Override
   public List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t)
       throws Throwable {
-    if (t instanceof R2dbcTimeoutException || t instanceof TimeoutException) {
+    // TODO inconsistencies of drivers - report to R2DBC
+    if (t instanceof R2dbcTimeoutException
+        || t instanceof TimeoutException
+        || ((t instanceof R2dbcNonTransientResourceException)
+            && t.getMessage().contains("timeout"))) {
       return List.of();
     } else {
       throw t;
@@ -47,14 +55,15 @@ class R2dbcSqlHandler implements Handler<Connection, R2dbcTransaction<?>> {
   @Override
   public void interceptNew(Dialect dialect, TransactionOutboxEntry entry) {
     // TODO remove hack https://github.com/mirromutth/r2dbc-mysql/issues/111
-    if (dialect.equals(Dialect.MY_SQL_5) || dialect.equals(Dialect.MY_SQL_8)) {
+    if (dialect.getFamily().equals(MY_SQL)) {
       entry.setNextAttemptTime(entry.getNextAttemptTime().truncatedTo(ChronoUnit.SECONDS));
     }
   }
 
   @Override
   public String preprocessSql(Dialect dialect, String sql) {
-    if (!dialect.equals(Dialect.POSTGRESQL_9)) {
+    // TODO delegate to the dialect
+    if (!dialect.getFamily().equals(POSTGRESQL)) {
       return sql;
     }
     // Blunt, not general purpose, but only needs to work for the known use cases
