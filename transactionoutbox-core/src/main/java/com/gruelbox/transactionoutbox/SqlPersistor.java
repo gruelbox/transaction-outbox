@@ -6,7 +6,6 @@ import static java.util.concurrent.CompletableFuture.failedFuture;
 
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.sql.SQLTimeoutException;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.List;
@@ -291,7 +290,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
                   throw sneakyRethrow(t);
                 }
               })
-          .thenApply(list ->!list.isEmpty());
+          .thenApply(list -> !list.isEmpty());
     } catch (Exception e) {
       return failedFuture(e);
     }
@@ -349,8 +348,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
 
   @Override
   public final CompletableFuture<Integer> clear(TX tx) {
-    return handler.statement(
-        tx, dialect, clearSql, 0, false, Binder::execute);
+    return handler.statement(tx, dialect, clearSql, 0, false, Binder::execute);
   }
 
   @Beta

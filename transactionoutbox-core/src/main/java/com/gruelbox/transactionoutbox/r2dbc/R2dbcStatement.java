@@ -1,14 +1,11 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
 import static com.gruelbox.transactionoutbox.r2dbc.Utils.EMPTY_RESULT;
-import static com.gruelbox.transactionoutbox.r2dbc.Utils.TIMEOUT_RESULT;
 
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.SqlPersistor.Binder;
 import com.gruelbox.transactionoutbox.SqlPersistor.ResultRow;
-import io.r2dbc.spi.R2dbcTimeoutException;
 import io.r2dbc.spi.Statement;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -25,11 +22,13 @@ import reactor.core.publisher.Mono;
 class R2dbcStatement implements Binder {
 
   private final Statement statement;
+  private final R2dbcTransaction<?> tx;
   private final Dialect dialect;
   private final int timeoutSeconds;
   private final String sql;
 
   R2dbcStatement(R2dbcTransaction<?> tx, Dialect dialect, int timeoutSeconds, String sql) {
+    this.tx = tx;
     this.dialect = dialect;
     this.timeoutSeconds = timeoutSeconds;
     this.sql = sql;
@@ -37,7 +36,7 @@ class R2dbcStatement implements Binder {
   }
 
   @Override
-  public Binder bind(int i, Object arg) {
+  public R2dbcStatement bind(int i, Object arg) {
     log.trace("Binding {} -> {}", i, arg);
     // TODO suggest Instant support to R2DBC
     if (arg instanceof Instant) {
@@ -55,45 +54,47 @@ class R2dbcStatement implements Binder {
 
   @Override
   public CompletableFuture<Integer> execute() {
-    Mono<Integer> timeout = timeoutSeconds > 0
-        ? Mono.just(Integer.MIN_VALUE)
-            .delayElement(Duration.ofSeconds(timeoutSeconds))
-            .doOnNext(it -> log.warn("Query timeout: {}", sql))
-        : Mono.empty();
-    Mono<Integer> execute = Mono.from(statement.execute())
-        .flatMap(result -> Mono.from(result.getRowsUpdated()))
-        .defaultIfEmpty(0);
-    return execute
-        .mergeWith(timeout)
-        .next()
-        .map(i -> {
-          if (i == Integer.MIN_VALUE) {
-            throw new R2dbcTimeoutException();
-          }
-          return i;
-        })
-        .toFuture();
+    return setQueryTimeout(timeoutSeconds).then(executeInternal()).toFuture();
   }
 
   @Override
-  @SuppressWarnings({"unchecked", "ConstantConditions"})
   public <U> CompletableFuture<List<U>> executeQuery(
       int expectedRowCount, Function<ResultRow, U> rowMapper) {
-    Mono<io.r2dbc.spi.Result> timeout = timeoutSeconds > 0
-        ? Mono.just(TIMEOUT_RESULT)
-            .delayElement(Duration.ofSeconds(timeoutSeconds))
-            .doOnNext(it -> log.info("Query timeout: {}", sql))
-        : Mono.empty();
-    Mono<io.r2dbc.spi.Result> execute = Mono.from(statement.execute())
+    return setQueryTimeout(timeoutSeconds)
+        .then(executeQueryInternal(expectedRowCount, rowMapper))
+        .toFuture();
+  }
+
+  private Mono<Integer> setQueryTimeout(int timeoutSeconds) {
+    if (timeoutSeconds <= 0) {
+      return Mono.empty();
+    }
+    String queryTimeoutSetup = dialect.getQueryTimeoutSetup();
+    if (queryTimeoutSetup == null || queryTimeoutSetup.isEmpty()) {
+      log.warn("Dialect {} not set up with query timeout support", dialect);
+      return Mono.empty();
+    }
+    return new R2dbcStatement(tx, dialect, 0, dialect.getQueryTimeoutSetup())
+        .bind(0, timeoutSeconds)
+        .executeInternal();
+  }
+
+  private Mono<Integer> executeInternal() {
+    return Mono.from(statement.execute())
+        .flatMap(result -> Mono.from(result.getRowsUpdated()))
+        .defaultIfEmpty(0);
+  }
+
+  private <U> Mono<List<U>> executeQueryInternal(
+      int expectedRowCount, Function<ResultRow, U> rowMapper) {
+    return Mono.from(statement.execute())
         .map(r -> (io.r2dbc.spi.Result) r)
-        .defaultIfEmpty(EMPTY_RESULT);
-    return execute
-        .mergeWith(timeout)
-        .next()
+        .defaultIfEmpty(EMPTY_RESULT)
         .flatMapMany(result -> result.map((r, m) -> r))
         .map(
             row ->
                 new ResultRow() {
+                  @SuppressWarnings({"unchecked", "ConstantConditions"})
                   @Override
                   public <V> V get(int index, Class<V> type) {
                     try {
@@ -117,7 +118,6 @@ class R2dbcStatement implements Binder {
                   }
                 })
         .map(rowMapper)
-        .collect(() -> new ArrayList<>(expectedRowCount), (BiConsumer<List<U>, U>) List::add)
-        .toFuture();
+        .collect(() -> new ArrayList<>(expectedRowCount), (BiConsumer<List<U>, U>) List::add);
   }
 }

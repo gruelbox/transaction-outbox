@@ -65,7 +65,8 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
   }
 
   @Override
-  public List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t) throws Throwable {
+  public List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t)
+      throws Throwable {
     if (t instanceof SQLTimeoutException) {
       return List.of();
     } else {

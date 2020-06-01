@@ -16,11 +16,13 @@ import lombok.Getter;
 @Getter
 @Beta
 public enum Dialect {
-  MY_SQL_5(false, Constants.DEFAULT_DELETE_EXPIRED_STMT, "SIGNED"),
+  MY_SQL_5(
+      false, Constants.DEFAULT_DELETE_EXPIRED_STMT, "SIGNED", "SET innodb_lock_wait_timeout = ?"),
 
-  MY_SQL_8(true, Constants.DEFAULT_DELETE_EXPIRED_STMT, "SIGNED"),
+  MY_SQL_8(
+      true, Constants.DEFAULT_DELETE_EXPIRED_STMT, "SIGNED", "SET innodb_lock_wait_timeout = ?"),
 
-  H2(false, Constants.DEFAULT_DELETE_EXPIRED_STMT, "INT"),
+  H2(false, Constants.DEFAULT_DELETE_EXPIRED_STMT, "INT", "SET QUERY_TIMEOUT ?"),
 
   POSTGRESQL_9(
       true,
@@ -31,7 +33,8 @@ public enum Dialect {
           + "        processed = true AND "
           + "        blacklisted = false "
           + "  LIMIT ?)",
-      "INTEGER");
+      "INTEGER",
+      null);
 
   /**
    * @return True if hot row support ({@code SKIP LOCKED}) is available, increasing performance when
@@ -48,6 +51,12 @@ public enum Dialect {
   /** @return The type to use for a cast to integer. */
   @SuppressWarnings("JavaDoc")
   private final String integerCastType;
+
+  /**
+   * @return The command to use to set a query timeout. Not needed by JDBC but important for lower
+   *     level protocols.
+   */
+  private final String queryTimeoutSetup;
 
   private static class Constants {
     static final String DEFAULT_DELETE_EXPIRED_STMT =

@@ -467,7 +467,8 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
                                               gotLockLatch.countDown();
                                               log.info("Waiter thread going to sleep");
                                               try {
-                                                assertTrue(releaseLatch.await(20, TimeUnit.SECONDS),
+                                                assertTrue(
+                                                    releaseLatch.await(20, TimeUnit.SECONDS),
                                                     "Background thread not released in time");
                                               } catch (InterruptedException e) {
                                                 Thread.currentThread().interrupt();
@@ -492,13 +493,15 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
       log.info("Attempting to obtain duplicate lock");
       boolean locked =
           txManager()
-              .transactionally(tx ->
-                  persistor().lock(tx, entry)
-                      .thenApply(
-                          it -> {
-                            log.info("Foreground thread obtained lock: {}", it);
-                            return it;
-                          }))
+              .transactionally(
+                  tx ->
+                      persistor()
+                          .lock(tx, entry)
+                          .thenApply(
+                              it -> {
+                                log.info("Foreground thread obtained lock: {}", it);
+                                return it;
+                              }))
               .join();
       log.info("Lock obtained: {}", locked);
 

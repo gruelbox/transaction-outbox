@@ -56,8 +56,10 @@ public class R2dbcRawTransactionManager
             conn ->
                 begin(conn)
                     .then(
-                        Mono.fromCompletionStage(() ->
-                            fn.apply(transactionFromContext(conn)).thenApply(Optional::ofNullable)))
+                        Mono.fromCompletionStage(
+                            () ->
+                                fn.apply(transactionFromContext(conn))
+                                    .thenApply(Optional::ofNullable)))
                     .concatWith(commit(conn))
                     .onErrorResume(t -> rollback(conn, t)))
         .last(Optional.empty())
@@ -96,11 +98,13 @@ public class R2dbcRawTransactionManager
                     .then(Mono.from(conn.setAutoCommit(false)))
                     .thenMany(fn.apply(conn))
                     .concatWith(
-                        Mono.from(conn.close())
+                        Mono.fromRunnable(() -> log.debug("Closing connection on success"))
+                            .then(Mono.from(conn.close()))
                             .then(Mono.fromRunnable(openTransactionCount::decrementAndGet)))
                     .onErrorResume(
                         t ->
-                            Mono.from(conn.close())
+                            Mono.fromRunnable(() -> log.debug("Closing connection on error"))
+                                .then(Mono.from(conn.close()))
                                 .then(Mono.fromRunnable(openTransactionCount::decrementAndGet))
                                 .then(Mono.error(t))));
   }
@@ -140,6 +144,7 @@ public class R2dbcRawTransactionManager
     }
 
     private static final AtomicLong nextId = new AtomicLong(1);
+
     @SuppressWarnings("NullableProblems")
     private class WrappedConnection implements Connection {
 

@@ -12,6 +12,7 @@ import io.r2dbc.spi.R2dbcTimeoutException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
 
@@ -34,8 +35,9 @@ class R2dbcSqlHandler implements Handler<Connection, R2dbcTransaction<?>> {
   }
 
   @Override
-  public List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t) throws Throwable {
-    if (t instanceof R2dbcTimeoutException) {
+  public List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t)
+      throws Throwable {
+    if (t instanceof R2dbcTimeoutException || t instanceof TimeoutException) {
       return List.of();
     } else {
       throw t;
