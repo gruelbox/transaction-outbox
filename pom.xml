@@ -45,6 +45,9 @@
     <module>transactionoutbox-spring</module>
     <module>transactionoutbox-guice</module>
     <module>transactionoutbox-jooq</module>
+    <module>transactionoutbox-r2dbc</module>
+    <module>transactionoutbox-testing</module>
+    <module>transactionoutbox-acceptance</module>
   </modules>
 
   <repositories>
@@ -90,36 +93,6 @@
         <groupId>org.glassfish</groupId>
         <artifactId>javax.el</artifactId>
         <version>3.0.0</version>
-      </dependency>
-      <dependency>
-
-      <!-- TODO move to new module -->
-        <groupId>io.projectreactor</groupId>
-        <artifactId>reactor-core</artifactId>
-        <version>3.3.5.RELEASE</version>
-      </dependency>
-      <dependency>
-        <groupId>io.r2dbc</groupId>
-        <artifactId>r2dbc-spi</artifactId>
-        <version>0.8.2.RELEASE</version>
-      </dependency>
-      <dependency>
-        <groupId>io.r2dbc</groupId>
-        <artifactId>r2dbc-h2</artifactId>
-        <version>0.8.2.RELEASE</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>io.r2dbc</groupId>
-        <artifactId>r2dbc-postgresql</artifactId>
-        <version>0.8.2.RELEASE</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>dev.miku</groupId>
-        <artifactId>r2dbc-mysql</artifactId>
-        <version>0.8.1.RELEASE</version>
-        <scope>test</scope>
       </dependency>
 
       <dependency>

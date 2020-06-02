@@ -37,7 +37,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -633,7 +632,6 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
         .build();
   }
 
-  @NotNull
   private Invocation createInvocation() {
     return new Invocation(
         "Foo",

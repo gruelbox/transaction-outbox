@@ -20,9 +20,6 @@ import net.sf.cglib.proxy.MethodInterceptor;
 import org.objenesis.Objenesis;
 import org.objenesis.ObjenesisStd;
 import org.objenesis.instantiator.ObjectInstantiator;
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -81,36 +78,6 @@ public class Utils {
       throw (Error) e;
     }
     throw new UncheckedException(e);
-  }
-
-  public static <T> CompletableFuture<T> toRunningFuture(Publisher<T> publisher) {
-    CompletableFuture<T> future = new CompletableFuture<>();
-    publisher.subscribe(
-        new Subscriber<>() {
-
-          private volatile T result;
-
-          @Override
-          public void onSubscribe(Subscription s) {
-            s.request(Long.MAX_VALUE);
-          }
-
-          @Override
-          public void onNext(T t) {
-            result = t;
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            future.completeExceptionally(t);
-          }
-
-          @Override
-          public void onComplete() {
-            future.complete(result);
-          }
-        });
-    return future;
   }
 
   public static <T> CompletableFuture<T> toBlockingFuture(Callable<T> callable) {
