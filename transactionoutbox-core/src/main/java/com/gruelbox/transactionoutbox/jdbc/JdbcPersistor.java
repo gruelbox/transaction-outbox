@@ -46,7 +46,7 @@ public class JdbcPersistor extends PersistorWrapper<Connection, JdbcTransaction<
           Connection, JdbcTransaction<?>, JdbcPersistorBuilder> {
 
     private JdbcPersistorBuilder() {
-      super(new JdbcSqlHandler());
+      super(new JdbcSqlApi());
     }
 
     public JdbcPersistor build() {

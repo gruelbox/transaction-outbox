@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox.sql;
 
-
 import com.gruelbox.transactionoutbox.Beta;
 import java.util.stream.Stream;
 import lombok.AllArgsConstructor;
@@ -15,7 +14,6 @@ import lombok.AllArgsConstructor;
  * gone into them; they've only need added as necessary to make things work.
  */
 @AllArgsConstructor
-@Beta
 public abstract class Dialect {
 
   public static final Dialect MY_SQL_5 = new MySqlDialect(false);
@@ -26,10 +24,9 @@ public abstract class Dialect {
   @Deprecated
   public static final Dialect POSTGRESQL__TEST_NO_SKIP_LOCK = new PostgreSqlDialect(false);
 
-  private final DialectFamily family;
-
   public abstract Stream<Migration> migrations(String tableName);
 
+  @Beta
   public String getDeleteExpired() {
     return "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blacklisted = false LIMIT ?";
   }
@@ -39,22 +36,27 @@ public abstract class Dialect {
    *     there are multiple instances of the application potentially competing to process the same
    *     task.
    */
+  @Beta
   public abstract boolean isSupportsSkipLock();
 
   /** @return The type to use for a cast to integer. */
+  @Beta
   public abstract String getIntegerCastType();
 
   /**
    * @return The command to use to set a query timeout. Not needed by JDBC but important for lower
    *     level protocols.
    */
+  @Beta
   public abstract String getQueryTimeoutSetup();
 
-  public DialectFamily getFamily() {
-    return family;
+  @Beta
+  public String mapStatementToNative(String sql) {
+    return sql;
   }
 
-  public String getDateTimeType() {
-    return "TIMESTAMP(6)";
+  @Beta
+  public SqlResultRow mapResultFromNative(SqlResultRow row) {
+    return row;
   }
 }

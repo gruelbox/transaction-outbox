@@ -41,7 +41,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   private final String tableName;
   private final boolean migrate;
   private final InvocationSerializer serializer;
-  private final Handler<CN, TX> handler;
+  private final SqlApi<CN, TX> sqlApi;
 
   private final String insertSql;
   private final String selectBatchSql;
@@ -57,56 +57,49 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
       String tableName,
       Boolean migrate,
       InvocationSerializer serializer,
-      Handler<CN, TX> handler) {
+      SqlApi<CN, TX> sqlApi) {
     this.writeLockTimeoutSeconds = writeLockTimeoutSeconds == null ? 2 : writeLockTimeoutSeconds;
     this.dialect = Objects.requireNonNull(dialect);
     this.tableName = tableName == null ? "TXNO_OUTBOX" : tableName;
     this.migrate = migrate == null ? true : migrate;
     this.serializer =
         Utils.firstNonNull(serializer, InvocationSerializer::createDefaultJsonSerializer);
-    this.handler = Objects.requireNonNull(handler);
+    this.sqlApi = Objects.requireNonNull(sqlApi);
     this.insertSql =
-        handler.preprocessSql(
-            dialect,
+        mapToNative(
             "INSERT INTO "
                 + this.tableName
                 + " (id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     this.selectBatchSql =
-        handler.preprocessSql(
-            dialect,
+        mapToNative(
             "SELECT id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version "
                 + "FROM "
                 + this.tableName
                 + " WHERE nextAttemptTime < ?"
                 + " AND blacklisted = false AND processed = false LIMIT ?"
                 + (dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : ""));
-    this.deleteSql =
-        handler.preprocessSql(
-            dialect, "DELETE FROM " + this.tableName + " WHERE id = ? and version = ?");
+    this.deleteSql = mapToNative("DELETE FROM " + this.tableName + " WHERE id = ? and version = ?");
     this.updateSql =
-        handler.preprocessSql(
-            dialect,
+        mapToNative(
             "UPDATE "
                 + this.tableName
                 + " SET nextAttemptTime = ?, attempts = ?,"
                 + " blacklisted = ?, processed = ?, version = ?"
                 + " WHERE id = ? and version = ?");
     this.lockSql =
-        handler.preprocessSql(
-            dialect,
+        mapToNative(
             "SELECT id FROM "
                 + this.tableName
                 + " WHERE id = ? AND version = ? FOR UPDATE"
                 + (dialect.isSupportsSkipLock() ? " SKIP LOCKED" : ""));
     this.whitelistSql =
-        handler.preprocessSql(
-            dialect,
+        mapToNative(
             "UPDATE "
                 + this.tableName
                 + " SET attempts = 0, blacklisted = false, version = version + 1 "
                 + "WHERE blacklisted = true AND processed = false AND id = ?");
-    this.clearSql = handler.preprocessSql(dialect, "DELETE FROM " + this.tableName);
+    this.clearSql = dialect.mapStatementToNative("DELETE FROM " + this.tableName);
   }
 
   @SuppressWarnings("unchecked")
@@ -124,11 +117,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
                           + dialect.getIntegerCastType()
                           + ") AS version"));
               List<Integer> versionResult =
-                  await(
-                      executeQuery(
-                          tx,
-                          "SELECT version FROM TXNO_VERSION FOR UPDATE",
-                          row -> row.get(0, Integer.class)));
+                  await(executeFetchVersion(tx, row -> row.get(0, Integer.class)));
               if (versionResult.size() != 1) {
                 throw new IllegalStateException(
                     "Unexpected number of version records: " + versionResult.size());
@@ -154,10 +143,9 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   @Override
   public CompletableFuture<Void> save(TX tx, TransactionOutboxEntry entry) {
     try {
-      handler.interceptNew(dialect, entry);
       var writer = new StringWriter();
       serializer.serializeInvocation(entry.getInvocation(), writer);
-      return handler
+      return sqlApi
           .statement(
               tx,
               dialect,
@@ -177,7 +165,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
                       .execute())
           .exceptionally(
               e -> {
-                handler.handleSaveException(entry, e);
+                sqlApi.handleSaveException(entry, e);
                 throw sneakyRethrow(e);
               })
           .thenApply(
@@ -195,7 +183,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   @Override
   public final CompletableFuture<Void> delete(TX tx, TransactionOutboxEntry entry) {
     try {
-      return handler
+      return sqlApi
           .statement(
               tx,
               dialect,
@@ -220,7 +208,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   @Override
   public final CompletableFuture<Void> update(TX tx, TransactionOutboxEntry entry) {
     try {
-      return handler
+      return sqlApi
           .statement(
               tx,
               dialect,
@@ -255,7 +243,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   @Override
   public final CompletableFuture<Boolean> lock(TX tx, TransactionOutboxEntry entry) {
     try {
-      return handler
+      return sqlApi
           .statement(
               tx,
               dialect,
@@ -270,7 +258,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
           .exceptionally(
               e -> {
                 try {
-                  return handler.handleLockException(entry, e);
+                  return sqlApi.handleLockException(entry, e);
                 } catch (Throwable t) {
                   throw sneakyRethrow(t);
                 }
@@ -284,7 +272,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   @Override
   public final CompletableFuture<Boolean> whitelist(TX tx, String entryId) {
     try {
-      return handler
+      return sqlApi
           .statement(
               tx,
               dialect,
@@ -302,7 +290,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   public final CompletableFuture<List<TransactionOutboxEntry>> selectBatch(
       TX tx, int batchSize, Instant now) {
     try {
-      return handler.statement(
+      return sqlApi.statement(
           tx,
           dialect,
           selectBatchSql,
@@ -336,11 +324,10 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   public final CompletableFuture<Integer> deleteProcessedAndExpired(
       TX tx, int batchSize, Instant now) {
     try {
-      return handler.statement(
+      return sqlApi.statement(
           tx,
           dialect,
-          handler.preprocessSql(
-              dialect, dialect.getDeleteExpired().replace("{{table}}", tableName)),
+          mapToNative(dialect.getDeleteExpired().replace("{{table}}", tableName)),
           writeLockTimeoutSeconds,
           false,
           binder -> binder.bind(0, now).bind(1, batchSize).execute());
@@ -351,17 +338,27 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
 
   @Override
   public final CompletableFuture<Integer> clear(TX tx) {
-    return handler.statement(tx, dialect, clearSql, 0, false, Binder::execute);
+    return sqlApi.statement(tx, dialect, clearSql, 0, false, SqlStatement::execute);
   }
 
-  private <T> CompletableFuture<List<T>> executeQuery(
-      TX tx, String sql, Function<ResultRow, T> mapper) {
-    return handler.statement(
-        tx, dialect, sql, writeLockTimeoutSeconds, false, binder -> binder.executeQuery(1, mapper));
+  private <T> CompletableFuture<List<T>> executeFetchVersion(
+      TX tx, Function<SqlResultRow, T> mapper) {
+    return sqlApi.statement(
+        tx,
+        dialect,
+        "SELECT version FROM TXNO_VERSION FOR UPDATE",
+        0,
+        false,
+        binder -> binder.executeQuery(1, mapper));
   }
 
   private CompletableFuture<Integer> executeUpdate(TX tx, String sql) {
-    return handler.statement(tx, dialect, sql, writeLockTimeoutSeconds, false, Binder::execute);
+    return sqlApi.statement(
+        tx, dialect, sql, writeLockTimeoutSeconds, false, SqlStatement::execute);
+  }
+
+  private String mapToNative(String sql) {
+    return sqlApi.requiresNativeStatementMapping() ? dialect.mapStatementToNative(sql) : sql;
   }
 
   @SneakyThrows
@@ -370,55 +367,17 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   }
 
   @Beta
-  public interface Handler<CN, TX extends Transaction<CN, ?>> {
-    default String preprocessSql(Dialect dialect, String sql) {
-      return sql;
-    }
-
-    <T> T statement(
-        TX tx,
-        Dialect dialect,
-        String sql,
-        int writeLockTimeoutSeconds,
-        boolean batchable,
-        Function<Binder, T> binding);
-
-    default void interceptNew(Dialect dialect, TransactionOutboxEntry entry) {
-      // No-op
-    }
-
-    void handleSaveException(TransactionOutboxEntry entry, Throwable t);
-
-    List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t) throws Throwable;
-  }
-
-  @Beta
-  public interface ResultRow {
-    <T> T get(int index, Class<T> type);
-  }
-
-  @Beta
-  public interface Binder {
-    Binder bind(int index, Object value);
-
-    CompletableFuture<Integer> execute();
-
-    <T> CompletableFuture<List<T>> executeQuery(
-        int expectedRowCount, Function<ResultRow, T> rowMapper);
-  }
-
-  @Beta
   public abstract static class SqlPersistorBuilder<
       CN, TX extends Transaction<CN, ?>, T extends SqlPersistorBuilder<CN, TX, T>> {
-    private final Handler<CN, TX> statementProcessor;
+    private final SqlApi<CN, TX> sqlApi;
     private Integer writeLockTimeoutSeconds = 2;
     private Dialect dialect;
     private String tableName;
     private Boolean migrate;
     private InvocationSerializer serializer;
 
-    protected SqlPersistorBuilder(Handler<CN, TX> statementProcessor) {
-      this.statementProcessor = statementProcessor;
+    protected SqlPersistorBuilder(SqlApi<CN, TX> sqlApi) {
+      this.sqlApi = sqlApi;
     }
 
     /**
@@ -472,23 +431,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
 
     protected SqlPersistor<CN, TX> buildGeneric() {
       return new SqlPersistor<>(
-          writeLockTimeoutSeconds, dialect, tableName, migrate, serializer, statementProcessor);
-    }
-
-    public String toString() {
-      return "SqlPersistor.SqlPersistorBuilder(writeLockTimeoutSeconds="
-          + this.writeLockTimeoutSeconds
-          + ", dialect="
-          + this.dialect
-          + ", tableName="
-          + this.tableName
-          + ", migrate="
-          + this.migrate
-          + ", serializer="
-          + this.serializer
-          + ", statementProcessor="
-          + this.statementProcessor
-          + ")";
+          writeLockTimeoutSeconds, dialect, tableName, migrate, serializer, sqlApi);
     }
   }
 }

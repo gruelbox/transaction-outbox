@@ -6,8 +6,7 @@ class MySqlDialect extends Dialect {
 
   private final boolean supportsSkipLock;
 
-  public MySqlDialect(boolean supportsSkipLock) {
-    super(DialectFamily.MY_SQL);
+  MySqlDialect(boolean supportsSkipLock) {
     this.supportsSkipLock = supportsSkipLock;
   }
 
@@ -64,7 +63,17 @@ class MySqlDialect extends Dialect {
   }
 
   @Override
-  public String getDateTimeType() {
-    return "DATETIME(6)";
+  public SqlResultRow mapResultFromNative(SqlResultRow row) {
+    return new SqlResultRow() {
+      @SuppressWarnings("unchecked")
+      @Override
+      public <T> T get(int index, Class<T> type) {
+        if (Boolean.class.equals(type)) {
+          return (T) Boolean.valueOf(row.get(index, Short.class) == 1);
+        } else {
+          return row.get(index, type);
+        }
+      }
+    };
   }
 }

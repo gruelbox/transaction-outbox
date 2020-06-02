@@ -6,9 +6,9 @@ import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.sql.Dialect;
-import com.gruelbox.transactionoutbox.sql.SqlPersistor;
-import com.gruelbox.transactionoutbox.sql.SqlPersistor.Binder;
-import com.gruelbox.transactionoutbox.sql.SqlPersistor.ResultRow;
+import com.gruelbox.transactionoutbox.sql.SqlApi;
+import com.gruelbox.transactionoutbox.sql.SqlResultRow;
+import com.gruelbox.transactionoutbox.sql.SqlStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -26,7 +26,12 @@ import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction<?>> {
+class JdbcSqlApi implements SqlApi<Connection, JdbcTransaction<?>> {
+
+  @Override
+  public boolean requiresNativeStatementMapping() {
+    return false;
+  }
 
   @Override
   public <T> T statement(
@@ -35,7 +40,7 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
       String sql,
       int timeoutSeconds,
       boolean batchable,
-      Function<Binder, T> binding) {
+      Function<SqlStatement, T> binding) {
     log.debug("Executing: {}", sql);
     if (batchable) {
       return executeWithSharedStatement(tx, sql, timeoutSeconds, binding);
@@ -75,7 +80,7 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
   }
 
   private <T> T executeWithStandaloneStatement(
-      JdbcTransaction<?> tx, String sql, int timeoutSeconds, Function<Binder, T> binding) {
+      JdbcTransaction<?> tx, String sql, int timeoutSeconds, Function<SqlStatement, T> binding) {
     try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
       statement.setQueryTimeout(timeoutSeconds);
       return binding.apply(executeAndMap(statement));
@@ -85,7 +90,7 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
   }
 
   private <T> T executeWithSharedStatement(
-      JdbcTransaction<?> tx, String sql, int timeoutSeconds, Function<Binder, T> binding) {
+      JdbcTransaction<?> tx, String sql, int timeoutSeconds, Function<SqlStatement, T> binding) {
     PreparedStatement statement = tx.prepareBatchStatement(sql);
     try {
       statement.setQueryTimeout(timeoutSeconds);
@@ -95,11 +100,11 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
     return binding.apply(executeAndMap(statement));
   }
 
-  private Binder executeAndMap(PreparedStatement statement) {
-    return new SqlPersistor.Binder() {
+  private SqlStatement executeAndMap(PreparedStatement statement) {
+    return new SqlStatement() {
 
       @Override
-      public Binder bind(int index, Object value) {
+      public SqlStatement bind(int index, Object value) {
         try {
           log.debug(" - Binding {} --> {}", index, value);
           if (value instanceof Instant) {
@@ -120,7 +125,7 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
 
       @Override
       public <T> CompletableFuture<List<T>> executeQuery(
-          int expectedRowCount, Function<ResultRow, T> rowMapper) {
+          int expectedRowCount, Function<SqlResultRow, T> rowMapper) {
         return toBlockingFuture(
             () -> {
               List<T> results = new ArrayList<>(expectedRowCount);
@@ -129,7 +134,7 @@ class JdbcSqlHandler implements SqlPersistor.Handler<Connection, JdbcTransaction
                   log.debug("Fetched row");
                   results.add(
                       rowMapper.apply(
-                          new ResultRow() {
+                          new SqlResultRow() {
                             @SuppressWarnings({"unchecked", "WrapperTypeMayBePrimitive"})
                             @Override
                             public <V> V get(int index, Class<V> type) {

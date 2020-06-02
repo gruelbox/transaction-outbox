@@ -3,9 +3,8 @@ package com.gruelbox.transactionoutbox.r2dbc;
 import static com.gruelbox.transactionoutbox.r2dbc.Utils.EMPTY_RESULT;
 
 import com.gruelbox.transactionoutbox.sql.Dialect;
-import com.gruelbox.transactionoutbox.sql.DialectFamily;
-import com.gruelbox.transactionoutbox.sql.SqlPersistor.Binder;
-import com.gruelbox.transactionoutbox.sql.SqlPersistor.ResultRow;
+import com.gruelbox.transactionoutbox.sql.SqlResultRow;
+import com.gruelbox.transactionoutbox.sql.SqlStatement;
 import io.r2dbc.spi.Statement;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -19,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 @Slf4j
-class R2dbcStatement implements Binder {
+class R2dbcStatement implements SqlStatement {
 
   private final Statement statement;
   private final R2dbcTransaction<?> tx;
@@ -59,7 +58,7 @@ class R2dbcStatement implements Binder {
 
   @Override
   public <U> CompletableFuture<List<U>> executeQuery(
-      int expectedRowCount, Function<ResultRow, U> rowMapper) {
+      int expectedRowCount, Function<SqlResultRow, U> rowMapper) {
     return setQueryTimeout(timeoutSeconds)
         .then(executeQueryInternal(expectedRowCount, rowMapper))
         .toFuture();
@@ -89,36 +88,33 @@ class R2dbcStatement implements Binder {
   }
 
   private <U> Mono<List<U>> executeQueryInternal(
-      int expectedRowCount, Function<ResultRow, U> rowMapper) {
+      int expectedRowCount, Function<SqlResultRow, U> rowMapper) {
     return Mono.from(statement.execute())
         .map(r -> (io.r2dbc.spi.Result) r)
         .defaultIfEmpty(EMPTY_RESULT)
         .flatMapMany(result -> result.map((r, m) -> r))
         .map(
             row ->
-                new ResultRow() {
-                  @SuppressWarnings({"unchecked", "ConstantConditions"})
-                  @Override
-                  public <V> V get(int index, Class<V> type) {
-                    try {
-                      // TODO suggest Instant support to R2DBC
-                      if (Instant.class.equals(type)) {
-                        return (V)
-                            Objects.requireNonNull(row.get(index, LocalDateTime.class))
-                                .toInstant(ZoneOffset.UTC);
-                        // TODO remove hack regarding data types
-                      } else if (Boolean.class.equals(type)
-                          && (dialect.getFamily().equals(DialectFamily.MY_SQL))) {
-                        return (V) Boolean.valueOf(row.get(index, Short.class) == 1);
-                      } else {
-                        return row.get(index, type);
+                dialect.mapResultFromNative(
+                    new SqlResultRow() {
+                      @SuppressWarnings("unchecked")
+                      @Override
+                      public <V> V get(int index, Class<V> type) {
+                        try {
+                          // TODO suggest Instant support to R2DBC
+                          if (Instant.class.equals(type)) {
+                            return (V)
+                                Objects.requireNonNull(row.get(index, LocalDateTime.class))
+                                    .toInstant(ZoneOffset.UTC);
+                          } else {
+                            return row.get(index, type);
+                          }
+                        } catch (Exception e) {
+                          throw new IllegalArgumentException(
+                              "Failed to fetch field [" + index + "] in " + sql, e);
+                        }
                       }
-                    } catch (Exception e) {
-                      throw new IllegalArgumentException(
-                          "Failed to fetch field [" + index + "] in " + sql, e);
-                    }
-                  }
-                })
+                    }))
         .map(rowMapper)
         .collect(() -> new ArrayList<>(expectedRowCount), List::add);
   }

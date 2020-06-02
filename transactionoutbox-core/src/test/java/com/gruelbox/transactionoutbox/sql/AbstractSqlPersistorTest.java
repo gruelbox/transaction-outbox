@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox.sql;
 
 import static java.time.Instant.now;
-import static java.time.temporal.ChronoUnit.MILLIS;
+import static java.time.temporal.ChronoUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -54,7 +54,7 @@ import org.junit.jupiter.api.Test;
 @Slf4j
 public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>> {
 
-  private Instant now = now().truncatedTo(MILLIS);
+  private Instant now = now().truncatedTo(SECONDS);
 
   protected abstract Dialect dialect();
 

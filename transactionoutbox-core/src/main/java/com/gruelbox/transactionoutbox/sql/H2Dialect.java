@@ -1,13 +1,8 @@
 package com.gruelbox.transactionoutbox.sql;
 
-
 import java.util.stream.Stream;
 
 class H2Dialect extends Dialect {
-
-  public H2Dialect() {
-    super(DialectFamily.H2);
-  }
 
   @Override
   public Stream<Migration> migrations(String tableName) {

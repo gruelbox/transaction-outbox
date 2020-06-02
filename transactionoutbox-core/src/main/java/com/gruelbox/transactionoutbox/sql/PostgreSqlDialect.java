@@ -6,8 +6,7 @@ class PostgreSqlDialect extends Dialect {
 
   private final boolean supportsSkipLock;
 
-  public PostgreSqlDialect(boolean supportsSkipLock) {
-    super(DialectFamily.POSTGRESQL);
+  PostgreSqlDialect(boolean supportsSkipLock) {
     this.supportsSkipLock = supportsSkipLock;
   }
 
@@ -72,5 +71,21 @@ class PostgreSqlDialect extends Dialect {
   @Override
   public String getQueryTimeoutSetup() {
     return "SET LOCAL lock_timeout = '{{timeout}}s'";
+  }
+
+  @Override
+  public String mapStatementToNative(String sql) {
+    // Blunt, not general purpose, but only needs to work for the known use cases
+    StringBuilder builder = new StringBuilder();
+    int paramIndex = 1;
+    for (int i = 0; i < sql.length(); i++) {
+      char c = sql.charAt(i);
+      if (c == '?') {
+        builder.append('$').append(paramIndex++);
+      } else {
+        builder.append(c);
+      }
+    }
+    return builder.toString();
   }
 }

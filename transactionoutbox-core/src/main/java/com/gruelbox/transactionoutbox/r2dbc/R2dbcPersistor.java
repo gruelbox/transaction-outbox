@@ -36,7 +36,7 @@ public class R2dbcPersistor extends PersistorWrapper<Connection, R2dbcTransactio
       extends SqlPersistor.SqlPersistorBuilder<
           Connection, R2dbcTransaction<?>, R2dbcPersistorBuilder> {
     private R2dbcPersistorBuilder() {
-      super(new R2dbcSqlHandler());
+      super(new R2dbcSqlApi());
     }
 
     public R2dbcPersistor build() {
