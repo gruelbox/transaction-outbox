@@ -2,8 +2,7 @@ package com.gruelbox.transactionoutbox.jdbc;
 
 import com.gruelbox.transactionoutbox.Beta;
 import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
-import com.gruelbox.transactionoutbox.Utils;
-import java.sql.Connection;
+import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -11,29 +10,33 @@ import lombok.extern.slf4j.Slf4j;
  * management.
  */
 @Slf4j
-public class StubThreadLocalJdbcTransactionManager
-    extends AbstractThreadLocalJdbcTransactionManager<Void, SimpleTransaction<Void>> {
+public class StubThreadLocalJdbcTransactionManager<CX, TX extends JdbcTransaction<CX>>
+    extends AbstractThreadLocalJdbcTransactionManager<CX, TX> {
+
+  private final Supplier<TX> transactionFactory;
 
   @Beta
-  public StubThreadLocalJdbcTransactionManager() {
-    // Nothing to do
+  public StubThreadLocalJdbcTransactionManager(Supplier<TX> transactionFactory) {
+    this.transactionFactory = transactionFactory;
   }
 
   @Override
   public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E, SimpleTransaction<Void>> work) throws E {
+      ThrowingTransactionalSupplier<T, E, TX> work) throws E {
     return withTransaction(
         atx -> {
           T result = work.doWork(atx);
-          atx.processHooks();
+          if (atx instanceof SimpleTransaction) {
+            ((SimpleTransaction) atx).processHooks();
+          }
           return result;
         });
   }
 
-  private <T, E extends Exception> T withTransaction(
-      ThrowingTransactionalSupplier<T, E, SimpleTransaction<Void>> work) throws E {
-    Connection mockConnection = Utils.createLoggingProxy(Connection.class);
-    try (var transaction = pushTransaction(new SimpleTransaction<>(mockConnection, null))) {
+  private <T, E extends Exception> T withTransaction(ThrowingTransactionalSupplier<T, E, TX> work)
+      throws E {
+    var transaction = pushTransaction(transactionFactory.get());
+    try {
       return work.doWork(transaction);
     } finally {
       popTransaction();

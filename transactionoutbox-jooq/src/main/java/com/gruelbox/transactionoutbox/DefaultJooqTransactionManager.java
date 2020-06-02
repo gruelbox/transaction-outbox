@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
-import lombok.extern.slf4j.Slf4j;
+import com.gruelbox.transactionoutbox.spi.ParameterContextTransactionManager;
+import java.sql.Connection;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
 
@@ -9,35 +10,6 @@ import org.jooq.DSLContext;
  * {@link org.jooq.impl.DefaultTransactionProvider}. Relies on {@link JooqTransactionListener} being
  * connected to the {@link DSLContext}.
  */
-@Slf4j
-@Beta
-final class DefaultJooqTransactionManager
-    implements ParameterContextTransactionManager<Configuration> {
-
-  private final DSLContext dsl;
-
-  DefaultJooqTransactionManager(DSLContext dsl) {
-    this.dsl = dsl;
-  }
-
-  @Override
-  public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E> work) {
-    return dsl.transactionResult(cfg -> work.doWork(transactionFromContext(cfg)));
-  }
-
-  @Override
-  public Transaction transactionFromContext(Configuration context) {
-    Object txn = context.data(JooqTransactionListener.TXN_KEY);
-    if (txn == null) {
-      throw new IllegalStateException(
-          JooqTransactionListener.class.getSimpleName() + " is not attached to the DSL");
-    }
-    return (Transaction) txn;
-  }
-
-  @Override
-  public Class<Configuration> contextType() {
-    return Configuration.class;
-  }
-}
+public interface DefaultJooqTransactionManager
+    extends ParameterContextTransactionManager<Connection, Configuration, JooqTransaction>,
+        JooqTransactionManager {}

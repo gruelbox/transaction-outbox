@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
 import com.gruelbox.transactionoutbox.jdbc.TransactionalSupplier;
+import com.gruelbox.transactionoutbox.spi.Transaction;
 
 @FunctionalInterface
 public interface ThrowingTransactionalSupplier<

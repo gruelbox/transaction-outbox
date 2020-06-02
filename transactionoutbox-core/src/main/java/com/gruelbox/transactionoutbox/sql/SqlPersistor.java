@@ -5,14 +5,14 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.failedFuture;
 
 import com.gruelbox.transactionoutbox.Beta;
-import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.InvocationSerializer;
 import com.gruelbox.transactionoutbox.OptimisticLockException;
-import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.Transaction;
-import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.Utils;
+import com.gruelbox.transactionoutbox.spi.Invocation;
+import com.gruelbox.transactionoutbox.spi.Persistor;
+import com.gruelbox.transactionoutbox.spi.Transaction;
+import com.gruelbox.transactionoutbox.spi.TransactionManager;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.Instant;
@@ -102,42 +102,37 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
     this.clearSql = dialect.mapStatementToNative("DELETE FROM " + this.tableName);
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public void migrate(TransactionManager<CN, ?, ? extends TX> tm) {
     if (!migrate) {
       return;
     }
-    tm.transactionally(
-            tx -> {
-              await(
-                  executeUpdate(
-                      tx,
-                      "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
-                          + dialect.getIntegerCastType()
-                          + ") AS version"));
-              List<Integer> versionResult =
-                  await(executeFetchVersion(tx, row -> row.get(0, Integer.class)));
-              if (versionResult.size() != 1) {
-                throw new IllegalStateException(
-                    "Unexpected number of version records: " + versionResult.size());
-              }
-              int currentVersion = versionResult.get(0);
-              Iterator<Migration> migrationIterator =
-                  dialect
-                      .migrations(tableName)
-                      .filter(it -> it.getVersion() > currentVersion)
-                      .iterator();
-              while (migrationIterator.hasNext()) {
-                var mig = migrationIterator.next();
-                log.info("Running migration {}: {}", mig.getVersion(), mig.getName());
-                await(executeUpdate(tx, mig.getSql()));
-                await(executeUpdate(tx, "UPDATE TXNO_VERSION SET version = " + mig.getVersion()));
-              }
-              return completedFuture(null);
-            })
-        .join();
+    tm.transactionally(this::doMigrate).join();
     log.info("Migrations complete");
+  }
+
+  private CompletableFuture<?> doMigrate(TX tx) {
+    await(
+        executeUpdate(
+            tx,
+            "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
+                + dialect.getIntegerCastType()
+                + ") AS version"));
+    List<Integer> versionResult = await(executeFetchVersion(tx, row -> row.get(0, Integer.class)));
+    if (versionResult.size() != 1) {
+      throw new IllegalStateException(
+          "Unexpected number of version records: " + versionResult.size());
+    }
+    int currentVersion = versionResult.get(0);
+    Iterator<Migration> migrationIterator =
+        dialect.migrations(tableName).filter(it -> it.getVersion() > currentVersion).iterator();
+    while (migrationIterator.hasNext()) {
+      var mig = migrationIterator.next();
+      log.info("Running migration {}: {}", mig.getVersion(), mig.getName());
+      await(executeUpdate(tx, mig.getSql()));
+      await(executeUpdate(tx, "UPDATE TXNO_VERSION SET version = " + mig.getVersion()));
+    }
+    return completedFuture(null);
   }
 
   @Override

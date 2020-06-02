@@ -13,8 +13,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 import lombok.AllArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 @Beta
@@ -43,7 +45,7 @@ public class SimpleTransaction<CONTEXT> implements JdbcTransaction<CONTEXT>, Aut
         sql, s -> uncheckedly(() -> connection.prepareStatement(s)));
   }
 
-  final void flushBatches() {
+  public final void flushBatches() {
     if (!preparedStatements.isEmpty()) {
       log.debug("Flushing batches");
       for (PreparedStatement statement : preparedStatements.values()) {
@@ -52,10 +54,19 @@ public class SimpleTransaction<CONTEXT> implements JdbcTransaction<CONTEXT>, Aut
     }
   }
 
-  final void processHooks() {
+  public final void processHooks() {
     if (!postCommitHooks.isEmpty()) {
       log.debug("Running post-commit hooks");
-      postCommitHooks.stream().map(Supplier::get).forEach(hook -> uncheckedly(hook::get));
+      postCommitHooks.stream().map(Supplier::get).forEach(this::runHook);
+    }
+  }
+
+  @SneakyThrows
+  private void runHook(CompletableFuture<Void> hook) {
+    try {
+      hook.join();
+    } catch (CompletionException e) {
+      throw e.getCause();
     }
   }
 

@@ -1,8 +1,8 @@
 package com.gruelbox.transactionoutbox.sql;
 
 import com.gruelbox.transactionoutbox.Beta;
-import com.gruelbox.transactionoutbox.Transaction;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
+import com.gruelbox.transactionoutbox.spi.Transaction;
 import java.util.List;
 import java.util.function.Function;
 

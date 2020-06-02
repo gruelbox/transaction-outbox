@@ -1,11 +1,10 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spi;
 
 import lombok.Value;
 
 /**
  * Describes a method invocation along with the transaction scope in which it should be performed.
  */
-@SuppressWarnings("WeakerAccess")
 @Value
 public class TransactionalInvocation<TX extends Transaction<?, ?>> {
   Class<?> clazz;

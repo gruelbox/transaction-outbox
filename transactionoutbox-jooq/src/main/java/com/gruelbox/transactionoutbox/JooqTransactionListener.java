@@ -11,11 +11,11 @@ public class JooqTransactionListener implements TransactionListener {
 
   static final String TXN_KEY = JooqTransactionListener.class.getName() + ".txn";
 
-  private ThreadLocalJooqTransactionManager jooqTransactionManager;
+  private ThreadLocalJooqTransactionManagerImpl jooqTransactionManager;
 
   JooqTransactionListener() {}
 
-  void setJooqTransactionManager(ThreadLocalJooqTransactionManager jooqTransactionManager) {
+  void setJooqTransactionManager(ThreadLocalJooqTransactionManagerImpl jooqTransactionManager) {
     this.jooqTransactionManager = jooqTransactionManager;
   }
 
@@ -29,8 +29,8 @@ public class JooqTransactionListener implements TransactionListener {
     ctx.dsl()
         .connection(
             connection -> {
-              SimpleTransaction transaction =
-                  new SimpleTransaction(connection, ctx.dsl().configuration());
+              JooqTransaction transaction =
+                  new JooqTransaction(connection, ctx.dsl().configuration());
               ctx.dsl().configuration().data(TXN_KEY, transaction);
               if (jooqTransactionManager != null) {
                 jooqTransactionManager.pushTransaction(transaction);

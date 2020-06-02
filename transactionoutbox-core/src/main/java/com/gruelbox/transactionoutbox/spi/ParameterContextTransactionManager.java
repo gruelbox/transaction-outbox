@@ -1,5 +1,7 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spi;
 
+import com.gruelbox.transactionoutbox.Beta;
+import com.gruelbox.transactionoutbox.TransactionOutbox;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 

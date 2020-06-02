@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.gruelbox.transactionoutbox.spi.Invocation;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;

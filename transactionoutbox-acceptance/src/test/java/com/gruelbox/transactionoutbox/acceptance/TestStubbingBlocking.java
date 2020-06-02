@@ -11,12 +11,14 @@ import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.StubPersistor;
 import com.gruelbox.transactionoutbox.Submitter;
-import com.gruelbox.transactionoutbox.Transaction;
-import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
 import com.gruelbox.transactionoutbox.jdbc.StubParameterContextJdbcTransactionManager;
 import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
+import com.gruelbox.transactionoutbox.spi.Transaction;
+import com.gruelbox.transactionoutbox.spi.TransactionManager;
 import java.math.BigDecimal;
+import java.sql.Connection;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -27,6 +29,7 @@ import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /** Checks that stubbing {@link TransactionOutbox} works cleanly. */
 @Slf4j
@@ -38,8 +41,9 @@ class TestStubbingBlocking {
 
   @Test
   void testStubbingWithThreadLocalContext() {
-    StubThreadLocalJdbcTransactionManager transactionManager =
-        new StubThreadLocalJdbcTransactionManager();
+    StubThreadLocalJdbcTransactionManager<Void, SimpleTransaction<Void>> transactionManager =
+        new StubThreadLocalJdbcTransactionManager<>(
+            () -> new SimpleTransaction<>(Mockito.mock(Connection.class), null));
     TransactionOutbox outbox = createOutbox(transactionManager);
 
     Interface.invocations.clear();
@@ -69,8 +73,12 @@ class TestStubbingBlocking {
 
   @Test
   void testStubbingWithExplicitContextInvalidContext() {
-    StubParameterContextJdbcTransactionManager<Context> transactionManager =
-        new StubParameterContextJdbcTransactionManager<>(Context.class, () -> new Context(1L));
+    StubParameterContextJdbcTransactionManager<Context, SimpleTransaction<Context>>
+        transactionManager =
+            new StubParameterContextJdbcTransactionManager<>(
+                Context.class,
+                () -> new Context(1L),
+                ctx -> new SimpleTransaction<>(Mockito.mock(Connection.class), ctx));
     TransactionOutbox outbox = createOutbox(transactionManager);
 
     Assertions.assertThrows(
@@ -82,8 +90,12 @@ class TestStubbingBlocking {
 
   @Test
   void testStubbingWithExplicitContextPassingTransaction() {
-    StubParameterContextJdbcTransactionManager<Context> transactionManager =
-        new StubParameterContextJdbcTransactionManager<>(Context.class, () -> new Context(1L));
+    StubParameterContextJdbcTransactionManager<Context, SimpleTransaction<Context>>
+        transactionManager =
+            new StubParameterContextJdbcTransactionManager<>(
+                Context.class,
+                () -> new Context(1L),
+                ctx -> new SimpleTransaction<>(Mockito.mock(Connection.class), ctx));
     TransactionOutbox outbox = createOutbox(transactionManager);
 
     Interface.invocations.clear();
@@ -97,8 +109,12 @@ class TestStubbingBlocking {
 
   @Test
   void testStubbingWithExplicitContextPassingContext() {
-    StubParameterContextJdbcTransactionManager<Context> transactionManager =
-        new StubParameterContextJdbcTransactionManager<>(Context.class, () -> new Context(1L));
+    StubParameterContextJdbcTransactionManager<Context, SimpleTransaction<Context>>
+        transactionManager =
+            new StubParameterContextJdbcTransactionManager<>(
+                Context.class,
+                () -> new Context(1L),
+                ctx -> new SimpleTransaction<>(Mockito.mock(Connection.class), ctx));
     TransactionOutbox outbox = createOutbox(transactionManager);
 
     Interface.invocations.clear();
@@ -152,7 +168,7 @@ class TestStubbingBlocking {
   }
 
   @Value
-  static class Context {
+  private static class Context {
     long id;
   }
 }

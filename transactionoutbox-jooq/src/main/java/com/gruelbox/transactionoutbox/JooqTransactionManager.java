@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
 
@@ -21,7 +22,8 @@ import org.jooq.DSLContext;
  * DSLContext dsl = DSL.using(configuration);
  * return JooqTransactionManager.create(dsl, listener);</pre>
  */
-public interface JooqTransactionManager extends TransactionManager {
+public interface JooqTransactionManager
+    extends JdbcTransactionManager<Configuration, JooqTransaction> {
 
   /**
    * Creates the {@link org.jooq.TransactionListener} to wire into the {@link DSLContext}. See
@@ -45,9 +47,9 @@ public interface JooqTransactionManager extends TransactionManager {
    * @param listener The listener, linked to the DSL context.
    * @return The transaction manager.
    */
-  static ThreadLocalContextTransactionManager create(
+  static ThreadLocalJooqTransactionManagerImpl create(
       DSLContext dslContext, JooqTransactionListener listener) {
-    var result = new ThreadLocalJooqTransactionManager(dslContext);
+    var result = new ThreadLocalJooqTransactionManagerImpl(dslContext);
     listener.setJooqTransactionManager(result);
     return result;
   }
@@ -86,7 +88,7 @@ public interface JooqTransactionManager extends TransactionManager {
    * @return The transaction manager.
    */
   @Beta
-  static ParameterContextTransactionManager<Configuration> create(DSLContext dslContext) {
-    return new DefaultJooqTransactionManager(dslContext);
+  static DefaultJooqTransactionManager create(DSLContext dslContext) {
+    return new DefaultJooqTransactionManagerImpl(dslContext);
   }
 }

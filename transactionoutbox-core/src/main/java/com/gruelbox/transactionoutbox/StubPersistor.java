@@ -2,6 +2,9 @@ package com.gruelbox.transactionoutbox;
 
 import static java.util.concurrent.CompletableFuture.completedFuture;
 
+import com.gruelbox.transactionoutbox.spi.Persistor;
+import com.gruelbox.transactionoutbox.spi.Transaction;
+import com.gruelbox.transactionoutbox.spi.TransactionManager;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;

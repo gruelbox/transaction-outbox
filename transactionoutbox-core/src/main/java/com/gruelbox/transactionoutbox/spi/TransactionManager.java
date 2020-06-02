@@ -1,12 +1,12 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spi;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 /**
- * Base type for transaction management in a {@link TransactionOutbox}. Provides the minimal SPI
- * surface required to allow {@link TransactionOutbox} to work and is not intended to be a
+ * Base type for transaction management in a {@code TransactionOutbox}. Provides the minimal SPI
+ * surface required to allow {@code TransactionOutbox} to work and is not intended to be a
  * client-side API. However, subtypes may extend this to provide client support.
  *
  * @param <CN> The type which the associated {@link Persistor} implementation will use to interact

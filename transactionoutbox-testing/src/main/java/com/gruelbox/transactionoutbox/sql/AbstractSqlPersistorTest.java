@@ -17,12 +17,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
-import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.OptimisticLockException;
-import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.Transaction;
-import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
+import com.gruelbox.transactionoutbox.spi.Invocation;
+import com.gruelbox.transactionoutbox.spi.Persistor;
+import com.gruelbox.transactionoutbox.spi.Transaction;
+import com.gruelbox.transactionoutbox.spi.TransactionManager;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -313,7 +313,7 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
   }
 
   @Test
-  void testWhitelist() throws InterruptedException {
+  void testWhitelist() {
     var entry1 = createEntry("FOOx", now, false);
     var entry2 = createEntry("FOOy", now, false);
     entry2.setBlacklisted(true);

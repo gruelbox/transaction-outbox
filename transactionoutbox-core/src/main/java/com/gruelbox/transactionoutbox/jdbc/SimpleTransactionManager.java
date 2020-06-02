@@ -3,7 +3,7 @@ package com.gruelbox.transactionoutbox.jdbc;
 import static com.gruelbox.transactionoutbox.Utils.uncheck;
 
 import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
-import com.gruelbox.transactionoutbox.TransactionManager;
+import com.gruelbox.transactionoutbox.spi.TransactionManager;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;

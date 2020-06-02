@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
-import com.gruelbox.transactionoutbox.Transaction;
 import com.gruelbox.transactionoutbox.Utils;
+import com.gruelbox.transactionoutbox.spi.Transaction;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.function.Supplier;

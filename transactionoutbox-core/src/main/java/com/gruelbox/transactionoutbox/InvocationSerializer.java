@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.Invocation;
 import java.io.Reader;
 import java.io.Writer;
 

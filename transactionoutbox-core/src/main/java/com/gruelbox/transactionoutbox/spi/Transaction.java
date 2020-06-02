@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spi;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;

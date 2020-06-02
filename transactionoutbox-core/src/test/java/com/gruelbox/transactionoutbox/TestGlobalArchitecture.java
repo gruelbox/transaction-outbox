@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
+import com.gruelbox.transactionoutbox.spi.TransactionManager;
 import com.gruelbox.transactionoutbox.sql.SqlPersistor;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;

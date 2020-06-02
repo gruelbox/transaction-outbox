@@ -1,5 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.Persistor;
+import com.gruelbox.transactionoutbox.spi.TransactionManager;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;

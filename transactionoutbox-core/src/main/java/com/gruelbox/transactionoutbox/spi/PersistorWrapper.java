@@ -1,5 +1,7 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spi;
 
+import com.gruelbox.transactionoutbox.Beta;
+import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;

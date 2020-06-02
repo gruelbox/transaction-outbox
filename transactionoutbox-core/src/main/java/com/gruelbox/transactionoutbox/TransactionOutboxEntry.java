@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import static java.util.stream.Collectors.joining;
 
+import com.gruelbox.transactionoutbox.spi.Invocation;
 import java.time.Instant;
 import java.util.Arrays;
 import javax.validation.constraints.Future;
@@ -13,14 +14,11 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
-/**
- * Internal representation of a {@link TransactionOutbox} task. Generally only directly of interest
- * to implementers of SPIs such as {@link Persistor} or {@link Submitter}.
- */
+/** Internal representation of a {@code TransactionOutbox} task. */
 @SuperBuilder(toBuilder = true)
 @EqualsAndHashCode
 @ToString
-public class TransactionOutboxEntry {
+public final class TransactionOutboxEntry {
 
   /**
    * @param id The id of the record. Usually a UUID.
@@ -111,7 +109,11 @@ public class TransactionOutboxEntry {
                   "%s.%s(%s) [%s]%s",
                   invocation.getClassName(),
                   invocation.getMethodName(),
-                  Arrays.stream(invocation.getArgs()).map(this::stringify).collect(joining(", ")),
+                  invocation.getArgs() == null
+                      ? ""
+                      : Arrays.stream(invocation.getArgs())
+                          .map(this::stringify)
+                          .collect(joining(", ")),
                   id,
                   uniqueRequestId == null ? "" : " uid=[" + uniqueRequestId + "]");
           this.description = description;

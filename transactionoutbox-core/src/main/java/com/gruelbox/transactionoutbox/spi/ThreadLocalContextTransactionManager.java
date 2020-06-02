@@ -1,13 +1,18 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spi;
 
+import com.gruelbox.transactionoutbox.NoTransactionActiveException;
+import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
+import com.gruelbox.transactionoutbox.TransactionOutbox;
 import java.lang.reflect.Method;
 
 /**
- * A transaction manager "mixin" which assumes a blocking {@link Persistor} and that there is a
- * single "current" {@link Transaction} on a thread (presumably saved in a {@link ThreadLocal})
- * which can be both used by {@link TransactionOutbox#schedule(Class)} as the current context to
- * write records using {@link Persistor} <em>and</em> used by scheduled methods themselves to write
- * changes within the transaction started as a result of reading and locking the request.
+ * A transaction manager "mixin" which assumes a blocking {@link
+ * com.gruelbox.transactionoutbox.spi.Persistor} and that there is a single "current" {@link
+ * com.gruelbox.transactionoutbox.spi.Transaction} on a thread (presumably saved in a {@link
+ * ThreadLocal}) which can be both used by {@link TransactionOutbox#schedule(Class)} as the current
+ * context to write records using {@link com.gruelbox.transactionoutbox.spi.Persistor} <em>and</em>
+ * used by scheduled methods themselves to write changes within the transaction started as a result
+ * of reading and locking the request.
  *
  * <p>Call pattern permitted:
  *

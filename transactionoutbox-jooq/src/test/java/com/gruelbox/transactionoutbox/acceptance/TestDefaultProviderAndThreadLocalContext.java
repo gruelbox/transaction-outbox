@@ -14,10 +14,8 @@ import com.gruelbox.transactionoutbox.JooqTransactionListener;
 import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.Submitter;
-import com.gruelbox.transactionoutbox.ThreadLocalContextTransactionManager;
+import com.gruelbox.transactionoutbox.ThreadLocalJooqTransactionManager;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
-import com.gruelbox.transactionoutbox.Transaction;
-import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
@@ -39,25 +37,23 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.MatcherAssert;
-import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.jooq.impl.DataSourceConnectionProvider;
 import org.jooq.impl.DefaultConfiguration;
-import org.jooq.impl.ThreadLocalTransactionProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 @Slf4j
-class TestJooqTransactionManagerWithThreadLocalProvider {
+class TestDefaultProviderAndThreadLocalContext {
 
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
   private HikariDataSource dataSource;
-  private ThreadLocalContextTransactionManager transactionManager;
+  private ThreadLocalJooqTransactionManager transactionManager;
   private DSLContext dsl;
 
   @BeforeEach
@@ -83,13 +79,10 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
     return new HikariDataSource(config);
   }
 
-  private ThreadLocalContextTransactionManager createTransactionManager() {
-    DataSourceConnectionProvider connectionProvider = new DataSourceConnectionProvider(dataSource);
+  private ThreadLocalJooqTransactionManager createTransactionManager() {
     DefaultConfiguration configuration = new DefaultConfiguration();
-    configuration.setConnectionProvider(connectionProvider);
+    configuration.setConnectionProvider(new DataSourceConnectionProvider(dataSource));
     configuration.setSQLDialect(SQLDialect.H2);
-    configuration.setTransactionProvider(
-        new ThreadLocalTransactionProvider(connectionProvider, true));
     JooqTransactionListener listener = JooqTransactionManager.createListener();
     configuration.set(listener);
     dsl = DSL.using(configuration);
@@ -97,7 +90,7 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
   }
 
   @Test
-  void testSimpleDirectInvocationWithThreadContext() throws InterruptedException {
+  void testSimpleDirectInvocation() throws InterruptedException {
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -132,62 +125,7 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
   }
 
   @Test
-  void testNestedDirectInvocation() throws Exception {
-    CountDownLatch latch1 = new CountDownLatch(1);
-    CountDownLatch latch2 = new CountDownLatch(1);
-    TransactionOutbox outbox =
-        TransactionOutbox.builder()
-            .transactionManager(transactionManager)
-            .persistor(Persistor.forDialect(Dialect.H2))
-            .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
-            .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
-            .listener(
-                new TransactionOutboxListener() {
-                  @Override
-                  public void success(TransactionOutboxEntry entry) {
-                    if (entry.getInvocation().getArgs()[0].equals(1)) {
-                      latch1.countDown();
-                    } else {
-                      latch2.countDown();
-                    }
-                  }
-                })
-            .build();
-
-    clearOutbox(transactionManager);
-
-    withRunningFlusher(
-        outbox,
-        () -> {
-          transactionManager.inTransactionThrows(
-              tx1 -> {
-                outbox.schedule(Worker.class).process(1);
-
-                transactionManager.inTransactionThrows(
-                    tx2 -> outbox.schedule(Worker.class).process(2));
-
-                // Neither should be fired - the second job is in a nested transaction
-                CompletableFuture.allOf(
-                        runAsync(
-                            () -> uncheck(() -> assertFalse(latch1.await(2, TimeUnit.SECONDS)))),
-                        runAsync(
-                            () -> uncheck(() -> assertFalse(latch2.await(2, TimeUnit.SECONDS)))))
-                    .get();
-              });
-
-          // Should be fired after commit
-          CompletableFuture.allOf(
-                  runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
-                  runAsync(() -> uncheck(() -> assertTrue(latch2.await(2, TimeUnit.SECONDS)))))
-              .get();
-        });
-
-    TestUtils.assertRecordExists(dsl, 1);
-    TestUtils.assertRecordExists(dsl, 2);
-  }
-
-  @Test
-  void testSimpleViaListenerWithThreadContext() throws InterruptedException {
+  void testSimpleViaListener() throws InterruptedException {
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -206,7 +144,7 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
     clearOutbox(transactionManager);
 
     dsl.transaction(
-        () -> {
+        cx1 -> {
           outbox.schedule(Worker.class).process(1);
           try {
             // Should not be fired until after commit
@@ -252,7 +190,7 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
           dsl.transaction(
               ctx -> {
                 outbox.schedule(Worker.class).process(1);
-                ctx.dsl().transaction(() -> outbox.schedule(Worker.class).process(2));
+                ctx.dsl().transaction(cx1 -> outbox.schedule(Worker.class).process(2));
 
                 // Neither should be fired - the second job is in a nested transaction
                 CompletableFuture.allOf(
@@ -314,7 +252,7 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
                     () ->
                         ctx.dsl()
                             .transaction(
-                                () -> {
+                                cx2 -> {
                                   outbox.schedule(Worker.class).process(2);
                                   throw new UnsupportedOperationException();
                                 }));
@@ -400,8 +338,8 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
               .parallel()
               .forEach(
                   i ->
-                      transactionManager.inTransaction(
-                          () -> {
+                      dsl.transaction(
+                          cx1 -> {
                             for (int j = 0; j < 10; j++) {
                               outbox.schedule(InterfaceWorker.class).process(i * 10 + j);
                             }
@@ -417,7 +355,7 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
   }
 
-  private void clearOutbox(TransactionManager transactionManager) {
+  private void clearOutbox(ThreadLocalJooqTransactionManager transactionManager) {
     TestUtils.runSql(transactionManager, "DELETE FROM TXNO_OUTBOX");
   }
 
@@ -450,23 +388,15 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
   @SuppressWarnings("EmptyMethod")
   static class Worker {
 
-    private final ThreadLocalContextTransactionManager transactionManager;
+    private final ThreadLocalJooqTransactionManager transactionManager;
 
-    Worker(ThreadLocalContextTransactionManager transactionManager) {
+    Worker(ThreadLocalJooqTransactionManager transactionManager) {
       this.transactionManager = transactionManager;
     }
 
     @SuppressWarnings("SameParameterValue")
     void process(int i) {
       TestUtils.writeRecord(transactionManager, i);
-    }
-
-    void process(int i, Transaction transaction) {
-      TestUtils.writeRecord(transaction, i);
-    }
-
-    void process(int i, Configuration configuration) {
-      TestUtils.writeRecord(configuration, i);
     }
   }
 

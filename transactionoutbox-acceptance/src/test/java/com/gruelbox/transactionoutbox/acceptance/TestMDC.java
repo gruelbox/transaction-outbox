@@ -7,12 +7,15 @@ import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.StubPersistor;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
 import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
 import java.math.BigInteger;
+import java.sql.Connection;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.slf4j.MDC;
 
 @Slf4j
@@ -25,8 +28,9 @@ class TestMDC {
   @Test
   final void testMDCPassedToTask() throws InterruptedException {
 
-    StubThreadLocalJdbcTransactionManager transactionManager =
-        new StubThreadLocalJdbcTransactionManager();
+    StubThreadLocalJdbcTransactionManager<Void, SimpleTransaction<Void>> transactionManager =
+        new StubThreadLocalJdbcTransactionManager<>(
+            () -> new SimpleTransaction<>(Mockito.mock(Connection.class), null));
 
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =

@@ -145,7 +145,6 @@ public class R2dbcRawTransactionManager
 
     private static final AtomicLong nextId = new AtomicLong(1);
 
-    @SuppressWarnings("NullableProblems")
     private class WrappedConnection implements Connection {
 
       private final Connection conn;

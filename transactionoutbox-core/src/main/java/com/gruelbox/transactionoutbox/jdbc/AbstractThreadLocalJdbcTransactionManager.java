@@ -1,10 +1,12 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
+import com.gruelbox.transactionoutbox.Beta;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
-import com.gruelbox.transactionoutbox.ThreadLocalContextTransactionManager;
+import com.gruelbox.transactionoutbox.NotApi;
 import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.ThrowingTransactionalWork;
 import com.gruelbox.transactionoutbox.TransactionalWork;
+import com.gruelbox.transactionoutbox.spi.ThreadLocalContextTransactionManager;
 import java.sql.Connection;
 import java.util.Deque;
 import java.util.LinkedList;
@@ -14,8 +16,10 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@Beta
+@NotApi
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-abstract class AbstractThreadLocalJdbcTransactionManager<CX, TX extends SimpleTransaction<CX>>
+public abstract class AbstractThreadLocalJdbcTransactionManager<CX, TX extends JdbcTransaction<CX>>
     implements ThreadLocalContextTransactionManager<Connection, CX, TX>,
         JdbcTransactionManager<CX, TX> {
 
@@ -48,12 +52,12 @@ abstract class AbstractThreadLocalJdbcTransactionManager<CX, TX extends SimpleTr
     return work.doWork(peekTransaction().orElseThrow(NoTransactionActiveException::new));
   }
 
-  final TX pushTransaction(TX transaction) {
+  public final TX pushTransaction(TX transaction) {
     transactions.get().push(transaction);
     return transaction;
   }
 
-  final TX popTransaction() {
+  public final TX popTransaction() {
     TX result = transactions.get().pop();
     if (transactions.get().isEmpty()) {
       transactions.remove();
@@ -61,7 +65,7 @@ abstract class AbstractThreadLocalJdbcTransactionManager<CX, TX extends SimpleTr
     return result;
   }
 
-  Optional<TX> peekTransaction() {
+  protected Optional<TX> peekTransaction() {
     return Optional.ofNullable(transactions.get().peek());
   }
 }

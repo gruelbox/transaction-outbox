@@ -7,6 +7,13 @@ import static java.time.temporal.ChronoUnit.MINUTES;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.failedFuture;
 
+import com.gruelbox.transactionoutbox.spi.Invocation;
+import com.gruelbox.transactionoutbox.spi.ParameterContextTransactionManager;
+import com.gruelbox.transactionoutbox.spi.Persistor;
+import com.gruelbox.transactionoutbox.spi.ThreadLocalContextTransactionManager;
+import com.gruelbox.transactionoutbox.spi.Transaction;
+import com.gruelbox.transactionoutbox.spi.TransactionManager;
+import com.gruelbox.transactionoutbox.spi.TransactionalInvocation;
 import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
 import java.time.Instant;
@@ -114,7 +121,7 @@ class TransactionOutboxImpl<CN, CX, TX extends Transaction<CN, CX>> implements T
     }
   }
 
-  @SuppressWarnings({"unchecked", "rawtypes"})
+  @SuppressWarnings({"unchecked"})
   @Override
   public CompletableFuture<Boolean> whitelist(String entryId, Object transactionContext) {
     // TODO needs testing
@@ -146,6 +153,7 @@ class TransactionOutboxImpl<CN, CX, TX extends Transaction<CN, CX>> implements T
         log.debug("Skipped task {} - may be locked or already processed", entry.getId());
       }
     } catch (Exception e) {
+      log.warn("Failed to process: {}", entry.description(), e);
       await(updateAttemptCount(entry, e));
     }
     return completedFuture(null);

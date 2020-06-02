@@ -1,8 +1,8 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
-import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.PersistorWrapper;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.spi.Persistor;
+import com.gruelbox.transactionoutbox.spi.PersistorWrapper;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import com.gruelbox.transactionoutbox.sql.SqlPersistor;
 import java.sql.Connection;
@@ -20,7 +20,8 @@ import java.util.concurrent.CompletableFuture;
  * java.sql.Connection}s. As a result, all methods should simply be called followed immediately with
  * {@link CompletableFuture#join()} to obtain the results.
  */
-public class JdbcPersistor extends PersistorWrapper<Connection, JdbcTransaction<?>> {
+public class JdbcPersistor extends PersistorWrapper<Connection, JdbcTransaction<?>>
+    implements com.gruelbox.transactionoutbox.Persistor {
 
   /**
    * Uses the default relational persistor. Shortcut for: <code>
