@@ -46,14 +46,13 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.org.apache.commons.lang.math.RandomUtils;
 
 @Slf4j
-abstract class AbstractBlockingAcceptanceTest {
+abstract class AbstractAcceptanceTest {
 
   static {
     Async.init();
   }
 
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(AbstractBlockingAcceptanceTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractAcceptanceTest.class);
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 

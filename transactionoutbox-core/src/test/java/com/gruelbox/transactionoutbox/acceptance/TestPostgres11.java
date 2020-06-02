@@ -9,7 +9,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SuppressWarnings("WeakerAccess")
 @Testcontainers
-class TestPostgres11Blocking extends AbstractBlockingAcceptanceTest {
+class TestPostgres11 extends AbstractAcceptanceTest {
 
   @Container
   @SuppressWarnings("rawtypes")

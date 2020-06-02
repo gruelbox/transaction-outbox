@@ -3,24 +3,25 @@ package com.gruelbox.transactionoutbox.acceptance;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SuppressWarnings("WeakerAccess")
 @Testcontainers
-class TestMySql8Blocking extends AbstractBlockingAcceptanceTest {
+class TestPostgres9 extends AbstractAcceptanceTest {
 
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      new MySQLContainer<>("mysql:8").withStartupTimeout(Duration.ofHours(1));
+      (JdbcDatabaseContainer)
+          new PostgreSQLContainer("postgres:9").withStartupTimeout(Duration.ofHours(1));
 
   @Override
   protected ConnectionDetails connectionDetails() {
     return ConnectionDetails.builder()
-        .dialect(Dialect.MY_SQL_8)
-        .driverClassName("com.mysql.cj.jdbc.Driver")
+        .dialect(Dialect.POSTGRESQL_9)
+        .driverClassName("org.postgresql.Driver")
         .url(container.getJdbcUrl())
         .user(container.getUsername())
         .password(container.getPassword())
