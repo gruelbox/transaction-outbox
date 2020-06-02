@@ -1,7 +1,6 @@
 package com.gruelbox.transactionoutbox.sql;
 
 import static com.ea.async.Async.*;
-import static com.gruelbox.transactionoutbox.sql.DialectFamily.MY_SQL;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.failedFuture;
 
@@ -20,10 +19,8 @@ import java.time.Instant;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
@@ -118,56 +115,6 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
     if (!migrate) {
       return;
     }
-    List<Migration> allMigrations =
-        List.of(
-            new Migration(
-                1,
-                "Create outbox table",
-                Dialect.all(),
-                "CREATE TABLE "
-                    + tableName
-                    + " (\n"
-                    + "    id VARCHAR(36) PRIMARY KEY,\n"
-                    + "    invocation TEXT,\n"
-                    + "    nextAttemptTime TIMESTAMP(6),\n"
-                    + "    attempts INT,\n"
-                    + "    blacklisted BOOLEAN,\n"
-                    + "    version INT\n"
-                    + ")"),
-            new Migration(
-                2,
-                "Add unique request id",
-                Dialect.all(),
-                "ALTER TABLE "
-                    + tableName
-                    + " ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE"),
-            new Migration(
-                3,
-                "Add processed flag",
-                Dialect.all(),
-                "ALTER TABLE " + tableName + " ADD COLUMN processed BOOLEAN"),
-            new Migration(
-                4,
-                "Add flush index",
-                Dialect.all(),
-                "CREATE INDEX IX_"
-                    + tableName
-                    + "_1 "
-                    + "ON "
-                    + tableName
-                    + " (processed, blacklisted, nextAttemptTime)"),
-            new Migration(
-                5,
-                "Use datetime datatype for the next process date",
-                Dialect.only(MY_SQL),
-                "ALTER TABLE " + tableName + " MODIFY COLUMN nextAttemptTime DATETIME(6) NOT NULL"),
-            new Migration(
-                5,
-                "Use datetime datatype for the next process date",
-                Dialect.excluding(MY_SQL),
-                "ALTER TABLE "
-                    + tableName
-                    + " MODIFY COLUMN nextAttemptTime TIMESTAMP(6) NOT NULL"));
     tm.transactionally(
             tx -> {
               await(
@@ -188,16 +135,15 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
               }
               int currentVersion = versionResult.get(0);
               Iterator<Migration> migrationIterator =
-                  allMigrations.stream().filter(it -> it.version > currentVersion).iterator();
+                  dialect
+                      .migrations(tableName)
+                      .filter(it -> it.getVersion() > currentVersion)
+                      .iterator();
               while (migrationIterator.hasNext()) {
                 var mig = migrationIterator.next();
-                if (mig.dialects.contains(dialect)) {
-                  log.info("Running migration {}: {}", mig.version, mig.name);
-                  await(executeUpdate(tx, mig.sql));
-                } else {
-                  log.info("Skipping migration {}: {}", mig.version, mig.name);
-                }
-                await(executeUpdate(tx, "UPDATE TXNO_VERSION SET version = " + mig.version));
+                log.info("Running migration {}: {}", mig.getVersion(), mig.getName());
+                await(executeUpdate(tx, mig.getSql()));
+                await(executeUpdate(tx, "UPDATE TXNO_VERSION SET version = " + mig.getVersion()));
               }
               return completedFuture(null);
             })
@@ -544,13 +490,5 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
           + this.statementProcessor
           + ")";
     }
-  }
-
-  @AllArgsConstructor
-  private static final class Migration {
-    private final int version;
-    private final String name;
-    private final Set<Dialect> dialects;
-    private final String sql;
   }
 }

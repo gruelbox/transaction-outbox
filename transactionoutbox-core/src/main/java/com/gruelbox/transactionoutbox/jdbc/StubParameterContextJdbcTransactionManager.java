@@ -11,6 +11,7 @@ import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.Utils;
 import java.sql.Connection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
@@ -61,6 +62,8 @@ public class StubParameterContextJdbcTransactionManager<C>
       T result = await(work.apply(transaction));
       transaction.processHooks();
       return completedFuture(result);
+    } catch (CompletionException e) {
+      throw (RuntimeException) Utils.uncheckAndThrow(e.getCause());
     } finally {
       contextMap.remove(context);
     }
