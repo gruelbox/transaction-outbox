@@ -45,8 +45,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Any implementation of {@link Persistor} should be accompanied by a subclass of this test
- * to ensure that it delivers against the contract.
+ * Any implementation of {@link Persistor} should be accompanied by a subclass of this test to
+ * ensure that it delivers against the contract.
  *
  * @param <CN> The connection type.
  * @param <TX> The transaction type.
@@ -54,7 +54,7 @@ import org.junit.jupiter.api.Test;
 @Slf4j
 public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>> {
 
-  private Instant now = now();
+  private Instant now = now().truncatedTo(MILLIS);
 
   protected abstract Dialect dialect();
 
@@ -257,29 +257,38 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
                     persistor().save(tx, entry1),
                     persistor().save(tx, entry2),
                     persistor().save(tx, entry3),
-                    persistor().save(tx, entry4))).join();
-
-    Integer records = txManager()
-        .transactionally(tx -> persistor().deleteProcessedAndExpired(tx, 10, now.plusSeconds(4)))
+                    persistor().save(tx, entry4)))
         .join();
+
+    Integer records =
+        txManager()
+            .transactionally(
+                tx -> persistor().deleteProcessedAndExpired(tx, 10, now.plusSeconds(4)))
+            .join();
     assertThat(records, equalTo(2));
 
     entry2.setProcessed(false);
     entry3.setProcessed(false);
     entry4.setProcessed(false);
     assertThat(
-        assertThrows(CompletionException.class, ()
-            -> txManager().transactionally(tx -> persistor().update(tx, entry2)).join()).getCause(),
+        assertThrows(
+                CompletionException.class,
+                () -> txManager().transactionally(tx -> persistor().update(tx, entry2)).join())
+            .getCause(),
         isA(OptimisticLockException.class));
     assertThat(
-        assertThrows(CompletionException.class, ()
-            -> txManager().transactionally(tx -> persistor().update(tx, entry4)).join()).getCause(),
+        assertThrows(
+                CompletionException.class,
+                () -> txManager().transactionally(tx -> persistor().update(tx, entry4)).join())
+            .getCause(),
         isA(OptimisticLockException.class));
-    assertDoesNotThrow(()
-        -> txManager().transactionally(tx -> persistor().update(tx, entry3)).join());
+    assertDoesNotThrow(
+        () -> txManager().transactionally(tx -> persistor().update(tx, entry3)).join());
 
-    List<TransactionOutboxEntry> entries = txManager()
-        .transactionally(tx -> persistor().selectBatch(tx, 10, now.plusSeconds(10))).join();
+    List<TransactionOutboxEntry> entries =
+        txManager()
+            .transactionally(tx -> persistor().selectBatch(tx, 10, now.plusSeconds(10)))
+            .join();
 
     assertThat(
         entries.stream().map(TransactionOutboxEntry::getId).collect(toList()),
@@ -302,6 +311,27 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
                         .transactionally(tx -> persistor().selectBatch(tx, 1, now.plusSeconds(1))))
             .join();
     assertThat(entries, containsInAnyOrder(entry));
+  }
+
+  @Test
+  void testWhitelist() throws InterruptedException {
+    var entry1 = createEntry("FOOx", now, false);
+    var entry2 = createEntry("FOOy", now, false);
+    entry2.setBlacklisted(true);
+    entry2.setAttempts(3);
+    txManager().transactionally(tx -> persistor().save(tx, entry1)).join();
+    txManager().transactionally(tx -> persistor().save(tx, entry2)).join();
+    assertFalse(txManager().transactionally(tx -> persistor().whitelist(tx, "FOOx")).join());
+    assertTrue(txManager().transactionally(tx -> persistor().whitelist(tx, "FOOy")).join());
+    assertFalse(txManager().transactionally(tx -> persistor().whitelist(tx, "FOOy")).join());
+    entry2.setBlacklisted(false);
+    entry2.setVersion(entry2.getVersion() + 1);
+    entry2.setAttempts(0);
+    List<TransactionOutboxEntry> entries =
+        txManager()
+            .transactionally(tx -> persistor().selectBatch(tx, 10, now.plusSeconds(1)))
+            .join();
+    assertThat(entries, containsInAnyOrder(entry1, entry2));
   }
 
   @Test
@@ -588,7 +618,7 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
         .id(id)
         .invocation(createInvocation())
         .blacklisted(blacklisted)
-        .nextAttemptTime(nextAttemptTime.truncatedTo(MILLIS))
+        .nextAttemptTime(nextAttemptTime)
         .build();
   }
 
@@ -598,7 +628,7 @@ public abstract class AbstractSqlPersistorTest<CN, TX extends Transaction<CN, ?>
         .id(id)
         .invocation(createInvocation())
         .blacklisted(blacklisted)
-        .nextAttemptTime(nextAttemptTime.truncatedTo(MILLIS))
+        .nextAttemptTime(nextAttemptTime)
         .uniqueRequestId(uniqueId)
         .build();
   }

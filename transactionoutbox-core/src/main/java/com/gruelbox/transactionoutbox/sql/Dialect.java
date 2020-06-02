@@ -1,6 +1,10 @@
 package com.gruelbox.transactionoutbox.sql;
 
+import static java.util.stream.Collectors.toSet;
+
 import com.gruelbox.transactionoutbox.Beta;
+import java.util.Arrays;
+import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -22,16 +26,24 @@ public enum Dialect {
       false,
       Constants.DEFAULT_DELETE_EXPIRED_STMT,
       "SIGNED",
-      "SET innodb_lock_wait_timeout = ?"),
+      "SET innodb_lock_wait_timeout = ?",
+      "DATETIME(6)"),
 
   MY_SQL_8(
       DialectFamily.MY_SQL,
       true,
       Constants.DEFAULT_DELETE_EXPIRED_STMT,
       "SIGNED",
-      "SET innodb_lock_wait_timeout = ?"),
+      "SET innodb_lock_wait_timeout = ?",
+      "DATETIME(6)"),
 
-  H2(DialectFamily.H2, false, Constants.DEFAULT_DELETE_EXPIRED_STMT, "INT", "SET QUERY_TIMEOUT ?"),
+  H2(
+      DialectFamily.H2,
+      false,
+      Constants.DEFAULT_DELETE_EXPIRED_STMT,
+      "INT",
+      "SET QUERY_TIMEOUT ?",
+      "TIMESTAMP(6)"),
 
   POSTGRESQL_9(
       DialectFamily.POSTGRESQL,
@@ -44,7 +56,8 @@ public enum Dialect {
           + "        blacklisted = false "
           + "  LIMIT ?)",
       "INTEGER",
-      "SET LOCAL lock_timeout = '{{timeout}}s'"),
+      "SET LOCAL lock_timeout = '{{timeout}}s'",
+      "TIMESTAMP(6)"),
 
   @Deprecated
   POSTGRESQL__TEST_NO_SKIP_LOCK(
@@ -58,7 +71,8 @@ public enum Dialect {
           + "        blacklisted = false "
           + "  LIMIT ?)",
       "INTEGER",
-      "SET LOCAL lock_timeout = '{{timeout}}s'");
+      "SET LOCAL lock_timeout = '{{timeout}}s'",
+      "TIMESTAMP(6)");
 
   private final DialectFamily family;
 
@@ -84,8 +98,26 @@ public enum Dialect {
    */
   private final String queryTimeoutSetup;
 
+  private final String dateTimeType;
+
   private static class Constants {
     static final String DEFAULT_DELETE_EXPIRED_STMT =
         "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blacklisted = false LIMIT ?";
+  }
+
+  public static Set<Dialect> all() {
+    return Set.copyOf(Arrays.asList(Dialect.values()));
+  }
+
+  public static Set<Dialect> only(DialectFamily family) {
+    return Arrays.stream(Dialect.values())
+        .filter(it -> it.getFamily().equals(family))
+        .collect(toSet());
+  }
+
+  public static Set<Dialect> excluding(DialectFamily family) {
+    return Arrays.stream(Dialect.values())
+        .filter(it -> !it.getFamily().equals(family))
+        .collect(toSet());
   }
 }

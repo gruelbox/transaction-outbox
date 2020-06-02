@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox.r2dbc;
 import static com.gruelbox.transactionoutbox.r2dbc.Utils.EMPTY_RESULT;
 
 import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.DialectFamily;
 import com.gruelbox.transactionoutbox.sql.SqlPersistor.Binder;
 import com.gruelbox.transactionoutbox.sql.SqlPersistor.ResultRow;
 import io.r2dbc.spi.Statement;
@@ -107,8 +108,7 @@ class R2dbcStatement implements Binder {
                                 .toInstant(ZoneOffset.UTC);
                         // TODO remove hack regarding data types
                       } else if (Boolean.class.equals(type)
-                          && (dialect.equals(Dialect.MY_SQL_5)
-                              || dialect.equals(Dialect.MY_SQL_8))) {
+                          && (dialect.getFamily().equals(DialectFamily.MY_SQL))) {
                         return (V) Boolean.valueOf(row.get(index, Short.class) == 1);
                       } else {
                         return row.get(index, type);

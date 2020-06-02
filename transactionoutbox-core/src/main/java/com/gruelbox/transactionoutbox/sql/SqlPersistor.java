@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.sql;
 
 import static com.ea.async.Async.*;
+import static com.gruelbox.transactionoutbox.sql.DialectFamily.MY_SQL;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.failedFuture;
 
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import lombok.AllArgsConstructor;
@@ -105,7 +107,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
             dialect,
             "UPDATE "
                 + this.tableName
-                + " SET attempts = 0, blacklisted = false "
+                + " SET attempts = 0, blacklisted = false, version = version + 1 "
                 + "WHERE blacklisted = true AND processed = false AND id = ?");
     this.clearSql = handler.preprocessSql(dialect, "DELETE FROM " + this.tableName);
   }
@@ -121,6 +123,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
             new Migration(
                 1,
                 "Create outbox table",
+                Dialect.all(),
                 "CREATE TABLE "
                     + tableName
                     + " (\n"
@@ -134,22 +137,37 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
             new Migration(
                 2,
                 "Add unique request id",
+                Dialect.all(),
                 "ALTER TABLE "
                     + tableName
                     + " ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE"),
             new Migration(
                 3,
                 "Add processed flag",
+                Dialect.all(),
                 "ALTER TABLE " + tableName + " ADD COLUMN processed BOOLEAN"),
             new Migration(
                 4,
                 "Add flush index",
+                Dialect.all(),
                 "CREATE INDEX IX_"
                     + tableName
                     + "_1 "
                     + "ON "
                     + tableName
-                    + " (processed, blacklisted, nextAttemptTime)"));
+                    + " (processed, blacklisted, nextAttemptTime)"),
+            new Migration(
+                5,
+                "Use datetime datatype for the next process date",
+                Dialect.only(MY_SQL),
+                "ALTER TABLE " + tableName + " MODIFY COLUMN nextAttemptTime DATETIME(6) NOT NULL"),
+            new Migration(
+                5,
+                "Use datetime datatype for the next process date",
+                Dialect.excluding(MY_SQL),
+                "ALTER TABLE "
+                    + tableName
+                    + " MODIFY COLUMN nextAttemptTime TIMESTAMP(6) NOT NULL"));
     tm.transactionally(
             tx -> {
               await(
@@ -173,8 +191,12 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
                   allMigrations.stream().filter(it -> it.version > currentVersion).iterator();
               while (migrationIterator.hasNext()) {
                 var mig = migrationIterator.next();
-                log.info("Running migration {}: {}", mig.version, mig.name);
-                await(executeUpdate(tx, mig.sql));
+                if (mig.dialects.contains(dialect)) {
+                  log.info("Running migration {}: {}", mig.version, mig.name);
+                  await(executeUpdate(tx, mig.sql));
+                } else {
+                  log.info("Skipping migration {}: {}", mig.version, mig.name);
+                }
                 await(executeUpdate(tx, "UPDATE TXNO_VERSION SET version = " + mig.version));
               }
               return completedFuture(null);
@@ -528,6 +550,7 @@ public final class SqlPersistor<CN, TX extends Transaction<CN, ?>> implements Pe
   private static final class Migration {
     private final int version;
     private final String name;
+    private final Set<Dialect> dialects;
     private final String sql;
   }
 }
