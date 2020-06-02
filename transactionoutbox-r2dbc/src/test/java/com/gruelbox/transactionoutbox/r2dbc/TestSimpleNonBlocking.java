@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.r2dbc;
 
 import lombok.extern.slf4j.Slf4j;
 
