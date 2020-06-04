@@ -37,8 +37,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -482,22 +480,24 @@ abstract class AbstractAcceptanceTest {
 
   private void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
       throws Exception {
-    Thread backgroundThread = new Thread(() -> {
-      while (!Thread.interrupted()) {
-        try {
-          // Keep flushing work until there's nothing left to flush
-          //noinspection StatementWithEmptyBody
-          while (outbox.flush()) {}
-        } catch (Exception e) {
-          log.error("Error flushing transaction outbox. Pausing", e);
-        }
-        try {
-          Thread.sleep(250);
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
-    });
+    Thread backgroundThread =
+        new Thread(
+            () -> {
+              while (!Thread.interrupted()) {
+                try {
+                  // Keep flushing work until there's nothing left to flush
+                  //noinspection StatementWithEmptyBody
+                  while (outbox.flush()) {}
+                } catch (Exception e) {
+                  log.error("Error flushing transaction outbox. Pausing", e);
+                }
+                try {
+                  Thread.sleep(250);
+                } catch (InterruptedException e) {
+                  break;
+                }
+              }
+            });
     backgroundThread.start();
     try {
       runnable.run();

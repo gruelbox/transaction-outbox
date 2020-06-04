@@ -12,12 +12,30 @@
   <name>Transaction Outbox jOOQ</name>
   <packaging>jar</packaging>
   <artifactId>transactionoutbox-jooq</artifactId>
-  <description>A safe implementation of the transactional outbox pattern for Java (jOOQ extension library)
+  <description>A safe implementation of the transactional outbox pattern for Java (jOOQ extension
+    library)
   </description>
 
   <properties>
     <guice.version>5.2.4.RELEASE</guice.version>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>cglib</groupId>
+        <artifactId>cglib</artifactId>
+        <version>${cglib.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.objenesis</groupId>
+        <artifactId>objenesis</artifactId>
+        <version>${objenesis.version}</version>
+        <scope>test</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
 
@@ -67,6 +85,14 @@
     <dependency>
       <groupId>org.hamcrest</groupId>
       <artifactId>hamcrest-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>cglib</groupId>
+      <artifactId>cglib</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.objenesis</groupId>
+      <artifactId>objenesis</artifactId>
     </dependency>
   </dependencies>
 </project>

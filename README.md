@@ -129,6 +129,9 @@ The latest stable release is available from Maven Central. Stable releases are [
 implementation 'com.gruelbox:transactionoutbox-core:1.3.109'
 ```
 
+#### Additional dependencies
+For additional usability, you may wish to also include [CGLIB](https://search.maven.org/artifact/cglib/cglib) and [Objenesis](https://search.maven.org/artifact/org.objenesis/objenesis) on your classpath. As of v2.1.x, these are used if available, but are not required. They do, however, make using the library much more enjoyable.
+
 ### Development snapshots
 
 Maven Central is updated regularly. However, if you want to stay at the bleeding edge, you can use continuously-delivered releases from [Github Package Repository](https://github.com/gruelbox/transaction-outbox/packages). These can be used from your production builds since they will never be deleted (unlike `SNAPSHOT`s).
@@ -180,7 +183,32 @@ An application needs a single, shared instance of [`TransactionOutbox`](https://
 
 ### No existing transaction manager or dependency injection
 
-If you have no existing transaction management, connection pooling or dependency injection, here's a quick way to get started:
+If you have no existing transaction management, connection pooling or dependency injection, here's a quick way to get started.  First, add CGLIB and Objenesis to your classpath so you can proxy concrete classes:
+
+```xml
+  <dependency>
+    <groupId>cglib</groupId>
+    <artifactId>cglib</artifactId>
+    <version>3.3.0</version>
+  </dependency>
+  <dependency>
+    <groupId>org.objenesis</groupId>
+    <artifactId>objenesis</artifactId>
+    <version>3.1</version>
+  </dependency>
+```
+
+And create the method we're going to schedule:
+
+```java
+class MyClass {
+  void myMethod(String arg1, String arg2) {
+    System.out.println("I've been called with " + arg1 + " and " + arg2);
+  }
+}
+```
+
+Now set up the `TransactionOutbox`:
 
 ```java
 // Use an in-memory H2 database
@@ -192,7 +220,11 @@ TransactionOutbox outbox = TransactionOutbox.builder()
   .transactionManager(transactionManager)
   .persistor(Persistor.forDialect(Dialect.H2))
   .build();
+```
 
+And finally start a transaction and schedule a call:
+
+```java
 // Start a transaction
 transactionManager.inTransaction(tx -> {
   // Save some stuff
@@ -208,7 +240,7 @@ Alternatively, you could create the [`TransactionManager`](https://www.javadoc.i
 TransactionManager transactionManager = TransactionManager.fromDataSource(dataSource);
 ```
 
-In this default configuration, `MyClass` must have a default constructor so the "real" implementation can be constructed at the point the method is actually invoked (which might be on another day on another instance of the application). However, you can avoid this requirement by providing an [`Instantiator`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/Instantiator.html) on every instance of your application that knows how to create the objects:
+In this default configuration, `MyClass` must have a default constructor so the "real" implementation can be constructed at the point the method is actually invoked (which might be on another day on another instance of the application). However, since we have Objenesis on the class path, we can avoid this requirement by providing an [`Instantiator`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/Instantiator.html) that knows how to create the objects:
 
 ```java
 TransactionOutbox outbox = TransactionOutbox.builder()
