@@ -7,6 +7,7 @@ import java.util.function.Function;
 
 @Beta
 public interface SqlStatement {
+
   SqlStatement bind(int index, Object value);
 
   CompletableFuture<Integer> execute();

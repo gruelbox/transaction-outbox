@@ -7,10 +7,8 @@ import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 import javax.sql.DataSource;
-import lombok.SneakyThrows;
 
 /**
  * @deprecated Use {@link com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager} for equivalent
@@ -72,7 +70,7 @@ public interface TransactionManager extends JdbcTransactionManager<Transaction> 
    *
    * @param work Code which must be called while the transaction is active..
    */
-  default void inTransaction(TransactionalWork<Transaction> work) {
+  default void inTransaction(TransactionalWork work) {
     uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work)));
   }
 
@@ -85,7 +83,7 @@ public interface TransactionManager extends JdbcTransactionManager<Transaction> 
    * @param supplier Code which must be called while the transaction is active.
    * @return The result of {@code supplier}.
    */
-  default <T> T inTransactionReturns(TransactionalSupplier<T, Transaction> supplier) {
+  default <T> T inTransactionReturns(TransactionalSupplier<T> supplier) {
     return uncheckedly(
         () -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromSupplier(supplier)));
   }
@@ -100,8 +98,8 @@ public interface TransactionManager extends JdbcTransactionManager<Transaction> 
    * @throws E If any exception is thrown by {@link Runnable}.
    */
   @SuppressWarnings("SameReturnValue")
-  default <E extends Exception> void inTransactionThrows(
-      ThrowingTransactionalWork<E, Transaction> work) throws E {
+  default <E extends Exception> void inTransactionThrows(ThrowingTransactionalWork<E> work)
+      throws E {
     inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work));
   }
 
@@ -116,27 +114,19 @@ public interface TransactionManager extends JdbcTransactionManager<Transaction> 
    * @return The result of {@code supplier}.
    * @throws E If any exception is thrown by {@link Runnable}.
    */
-  <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E, Transaction> work) throws E;
+  <T, E extends Exception> T inTransactionReturnsThrows(ThrowingTransactionalSupplier<T, E> work)
+      throws E;
+
+  @Override
+  default <T, E extends Exception> T inTransactionReturnsThrows(
+      com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier<T, E, Transaction> work)
+      throws E {
+    return inTransactionReturnsThrows((ThrowingTransactionalSupplier<T, E>) work::doWork);
+  }
 
   @Override
   default <T> CompletableFuture<T> transactionally(
       Function<Transaction, CompletableFuture<T>> work) {
-    return toBlockingFuture(
-        () ->
-            inTransactionReturnsThrows(
-                tx -> {
-                  try {
-                    return work.apply(tx).join();
-                  } catch (CompletionException e) {
-                    sneakyThrow(e.getCause());
-                    return null;
-                  }
-                }));
-  }
-
-  @SneakyThrows
-  private void sneakyThrow(Throwable t) {
-    throw t;
+    return toBlockingFuture(() -> inTransactionReturnsThrows(tx -> Utils.join(work.apply(tx))));
   }
 }

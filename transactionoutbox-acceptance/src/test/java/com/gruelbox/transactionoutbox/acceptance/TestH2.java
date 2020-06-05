@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
-import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.Dialect;
 
 class TestH2 extends AbstractAcceptanceTest {
 

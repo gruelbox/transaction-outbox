@@ -11,9 +11,9 @@ class MySqlDialect extends Dialect {
   }
 
   @Override
-  public Stream<Migration> migrations(String tableName) {
+  public Stream<SqlMigration> migrations(String tableName) {
     return Stream.of(
-        new Migration(
+        new SqlMigration(
             1,
             "Create outbox table",
             "CREATE TABLE "
@@ -26,13 +26,13 @@ class MySqlDialect extends Dialect {
                 + "    blacklisted BOOLEAN,\n"
                 + "    version INT\n"
                 + ")"),
-        new Migration(
+        new SqlMigration(
             2,
             "Add unique request id",
             "ALTER TABLE " + tableName + " ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE"),
-        new Migration(
+        new SqlMigration(
             3, "Add processed flag", "ALTER TABLE " + tableName + " ADD COLUMN processed BOOLEAN"),
-        new Migration(
+        new SqlMigration(
             4,
             "Add flush index",
             "CREATE INDEX IX_"
@@ -41,7 +41,7 @@ class MySqlDialect extends Dialect {
                 + "ON "
                 + tableName
                 + " (processed, blacklisted, nextAttemptTime)"),
-        new Migration(
+        new SqlMigration(
             5,
             "Use datetime datatype for the next process date",
             "ALTER TABLE " + tableName + " MODIFY COLUMN nextAttemptTime DATETIME(6) NOT NULL"));

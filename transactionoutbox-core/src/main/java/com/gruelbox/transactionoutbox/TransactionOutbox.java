@@ -114,6 +114,16 @@ public interface TransactionOutbox {
 
   /**
    * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
+   * active transaction and a transaction manager that supports thread local context.
+   *
+   * @param entryId The entry id.
+   * @return True if the whitelisting request was successful. May return false if another thread
+   *     whitelisted the entry first.
+   */
+  CompletableFuture<Boolean> whitelistAsync(String entryId);
+
+  /**
+   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
    * active transaction and a transaction manager that supports supplied context.
    *
    * @param entryId The entry id.
@@ -121,7 +131,7 @@ public interface TransactionOutbox {
    * @return True if the whitelisting request was successful. May return false if another thread
    *     whitelisted the entry first.
    */
-  CompletableFuture<Boolean> whitelist(String entryId, BaseTransaction<?> transaction);
+  CompletableFuture<Boolean> whitelistAsync(String entryId, BaseTransaction<?> transaction);
 
   /**
    * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
@@ -133,7 +143,7 @@ public interface TransactionOutbox {
    * @return True if the whitelisting request was successful. May return false if another thread
    *     whitelisted the entry first.
    */
-  CompletableFuture<Boolean> whitelist(String entryId, Object transactionContext);
+  CompletableFuture<Boolean> whitelistAsync(String entryId, Object transactionContext);
 
   /**
    * Processes an entry immediately. Intended for use in custom implementations of {@link Submitter}
@@ -141,6 +151,7 @@ public interface TransactionOutbox {
    *
    * @param entry The entry.
    */
+  @Beta
   CompletableFuture<Void> processNow(TransactionOutboxEntry entry);
 
   /** Builder for {@link TransactionOutbox}. */

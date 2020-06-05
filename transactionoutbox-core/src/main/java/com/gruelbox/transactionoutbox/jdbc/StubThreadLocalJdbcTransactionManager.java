@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
 import com.gruelbox.transactionoutbox.Beta;
-import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
 import java.util.function.Supplier;
 
 public class StubThreadLocalJdbcTransactionManager<TX extends JdbcTransaction>

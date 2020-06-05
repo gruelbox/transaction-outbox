@@ -16,6 +16,16 @@ import java.lang.reflect.Method;
 @Deprecated
 public interface ThreadLocalContextTransactionManager extends TransactionManager {
 
+  <T, E extends Exception> T inTransactionReturnsThrows(ThrowingTransactionalSupplier<T, E> work)
+      throws E;
+
+  @Override
+  default <T, E extends Exception> T inTransactionReturnsThrows(
+      com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier<T, E, Transaction> work)
+      throws E {
+    return inTransactionReturnsThrows((ThrowingTransactionalSupplier<T, E>) work::doWork);
+  }
+
   /**
    * Runs the specified work in the context of the "current" transaction (the definition of which is
    * up to the implementation).
@@ -25,8 +35,8 @@ public interface ThreadLocalContextTransactionManager extends TransactionManager
    * @throws E If any exception is thrown by {@link Runnable}.
    * @throws NoTransactionActiveException If a transaction is not currently active.
    */
-  default <E extends Exception> void requireTransaction(
-      ThrowingTransactionalWork<E, Transaction> work) throws E, NoTransactionActiveException {
+  default <E extends Exception> void requireTransaction(ThrowingTransactionalWork<E> work)
+      throws E, NoTransactionActiveException {
     requireTransactionReturns(ThrowingTransactionalSupplier.fromWork(work));
   }
 
@@ -43,8 +53,8 @@ public interface ThreadLocalContextTransactionManager extends TransactionManager
    * @throws UnsupportedOperationException If the transaction manager does not support thread-local
    *     context.
    */
-  <T, E extends Exception> T requireTransactionReturns(
-      ThrowingTransactionalSupplier<T, E, Transaction> work) throws E, NoTransactionActiveException;
+  <T, E extends Exception> T requireTransactionReturns(ThrowingTransactionalSupplier<T, E> work)
+      throws E, NoTransactionActiveException;
 
   @Override
   default TransactionalInvocation extractTransaction(Method method, Object[] args) {

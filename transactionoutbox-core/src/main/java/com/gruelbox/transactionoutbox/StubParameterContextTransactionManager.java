@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
  * specified type.
  */
 @Slf4j
+@Deprecated
 public class StubParameterContextTransactionManager<CX>
     implements ParameterContextTransactionManager<CX> {
 
@@ -43,17 +44,17 @@ public class StubParameterContextTransactionManager<CX>
   @Override
   @SuppressWarnings("unchecked")
   public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E, Transaction> work) throws E {
+      ThrowingTransactionalSupplier<T, E> work) throws E {
     return withTransaction(
         atx -> {
           T result = work.doWork(atx);
-          ((SimpleTransaction<Void>) atx.getDelegate()).processHooks();
+          ((SimpleTransaction<Void>) ((JdbcShimTransaction) atx).getDelegate()).processHooks();
           return result;
         });
   }
 
-  private <T, E extends Exception> T withTransaction(
-      ThrowingTransactionalSupplier<T, E, JdbcShimTransaction> work) throws E {
+  private <T, E extends Exception> T withTransaction(ThrowingTransactionalSupplier<T, E> work)
+      throws E {
     Connection mockConnection = Utils.createLoggingProxy(Connection.class);
     CX context = contextFactory.get();
     try (SimpleTransaction<CX> tx = new SimpleTransaction<CX>(mockConnection, context)) {

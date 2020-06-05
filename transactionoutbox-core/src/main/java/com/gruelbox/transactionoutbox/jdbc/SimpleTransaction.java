@@ -5,6 +5,7 @@ import static com.gruelbox.transactionoutbox.Utils.uncheck;
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
 import com.gruelbox.transactionoutbox.Beta;
+import com.gruelbox.transactionoutbox.Utils;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -13,7 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
@@ -63,11 +63,7 @@ public class SimpleTransaction<CONTEXT> implements JdbcTransaction, AutoCloseabl
 
   @SneakyThrows
   private void runHook(CompletableFuture<Void> hook) {
-    try {
-      hook.join();
-    } catch (CompletionException e) {
-      throw e.getCause();
-    }
+    Utils.join(hook);
   }
 
   void commit() {

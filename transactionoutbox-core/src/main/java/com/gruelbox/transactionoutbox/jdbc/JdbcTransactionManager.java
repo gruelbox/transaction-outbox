@@ -4,16 +4,15 @@ import static com.gruelbox.transactionoutbox.Utils.toBlockingFuture;
 import static com.gruelbox.transactionoutbox.Utils.uncheck;
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
-import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
-import com.gruelbox.transactionoutbox.ThrowingTransactionalWork;
-import com.gruelbox.transactionoutbox.TransactionalSupplier;
-import com.gruelbox.transactionoutbox.TransactionalWork;
+import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalWork;
+import com.gruelbox.transactionoutbox.spi.TransactionalSupplier;
+import com.gruelbox.transactionoutbox.spi.TransactionalWork;
 import java.sql.Connection;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.function.Function;
-import lombok.SneakyThrows;
 
 /**
  * Specialises {@link BaseTransactionManager} for use with JDBC. Since JDBC is a fundamentally
@@ -92,21 +91,6 @@ public interface JdbcTransactionManager<TX extends JdbcTransaction>
 
   @Override
   default <T> CompletableFuture<T> transactionally(Function<TX, CompletableFuture<T>> work) {
-    return toBlockingFuture(
-        () ->
-            inTransactionReturnsThrows(
-                tx -> {
-                  try {
-                    return work.apply(tx).join();
-                  } catch (CompletionException e) {
-                    sneakyThrow(e.getCause());
-                    return null;
-                  }
-                }));
-  }
-
-  @SneakyThrows
-  private void sneakyThrow(Throwable t) {
-    throw t;
+    return toBlockingFuture(() -> inTransactionReturnsThrows(tx -> Utils.join(work.apply(tx))));
   }
 }

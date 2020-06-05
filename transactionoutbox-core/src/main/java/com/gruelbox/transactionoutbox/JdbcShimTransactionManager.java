@@ -12,14 +12,13 @@ class JdbcShimTransactionManager implements ThreadLocalContextTransactionManager
 
   @Override
   public <T, E extends Exception> T requireTransactionReturns(
-      ThrowingTransactionalSupplier<T, E, Transaction> work)
-      throws E, NoTransactionActiveException {
+      ThrowingTransactionalSupplier<T, E> work) throws E, NoTransactionActiveException {
     return delegate.requireTransactionReturns(tx -> work.doWork(new JdbcShimTransaction(tx)));
   }
 
   @Override
   public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E, Transaction> work) throws E {
+      ThrowingTransactionalSupplier<T, E> work) throws E {
     return delegate.inTransactionReturnsThrows(tx -> work.doWork(new JdbcShimTransaction(tx)));
   }
 }

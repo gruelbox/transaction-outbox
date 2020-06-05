@@ -124,7 +124,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>> implements P
           "Unexpected number of version records: " + versionResult.size());
     }
     int currentVersion = versionResult.get(0);
-    Iterator<Migration> migrationIterator =
+    Iterator<SqlMigration> migrationIterator =
         dialect.migrations(tableName).filter(it -> it.getVersion() > currentVersion).iterator();
     while (migrationIterator.hasNext()) {
       var mig = migrationIterator.next();

@@ -7,7 +7,6 @@ import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 import javax.persistence.EntityManager;
 import lombok.AccessLevel;
@@ -47,11 +46,7 @@ public final class SpringTransaction implements JdbcTransaction {
           @Override
           @SneakyThrows
           public void afterCommit() {
-            try {
-              hook.get().join();
-            } catch (CompletionException e) {
-              throw e.getCause();
-            }
+            Utils.join(hook.get());
           }
         });
   }

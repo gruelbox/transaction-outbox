@@ -1,9 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
-import com.gruelbox.transactionoutbox.spi.BaseTransaction;
-
+@Deprecated
 @FunctionalInterface
-public interface ThrowingTransactionalWork<E extends Exception, TX extends BaseTransaction<?>> {
-
-  void doWork(TX transaction) throws E;
-}
+public interface ThrowingTransactionalWork<E extends Exception>
+    extends com.gruelbox.transactionoutbox.spi.ThrowingTransactionalWork<E, Transaction> {}

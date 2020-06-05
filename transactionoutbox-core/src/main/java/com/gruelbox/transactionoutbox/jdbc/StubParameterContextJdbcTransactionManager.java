@@ -2,9 +2,9 @@ package com.gruelbox.transactionoutbox.jdbc;
 
 import com.gruelbox.transactionoutbox.Beta;
 import com.gruelbox.transactionoutbox.Invocation;
-import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.TransactionalInvocation;
 import com.gruelbox.transactionoutbox.Utils;
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
 import java.lang.reflect.Method;
 import java.util.concurrent.ConcurrentHashMap;

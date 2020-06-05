@@ -5,9 +5,9 @@ import java.util.stream.Stream;
 class H2Dialect extends Dialect {
 
   @Override
-  public Stream<Migration> migrations(String tableName) {
+  public Stream<SqlMigration> migrations(String tableName) {
     return Stream.of(
-        new Migration(
+        new SqlMigration(
             1,
             "Create outbox table",
             "CREATE TABLE "
@@ -22,7 +22,7 @@ class H2Dialect extends Dialect {
                 + "    blacklisted BOOLEAN NOT NULL,\n"
                 + "    version INT NOT NULL\n"
                 + ")"),
-        new Migration(
+        new SqlMigration(
             2,
             "Add flush index",
             "CREATE INDEX IX_"

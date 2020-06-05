@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import javax.validation.ClockProvider;
 import javax.validation.Valid;
@@ -83,7 +82,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     this.retentionThreshold = retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold;
     this.validator.validate(this);
     this.whitelistMethod =
-        Utils.uncheckedly(() -> getClass().getMethod("whitelist", String.class, Object.class));
+        Utils.uncheckedly(() -> getClass().getMethod("whitelistAsync", String.class, Object.class));
     this.persistor.migrate(transactionManager);
   }
 
@@ -99,12 +98,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   @Override
   public boolean flush() {
-    try {
-      return flushAsync().join();
-    } catch (CompletionException e) {
-      sneakyThrow(e.getCause());
-      return false;
-    }
+    return Utils.join(flushAsync());
   }
 
   @SneakyThrows
@@ -123,14 +117,19 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   @Override
   public boolean whitelist(String entryId) {
+    return Utils.join(whitelistAsync(entryId));
+  }
+
+  @Override
+  public CompletableFuture<Boolean> whitelistAsync(String entryId) {
     TransactionalInvocation invocation =
         transactionManager.extractTransaction(whitelistMethod, new Object[] {entryId, null});
-    return Utils.join(whitelist(entryId, invocation.getTransaction()));
+    return whitelistAsync(entryId, invocation.getTransaction());
   }
 
   @Override
   @SuppressWarnings("unchecked")
-  public CompletableFuture<Boolean> whitelist(String entryId, BaseTransaction<?> tx) {
+  public CompletableFuture<Boolean> whitelistAsync(String entryId, BaseTransaction<?> tx) {
     log.info("Whitelisting entry {}", entryId);
     return persistor
         .whitelist((TX) tx, entryId)
@@ -144,13 +143,13 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   }
 
   @Override
-  public CompletableFuture<Boolean> whitelist(String entryId, Object context) {
+  public CompletableFuture<Boolean> whitelistAsync(String entryId, Object context) {
     if (context instanceof BaseTransaction) {
-      return whitelist(entryId, (BaseTransaction<?>) context);
+      return whitelistAsync(entryId, (BaseTransaction<?>) context);
     }
     TransactionalInvocation invocation =
         transactionManager.extractTransaction(whitelistMethod, new Object[] {entryId, null});
-    return whitelist(entryId, invocation.getTransaction());
+    return whitelistAsync(entryId, invocation.getTransaction());
   }
 
   @Override

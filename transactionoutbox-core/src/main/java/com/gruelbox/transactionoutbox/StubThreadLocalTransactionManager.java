@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
  * management.
  */
 @Slf4j
+@Deprecated
 public class StubThreadLocalTransactionManager
     extends AbstractThreadLocalJdbcTransactionManager<Transaction>
     implements ThreadLocalContextTransactionManager {
@@ -21,17 +22,36 @@ public class StubThreadLocalTransactionManager
   @SuppressWarnings("unchecked")
   @Override
   public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E, Transaction> work) throws E {
+      ThrowingTransactionalSupplier<T, E> work) throws E {
     return withTransaction(
         atx -> {
           T result = work.doWork(atx);
-          ((SimpleTransaction<Void>) atx.getDelegate()).processHooks();
+          ((SimpleTransaction<Void>) ((JdbcShimTransaction) atx).getDelegate()).processHooks();
           return result;
         });
   }
 
-  private <T, E extends Exception> T withTransaction(
-      ThrowingTransactionalSupplier<T, E, JdbcShimTransaction> work) throws E {
+  @Override
+  @SuppressWarnings("unchecked")
+  public <T, E extends Exception> T inTransactionReturnsThrows(
+      com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier<T, E, Transaction> work)
+      throws E {
+    return withTransaction(
+        atx -> {
+          T result = work.doWork(atx);
+          ((SimpleTransaction<Void>) ((JdbcShimTransaction) atx).getDelegate()).processHooks();
+          return result;
+        });
+  }
+
+  @Override
+  public <T, E extends Exception> T requireTransactionReturns(
+      ThrowingTransactionalSupplier<T, E> work) throws E, NoTransactionActiveException {
+    return super.requireTransactionReturns(work);
+  }
+
+  private <T, E extends Exception> T withTransaction(ThrowingTransactionalSupplier<T, E> work)
+      throws E {
     Connection mockConnection = Utils.createLoggingProxy(Connection.class);
     try (SimpleTransaction<Void> tx = new SimpleTransaction<>(mockConnection, null)) {
       JdbcShimTransaction shim = new JdbcShimTransaction(tx);

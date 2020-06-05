@@ -3,7 +3,6 @@ package com.gruelbox.transactionoutbox;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
-import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -18,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface Persistor<CN, TX extends BaseTransaction<?>> {
 
-  static Persistor forDialect(Dialect dialect) {
+  static Persistor forDialect(com.gruelbox.transactionoutbox.sql.Dialect dialect) {
     return JdbcPersistor.forDialect(dialect);
   }
 

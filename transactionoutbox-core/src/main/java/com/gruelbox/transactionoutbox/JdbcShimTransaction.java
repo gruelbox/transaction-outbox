@@ -14,6 +14,11 @@ class JdbcShimTransaction implements Transaction {
   }
 
   @Override
+  public <T> T context() {
+    return tx.context();
+  }
+
+  @Override
   public PreparedStatement prepareBatchStatement(String sql) {
     return tx.prepareBatchStatement(sql);
   }
