@@ -17,6 +17,7 @@ class TestPostgres10 extends AbstractAcceptanceTestV1 {
       (JdbcDatabaseContainer)
           new PostgreSQLContainer("postgres:10").withStartupTimeout(Duration.ofHours(1));
 
+  @SuppressWarnings("deprecation")
   @Override
   protected JdbcConnectionDetails connectionDetails() {
     return JdbcConnectionDetails.builder()

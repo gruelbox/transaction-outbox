@@ -21,8 +21,7 @@ public class TestPostgres10JooqThreadLocalProvider extends AbstractJooqThreadLoc
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      (JdbcDatabaseContainer)
-          new PostgreSQLContainer<>("postgres:10").withStartupTimeout(Duration.ofHours(1));
+      new PostgreSQLContainer<>("postgres:10").withStartupTimeout(Duration.ofHours(1));
 
   @Override
   protected JdbcConnectionDetails connectionDetails() {

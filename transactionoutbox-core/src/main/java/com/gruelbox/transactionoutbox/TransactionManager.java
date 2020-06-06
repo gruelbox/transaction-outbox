@@ -121,7 +121,7 @@ public interface TransactionManager extends JdbcTransactionManager<Transaction> 
   default <T, E extends Exception> T inTransactionReturnsThrows(
       com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier<T, E, Transaction> work)
       throws E {
-    return inTransactionReturnsThrows((ThrowingTransactionalSupplier<T, E>) work::doWork);
+    return inTransactionReturnsThrows(work::doWork);
   }
 
   @Override

@@ -4,53 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.gruelbox.transactionoutbox.JooqTransaction;
-import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.ThreadLocalJooqTransactionManager;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.UncheckedException;
-import com.gruelbox.transactionoutbox.spi.TransactionalWork;
-import java.sql.Statement;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
-import org.jooq.impl.SQLDataType;
 
 @Slf4j
 class TestUtils {
 
   private static final Table<Record> TEST_TABLE = DSL.table("TESTDATA");
-
-  @SuppressWarnings("SameParameterValue")
-  @Deprecated // TODO remove
-  static void runSql(JooqTransactionManager transactionManager, String sql) {
-    transactionManager.inTransaction(
-        new TransactionalWork<JooqTransaction>() {
-          @Override
-          public void doWork(JooqTransaction tx) {
-            try {
-              try (Statement statement = tx.connection().createStatement()) {
-                statement.execute(sql);
-              }
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
-          }
-        });
-
-    //    transactionManager.inTransaction(
-    //        tx -> {
-    //          try {
-    //            try (Statement statement = tx.connection().createStatement()) {
-    //              statement.execute(sql);
-    //            }
-    //          } catch (Exception e) {
-    //            throw new RuntimeException(e);
-    //          }
-    //        });
-  }
 
   static void uncheck(ThrowingRunnable runnable) {
     try {
@@ -60,6 +27,7 @@ class TestUtils {
     }
   }
 
+  @SuppressWarnings("UnusedReturnValue")
   private static <T> T uncheckAndThrow(Throwable e) {
     if (e instanceof RuntimeException) {
       throw (RuntimeException) e;
@@ -68,12 +36,6 @@ class TestUtils {
       throw (Error) e;
     }
     throw new UncheckedException(e);
-  }
-
-  static void createTestTable(DSLContext dsl) {
-    log.info("Creating table");
-    dsl.dropTableIfExists(TEST_TABLE).execute();
-    dsl.createTable(TEST_TABLE).column("VALUE", SQLDataType.INTEGER).execute();
   }
 
   static void writeRecord(Configuration configuration, int value) {

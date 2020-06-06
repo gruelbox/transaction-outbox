@@ -15,6 +15,7 @@ public abstract class AbstractSqlAcceptanceTest<
 
   protected abstract CompletableFuture<?> runSql(Object txOrContext, String sql);
 
+  @SuppressWarnings("SameParameterValue")
   protected abstract CompletableFuture<Long> readLongValue(TX tx, String sql);
 
   protected final void prepareDataStore() {

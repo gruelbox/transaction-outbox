@@ -6,6 +6,7 @@ import java.sql.PreparedStatement;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
+@SuppressWarnings("deprecation")
 class JdbcShimTransaction implements Transaction {
   private final JdbcTransaction tx;
 

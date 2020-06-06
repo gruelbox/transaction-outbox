@@ -5,6 +5,7 @@ import com.gruelbox.transactionoutbox.acceptance.JdbcConnectionDetails;
 
 class TestH2 extends AbstractAcceptanceTestV1 {
 
+  @SuppressWarnings("deprecation")
   @Override
   protected JdbcConnectionDetails connectionDetails() {
     return JdbcConnectionDetails.builder()

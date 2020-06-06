@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
 
+@SuppressWarnings("deprecation")
 class JdbcShimTransactionManager implements ThreadLocalContextTransactionManager {
 
   private final SimpleTransactionManager delegate;

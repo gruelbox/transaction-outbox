@@ -4,11 +4,8 @@ import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
 import java.lang.reflect.Method;
 import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 @Beta
 @Slf4j
@@ -18,7 +15,8 @@ public class SpringTransactionManagerImpl implements SpringTransactionManager {
   private final SpringTransaction transaction;
   private final SpringTransactionEntryPoints entryPoints;
 
-  public SpringTransactionManagerImpl(EntityManager entityManager, SpringTransactionEntryPoints entryPoints) {
+  public SpringTransactionManagerImpl(
+      EntityManager entityManager, SpringTransactionEntryPoints entryPoints) {
     this.transaction = new SpringTransaction(entityManager);
     this.entryPoints = entryPoints;
   }

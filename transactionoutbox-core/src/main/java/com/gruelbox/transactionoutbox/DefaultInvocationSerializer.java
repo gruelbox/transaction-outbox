@@ -168,6 +168,7 @@ public final class DefaultInvocationSerializer
       addClassPair(ChronoUnit.class, "ChronoUnit");
 
       addClassPair(BaseTransaction.class, "Transaction");
+      //noinspection deprecation
       addClassPair(Transaction.class, "Transaction");
       addClassPair(JdbcTransaction.class, "Transaction");
       addClassPair(TransactionContextPlaceholder.class, "TransactionContext");
@@ -379,6 +380,7 @@ public final class DefaultInvocationSerializer
      * @param tz timezone to use for the formatting (GMT will produce 'Z')
      * @return the date formatted as yyyy-MM-ddThh:mm:ss[.sss][Z|[+-]hh:mm]
      */
+    @SuppressWarnings("SameParameterValue")
     private static String format(Date date, boolean millis, TimeZone tz) {
       Calendar calendar = new GregorianCalendar(tz, Locale.US);
       calendar.setTime(date);

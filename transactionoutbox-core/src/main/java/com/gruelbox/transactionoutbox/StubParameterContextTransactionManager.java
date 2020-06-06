@@ -57,7 +57,7 @@ public class StubParameterContextTransactionManager<CX>
       throws E {
     Connection mockConnection = Utils.createLoggingProxy(Connection.class);
     CX context = contextFactory.get();
-    try (SimpleTransaction<CX> tx = new SimpleTransaction<CX>(mockConnection, context)) {
+    try (SimpleTransaction<CX> tx = new SimpleTransaction<>(mockConnection, context)) {
       JdbcShimTransaction shim = new JdbcShimTransaction(tx);
       contextMap.put(context, shim);
       try {

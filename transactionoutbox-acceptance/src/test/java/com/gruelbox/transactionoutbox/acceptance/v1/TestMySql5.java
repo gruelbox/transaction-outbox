@@ -16,6 +16,7 @@ class TestMySql5 extends AbstractAcceptanceTestV1 {
   private static final JdbcDatabaseContainer container =
       new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1));
 
+  @SuppressWarnings("deprecation")
   @Override
   protected JdbcConnectionDetails connectionDetails() {
     return JdbcConnectionDetails.builder()

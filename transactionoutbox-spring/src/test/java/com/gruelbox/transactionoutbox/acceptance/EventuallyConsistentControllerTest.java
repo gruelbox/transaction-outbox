@@ -45,6 +45,7 @@ class EventuallyConsistentControllerTest {
       }
       Thread.sleep(1000);
     }
+    //noinspection ResultOfMethodCallIgnored
     fail("Could not confirm eventually consistent part of transaction completed");
   }
 }

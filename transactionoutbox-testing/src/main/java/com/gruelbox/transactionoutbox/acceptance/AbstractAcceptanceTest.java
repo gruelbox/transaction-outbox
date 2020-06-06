@@ -65,9 +65,11 @@ public abstract class AbstractAcceptanceTest<
 
   protected abstract TM createTxManager();
 
+  @SuppressWarnings("SameParameterValue")
   protected abstract CompletableFuture<Void> scheduleWithTx(
       TransactionOutbox outbox, TX tx, int arg1, String arg2);
 
+  @SuppressWarnings("SameParameterValue")
   protected abstract CompletableFuture<Void> scheduleWithCtx(
       TransactionOutbox outbox, Object context, int arg1, String arg2);
 
@@ -371,6 +373,7 @@ public abstract class AbstractAcceptanceTest<
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   private void notTestingContextInjection() {
     log.info("Not testing context injection, not supported by transaction manager");
     Assumptions.assumeTrue(

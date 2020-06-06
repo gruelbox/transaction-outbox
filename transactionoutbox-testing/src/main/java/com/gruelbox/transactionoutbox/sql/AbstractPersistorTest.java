@@ -621,6 +621,7 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
         .build();
   }
 
+  @SuppressWarnings("SameParameterValue")
   private TransactionOutboxEntry createEntry(
       String id, Instant nextAttemptTime, boolean blacklisted, String uniqueId) {
     return TransactionOutboxEntry.builder()

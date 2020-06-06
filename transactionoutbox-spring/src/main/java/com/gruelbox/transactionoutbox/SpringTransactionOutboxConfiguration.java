@@ -8,13 +8,13 @@ import org.springframework.context.annotation.Lazy;
 
 @Beta
 @Configuration
-@Import({ SpringInstantiator.class, SpringTransactionEntryPoints.class })
+@Import({SpringInstantiator.class, SpringTransactionEntryPoints.class})
 public class SpringTransactionOutboxConfiguration {
 
   @Bean
   @Lazy
-  SpringTransactionManager txManager(EntityManager entityManager, SpringTransactionEntryPoints entryPoints) {
+  SpringTransactionManager txManager(
+      EntityManager entityManager, SpringTransactionEntryPoints entryPoints) {
     return new SpringTransactionManagerImpl(entityManager, entryPoints);
   }
-
 }

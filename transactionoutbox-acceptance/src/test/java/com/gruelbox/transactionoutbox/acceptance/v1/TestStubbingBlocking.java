@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Checks that stubbing {@link TransactionOutbox} works cleanly. */
+@SuppressWarnings("deprecation")
 @Slf4j
 class TestStubbingBlocking {
 
