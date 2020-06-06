@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Beta
 @Slf4j
 @Service
-public class SpringTransactionManagerImpl implements SpringTransactionManager {
+class SpringTransactionManagerImpl implements SpringTransactionManager {
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -35,6 +35,7 @@ public class SpringTransactionManagerImpl implements SpringTransactionManager {
   }
 
   @Override
+  @Transactional(propagation = Propagation.MANDATORY)
   public <T, E extends Exception> T requireTransactionReturns(
       ThrowingTransactionalSupplier<T, E, SpringTransaction> work)
       throws E, NoTransactionActiveException {
