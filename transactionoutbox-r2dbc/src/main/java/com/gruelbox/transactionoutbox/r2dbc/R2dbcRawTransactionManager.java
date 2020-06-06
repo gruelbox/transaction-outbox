@@ -5,6 +5,9 @@ import static io.r2dbc.spi.IsolationLevel.READ_COMMITTED;
 import com.gruelbox.transactionoutbox.Beta;
 import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.TransactionalInvocation;
+import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
+import com.gruelbox.transactionoutbox.spi.InitializationEventPublisher;
+import com.gruelbox.transactionoutbox.spi.SerializableTypeRequired;
 import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
 import io.r2dbc.spi.Batch;
 import io.r2dbc.spi.Connection;
@@ -35,20 +38,29 @@ import reactor.core.publisher.Mono;
  */
 @Beta
 @Slf4j
-public class R2dbcRawTransactionManager implements R2dbcTransactionManager<R2dbcRawTransaction> {
+public class R2dbcRawTransactionManager
+    implements R2dbcTransactionManager<R2dbcRawTransaction>, InitializationEventPublisher {
 
   private final ConnectionFactoryWrapper cf;
   private final AtomicInteger openTransactionCount = new AtomicInteger();
 
-  @SuppressWarnings("WeakerAccess")
   public R2dbcRawTransactionManager(ConnectionFactoryWrapper cf) {
     this.cf = cf;
   }
 
-  @SuppressWarnings("WeakerAccess")
   public static ConnectionFactoryWrapper wrapConnectionFactory(
       ConnectionFactory connectionFactory) {
     return new ConnectionFactoryWrapper(connectionFactory);
+  }
+
+  @Override
+  public void onPublishInitializationEvents(InitializationEventBus eventBus) {
+    eventBus.sendEvent(
+        SerializableTypeRequired.class, new SerializableTypeRequired(R2dbcTransaction.class));
+    eventBus.sendEvent(
+        SerializableTypeRequired.class, new SerializableTypeRequired(R2dbcRawTransaction.class));
+    eventBus.sendEvent(
+        SerializableTypeRequired.class, new SerializableTypeRequired(Connection.class));
   }
 
   // For testing
@@ -86,13 +98,11 @@ public class R2dbcRawTransactionManager implements R2dbcTransactionManager<R2dbc
   }
 
   private <T> Mono<T> begin(Connection conn) {
-    return Mono.from(conn.beginTransaction())
-        .then(Mono.fromRunnable(() -> log.debug("Started transaction on {}", conn)));
+    return Mono.from(conn.beginTransaction()).then(Mono.empty());
   }
 
   private <T> Mono<T> commit(Connection conn) {
-    return Mono.from(conn.commitTransaction())
-        .then(Mono.fromRunnable(() -> log.debug("Committed transaction on {}", conn)));
+    return Mono.from(conn.commitTransaction()).then(Mono.empty());
   }
 
   private <T> Mono<T> rollback(Connection conn, Throwable e) {
@@ -181,7 +191,7 @@ public class R2dbcRawTransactionManager implements R2dbcTransactionManager<R2dbc
       @Override
       public Publisher<Void> commitTransaction() {
         return Mono.from(conn.commitTransaction())
-            .then(Mono.fromCompletionStage(contextMap.get(this).processHooks()));
+            .then(Mono.fromCompletionStage(() -> contextMap.get(this).processHooks()));
       }
 
       @Override

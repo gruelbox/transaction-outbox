@@ -46,7 +46,7 @@ public interface JooqTransactionManager extends JdbcTransactionManager<JooqTrans
    * @param listener The listener, linked to the DSL context.
    * @return The transaction manager.
    */
-  static ThreadLocalJooqTransactionManagerImpl create(
+  static ThreadLocalJooqTransactionManager create(
       DSLContext dslContext, JooqTransactionListener listener) {
     var result = new ThreadLocalJooqTransactionManagerImpl(dslContext);
     listener.setJooqTransactionManager(result);

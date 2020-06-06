@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.acceptance.v1;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 
 /** Checks that stubbing {@link TransactionOutbox} works cleanly. */
 @Slf4j
-class TestStubbingBlockingV1 {
+class TestStubbingBlocking {
 
   @Test
   void testStubbingWithThreadLocalContext() {

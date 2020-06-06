@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.acceptance.v1;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
@@ -10,7 +10,6 @@ import static org.junit.Assert.fail;
 
 import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
-import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.Submitter;
@@ -22,7 +21,14 @@ import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
-import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.acceptance.ClassProcessor;
+import com.gruelbox.transactionoutbox.acceptance.ConnectionDetails;
+import com.gruelbox.transactionoutbox.acceptance.FailingInstantiator;
+import com.gruelbox.transactionoutbox.acceptance.InterfaceProcessor;
+import com.gruelbox.transactionoutbox.acceptance.LatchListener;
+import com.gruelbox.transactionoutbox.acceptance.LoggingInstantiator;
+import com.gruelbox.transactionoutbox.acceptance.RandomFailingInstantiator;
+import com.gruelbox.transactionoutbox.acceptance.TestUtils;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
@@ -43,16 +49,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
-import lombok.Builder;
 import lombok.SneakyThrows;
-import lombok.Value;
-import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.apache.commons.lang.math.RandomUtils;
 
 @Slf4j
 abstract class AbstractAcceptanceTestV1 {
@@ -82,11 +84,7 @@ abstract class AbstractAcceptanceTestV1 {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .instantiator(
-                Instantiator.using(
-                    clazz ->
-                        (InterfaceProcessor)
-                            (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
+            .instantiator(new LoggingInstantiator())
             .submitter(Submitter.withExecutor(unreliablePool))
             .listener(
                 new LatchListener(latch)
@@ -510,69 +508,5 @@ abstract class AbstractAcceptanceTestV1 {
       backgroundThread.interrupt();
       backgroundThread.join();
     }
-  }
-
-  private static class FailingInstantiator implements Instantiator {
-
-    private final AtomicInteger attempts;
-
-    FailingInstantiator(AtomicInteger attempts) {
-      this.attempts = attempts;
-    }
-
-    @Override
-    public String getName(Class<?> clazz) {
-      return "BEEF";
-    }
-
-    @Override
-    public Object getInstance(String name) {
-      if (!"BEEF".equals(name)) {
-        throw new UnsupportedOperationException();
-      }
-      return (InterfaceProcessor)
-          (foo, bar) -> {
-            LOGGER.info("Processing ({}, {})", foo, bar);
-            if (attempts.incrementAndGet() < 3) {
-              throw new RuntimeException("Temporary failure");
-            }
-            LOGGER.info("Processed ({}, {})", foo, bar);
-          };
-    }
-  }
-
-  private static class RandomFailingInstantiator implements Instantiator {
-
-    @Override
-    public String getName(Class<?> clazz) {
-      return clazz.getName();
-    }
-
-    @Override
-    public Object getInstance(String name) {
-      if (InterfaceProcessor.class.getName().equals(name)) {
-        return (InterfaceProcessor)
-            (foo, bar) -> {
-              LOGGER.info("Processing ({}, {})", foo, bar);
-              if (RandomUtils.nextInt(10) == 5) {
-                throw new RuntimeException("Temporary failure of InterfaceProcessor");
-              }
-              LOGGER.info("Processed ({}, {})", foo, bar);
-            };
-      } else {
-        throw new UnsupportedOperationException();
-      }
-    }
-  }
-
-  @Value
-  @Accessors(fluent = true)
-  @Builder
-  static class ConnectionDetails {
-    String driverClassName;
-    String url;
-    String user;
-    String password;
-    Dialect dialect;
   }
 }

@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import static com.ea.async.Async.await;
 import static com.gruelbox.transactionoutbox.Utils.logAtLevel;
+import static java.lang.reflect.Modifier.isStatic;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.time.temporal.ChronoUnit.MINUTES;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -9,20 +10,28 @@ import static java.util.concurrent.CompletableFuture.failedFuture;
 
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
+import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
+import com.gruelbox.transactionoutbox.spi.InitializationEventPublisher;
+import com.gruelbox.transactionoutbox.spi.InitializationEventSubscriber;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import javax.validation.ClockProvider;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.constraints.Length;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
@@ -67,6 +76,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       Level logLevelTemporaryFailure,
       Boolean serializeMdc,
       Duration retentionThreshold) {
+
     this.transactionManager = transactionManager;
     this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
     this.persistor = persistor;
@@ -83,6 +93,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     this.validator.validate(this);
     this.whitelistMethod =
         Utils.uncheckedly(() -> getClass().getMethod("whitelistAsync", String.class, Object.class));
+    publishInitializationEvents();
     this.persistor.migrate(transactionManager);
   }
 
@@ -101,18 +112,12 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     return Utils.join(flushAsync());
   }
 
-  @SneakyThrows
-  private void sneakyThrow(Throwable t) {
-    throw t;
-  }
-
   @SuppressWarnings("UnusedReturnValue")
   @Override
   public CompletableFuture<Boolean> flushAsync() {
     Instant now = clockProvider.getClock().instant();
-    List<TransactionOutboxEntry> batch = await(flush(now));
-    await(expireIdempotencyProtection(now));
-    return completedFuture(!batch.isEmpty());
+    return flush(now)
+        .thenCompose(batch -> expireIdempotencyProtection(now).thenApply(__ -> !batch.isEmpty()));
   }
 
   @Override
@@ -148,7 +153,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       return whitelistAsync(entryId, (BaseTransaction<?>) context);
     }
     TransactionalInvocation invocation =
-        transactionManager.extractTransaction(whitelistMethod, new Object[] {entryId, null});
+        transactionManager.extractTransaction(whitelistMethod, new Object[] {entryId, context});
     return whitelistAsync(entryId, invocation.getTransaction());
   }
 
@@ -173,7 +178,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     log.info("Flushing stale tasks");
     List<TransactionOutboxEntry> batch =
         await(transactionManager.transactionally(tx -> selectBatch(tx, now)));
-    log.debug("Got batch of {}", batch.size());
+    log.info("Got batch of {}", batch.size());
     batch.forEach(this::submitNow);
     log.debug("Submitted batch");
     return completedFuture(batch);
@@ -184,9 +189,10 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     List<TransactionOutboxEntry> found = await(persistor.selectBatch(tx, flushBatchSize, now));
     found.forEach(
         entry -> {
-          log.debug("Reprocessing {}", entry.description());
+          log.info("Reprocessing {}", entry.description());
           try {
             await(pushBack(tx, entry));
+            log.debug("Pushed back {}", entry.description());
             result.add(entry);
           } catch (OptimisticLockException e) {
             log.debug("Beaten to optimistic lock on {}", entry.description());
@@ -383,6 +389,12 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     return completedFuture(null);
   }
 
+  private void publishInitializationEvents() {
+    InitializationEventBusImpl eventBus = new InitializationEventBusImpl();
+    eventBus.subscribe(this);
+    eventBus.publish(this);
+  }
+
   private class ParameterizedScheduleBuilderImpl implements ParameterizedScheduleBuilder {
 
     @Length(max = 100)
@@ -398,6 +410,67 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     public <T> T schedule(Class<T> clazz) {
       validator.validate(this);
       return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId);
+    }
+  }
+
+  @SuppressWarnings("rawtypes")
+  private static class InitializationEventBusImpl implements InitializationEventBus {
+
+    private final Map<Class<?>, Set<Consumer>> subscribers = new HashMap<>();
+
+    void subscribe(Object owner) {
+      Arrays.stream(owner.getClass().getDeclaredFields())
+          .filter(f -> !isStatic(f.getModifiers()))
+          .forEach(
+              f -> {
+                f.setAccessible(true);
+                try {
+                  Object value = f.get(owner);
+                  if (value instanceof InitializationEventSubscriber) {
+                    log.debug(
+                        "Adding subscriber to startup events: {}", value.getClass().getName());
+                    ((InitializationEventSubscriber) value).onRegisterInitializationEvents(this);
+                  }
+                } catch (IllegalAccessException e) {
+                  throw new RuntimeException(e);
+                }
+              });
+    }
+
+    void publish(Object owner) {
+      Arrays.stream(owner.getClass().getDeclaredFields())
+          .filter(f -> !isStatic(f.getModifiers()))
+          .forEach(
+              f -> {
+                f.setAccessible(true);
+                try {
+                  Object value = f.get(owner);
+                  if (value instanceof InitializationEventPublisher) {
+                    log.debug("Invoking startup event publisher: {}", value.getClass().getName());
+                    ((InitializationEventPublisher) value).onPublishInitializationEvents(this);
+                  }
+                } catch (IllegalAccessException e) {
+                  throw new RuntimeException(e);
+                }
+              });
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> void sendEvent(Class<T> eventType, T event) {
+      Set<Consumer> consumers = subscribers.get(eventType);
+      if (consumers != null) {
+        consumers.forEach(
+            subscriber -> {
+              log.debug("Dispatching {} to {}", event, subscriber);
+              subscriber.accept(event);
+            });
+      }
+    }
+
+    @Override
+    public <T> void register(Class<T> eventType, Consumer<T> handler) {
+      subscribers.computeIfAbsent(eventType, __ -> new HashSet<>()).add(handler);
     }
   }
 }

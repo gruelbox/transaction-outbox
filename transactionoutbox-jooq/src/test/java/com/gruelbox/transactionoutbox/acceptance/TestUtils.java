@@ -8,6 +8,7 @@ import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.ThreadLocalJooqTransactionManager;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.UncheckedException;
+import com.gruelbox.transactionoutbox.spi.TransactionalWork;
 import java.sql.Statement;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
@@ -25,15 +26,29 @@ class TestUtils {
   @SuppressWarnings("SameParameterValue")
   static void runSql(JooqTransactionManager transactionManager, String sql) {
     transactionManager.inTransaction(
-        tx -> {
-          try {
-            try (Statement statement = tx.connection().createStatement()) {
-              statement.execute(sql);
+        new TransactionalWork<JooqTransaction>() {
+          @Override
+          public void doWork(JooqTransaction tx) {
+            try {
+              try (Statement statement = tx.connection().createStatement()) {
+                statement.execute(sql);
+              }
+            } catch (Exception e) {
+              throw new RuntimeException(e);
             }
-          } catch (Exception e) {
-            throw new RuntimeException(e);
           }
         });
+
+    //    transactionManager.inTransaction(
+    //        tx -> {
+    //          try {
+    //            try (Statement statement = tx.connection().createStatement()) {
+    //              statement.execute(sql);
+    //            }
+    //          } catch (Exception e) {
+    //            throw new RuntimeException(e);
+    //          }
+    //        });
   }
 
   static void uncheck(ThrowingRunnable runnable) {

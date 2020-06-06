@@ -51,7 +51,7 @@ import org.junit.jupiter.api.Test;
  * @param <TX> The transaction type.
  */
 @Slf4j
-public abstract class AbstractSqlPersistorTest<CN, TX extends BaseTransaction<CN>> {
+public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> {
 
   private Instant now = now().truncatedTo(SECONDS);
 

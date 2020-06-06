@@ -3,7 +3,7 @@ package com.gruelbox.transactionoutbox.r2dbc;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
-import com.gruelbox.transactionoutbox.sql.AbstractSqlPersistorTest;
+import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import io.r2dbc.h2.H2ConnectionConfiguration;
 import io.r2dbc.h2.H2ConnectionFactory;
@@ -13,7 +13,7 @@ import org.junit.jupiter.api.BeforeAll;
 import reactor.core.publisher.Hooks;
 
 @Slf4j
-class TestR2dbcPersistorH2 extends AbstractSqlPersistorTest<Connection, R2dbcRawTransaction> {
+class TestR2dbcPersistorH2 extends AbstractPersistorTest<Connection, R2dbcRawTransaction> {
 
   private final R2dbcPersistor persistor = R2dbcPersistor.forDialect(Dialect.H2);
   private final ConnectionFactoryWrapper connectionFactory =

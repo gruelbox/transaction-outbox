@@ -14,6 +14,9 @@ import com.google.gson.TypeAdapter;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
+import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
+import com.gruelbox.transactionoutbox.spi.InitializationEventSubscriber;
+import com.gruelbox.transactionoutbox.spi.SerializableTypeRequired;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
@@ -75,19 +78,20 @@ import lombok.extern.slf4j.Slf4j;
  * </ul>
  */
 @Slf4j
-public final class DefaultInvocationSerializer implements InvocationSerializer {
+public final class DefaultInvocationSerializer
+    implements InvocationSerializer, InitializationEventSubscriber {
 
   private final Gson gson;
+  private final InvocationJsonSerializer gsonSerializer;
 
   @Builder
   DefaultInvocationSerializer(Set<Class<?>> whitelistedTypes, Integer version) {
+    this.gsonSerializer =
+        new InvocationJsonSerializer(
+            whitelistedTypes == null ? Set.of() : whitelistedTypes, version == null ? 2 : version);
     this.gson =
         new GsonBuilder()
-            .registerTypeAdapter(
-                Invocation.class,
-                new InvocationJsonSerializer(
-                    whitelistedTypes == null ? Set.of() : whitelistedTypes,
-                    version == null ? 2 : version))
+            .registerTypeAdapter(Invocation.class, gsonSerializer)
             .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
             .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
             .create();
@@ -105,6 +109,13 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
   @Override
   public Invocation deserializeInvocation(Reader reader) {
     return gson.fromJson(reader, Invocation.class);
+  }
+
+  @Override
+  public void onRegisterInitializationEvents(InitializationEventBus eventBus) {
+    eventBus.register(
+        SerializableTypeRequired.class,
+        event -> gsonSerializer.addClassPair(event.getType(), event.getType().getName()));
   }
 
   private static final class InvocationJsonSerializer

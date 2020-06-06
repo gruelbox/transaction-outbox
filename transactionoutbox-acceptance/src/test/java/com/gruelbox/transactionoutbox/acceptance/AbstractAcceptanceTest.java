@@ -10,15 +10,14 @@ import static org.junit.Assert.fail;
 
 import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
-import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
-import com.gruelbox.transactionoutbox.sql.Dialect;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Clock;
@@ -27,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -35,15 +35,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
-import lombok.Builder;
-import lombok.Value;
-import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.apache.commons.lang.math.RandomUtils;
 
 @Slf4j
 abstract class AbstractAcceptanceTest {
@@ -52,19 +46,13 @@ abstract class AbstractAcceptanceTest {
     Async.init();
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractAcceptanceTest.class);
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
   protected abstract ConnectionDetails connectionDetails();
 
-  /**
-   * Uses a simple direct transaction manager and connection manager and attempts to fire an
-   * interface using a custom instantiator.
-   */
   @Test
-  final void simpleConnectionProviderCustomInstantiatorInterfaceClass()
-      throws InterruptedException {
+  final void testCustomInstantiator() throws InterruptedException {
 
     SimpleTransactionManager transactionManager = simpleTxnManager();
 
@@ -73,12 +61,7 @@ abstract class AbstractAcceptanceTest {
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
-            .instantiator(
-                Instantiator.using(
-                    clazz ->
-                        (InterfaceProcessor)
-                            (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
-            .submitter(Submitter.withExecutor(unreliablePool))
+            .instantiator(new LoggingInstantiator())
             .listener(
                 new LatchListener(latch)
                     .andThen(
@@ -110,7 +93,51 @@ abstract class AbstractAcceptanceTest {
   }
 
   @Test
-  void duplicateRequests() {
+  final void testCustomInstantiatorAsync() {
+
+    SimpleTransactionManager transactionManager = simpleTxnManager();
+
+    CountDownLatch latch = new CountDownLatch(1);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(new LoggingInstantiator())
+            .listener(new LatchListener(latch))
+            .persistor(JdbcPersistor.forDialect(connectionDetails().dialect()))
+            .build();
+
+    clearOutbox();
+
+    boolean success =
+        Utils.join(
+            transactionManager
+                .transactionally(
+                    tx ->
+                        outbox
+                            .schedule(InterfaceProcessor.class)
+                            .processAsync(3, "Whee")
+                            .thenRun(
+                                () -> {
+                                  try {
+                                    // Should not be fired until after commit
+                                    assertFalse(latch.await(2, TimeUnit.SECONDS));
+                                  } catch (InterruptedException e) {
+                                    fail("Interrupted");
+                                  }
+                                }))
+                .thenApply(
+                    __ -> {
+                      try {
+                        return latch.await(1, TimeUnit.SECONDS);
+                      } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                      }
+                    }));
+    assertTrue(success);
+  }
+
+  @Test
+  void testDuplicateRequests() {
 
     SimpleTransactionManager transactionManager = simpleTxnManager();
 
@@ -215,7 +242,7 @@ abstract class AbstractAcceptanceTest {
    * reflection.
    */
   @Test
-  final void dataSourceConnectionProviderReflectionInstantiatorConcreteClass()
+  final void testDataSourceConnectionProviderReflectionInstantiatorConcreteClass()
       throws InterruptedException {
     try (HikariDataSource ds = pooledDataSource()) {
 
@@ -240,112 +267,12 @@ abstract class AbstractAcceptanceTest {
     }
   }
 
-  // TODO rethink the story here
-  //  /**
-  //   * Implements a custom transaction manager. Any required changes to this test are a sign that
-  // we
-  //   * need to bump the major revision.
-  //   */
-  //  @Test
-  //  final void customTransactionManager()
-  //      throws ClassNotFoundException, SQLException, InterruptedException {
-  //
-  //    Class.forName(connectionDetails().driverClassName());
-  //    try (Connection connection =
-  //        DriverManager.getConnection(
-  //            connectionDetails().url(),
-  //            connectionDetails().user(),
-  //            connectionDetails().password())) {
-  //
-  //      connection.setAutoCommit(false);
-  //      connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
-  //
-  //      ArrayList<Supplier<CompletableFuture<Void>>> postCommitHooks = new ArrayList<>();
-  //      ArrayList<PreparedStatement> preparedStatements = new ArrayList<>();
-  //      CountDownLatch latch = new CountDownLatch(1);
-  //
-  //      JdbcTransaction<Void> transaction =
-  //          new JdbcTransaction<Void>() {
-  //            @Override
-  //            public Connection connection() {
-  //              return connection;
-  //            }
-  //
-  //            @Override
-  //            public Void context() {
-  //              return null;
-  //            }
-  //
-  //            @Override
-  //            @SneakyThrows
-  //            public PreparedStatement prepareBatchStatement(String sql) {
-  //              var stmt = connection.prepareStatement(sql);
-  //              preparedStatements.add(stmt);
-  //              return stmt;
-  //            }
-  //
-  //            @Override
-  //            public void addPostCommitHook(Supplier<CompletableFuture<Void>> hook) {
-  //              postCommitHooks.add(hook);
-  //            }
-  //          };
-  //
-  //      TransactionManager transactionManager =
-  //          new ThreadLocalContextTransactionManager() {
-  //            @Override
-  //            public <T, E extends Exception> T inTransactionReturnsThrows(
-  //                ThrowingTransactionalSupplier<T, E> work) throws E {
-  //              return work.doWork(transaction);
-  //            }
-  //
-  //            @Override
-  //            public <T, E extends Exception> T requireTransactionReturns(
-  //                ThrowingTransactionalSupplier<T, E> work) throws E, NoTransactionActiveException
-  // {
-  //              return work.doWork(transaction);
-  //            }
-  //          };
-  //
-  //      TransactionOutbox outbox =
-  //          TransactionOutbox.builder()
-  //              .transactionManager(transactionManager)
-  //              .listener(new LatchListener(latch))
-  //              .persistor(Persistor.forDialect(connectionDetails().dialect()))
-  //              .build();
-  //
-  //      clearOutbox();
-  //      ClassProcessor.PROCESSED.clear();
-  //      String myId = UUID.randomUUID().toString();
-  //
-  //      try {
-  //        outbox.schedule(ClassProcessor.class).process(myId);
-  //        preparedStatements.forEach(
-  //            it -> {
-  //              try {
-  //                it.executeBatch();
-  //                it.close();
-  //              } catch (SQLException e) {
-  //                throw new RuntimeException(e);
-  //              }
-  //            });
-  //        connection.commit();
-  //      } catch (Exception e) {
-  //        connection.rollback();
-  //        throw e;
-  //      }
-  //      postCommitHooks.forEach(Runnable::run);
-  //
-  //      assertTrue(latch.await(2, TimeUnit.SECONDS));
-  //      assertEquals(List.of(myId), ClassProcessor.PROCESSED);
-  //    }
-  //  }
-
   /**
    * Runs a piece of work which will fail several times before working successfully. Ensures that
    * the work runs eventually.
    */
   @Test
-  final void retryBehaviour() throws Exception {
+  final void testRetryBehaviour() throws Exception {
     SimpleTransactionManager transactionManager = simpleTxnManager();
     CountDownLatch latch = new CountDownLatch(1);
     AtomicInteger attempts = new AtomicInteger();
@@ -375,7 +302,7 @@ abstract class AbstractAcceptanceTest {
    * re-whitelisted.
    */
   @Test
-  final void blacklistAndWhitelist() throws Exception {
+  final void testBlackAndWhitelist() throws Exception {
     SimpleTransactionManager transactionManager = simpleTxnManager();
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blacklistLatch = new CountDownLatch(1);
@@ -406,9 +333,58 @@ abstract class AbstractAcceptanceTest {
         });
   }
 
+  @Test
+  final void testBlackAndWhitelistAsync() throws Exception {
+    SimpleTransactionManager transactionManager = simpleTxnManager();
+    CountDownLatch successLatch = new CountDownLatch(1);
+    CountDownLatch blacklistLatch = new CountDownLatch(1);
+    LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
+    AtomicInteger attempts = new AtomicInteger();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(JdbcPersistor.forDialect(connectionDetails().dialect()))
+            .instantiator(new FailingInstantiator(attempts))
+            .attemptFrequency(Duration.ofMillis(500))
+            .listener(latchListener)
+            .blacklistAfterAttempts(2)
+            .build();
+
+    clearOutbox();
+
+    withRunningFlusher(
+        outbox,
+        () ->
+            Utils.join(
+                transactionManager
+                    .transactionally(
+                        tx -> outbox.schedule(InterfaceProcessor.class).processAsync(3, "Whee"))
+                    .thenRun(
+                        () -> {
+                          try {
+                            assertTrue(blacklistLatch.await(3, TimeUnit.SECONDS));
+                          } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                          }
+                        })
+                    .thenCompose(
+                        __ ->
+                            transactionManager.transactionally(
+                                tx ->
+                                    outbox.whitelistAsync(latchListener.getBlacklisted().getId())))
+                    .thenRun(
+                        () -> {
+                          try {
+                            assertTrue(successLatch.await(3, TimeUnit.SECONDS));
+                          } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                          }
+                        })));
+  }
+
   /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
   @Test
-  final void highVolumeUnreliable() throws Exception {
+  final void testHighVolumeUnreliable() throws Exception {
     int count = 10;
 
     SimpleTransactionManager transactionManager = simpleTxnManager();
@@ -450,6 +426,67 @@ abstract class AbstractAcceptanceTest {
                               outbox.schedule(InterfaceProcessor.class).process(i * 10 + j, "Whee");
                             }
                           }));
+          assertTrue("Latch not opened in time", latch.await(30, TimeUnit.SECONDS));
+        });
+
+    assertThat(
+        "Should never get duplicates running to full completion", duplicates.keySet(), empty());
+    assertThat(
+        "Only got: " + results.keySet(),
+        results.keySet(),
+        containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
+  }
+
+  /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
+  @Test
+  final void testHighVolumeUnreliableAsync() throws Exception {
+    int count = 10;
+
+    SimpleTransactionManager transactionManager = simpleTxnManager();
+    CountDownLatch latch = new CountDownLatch(count * 10);
+    ConcurrentHashMap<Integer, Integer> results = new ConcurrentHashMap<>();
+    ConcurrentHashMap<Integer, Integer> duplicates = new ConcurrentHashMap<>();
+
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(JdbcPersistor.forDialect(connectionDetails().dialect()))
+            .instantiator(new RandomFailingInstantiator())
+            .submitter(Submitter.withExecutor(unreliablePool))
+            .attemptFrequency(Duration.ofMillis(500))
+            .flushBatchSize(1000)
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    Integer i = (Integer) entry.getInvocation().getArgs()[0];
+                    if (results.putIfAbsent(i, i) != null) {
+                      duplicates.put(i, i);
+                    }
+                    latch.countDown();
+                  }
+                })
+            .build();
+
+    clearOutbox();
+
+    withRunningFlusher(
+        outbox,
+        () -> {
+          IntStream.range(0, count)
+              .parallel()
+              .forEach(
+                  i ->
+                      transactionManager.transactionally(
+                          tx ->
+                              CompletableFuture.allOf(
+                                  IntStream.range(0, 10)
+                                      .mapToObj(
+                                          j ->
+                                              outbox
+                                                  .schedule(InterfaceProcessor.class)
+                                                  .processAsync(i * 10 + j, "Whee"))
+                                      .toArray(CompletableFuture[]::new))));
           assertTrue("Latch not opened in time", latch.await(30, TimeUnit.SECONDS));
         });
 
@@ -509,69 +546,5 @@ abstract class AbstractAcceptanceTest {
       backgroundThread.interrupt();
       backgroundThread.join();
     }
-  }
-
-  private static class FailingInstantiator implements Instantiator {
-
-    private final AtomicInteger attempts;
-
-    FailingInstantiator(AtomicInteger attempts) {
-      this.attempts = attempts;
-    }
-
-    @Override
-    public String getName(Class<?> clazz) {
-      return "BEEF";
-    }
-
-    @Override
-    public Object getInstance(String name) {
-      if (!"BEEF".equals(name)) {
-        throw new UnsupportedOperationException();
-      }
-      return (InterfaceProcessor)
-          (foo, bar) -> {
-            LOGGER.info("Processing ({}, {})", foo, bar);
-            if (attempts.incrementAndGet() < 3) {
-              throw new RuntimeException("Temporary failure");
-            }
-            LOGGER.info("Processed ({}, {})", foo, bar);
-          };
-    }
-  }
-
-  private static class RandomFailingInstantiator implements Instantiator {
-
-    @Override
-    public String getName(Class<?> clazz) {
-      return clazz.getName();
-    }
-
-    @Override
-    public Object getInstance(String name) {
-      if (InterfaceProcessor.class.getName().equals(name)) {
-        return (InterfaceProcessor)
-            (foo, bar) -> {
-              LOGGER.info("Processing ({}, {})", foo, bar);
-              if (RandomUtils.nextInt(10) == 5) {
-                throw new RuntimeException("Temporary failure of InterfaceProcessor");
-              }
-              LOGGER.info("Processed ({}, {})", foo, bar);
-            };
-      } else {
-        throw new UnsupportedOperationException();
-      }
-    }
-  }
-
-  @Value
-  @Accessors(fluent = true)
-  @Builder
-  static class ConnectionDetails {
-    String driverClassName;
-    String url;
-    String user;
-    String password;
-    Dialect dialect;
   }
 }

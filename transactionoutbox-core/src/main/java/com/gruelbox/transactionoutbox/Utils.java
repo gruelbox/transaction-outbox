@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.failedFuture;
+import static java.util.stream.Collectors.joining;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -9,11 +10,8 @@ import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.cglib.proxy.Callback;
@@ -23,6 +21,7 @@ import org.objenesis.Objenesis;
 import org.objenesis.ObjenesisStd;
 import org.objenesis.instantiator.ObjectInstantiator;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 @Slf4j
@@ -108,18 +107,8 @@ public class Utils {
     }
   }
 
-  public static <T> T blockingRun(Future<T> future) {
-    try {
-      return future.get();
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    } catch (ExecutionException e) {
-      throw (RuntimeException) Utils.uncheckAndThrow(e.getCause());
-    }
-  }
-
   @SuppressWarnings({"unchecked", "cast"})
-  static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], Object> processor) {
+  public static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], Object> processor) {
     if (clazz.isInterface()) {
       // Fastest - we can just proxy an interface directly
       return (T)
@@ -156,16 +145,22 @@ public class Utils {
     return createProxy(
         clazz,
         (method, args) -> {
-          log.info(
-              "Called mock " + clazz.getSimpleName() + ".{}({})",
-              method.getName(),
-              args == null
-                  ? ""
-                  : Arrays.stream(args)
-                      .map(it -> it == null ? "null" : it.toString())
-                      .collect(Collectors.joining(", ")));
+          logMethodCall("Called mock {}.{}({})", clazz, method, args);
           return null;
         });
+  }
+
+  public static void logMethodCall(String format, Class<?> clazz, Method method, Object[] args) {
+    LoggerFactory.getLogger(clazz)
+        .info(
+            format,
+            clazz.getName(),
+            method.getName(),
+            args == null
+                ? ""
+                : Arrays.stream(args)
+                    .map(it -> it == null ? "null" : it.toString())
+                    .collect(joining(", ")));
   }
 
   public static <T> T firstNonNull(T one, Supplier<T> two) {

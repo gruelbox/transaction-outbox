@@ -1,5 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalWork;
 import org.jooq.DSLContext;
 
 /**

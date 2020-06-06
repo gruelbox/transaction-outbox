@@ -13,6 +13,8 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
+import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
+import com.gruelbox.transactionoutbox.spi.InitializationEventSubscriber;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.Instant;
@@ -34,7 +36,8 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Beta
 @Slf4j
-public final class SqlPersistor<CN, TX extends BaseTransaction<CN>> implements Persistor<CN, TX> {
+public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
+    implements Persistor<CN, TX>, InitializationEventSubscriber {
 
   private final int writeLockTimeoutSeconds;
   private final Dialect dialect;
@@ -359,6 +362,16 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>> implements P
   @SneakyThrows
   private RuntimeException sneakyRethrow(Throwable t) {
     throw t;
+  }
+
+  @Override
+  public void onRegisterInitializationEvents(InitializationEventBus eventBus) {
+    if (serializer instanceof InitializationEventSubscriber) {
+      ((InitializationEventSubscriber) serializer).onRegisterInitializationEvents(eventBus);
+    }
+    if (sqlApi instanceof InitializationEventSubscriber) {
+      ((InitializationEventSubscriber) sqlApi).onRegisterInitializationEvents(eventBus);
+    }
   }
 
   @Beta

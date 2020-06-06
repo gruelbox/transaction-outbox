@@ -11,12 +11,12 @@ public final class LatchListener implements TransactionOutboxListener {
 
   @Getter private volatile TransactionOutboxEntry blacklisted;
 
-  public LatchListener(CountDownLatch successLatch, CountDownLatch blacklistLatch) {
+  LatchListener(CountDownLatch successLatch, CountDownLatch blacklistLatch) {
     this.successLatch = successLatch;
     this.blacklistLatch = blacklistLatch;
   }
 
-  public LatchListener(CountDownLatch successLatch) {
+  LatchListener(CountDownLatch successLatch) {
     this.successLatch = successLatch;
     this.blacklistLatch = new CountDownLatch(1);
   }

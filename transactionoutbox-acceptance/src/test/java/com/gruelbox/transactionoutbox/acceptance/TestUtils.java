@@ -3,10 +3,10 @@ package com.gruelbox.transactionoutbox.acceptance;
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
 import java.sql.Statement;
 
-class TestUtils {
+public class TestUtils {
 
   @SuppressWarnings("SameParameterValue")
-  static void runSqlViaJdbc(JdbcTransactionManager<?> transactionManager, String sql) {
+  public static void runSqlViaJdbc(JdbcTransactionManager<?> transactionManager, String sql) {
     transactionManager.inTransaction(
         tx -> {
           try {

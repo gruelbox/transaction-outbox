@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
 import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.sql.AbstractSqlPersistorTest;
+import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.sql.Connection;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +9,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Slf4j
 @Testcontainers
-class TestJdbcPersistorH2 extends AbstractSqlPersistorTest<Connection, SimpleTransaction<Void>> {
+class TestJdbcPersistorH2 extends AbstractPersistorTest<Connection, SimpleTransaction<Void>> {
 
   private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialect.H2).build();
   private SimpleTransactionManager txManager =

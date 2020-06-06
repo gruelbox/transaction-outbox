@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import com.gruelbox.transactionoutbox.jdbc.AbstractThreadLocalJdbcTransactionManager;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;

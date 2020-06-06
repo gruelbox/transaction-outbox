@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
 import java.lang.reflect.Method;
 import javax.persistence.EntityManager;

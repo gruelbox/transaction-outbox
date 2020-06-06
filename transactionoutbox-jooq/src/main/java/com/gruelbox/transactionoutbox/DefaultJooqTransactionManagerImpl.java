@@ -1,5 +1,9 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
+import com.gruelbox.transactionoutbox.spi.InitializationEventPublisher;
+import com.gruelbox.transactionoutbox.spi.SerializableTypeRequired;
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
 import java.lang.reflect.Method;
 import lombok.extern.slf4j.Slf4j;
@@ -8,12 +12,21 @@ import org.jooq.DSLContext;
 
 @Slf4j
 @Beta
-final class DefaultJooqTransactionManagerImpl implements DefaultJooqTransactionManager {
+final class DefaultJooqTransactionManagerImpl
+    implements DefaultJooqTransactionManager, InitializationEventPublisher {
 
   private final DSLContext dsl;
 
   DefaultJooqTransactionManagerImpl(DSLContext dsl) {
     this.dsl = dsl;
+  }
+
+  @Override
+  public void onPublishInitializationEvents(InitializationEventBus eventBus) {
+    eventBus.sendEvent(
+        SerializableTypeRequired.class, new SerializableTypeRequired(JooqTransaction.class));
+    eventBus.sendEvent(
+        SerializableTypeRequired.class, new SerializableTypeRequired(Configuration.class));
   }
 
   @Override
@@ -30,7 +43,8 @@ final class DefaultJooqTransactionManagerImpl implements DefaultJooqTransactionM
 
   @Override
   public Invocation injectTransaction(Invocation invocation, JooqTransaction transaction) {
-    return null;
+    return TransactionManagerSupport.injectTransactionIntoInvocation(
+        invocation, Configuration.class, transaction);
   }
 
   private JooqTransaction transactionFromContext(Configuration context) {

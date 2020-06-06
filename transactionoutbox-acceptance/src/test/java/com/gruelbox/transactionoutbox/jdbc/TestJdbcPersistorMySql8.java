@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
 import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.sql.AbstractSqlPersistorTest;
+import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.sql.Connection;
 import java.time.Duration;
@@ -13,8 +13,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Slf4j
 @Testcontainers
-class TestJdbcPersistorMySql8
-    extends AbstractSqlPersistorTest<Connection, SimpleTransaction<Void>> {
+class TestJdbcPersistorMySql8 extends AbstractPersistorTest<Connection, SimpleTransaction<Void>> {
 
   @Container
   @SuppressWarnings("rawtypes")

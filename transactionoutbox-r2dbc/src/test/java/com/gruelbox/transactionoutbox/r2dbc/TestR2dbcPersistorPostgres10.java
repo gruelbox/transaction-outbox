@@ -3,7 +3,7 @@ package com.gruelbox.transactionoutbox.r2dbc;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
-import com.gruelbox.transactionoutbox.sql.AbstractSqlPersistorTest;
+import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import io.r2dbc.postgresql.PostgresqlConnectionConfiguration;
 import io.r2dbc.postgresql.PostgresqlConnectionFactory;
@@ -20,8 +20,7 @@ import reactor.core.publisher.Hooks;
 
 @Slf4j
 @Testcontainers
-class TestR2dbcPersistorPostgres10
-    extends AbstractSqlPersistorTest<Connection, R2dbcRawTransaction> {
+class TestR2dbcPersistorPostgres10 extends AbstractPersistorTest<Connection, R2dbcRawTransaction> {
 
   @Container
   @SuppressWarnings("rawtypes")

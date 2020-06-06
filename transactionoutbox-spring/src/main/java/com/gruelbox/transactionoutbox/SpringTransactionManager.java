@@ -1,6 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalWork;
 
 /** Transaction manager which uses spring-tx and Hibernate. */
 public interface SpringTransactionManager extends JdbcTransactionManager<SpringTransaction> {

@@ -7,7 +7,7 @@ import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor.JdbcPersistorBuilder;
 public class DefaultPersistor {
 
   public static JdbcPersistor forDialect(Dialect dialect) {
-    return JdbcPersistor.forDialect((com.gruelbox.transactionoutbox.sql.Dialect) dialect);
+    return JdbcPersistor.forDialect(dialect);
   }
 
   public static JdbcPersistorBuilder builder() {

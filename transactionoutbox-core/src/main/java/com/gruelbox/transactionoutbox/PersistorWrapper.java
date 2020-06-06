@@ -2,12 +2,15 @@ package com.gruelbox.transactionoutbox;
 
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
+import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
+import com.gruelbox.transactionoutbox.spi.InitializationEventSubscriber;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Beta
-public class PersistorWrapper<CN, TX extends BaseTransaction<CN>> implements Persistor<CN, TX> {
+public class PersistorWrapper<CN, TX extends BaseTransaction<CN>>
+    implements Persistor<CN, TX>, InitializationEventSubscriber {
 
   private final Persistor<CN, TX> delegate;
 
@@ -59,5 +62,12 @@ public class PersistorWrapper<CN, TX extends BaseTransaction<CN>> implements Per
   @Override
   public CompletableFuture<Integer> clear(TX tx) {
     return delegate.clear(tx);
+  }
+
+  @Override
+  public void onRegisterInitializationEvents(InitializationEventBus eventBus) {
+    if (delegate instanceof InitializationEventSubscriber) {
+      ((InitializationEventSubscriber) delegate).onRegisterInitializationEvents(eventBus);
+    }
   }
 }
