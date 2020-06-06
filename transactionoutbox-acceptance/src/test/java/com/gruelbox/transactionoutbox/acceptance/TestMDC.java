@@ -7,6 +7,7 @@ import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.StubPersistor;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.jdbc.JdbcTransaction;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
 import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
 import java.sql.Connection;
@@ -38,11 +39,18 @@ class TestMDC {
             .instantiator(
                 Instantiator.using(
                     clazz ->
-                        (InterfaceProcessor)
-                            (foo, bar) -> {
-                              log.info("Processing ({}, {})", foo, bar);
-                              assertEquals("Foo", MDC.get("SESSION-KEY"));
-                            }))
+                        new BlockingInterfaceProcessor() {
+                          @Override
+                          public void process(int foo, String bar) {
+                            log.info("Processing ({}, {})", foo, bar);
+                            assertEquals("Foo", MDC.get("SESSION-KEY"));
+                          }
+
+                          @Override
+                          public void process(int foo, String bar, JdbcTransaction transaction) {
+                            throw new UnsupportedOperationException();
+                          }
+                        }))
             .listener(new LatchListener(latch))
             .persistor(StubPersistor.builder().build())
             .build();
@@ -50,7 +58,7 @@ class TestMDC {
     MDC.put("SESSION-KEY", "Foo");
     try {
       transactionManager.inTransaction(
-          () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
+          () -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee"));
     } finally {
       MDC.clear();
     }

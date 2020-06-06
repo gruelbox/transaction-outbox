@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import javax.validation.ClockProvider;
@@ -126,6 +127,11 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   }
 
   @Override
+  public boolean whitelist(String entryId, BaseTransaction<?> transaction) {
+    return Utils.join(whitelistAsync(entryId, transaction));
+  }
+
+  @Override
   public CompletableFuture<Boolean> whitelistAsync(String entryId) {
     TransactionalInvocation invocation =
         transactionManager.extractTransaction(whitelistMethod, new Object[] {entryId, null});
@@ -178,8 +184,10 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     log.info("Flushing stale tasks");
     List<TransactionOutboxEntry> batch =
         await(transactionManager.transactionally(tx -> selectBatch(tx, now)));
-    log.info("Got batch of {}", batch.size());
-    batch.forEach(this::submitNow);
+    log.debug("Got batch of {}", batch.size());
+    for (TransactionOutboxEntry entry : batch) {
+      submitNow(entry);
+    }
     log.debug("Submitted batch");
     return completedFuture(batch);
   }
@@ -187,17 +195,22 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   private CompletableFuture<List<TransactionOutboxEntry>> selectBatch(TX tx, Instant now) {
     List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
     List<TransactionOutboxEntry> found = await(persistor.selectBatch(tx, flushBatchSize, now));
-    found.forEach(
-        entry -> {
-          log.info("Reprocessing {}", entry.description());
-          try {
-            await(pushBack(tx, entry));
-            log.debug("Pushed back {}", entry.description());
-            result.add(entry);
-          } catch (OptimisticLockException e) {
-            log.debug("Beaten to optimistic lock on {}", entry.description());
-          }
-        });
+    for (TransactionOutboxEntry entry : found) {
+      log.info("Reprocessing {}", entry.description());
+      try {
+        await(pushBack(tx, entry));
+        log.debug("Pushed back {}", entry.description());
+        result.add(entry);
+      } catch (OptimisticLockException e) {
+        log.debug("Beaten to optimistic lock on {}", entry.description());
+      } catch (CompletionException e) {
+        if (e.getCause() instanceof OptimisticLockException) {
+          log.debug("Beaten to optimistic lock on {}", entry.description());
+        } else {
+          return failedFuture(e.getCause());
+        }
+      }
+    }
     return completedFuture(result);
   }
 

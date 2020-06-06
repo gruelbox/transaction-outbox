@@ -14,6 +14,8 @@ import com.google.gson.TypeAdapter;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
+import com.gruelbox.transactionoutbox.jdbc.JdbcTransaction;
+import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
 import com.gruelbox.transactionoutbox.spi.InitializationEventSubscriber;
 import com.gruelbox.transactionoutbox.spi.SerializableTypeRequired;
@@ -165,7 +167,9 @@ public final class DefaultInvocationSerializer
       addClassPair(DayOfWeek.class, "DayOfWeek");
       addClassPair(ChronoUnit.class, "ChronoUnit");
 
+      addClassPair(BaseTransaction.class, "Transaction");
       addClassPair(Transaction.class, "Transaction");
+      addClassPair(JdbcTransaction.class, "Transaction");
       addClassPair(TransactionContextPlaceholder.class, "TransactionContext");
 
       whitelistedClasses.forEach(clazz -> addClassPair(clazz, clazz.getName()));

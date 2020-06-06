@@ -17,20 +17,22 @@ public abstract class AbstractSqlAcceptanceTest<
 
   protected abstract CompletableFuture<Long> readLongValue(TX tx, String sql);
 
-  protected final CompletableFuture<?> prepareDataStore() {
-    return txManager
+  protected final void prepareDataStore() {
+    txManager
         .transactionally(tx -> runSql(tx, "CREATE TABLE IF NOT EXISTS TESTDATA(value INT)"))
-        .thenRun(() -> log.info("Table created"));
+        .thenRun(() -> log.info("Table created"))
+        .join();
   }
 
   @Override
-  protected final CompletableFuture<?> cleanDataStore() {
-    return txManager
+  protected final void cleanDataStore() {
+    txManager
         .transactionally(
             tx ->
                 runSql(tx, "DELETE FROM TXNO_OUTBOX")
                     .thenCompose(__ -> runSql(tx, "DELETE FROM TESTDATA")))
-        .thenRun(() -> log.info("Database cleaned"));
+        .thenRun(() -> log.info("Database cleaned"))
+        .join();
   }
 
   @Override

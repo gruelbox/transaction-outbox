@@ -114,7 +114,19 @@ public interface TransactionOutbox {
 
   /**
    * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction and a transaction manager that supports thread local context.
+   * active transaction to be supplied.
+   *
+   * @param entryId The entry id.
+   * @param transaction The transaction ({@link BaseTransactionManager} implementation specific).
+   * @return True if the whitelisting request was successful. May return false if another thread
+   *     whitelisted the entry first.
+   */
+  boolean whitelist(String entryId, BaseTransaction<?> transaction);
+
+  /**
+   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
+   * active transaction and a transaction manager that supports thread local context. Will run
+   * asynchronously if the underlying database API supports it.
    *
    * @param entryId The entry id.
    * @return True if the whitelisting request was successful. May return false if another thread
@@ -124,7 +136,9 @@ public interface TransactionOutbox {
 
   /**
    * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction and a transaction manager that supports supplied context.
+   * active transaction to be supplied.
+   *
+   * <p>Will run asynchronously if the underlying database API supports it.
    *
    * @param entryId The entry id.
    * @param transaction The transaction ({@link BaseTransactionManager} implementation specific).
@@ -135,7 +149,9 @@ public interface TransactionOutbox {
 
   /**
    * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction and a transaction manager that supports supplied context.
+   * active transaction to be supplied via the implementation-specific context.
+   *
+   * <p>Will run asynchronously if the underlying database API supports it.
    *
    * @param entryId The entry id.
    * @param transactionContext The transaction context ({@link BaseTransactionManager}

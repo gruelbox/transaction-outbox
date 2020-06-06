@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
-import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -8,7 +8,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-class TestPostgres12 extends AbstractAcceptanceTest {
+class TestPostgres12 extends AbstractSimpleTransactionManagerAcceptanceTest {
 
   @Container
   @SuppressWarnings("rawtypes")
@@ -17,8 +17,8 @@ class TestPostgres12 extends AbstractAcceptanceTest {
           new PostgreSQLContainer("postgres:12").withStartupTimeout(Duration.ofHours(1));
 
   @Override
-  protected ConnectionDetails connectionDetails() {
-    return ConnectionDetails.builder()
+  protected JdbcConnectionDetails connectionDetails() {
+    return JdbcConnectionDetails.builder()
         .dialect(Dialect.POSTGRESQL_9)
         .driverClassName("org.postgresql.Driver")
         .url(container.getJdbcUrl())

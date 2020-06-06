@@ -21,10 +21,10 @@ import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
-import com.gruelbox.transactionoutbox.acceptance.ClassProcessor;
-import com.gruelbox.transactionoutbox.acceptance.ConnectionDetails;
+import com.gruelbox.transactionoutbox.acceptance.BlockingClassProcessor;
+import com.gruelbox.transactionoutbox.acceptance.BlockingInterfaceProcessor;
 import com.gruelbox.transactionoutbox.acceptance.FailingInstantiator;
-import com.gruelbox.transactionoutbox.acceptance.InterfaceProcessor;
+import com.gruelbox.transactionoutbox.acceptance.JdbcConnectionDetails;
 import com.gruelbox.transactionoutbox.acceptance.LatchListener;
 import com.gruelbox.transactionoutbox.acceptance.LoggingInstantiator;
 import com.gruelbox.transactionoutbox.acceptance.RandomFailingInstantiator;
@@ -67,7 +67,7 @@ abstract class AbstractAcceptanceTestV1 {
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
-  protected abstract ConnectionDetails connectionDetails();
+  protected abstract JdbcConnectionDetails connectionDetails();
 
   /**
    * Uses a simple direct transaction manager and connection manager and attempts to fire an
@@ -102,7 +102,7 @@ abstract class AbstractAcceptanceTestV1 {
 
     transactionManager.inTransaction(
         () -> {
-          outbox.schedule(InterfaceProcessor.class).process(3, "Whee");
+          outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee");
           try {
             // Should not be fired until after commit
             assertFalse(latch.await(2, TimeUnit.SECONDS));
@@ -148,7 +148,7 @@ abstract class AbstractAcceptanceTestV1 {
             outbox
                 .with()
                 .uniqueRequestId("context-clientkey1")
-                .schedule(ClassProcessor.class)
+                .schedule(BlockingClassProcessor.class)
                 .process("1"));
 
     // Make sure we can schedule more work with a different client key
@@ -157,7 +157,7 @@ abstract class AbstractAcceptanceTestV1 {
             outbox
                 .with()
                 .uniqueRequestId("context-clientkey2")
-                .schedule(ClassProcessor.class)
+                .schedule(BlockingClassProcessor.class)
                 .process("2"));
 
     // Make sure we can't repeat the same work
@@ -169,7 +169,7 @@ abstract class AbstractAcceptanceTestV1 {
                     outbox
                         .with()
                         .uniqueRequestId("context-clientkey1")
-                        .schedule(ClassProcessor.class)
+                        .schedule(BlockingClassProcessor.class)
                         .process("3")));
 
     // Run the clock forward to just under the retention threshold
@@ -185,7 +185,7 @@ abstract class AbstractAcceptanceTestV1 {
             outbox
                 .with()
                 .uniqueRequestId("context-clientkey4")
-                .schedule(ClassProcessor.class)
+                .schedule(BlockingClassProcessor.class)
                 .process("4"));
 
     // Make sure we still can't repeat the same work
@@ -197,7 +197,7 @@ abstract class AbstractAcceptanceTestV1 {
                     outbox
                         .with()
                         .uniqueRequestId("context-clientkey1")
-                        .schedule(ClassProcessor.class)
+                        .schedule(BlockingClassProcessor.class)
                         .process("5")));
 
     // Run the clock over the threshold
@@ -211,7 +211,7 @@ abstract class AbstractAcceptanceTestV1 {
             outbox
                 .with()
                 .uniqueRequestId("context-clientkey1")
-                .schedule(ClassProcessor.class)
+                .schedule(BlockingClassProcessor.class)
                 .process("6"));
 
     assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
@@ -237,13 +237,14 @@ abstract class AbstractAcceptanceTestV1 {
               .build();
 
       clearOutbox();
-      ClassProcessor.PROCESSED.clear();
+      BlockingClassProcessor.PROCESSED.clear();
       String myId = UUID.randomUUID().toString();
 
-      transactionManager.inTransaction(() -> outbox.schedule(ClassProcessor.class).process(myId));
+      transactionManager.inTransaction(
+          () -> outbox.schedule(BlockingClassProcessor.class).process(myId));
 
       assertTrue(latch.await(2, TimeUnit.SECONDS));
-      assertEquals(List.of(myId), ClassProcessor.PROCESSED);
+      assertEquals(List.of(myId), BlockingClassProcessor.PROCESSED);
     }
   }
 
@@ -313,11 +314,11 @@ abstract class AbstractAcceptanceTestV1 {
               .build();
 
       clearOutbox();
-      ClassProcessor.PROCESSED.clear();
+      BlockingClassProcessor.PROCESSED.clear();
       String myId = UUID.randomUUID().toString();
 
       try {
-        outbox.schedule(ClassProcessor.class).process(myId);
+        outbox.schedule(BlockingClassProcessor.class).process(myId);
         preparedStatements.forEach(
             it -> {
               try {
@@ -335,7 +336,7 @@ abstract class AbstractAcceptanceTestV1 {
       postCommitHooks.forEach(Runnable::run);
 
       assertTrue(latch.await(2, TimeUnit.SECONDS));
-      assertEquals(List.of(myId), ClassProcessor.PROCESSED);
+      assertEquals(List.of(myId), BlockingClassProcessor.PROCESSED);
     }
   }
 
@@ -364,7 +365,7 @@ abstract class AbstractAcceptanceTestV1 {
         outbox,
         () -> {
           transactionManager.inTransaction(
-              () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
+              () -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee"));
           assertTrue(latch.await(15, TimeUnit.SECONDS));
         });
   }
@@ -396,7 +397,7 @@ abstract class AbstractAcceptanceTestV1 {
         outbox,
         () -> {
           transactionManager.inTransaction(
-              () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
+              () -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee"));
           assertTrue(blacklistLatch.await(3, TimeUnit.SECONDS));
           assertTrue(
               transactionManager.inTransactionReturns(
@@ -446,7 +447,9 @@ abstract class AbstractAcceptanceTestV1 {
                       transactionManager.inTransaction(
                           () -> {
                             for (int j = 0; j < 10; j++) {
-                              outbox.schedule(InterfaceProcessor.class).process(i * 10 + j, "Whee");
+                              outbox
+                                  .schedule(BlockingInterfaceProcessor.class)
+                                  .process(i * 10 + j, "Whee");
                             }
                           }));
           assertTrue("Latch not opened in time", latch.await(30, TimeUnit.SECONDS));

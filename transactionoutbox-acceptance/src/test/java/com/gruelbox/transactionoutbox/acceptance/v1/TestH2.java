@@ -1,13 +1,13 @@
 package com.gruelbox.transactionoutbox.acceptance.v1;
 
 import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.acceptance.ConnectionDetails;
+import com.gruelbox.transactionoutbox.acceptance.JdbcConnectionDetails;
 
 class TestH2 extends AbstractAcceptanceTestV1 {
 
   @Override
-  protected ConnectionDetails connectionDetails() {
-    return ConnectionDetails.builder()
+  protected JdbcConnectionDetails connectionDetails() {
+    return JdbcConnectionDetails.builder()
         .dialect(Dialect.H2)
         .driverClassName("org.h2.Driver")
         .url(

@@ -8,7 +8,7 @@ import lombok.experimental.Accessors;
 @Value
 @Accessors(fluent = true)
 @Builder
-public class ConnectionDetails {
+public class JdbcConnectionDetails {
   String driverClassName;
   String url;
   String user;

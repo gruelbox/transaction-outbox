@@ -6,6 +6,7 @@ import com.gruelbox.transactionoutbox.TransactionContextPlaceholder;
 import com.gruelbox.transactionoutbox.TransactionalInvocation;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.function.Function;
 
 @Beta
@@ -23,22 +24,51 @@ public final class TransactionManagerSupport {
    * @param args The method arguments.
    * @param contextType The type expected for the transaction context.
    * @param transactionFromContext A function for determining the transaction for a given context.
-   * @return The transactional invocation.
+   * @return The transactional invocation, or throws {@link IllegalStateException}
    */
-  @SuppressWarnings("unchecked")
   public static <CX> TransactionalInvocation extractTransactionFromInvocation(
       Method method,
       Object[] args,
       Class<CX> contextType,
       Function<CX, ? extends BaseTransaction<?>> transactionFromContext) {
-    args = Arrays.copyOf(args, args.length);
+    return extractTransactionFromInvocationOptional(
+            method, args, contextType, transactionFromContext)
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Transaction context (either "
+                        + contextType.getName()
+                        + " or "
+                        + BaseTransaction.class.getName()
+                        + ") must be passed as a parameter to any scheduled method."));
+  }
+
+  /**
+   * Obtains the active transaction by parsing the method arguments for a {@link BaseTransaction} or
+   * a context object. All such arguments are removed from the invocation adn replaced with nulls
+   * before saving. They will be "rehydrated" later upon actual invocation using the
+   * transaction/context at the time of invocation.
+   *
+   * @param method The method called.
+   * @param oldArgs The method arguments.
+   * @param contextType The type expected for the transaction context.
+   * @param transactionFromContext A function for determining the transaction for a given context.
+   * @return The transactional invocation.
+   */
+  @SuppressWarnings("unchecked")
+  public static <CX> Optional<TransactionalInvocation> extractTransactionFromInvocationOptional(
+      Method method,
+      Object[] oldArgs,
+      Class<CX> contextType,
+      Function<CX, ? extends BaseTransaction<?>> transactionFromContext) {
+    Object[] newArgs = Arrays.copyOf(oldArgs, oldArgs.length);
     var params = Arrays.copyOf(method.getParameterTypes(), method.getParameterCount());
     BaseTransaction<?> transaction = null;
-    for (int i = 0; i < args.length; i++) {
-      Object candidate = args[i];
+    for (int i = 0; i < newArgs.length; i++) {
+      Object candidate = newArgs[i];
       if (candidate instanceof BaseTransaction) {
         transaction = (BaseTransaction<?>) candidate;
-        args[i] = null;
+        newArgs[i] = null;
       } else if (contextType.isInstance(candidate)) {
         if (transaction == null) {
           transaction = transactionFromContext.apply((CX) candidate);
@@ -51,20 +81,15 @@ public final class TransactionManagerSupport {
                     + "created by normal means or the transaction manager is incorrectly configured.");
           }
         }
-        args[i] = null;
+        newArgs[i] = null;
         params[i] = TransactionContextPlaceholder.class;
       }
     }
-    if (transaction == null) {
-      throw new IllegalArgumentException(
-          "Transaction context (either "
-              + contextType.getName()
-              + " or "
-              + BaseTransaction.class.getName()
-              + ") must be passed as a parameter to any scheduled method.");
-    }
-    return new TransactionalInvocation(
-        method.getDeclaringClass(), method.getName(), params, args, transaction);
+    return Optional.ofNullable(transaction)
+        .map(
+            tx ->
+                new TransactionalInvocation(
+                    method.getDeclaringClass(), method.getName(), params, newArgs, tx));
   }
 
   /**

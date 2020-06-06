@@ -7,6 +7,7 @@ import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.Utils;
 import java.util.PrimitiveIterator;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,7 +30,12 @@ public class RandomFailingInstantiator implements Instantiator {
         (method, args) -> {
           Utils.logMethodCall("Enter {}.{}({})", clazz, method, args);
           if (randoms.next() == 5) {
-            return failedFuture(new RuntimeException("Temporary failure"));
+            Utils.logMethodCall("Failed {}.{}({})", clazz, method, args);
+            if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
+              return failedFuture(new RuntimeException("Temporary failure"));
+            } else {
+              throw new RuntimeException("Temporary failure");
+            }
           }
           Utils.logMethodCall("Exit {}.{}({})", clazz, method, args);
           return completedFuture(null);

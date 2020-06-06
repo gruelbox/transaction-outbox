@@ -5,6 +5,7 @@ import static java.util.concurrent.CompletableFuture.failedFuture;
 
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.Utils;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +15,7 @@ public class FailingInstantiator implements Instantiator {
 
   private final AtomicInteger attempts;
 
-  FailingInstantiator(AtomicInteger attempts) {
+  public FailingInstantiator(AtomicInteger attempts) {
     this.attempts = attempts;
   }
 
@@ -32,7 +33,12 @@ public class FailingInstantiator implements Instantiator {
         (method, args) -> {
           Utils.logMethodCall("Enter {}.{}({})", clazz, method, args);
           if (attempts.incrementAndGet() < 3) {
-            return failedFuture(new RuntimeException("Temporary failure"));
+            Utils.logMethodCall("Failed {}.{}({})", clazz, method, args);
+            if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
+              return failedFuture(new RuntimeException("Temporary failure"));
+            } else {
+              throw new RuntimeException("Temporary failure");
+            }
           }
           Utils.logMethodCall("Exit {}.{}({})", clazz, method, args);
           return completedFuture(null);

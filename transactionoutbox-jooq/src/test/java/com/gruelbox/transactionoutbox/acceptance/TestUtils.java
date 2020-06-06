@@ -21,9 +21,10 @@ import org.jooq.impl.SQLDataType;
 @Slf4j
 class TestUtils {
 
-  private static final Table<Record> TEST_TABLE = DSL.table("TEST_TABLE");
+  private static final Table<Record> TEST_TABLE = DSL.table("TESTDATA");
 
   @SuppressWarnings("SameParameterValue")
+  @Deprecated // TODO remove
   static void runSql(JooqTransactionManager transactionManager, String sql) {
     transactionManager.inTransaction(
         new TransactionalWork<JooqTransaction>() {

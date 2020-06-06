@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox.acceptance.v1;
 
 import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.acceptance.ConnectionDetails;
+import com.gruelbox.transactionoutbox.acceptance.JdbcConnectionDetails;
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -18,8 +18,8 @@ class TestPostgres10 extends AbstractAcceptanceTestV1 {
           new PostgreSQLContainer("postgres:10").withStartupTimeout(Duration.ofHours(1));
 
   @Override
-  protected ConnectionDetails connectionDetails() {
-    return ConnectionDetails.builder()
+  protected JdbcConnectionDetails connectionDetails() {
+    return JdbcConnectionDetails.builder()
         .dialect(Dialect.POSTGRESQL_9)
         .driverClassName("org.postgresql.Driver")
         .url(container.getJdbcUrl())

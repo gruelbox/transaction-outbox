@@ -2,8 +2,15 @@ package com.gruelbox.transactionoutbox.jdbc;
 
 import static com.gruelbox.transactionoutbox.Utils.uncheck;
 
+import com.gruelbox.transactionoutbox.Invocation;
+import com.gruelbox.transactionoutbox.TransactionalInvocation;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
+import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
+import com.gruelbox.transactionoutbox.spi.InitializationEventPublisher;
+import com.gruelbox.transactionoutbox.spi.SerializableTypeRequired;
 import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
+import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
+import java.lang.reflect.Method;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import lombok.Builder;
@@ -16,7 +23,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Builder
 public final class SimpleTransactionManager
-    extends AbstractThreadLocalJdbcTransactionManager<SimpleTransaction<Void>> {
+    extends AbstractThreadLocalJdbcTransactionManager<SimpleTransaction<Void>>
+    implements InitializationEventPublisher {
 
   private final JdbcConnectionProvider connectionProvider;
 
@@ -66,6 +74,14 @@ public final class SimpleTransactionManager
   }
 
   @Override
+  public void onPublishInitializationEvents(InitializationEventBus eventBus) {
+    eventBus.sendEvent(
+        SerializableTypeRequired.class, new SerializableTypeRequired(JdbcTransaction.class));
+    eventBus.sendEvent(
+        SerializableTypeRequired.class, new SerializableTypeRequired(SimpleTransaction.class));
+  }
+
+  @Override
   public <T, E extends Exception> T inTransactionReturnsThrows(
       ThrowingTransactionalSupplier<T, E, SimpleTransaction<Void>> work) throws E {
     return withTransaction(
@@ -74,6 +90,19 @@ public final class SimpleTransactionManager
           atx.processHooks();
           return result;
         });
+  }
+
+  @Override
+  public TransactionalInvocation extractTransaction(Method method, Object[] args) {
+    return TransactionManagerSupport.extractTransactionFromInvocationOptional(
+            method, args, Void.class, ctx -> null)
+        .orElse(super.extractTransaction(method, args));
+  }
+
+  @Override
+  public Invocation injectTransaction(Invocation invocation, SimpleTransaction<Void> transaction) {
+    return TransactionManagerSupport.injectTransactionIntoInvocation(
+        invocation, Void.class, transaction);
   }
 
   private <T, E extends Exception> T processAndCommitOrRollback(

@@ -30,6 +30,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reactor.core.Disposable;
@@ -47,14 +49,14 @@ import reactor.core.publisher.Mono;
  * @param <TM> The transaction manager type
  */
 @Slf4j
-abstract class AbstractAcceptanceTest<
+public abstract class AbstractAcceptanceTest<
     CN, TX extends BaseTransaction<CN>, TM extends BaseTransactionManager<CN, ? extends TX>> {
 
   static {
     Async.init();
   }
 
-  private final ExecutorService unreliablePool =
+  protected final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
   protected abstract Dialect dialect();
@@ -69,9 +71,9 @@ abstract class AbstractAcceptanceTest<
   protected abstract CompletableFuture<Void> scheduleWithCtx(
       TransactionOutbox outbox, Object context, int arg1, String arg2);
 
-  protected abstract CompletableFuture<?> prepareDataStore();
+  protected abstract void prepareDataStore();
 
-  protected abstract CompletableFuture<?> cleanDataStore();
+  protected abstract void cleanDataStore();
 
   protected abstract CompletableFuture<?> incrementRecordCount(Object txOrContext);
 
@@ -82,6 +84,12 @@ abstract class AbstractAcceptanceTest<
   protected Persistor<CN, TX> persistor;
   protected TM txManager;
 
+  @BeforeAll
+  static void cleanState() {
+    staticPersistor = null;
+    staticTxManager = null;
+  }
+
   @SuppressWarnings("unchecked")
   @BeforeEach
   void beforeEach() {
@@ -90,14 +98,14 @@ abstract class AbstractAcceptanceTest<
       staticTxManager = createTxManager();
       persistor = (Persistor<CN, TX>) staticPersistor;
       txManager = (TM) staticTxManager;
-      Utils.join(prepareDataStore());
+      prepareDataStore();
     } else {
       persistor = (Persistor<CN, TX>) staticPersistor;
       txManager = (TM) staticTxManager;
     }
   }
 
-  private TransactionOutbox.TransactionOutboxBuilder builder() {
+  protected TransactionOutbox.TransactionOutboxBuilder builder() {
     return TransactionOutbox.builder().transactionManager(txManager).persistor(persistor);
   }
 
@@ -110,7 +118,8 @@ abstract class AbstractAcceptanceTest<
             .instantiator(new LoggingInstantiator())
             .listener(new LatchListener(latch))
             .build();
-    Utils.join(cleanDataStore());
+
+    cleanDataStore();
 
     Utils.join(
         txManager
@@ -131,7 +140,8 @@ abstract class AbstractAcceptanceTest<
             .instantiator(new InsertingInstantiator(this::incrementRecordCount))
             .listener(new LatchListener(latch))
             .build();
-    Utils.join(cleanDataStore());
+
+    cleanDataStore();
 
     Utils.join(
         txManager
@@ -163,22 +173,33 @@ abstract class AbstractAcceptanceTest<
             .instantiator(new InsertingInstantiator(this::incrementRecordCount))
             .listener(new LatchListener(latch))
             .build();
-    Utils.join(cleanDataStore());
 
-    Utils.join(
-        txManager
-            .transactionally(
-                tx ->
-                    scheduleWithCtx(outbox, tx.context(), 3, "Whee")
-                        .thenRun(() -> assertNotFired(latch))
-                        .thenCompose(__ -> countRecords(tx))
-                        .thenApply(
-                            count -> {
-                              assertEquals(0, count);
-                              return count;
-                            }))
-            .thenRun(() -> assertFired(latch))
-            .thenRun(chainCompleted::countDown));
+    cleanDataStore();
+
+    try {
+      Utils.join(
+          txManager
+              .transactionally(
+                  tx ->
+                      scheduleWithCtx(outbox, tx.context(), 3, "Whee")
+                          .thenRun(() -> assertNotFired(latch))
+                          .thenCompose(__ -> countRecords(tx))
+                          .thenApply(
+                              count -> {
+                                assertEquals(0, count);
+                                return count;
+                              }))
+              .thenRun(() -> assertFired(latch))
+              .thenRun(chainCompleted::countDown));
+    } catch (UnsupportedOperationException e) {
+      notTestingContextInjection();
+    } catch (Exception e) {
+      if (e.getCause() instanceof UnsupportedOperationException) {
+        notTestingContextInjection();
+      } else {
+        throw e;
+      }
+    }
 
     assertFired(chainCompleted);
 
@@ -199,7 +220,8 @@ abstract class AbstractAcceptanceTest<
             .listener(latchListener)
             .blacklistAfterAttempts(2)
             .build();
-    Utils.join(cleanDataStore());
+
+    cleanDataStore();
 
     withRunningFlusher(
         outbox,
@@ -230,11 +252,13 @@ abstract class AbstractAcceptanceTest<
             .listener(latchListener)
             .blacklistAfterAttempts(2)
             .build();
-    Utils.join(cleanDataStore());
+
+    cleanDataStore();
 
     withRunningFlusher(
         outbox,
-        () ->
+        () -> {
+          try {
             Utils.join(
                 txManager
                     .transactionally(tx -> scheduleWithCtx(outbox, tx.context(), 3, "Whee"))
@@ -246,7 +270,17 @@ abstract class AbstractAcceptanceTest<
                                     outbox.whitelistAsync(
                                         latchListener.getBlacklisted().getId(),
                                         (Object) tx.context())))
-                    .thenRun(() -> assertFired(successLatch))));
+                    .thenRun(() -> assertFired(successLatch)));
+          } catch (UnsupportedOperationException e) {
+            notTestingContextInjection();
+          } catch (Exception e) {
+            if (e.getCause() instanceof UnsupportedOperationException) {
+              notTestingContextInjection();
+            } else {
+              throw e;
+            }
+          }
+        });
   }
 
   /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
@@ -276,7 +310,8 @@ abstract class AbstractAcceptanceTest<
                   }
                 })
             .build();
-    Utils.join(cleanDataStore());
+
+    cleanDataStore();
 
     withRunningFlusher(
         outbox,
@@ -289,10 +324,7 @@ abstract class AbstractAcceptanceTest<
                           tx ->
                               CompletableFuture.allOf(
                                   IntStream.range(0, 10)
-                                      .mapToObj(
-                                          j ->
-                                              scheduleWithCtx(
-                                                  outbox, tx.context(), i * 10 + j, "Whee"))
+                                      .mapToObj(j -> scheduleWithTx(outbox, tx, i * 10 + j, "Whee"))
                                       .toArray(CompletableFuture[]::new))));
           assertFired(latch, 30);
         });
@@ -333,9 +365,15 @@ abstract class AbstractAcceptanceTest<
 
   protected void assertNotFired(CountDownLatch latch) {
     try {
-      assertFalse(latch.await(3, TimeUnit.SECONDS));
+      assertFalse(latch.await(2, TimeUnit.SECONDS));
     } catch (InterruptedException e) {
       fail("Interrupted");
     }
+  }
+
+  private void notTestingContextInjection() {
+    log.info("Not testing context injection, not supported by transaction manager");
+    Assumptions.assumeTrue(
+        false, "Not testing context injection, not supported by transaction manager");
   }
 }
