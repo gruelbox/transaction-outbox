@@ -13,45 +13,32 @@ import org.springframework.transaction.annotation.Transactional;
 @Beta
 @Slf4j
 @Service
-class SpringTransactionManagerImpl implements SpringTransactionManager {
+public class SpringTransactionManagerImpl implements SpringTransactionManager {
 
-  @PersistenceContext private EntityManager entityManager;
+  private final SpringTransaction transaction;
+  private final SpringTransactionEntryPoints entryPoints;
 
-  private volatile boolean initialized;
-  private SpringTransaction transaction;
-
-  private SpringTransaction transaction() {
-    if (!initialized) {
-      synchronized (this) {
-        if (!initialized) {
-          initialized = true;
-          SpringTransaction tx = new SpringTransaction(entityManager);
-          transaction = tx;
-          return tx;
-        }
-      }
-    }
-    return transaction;
+  public SpringTransactionManagerImpl(EntityManager entityManager, SpringTransactionEntryPoints entryPoints) {
+    this.transaction = new SpringTransaction(entityManager);
+    this.entryPoints = entryPoints;
   }
 
   @Override
-  @Transactional(propagation = Propagation.MANDATORY)
   public <T, E extends Exception> T requireTransactionReturns(
       ThrowingTransactionalSupplier<T, E, SpringTransaction> work)
       throws E, NoTransactionActiveException {
-    return work.doWork(transaction());
+    return entryPoints.requireTransactionReturns(work, transaction);
   }
 
   @Override
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public <T, E extends Exception> T inTransactionReturnsThrows(
       ThrowingTransactionalSupplier<T, E, SpringTransaction> work) throws E {
-    return work.doWork(transaction());
+    return entryPoints.inTransactionReturnsThrows(work, transaction);
   }
 
   @Override
   public TransactionalInvocation extractTransaction(Method method, Object[] args) {
-    return TransactionManagerSupport.toTransactionalInvocation(method, args, transaction());
+    return TransactionManagerSupport.toTransactionalInvocation(method, args, transaction);
   }
 
   @Override
