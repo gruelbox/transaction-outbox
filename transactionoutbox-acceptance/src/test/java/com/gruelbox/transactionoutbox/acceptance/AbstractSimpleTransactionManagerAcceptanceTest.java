@@ -12,11 +12,7 @@ abstract class AbstractSimpleTransactionManagerAcceptanceTest
 
   @Override
   protected final SimpleTransactionManager createTxManager() {
-    return SimpleTransactionManager.fromConnectionDetails(
-        connectionDetails().driverClassName(),
-        connectionDetails().url(),
-        connectionDetails().user(),
-        connectionDetails().password());
+    return SimpleTransactionManager.fromDataSource(pooledDataSource());
   }
 
   @Override
