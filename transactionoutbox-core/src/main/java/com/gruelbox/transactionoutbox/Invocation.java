@@ -82,7 +82,7 @@ public final class Invocation {
     this.mdc = mdc;
   }
 
-  public Object invoke(Object instance)
+  Object invoke(Object instance)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
     method.setAccessible(true);
