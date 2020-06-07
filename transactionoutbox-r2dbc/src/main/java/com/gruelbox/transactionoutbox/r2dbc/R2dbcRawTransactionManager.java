@@ -64,7 +64,7 @@ public class R2dbcRawTransactionManager
   }
 
   // For testing
-  int getOpenTransactionCount() {
+  public int getOpenTransactionCount() {
     return openTransactionCount.get();
   }
 

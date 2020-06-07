@@ -1,5 +1,8 @@
 package com.gruelbox.transactionoutbox.r2dbc.acceptance;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.acceptance.AbstractSqlAcceptanceTest;
@@ -14,6 +17,7 @@ import io.r2dbc.spi.ConnectionFactory;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.BeforeEach;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -26,6 +30,11 @@ abstract class AbstractR2dbcAcceptanceTest
   @Override
   protected Persistor<Connection, R2dbcTransaction> createPersistor() {
     return R2dbcPersistor.forDialect(dialect());
+  }
+
+  @BeforeEach
+  void checkOpenTransactions() {
+    assertThat(txManager.getOpenTransactionCount(), equalTo(0));
   }
 
   @Override
