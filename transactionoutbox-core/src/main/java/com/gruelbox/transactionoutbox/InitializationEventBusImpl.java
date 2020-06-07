@@ -19,7 +19,7 @@ class InitializationEventBusImpl implements InitializationEventBus {
 
   private final Map<Class<?>, Set<Consumer>> subscribers = new HashMap<>();
 
-  void subscribe(Object owner) {
+  void subscribeAll(Object owner) {
     Arrays.stream(owner.getClass().getDeclaredFields())
         .filter(f -> !isStatic(f.getModifiers()))
         .forEach(
@@ -37,7 +37,7 @@ class InitializationEventBusImpl implements InitializationEventBus {
             });
   }
 
-  void publish(Object owner) {
+  void publishAll(Object owner) {
     Arrays.stream(owner.getClass().getDeclaredFields())
         .filter(f -> !isStatic(f.getModifiers()))
         .forEach(

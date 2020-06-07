@@ -344,10 +344,9 @@ public abstract class AbstractJdbcAcceptanceTest<
   @Test
   final void testBlockingRetryBehaviourDirectTx() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         builder()
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(new FailingInstantiator(2))
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(new LatchListener(latch))
@@ -373,10 +372,9 @@ public abstract class AbstractJdbcAcceptanceTest<
     Assumptions.assumeTrue(supportsThreadLocalContext());
 
     CountDownLatch latch = new CountDownLatch(1);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         builder()
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(new FailingInstantiator(2))
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(new LatchListener(latch))
@@ -404,10 +402,9 @@ public abstract class AbstractJdbcAcceptanceTest<
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blacklistLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         builder()
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(new FailingInstantiator(2))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
             .blacklistAfterAttempts(2)
@@ -438,10 +435,9 @@ public abstract class AbstractJdbcAcceptanceTest<
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blacklistLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         builder()
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(new FailingInstantiator(2))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
             .blacklistAfterAttempts(2)

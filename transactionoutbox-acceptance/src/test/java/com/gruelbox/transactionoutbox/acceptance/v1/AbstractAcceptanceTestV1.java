@@ -349,7 +349,7 @@ abstract class AbstractAcceptanceTestV1 {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(new FailingInstantiator(2))
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(new LatchListener(latch))
@@ -376,12 +376,11 @@ abstract class AbstractAcceptanceTestV1 {
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blacklistLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(new FailingInstantiator(2))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
             .blacklistAfterAttempts(2)

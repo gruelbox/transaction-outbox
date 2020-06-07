@@ -113,7 +113,7 @@ public class R2dbcRawTransactionManager
                     e.getClass().getSimpleName(),
                     e.getMessage() == null ? "" : (" - " + e.getMessage())))
         .concatWith(Mono.from(conn.rollbackTransaction()).then(Mono.empty()))
-        .concatWith(Mono.fromRunnable(() -> log.info("Rollback complete")))
+        .concatWith(Mono.fromRunnable(() -> log.debug("Rollback complete")))
         .then(Mono.error(e));
   }
 

@@ -1,6 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
+import static com.gruelbox.transactionoutbox.Utils.firstNonNull;
 import static com.gruelbox.transactionoutbox.Utils.logAtLevel;
+import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.time.temporal.ChronoUnit.MINUTES;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -69,21 +71,21 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       Duration retentionThreshold) {
 
     this.transactionManager = transactionManager;
-    this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
+    this.instantiator = firstNonNull(instantiator, Instantiator::usingReflection);
     this.persistor = persistor;
-    this.submitter = Utils.firstNonNull(submitter, Submitter::withDefaultExecutor);
-    this.attemptFrequency = Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
+    this.submitter = firstNonNull(submitter, Submitter::withDefaultExecutor);
+    this.attemptFrequency = firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
     this.blacklistAfterAttempts = blacklistAfterAttempts <= 1 ? 5 : blacklistAfterAttempts;
     this.flushBatchSize = flushBatchSize <= 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
-    this.clockProvider = Utils.firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
-    this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {});
-    this.logLevelTemporaryFailure = Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
+    this.clockProvider = firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
+    this.listener = firstNonNull(listener, () -> new TransactionOutboxListener() {});
+    this.logLevelTemporaryFailure = firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
     this.validator = new Validator(this.clockProvider);
     this.serializeMdc = serializeMdc == null ? true : serializeMdc;
     this.retentionThreshold = retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold;
     this.validator.validate(this);
     this.whitelistMethod =
-        Utils.uncheckedly(() -> getClass().getMethod("whitelistAsync", String.class, Object.class));
+        uncheckedly(() -> getClass().getMethod("whitelistAsync", String.class, Object.class));
     publishInitializationEvents();
     this.persistor.migrate(transactionManager);
   }
@@ -161,14 +163,14 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
             (success, e) -> {
               if (e == null) {
                 if (success) {
-                  log.info("Processed {}", entry.description());
+                  log.info("Processed({}) {}", entry.getAttempts(), entry.description());
                   onSuccess(entry);
                 } else {
                   log.debug("Skipped task {} - may be locked or already processed", entry.getId());
                 }
                 return CompletableFuture.<Void>completedFuture(null);
               } else {
-                return updateAttemptCount(entry, e);
+                return recordFailedAttempt(entry, e);
               }
             })
         .thenCompose(Function.identity());
@@ -266,7 +268,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     return Utils.createProxy(
         clazz,
         (method, args) ->
-            Utils.uncheckedly(
+            uncheckedly(
                 () -> {
                   TransactionalInvocation extracted =
                       transactionManager.extractTransaction(method, args);
@@ -329,7 +331,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   private CompletableFuture<Void> invoke(TransactionOutboxEntry entry, TX transaction) {
     try {
-      log.info("Processing {}", entry.description());
+      log.info("Processing({}) {}", entry.getAttempts(), entry.description());
       Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
       log.debug("Created instance {}", instance);
       Invocation invocation =
@@ -372,6 +374,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
                     serializeMdc && (MDC.getMDCAdapter() != null)
                         ? MDC.getCopyOfContextMap()
                         : null))
+            .attempts(1)
             .nextAttemptTime(after(attemptFrequency))
             .uniqueRequestId(uniqueRequestId)
             .build();
@@ -381,6 +384,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   private CompletableFuture<Void> pushBack(TX transaction, TransactionOutboxEntry entry) {
     entry.setNextAttemptTime(after(attemptFrequency));
+    entry.setAttempts(entry.getAttempts() + 1);
     validator.validate(entry);
     return persistor.update(transaction, entry);
   }
@@ -389,10 +393,9 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     return clockProvider.getClock().instant().plus(duration).truncatedTo(MILLIS);
   }
 
-  private CompletableFuture<Void> updateAttemptCount(
+  private CompletableFuture<Void> recordFailedAttempt(
       TransactionOutboxEntry entry, Throwable cause) {
     try {
-      entry.setAttempts(entry.getAttempts() + 1);
       var blacklisted = entry.getAttempts() >= blacklistAfterAttempts;
       if (blacklisted) {
         log.error(
@@ -404,11 +407,13 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
         if (!logAtLevel(
             log,
             logLevelTemporaryFailure,
-            "Temporarily failed to process: {}",
+            "Failed({}): {}",
+            entry.getAttempts(),
             entry.description(),
             cause)) {
           log.info(
-              "Temporarily failed to process: {} ({} - {})",
+              "Failed({}): {} ({} - {})",
+              entry.getAttempts(),
               entry.description(),
               cause.getClass().getSimpleName(),
               cause.getMessage());
@@ -419,26 +424,27 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       validator.validate(entry);
       return transactionManager
           .transactionally(transaction -> persistor.update(transaction, entry))
-          .thenRun(() -> onFailure(entry, cause))
-          .thenRun(
-              () -> {
-                if (blacklisted) {
-                  onBlacklisted(entry, cause);
-                }
-              })
+          .thenRun(() -> {
+            log.debug("Successfully updated {}", entry.description());
+            onFailure(entry, cause);
+            if (blacklisted) {
+              onBlacklisted(entry, cause);
+            }
+          })
           .exceptionally(
               e -> {
                 if (e instanceof OptimisticLockException
                     || e.getCause() instanceof OptimisticLockException) {
                   log.warn(
-                      "Failed to update attempt count for {} due to conflicting locks caused by concurrent "
-                          + "run attempts. The attemptFrequency may be set too low combined with a blocking "
-                          + "connection pool causing attempts to overlap. It may be retried more times than "
-                          + "expected.",
+                      "Failed to update attempt count for {} due to conflicting locks caused by "
+                          + "concurrent run attempts. The attemptFrequency may be set too low "
+                          + "combined with a blocking connection pool causing attempts to overlap. "
+                          + "It may be retried more times than expected.",
                       entry.description());
                 } else {
                   log.error(
-                      "Failed to update attempt count for {}. It may be retried more times than expected.",
+                      "Failed to update attempt count for {}. It may be retried more times than "
+                          + "expected.",
                       entry.description(),
                       e);
                 }
@@ -455,8 +461,8 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   private void publishInitializationEvents() {
     InitializationEventBusImpl eventBus = new InitializationEventBusImpl();
-    eventBus.subscribe(this);
-    eventBus.publish(this);
+    eventBus.subscribeAll(this);
+    eventBus.publishAll(this);
   }
 
   private void onSuccess(TransactionOutboxEntry entry) {

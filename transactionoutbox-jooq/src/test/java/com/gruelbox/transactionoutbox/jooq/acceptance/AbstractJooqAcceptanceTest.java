@@ -6,13 +6,10 @@ import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.acceptance.AbstractJdbcAcceptanceTest;
 import java.util.concurrent.CompletableFuture;
 import org.jooq.Configuration;
-import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 
 public abstract class AbstractJooqAcceptanceTest<TM extends JooqTransactionManager>
     extends AbstractJdbcAcceptanceTest<JooqTransaction, TM> {
-
-  private DSLContext dsl;
 
   @Override
   protected CompletableFuture<Void> scheduleWithTx(

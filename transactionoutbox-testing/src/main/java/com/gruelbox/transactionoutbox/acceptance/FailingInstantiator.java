@@ -13,17 +13,18 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class FailingInstantiator implements Instantiator {
 
-  private final AtomicInteger attempts;
+  private final AtomicInteger attempts = new AtomicInteger();
   private final boolean verbose;
+  private final int failuresUntilSuccess;
 
-  public FailingInstantiator(AtomicInteger attempts) {
-    this.attempts = attempts;
+  public FailingInstantiator(int failuresUntilSuccess) {
     this.verbose = true;
+    this.failuresUntilSuccess = failuresUntilSuccess;
   }
 
-  public FailingInstantiator(AtomicInteger attempts, boolean verbose) {
-    this.attempts = attempts;
+  public FailingInstantiator(int failuresUntilSuccess, boolean verbose) {
     this.verbose = verbose;
+    this.failuresUntilSuccess = failuresUntilSuccess;
   }
 
   @Override
@@ -40,7 +41,7 @@ public class FailingInstantiator implements Instantiator {
         (method, args) -> {
           if (verbose)
             Utils.logMethodCall("Enter {}.{}({})", clazz, method, args);
-          if (attempts.incrementAndGet() < 3) {
+          if (attempts.incrementAndGet() <= failuresUntilSuccess) {
             if (verbose)
               Utils.logMethodCall("Failed {}.{}({})", clazz, method, args);
             if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {

@@ -222,10 +222,9 @@ public abstract class AbstractAcceptanceTest<
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blacklistLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         builder()
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(new FailingInstantiator(2))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
             .blacklistAfterAttempts(2)
@@ -254,10 +253,9 @@ public abstract class AbstractAcceptanceTest<
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blacklistLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         builder()
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(new FailingInstantiator(2, false))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
             .blacklistAfterAttempts(2)
@@ -352,7 +350,10 @@ public abstract class AbstractAcceptanceTest<
     Disposable background =
         Flux.interval(Duration.ofMillis(250))
             .flatMap(__ -> Mono.fromFuture(outbox::flushAsync))
-            .doOnError(e -> log.error("Error in poller", e))
+            .onErrorResume(e -> {
+              log.error("Error in poller", e);
+              return Mono.empty();
+            })
             .subscribe();
     try {
       runnable.run();
