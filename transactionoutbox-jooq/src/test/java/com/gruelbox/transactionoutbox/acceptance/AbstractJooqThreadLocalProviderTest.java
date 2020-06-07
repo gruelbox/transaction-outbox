@@ -31,7 +31,7 @@ abstract class AbstractJooqThreadLocalProviderTest
     CountDownLatch latch2 = new CountDownLatch(1);
     TransactionOutbox outbox =
         builder()
-            .instantiator(Instantiator.using(clazz -> new Worker(txManager)))
+            .instantiator(Instantiator.using(clazz -> new JooqWorker(txManager)))
             .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
@@ -53,9 +53,9 @@ abstract class AbstractJooqThreadLocalProviderTest
         () -> {
           txManager.inTransactionThrows(
               tx1 -> {
-                outbox.schedule(Worker.class).process(1);
+                outbox.schedule(JooqWorker.class).process(1);
 
-                txManager.inTransactionThrows(tx2 -> outbox.schedule(Worker.class).process(2));
+                txManager.inTransactionThrows(tx2 -> outbox.schedule(JooqWorker.class).process(2));
 
                 // Neither should be fired - the second job is in a nested transaction
                 CompletableFuture.allOf(
@@ -82,7 +82,7 @@ abstract class AbstractJooqThreadLocalProviderTest
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
         builder()
-            .instantiator(Instantiator.using(clazz -> new Worker(txManager)))
+            .instantiator(Instantiator.using(clazz -> new JooqWorker(txManager)))
             .listener(
                 new TransactionOutboxListener() {
                   @Override
@@ -96,7 +96,7 @@ abstract class AbstractJooqThreadLocalProviderTest
 
     dsl.transaction(
         () -> {
-          outbox.schedule(Worker.class).process(1);
+          outbox.schedule(JooqWorker.class).process(1);
           try {
             // Should not be fired until after commit
             assertFalse(latch.await(2, TimeUnit.SECONDS));
@@ -116,7 +116,7 @@ abstract class AbstractJooqThreadLocalProviderTest
     CountDownLatch latch2 = new CountDownLatch(1);
     TransactionOutbox outbox =
         builder()
-            .instantiator(Instantiator.using(clazz -> new Worker(txManager)))
+            .instantiator(Instantiator.using(clazz -> new JooqWorker(txManager)))
             .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
@@ -138,8 +138,8 @@ abstract class AbstractJooqThreadLocalProviderTest
         () -> {
           dsl.transaction(
               ctx -> {
-                outbox.schedule(Worker.class).process(1);
-                ctx.dsl().transaction(() -> outbox.schedule(Worker.class).process(2));
+                outbox.schedule(JooqWorker.class).process(1);
+                ctx.dsl().transaction(() -> outbox.schedule(JooqWorker.class).process(2));
 
                 // Neither should be fired - the second job is in a nested transaction
                 CompletableFuture.allOf(
@@ -170,7 +170,7 @@ abstract class AbstractJooqThreadLocalProviderTest
     CountDownLatch latch2 = new CountDownLatch(1);
     TransactionOutbox outbox =
         builder()
-            .instantiator(Instantiator.using(clazz -> new Worker(txManager)))
+            .instantiator(Instantiator.using(clazz -> new JooqWorker(txManager)))
             .attemptFrequency(Duration.of(1, ChronoUnit.SECONDS))
             .listener(
                 new TransactionOutboxListener() {
@@ -192,7 +192,7 @@ abstract class AbstractJooqThreadLocalProviderTest
         () -> {
           dsl.transaction(
               ctx -> {
-                outbox.schedule(Worker.class).process(1);
+                outbox.schedule(JooqWorker.class).process(1);
 
                 assertThrows(
                     UnsupportedOperationException.class,
@@ -200,7 +200,7 @@ abstract class AbstractJooqThreadLocalProviderTest
                         ctx.dsl()
                             .transaction(
                                 () -> {
-                                  outbox.schedule(Worker.class).process(2);
+                                  outbox.schedule(JooqWorker.class).process(2);
                                   throw new UnsupportedOperationException();
                                 }));
 
@@ -220,11 +220,11 @@ abstract class AbstractJooqThreadLocalProviderTest
   }
 
   @SuppressWarnings("EmptyMethod")
-  static class Worker {
+  static class JooqWorker {
 
     private final ThreadLocalJooqTransactionManager transactionManager;
 
-    Worker(ThreadLocalJooqTransactionManager transactionManager) {
+    JooqWorker(ThreadLocalJooqTransactionManager transactionManager) {
       this.transactionManager = transactionManager;
     }
 
