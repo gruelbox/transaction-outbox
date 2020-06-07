@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
@@ -55,10 +54,6 @@ import reactor.core.publisher.Mono;
 @Slf4j
 public abstract class AbstractAcceptanceTest<
     CN, TX extends BaseTransaction<CN>, TM extends BaseTransactionManager<CN, ? extends TX>> {
-
-  static {
-    Async.init();
-  }
 
   protected final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));

@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox.r2dbc.acceptance;
 
-import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.acceptance.AbstractSqlAcceptanceTest;
@@ -21,10 +20,6 @@ import reactor.core.publisher.Mono;
 @Slf4j
 abstract class AbstractR2dbcAcceptanceTest
     extends AbstractSqlAcceptanceTest<Connection, R2dbcTransaction, R2dbcRawTransactionManager> {
-
-  static {
-    Async.init();
-  }
 
   protected abstract ConnectionFactory createConnectionFactory();
 

@@ -7,7 +7,6 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.isA;
 import static org.hamcrest.Matchers.notNullValue;
 
-import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.StubPersistor;
 import com.gruelbox.transactionoutbox.Submitter;
@@ -34,10 +33,6 @@ import org.mockito.Mockito;
 /** Checks that stubbing {@link TransactionOutbox} works cleanly. */
 @Slf4j
 class TestStubbingBlocking {
-
-  static {
-    Async.init();
-  }
 
   @Test
   void testStubbingWithThreadLocalContext() {

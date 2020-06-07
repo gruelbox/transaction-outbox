@@ -8,7 +8,6 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
 import com.gruelbox.transactionoutbox.Persistor;
@@ -59,10 +58,6 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("deprecation")
 @Slf4j
 abstract class AbstractAcceptanceTestV1 {
-
-  static {
-    Async.init();
-  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractAcceptanceTestV1.class);
   private final ExecutorService unreliablePool =

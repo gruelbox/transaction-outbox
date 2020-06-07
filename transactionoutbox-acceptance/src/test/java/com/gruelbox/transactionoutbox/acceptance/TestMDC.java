@@ -3,7 +3,6 @@ package com.gruelbox.transactionoutbox.acceptance;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.StubPersistor;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
@@ -20,10 +19,6 @@ import org.slf4j.MDC;
 
 @Slf4j
 class TestMDC {
-
-  static {
-    Async.init();
-  }
 
   @Test
   final void testMDCPassedToTask() throws InterruptedException {

@@ -3,7 +3,6 @@ package com.gruelbox.transactionoutbox.acceptance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-import com.ea.async.Async;
 import java.net.URL;
 import javax.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,10 +20,6 @@ class EventuallyConsistentControllerTest {
   private URL base;
 
   @Inject private TestRestTemplate template;
-
-  static {
-    Async.init();
-  }
 
   @BeforeEach
   void setUp() throws Exception {

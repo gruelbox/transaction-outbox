@@ -15,7 +15,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.ea.async.Async;
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.OptimisticLockException;
@@ -39,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -62,11 +60,6 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
   protected abstract BaseTransactionManager<CN, TX> txManager();
 
   protected void validateState() {}
-
-  @BeforeAll
-  static void beforeAll() {
-    Async.init();
-  }
 
   @BeforeEach
   void beforeEach() throws InterruptedException, ExecutionException, TimeoutException {
