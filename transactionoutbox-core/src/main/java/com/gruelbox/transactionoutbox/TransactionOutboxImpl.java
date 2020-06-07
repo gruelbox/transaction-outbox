@@ -1,8 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
-import static com.ea.async.Async.await;
 import static com.gruelbox.transactionoutbox.Utils.logAtLevel;
-import static java.lang.reflect.Modifier.isStatic;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.time.temporal.ChronoUnit.MINUTES;
 import static java.util.concurrent.CompletableFuture.completedFuture;
@@ -10,29 +8,21 @@ import static java.util.concurrent.CompletableFuture.failedFuture;
 
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
-import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
-import com.gruelbox.transactionoutbox.spi.InitializationEventPublisher;
-import com.gruelbox.transactionoutbox.spi.InitializationEventSubscriber;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
-import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import javax.validation.ClockProvider;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.constraints.Length;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
@@ -165,79 +155,111 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   @Override
   public CompletableFuture<Void> processNow(TransactionOutboxEntry entry) {
-    try {
-      boolean success =
-          await(transactionManager.transactionally(transaction -> processNow(entry, transaction)));
-      if (success) {
-        log.info("Processed {}", entry.description());
-        listener.success(entry);
-      } else {
-        log.debug("Skipped task {} - may be locked or already processed", entry.getId());
-      }
-    } catch (Exception e) {
-      await(updateAttemptCount(entry, e));
-    }
-    return completedFuture(null);
+    return transactionManager
+        .transactionally(transaction -> processNow(entry, transaction))
+        .handle(
+            (success, e) -> {
+              if (e == null) {
+                if (success) {
+                  log.info("Processed {}", entry.description());
+                  onSuccess(entry);
+                } else {
+                  log.debug("Skipped task {} - may be locked or already processed", entry.getId());
+                }
+                return CompletableFuture.<Void>completedFuture(null);
+              } else {
+                return updateAttemptCount(entry, e);
+              }
+            })
+        .thenCompose(Function.identity());
   }
 
   private CompletableFuture<List<TransactionOutboxEntry>> flush(Instant now) {
     log.info("Flushing stale tasks");
-    List<TransactionOutboxEntry> batch =
-        await(transactionManager.transactionally(tx -> selectBatch(tx, now)));
-    log.debug("Got batch of {}", batch.size());
-    for (TransactionOutboxEntry entry : batch) {
-      submitNow(entry);
-    }
-    log.debug("Submitted batch");
-    return completedFuture(batch);
+    return transactionManager
+        .transactionally(tx -> selectBatch(tx, now))
+        .thenApply(
+            batch -> {
+              log.debug("Got batch of {}", batch.size());
+              batch.forEach(this::submitNow);
+              log.debug("Submitted batch");
+              return batch;
+            });
   }
 
   private CompletableFuture<List<TransactionOutboxEntry>> selectBatch(TX tx, Instant now) {
-    List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
-    List<TransactionOutboxEntry> found = await(persistor.selectBatch(tx, flushBatchSize, now));
-    for (TransactionOutboxEntry entry : found) {
-      log.info("Reprocessing {}", entry.description());
-      try {
-        await(pushBack(tx, entry));
-        log.debug("Pushed back {}", entry.description());
-        result.add(entry);
-      } catch (OptimisticLockException e) {
-        log.debug("Beaten to optimistic lock on {}", entry.description());
-      } catch (CompletionException e) {
-        if (e.getCause() instanceof OptimisticLockException) {
-          log.debug("Beaten to optimistic lock on {}", entry.description());
-        } else {
-          return failedFuture(e.getCause());
-        }
-      }
-    }
-    return completedFuture(result);
+    TransactionOutboxEntry[] result = new TransactionOutboxEntry[flushBatchSize];
+    AtomicInteger resultSize = new AtomicInteger();
+    return persistor
+        .selectBatch(tx, flushBatchSize, now)
+        .thenCompose(
+            found ->
+                CompletableFuture.allOf(
+                    found.stream()
+                        .peek(entry -> log.info("Reprocessing {}", entry.description()))
+                        .map(
+                            entry ->
+                                pushBack(tx, entry)
+                                    .handle(
+                                        (__, e) -> {
+                                          if (e == null) {
+                                            log.debug("Pushed back {}", entry.description());
+                                            result[resultSize.getAndIncrement()] = entry;
+                                            return null;
+                                          } else if (e instanceof OptimisticLockException
+                                              || e.getCause() instanceof OptimisticLockException) {
+                                            log.debug(
+                                                "Beaten to optimistic lock on {}",
+                                                entry.description());
+                                            return null;
+                                          } else {
+                                            throw sneakyThrow(e);
+                                          }
+                                        }))
+                        .toArray(CompletableFuture[]::new)))
+        .thenApply(__ -> Arrays.asList(result).subList(0, resultSize.get()));
+  }
+
+  @SneakyThrows
+  private RuntimeException sneakyThrow(Throwable t) {
+    throw t;
   }
 
   private CompletableFuture<Void> expireIdempotencyProtection(Instant now) {
-    long totalRecordsDeleted = 0;
-    int recordsDeleted;
-    do {
-      recordsDeleted =
-          await(transactionManager.transactionally(tx -> deleteProcessedAndExpired(tx, now)));
-      totalRecordsDeleted += recordsDeleted;
-    } while (recordsDeleted > 0);
-    if (totalRecordsDeleted > 0) {
-      long s = retentionThreshold.toSeconds();
-      String duration = String.format("%dd:%02dh:%02dm", s / 3600, (s % 3600) / 60, (s % 60));
-      log.info(
-          "Expired idempotency protection on {} requests completed more than {} ago",
-          totalRecordsDeleted,
-          duration);
-    } else {
-      log.debug("No records found to delete as of {}", now);
-    }
-    return completedFuture(null);
+    return expireIdempotencyProtectionBatch(now)
+        .thenApply(
+            total -> {
+              if (total > 0) {
+                long s = retentionThreshold.toSeconds();
+                String duration =
+                    String.format("%dd:%02dh:%02dm", s / 3600, (s % 3600) / 60, (s % 60));
+                log.info(
+                    "Expired idempotency protection on {} requests completed more than {} ago",
+                    total,
+                    duration);
+              } else {
+                log.debug("No records found to delete as of {}", now);
+              }
+              return null;
+            });
+  }
+
+  // TODO needs testing!
+  private CompletableFuture<Integer> expireIdempotencyProtectionBatch(Instant now) {
+    return transactionManager
+        .transactionally(tx -> deleteProcessedAndExpired(tx, now))
+        .thenCompose(
+            recordsDeleted -> {
+              if (recordsDeleted > 0) {
+                return expireIdempotencyProtectionBatch(now)
+                    .thenApply(more -> more + recordsDeleted);
+              }
+              return completedFuture(recordsDeleted);
+            });
   }
 
   private CompletableFuture<Integer> deleteProcessedAndExpired(TX tx, Instant now) {
-    int result = await(persistor.deleteProcessedAndExpired(tx, flushBatchSize, now));
-    return completedFuture(result);
+    return persistor.deleteProcessedAndExpired(tx, flushBatchSize, now);
   }
 
   @SuppressWarnings("unchecked")
@@ -261,24 +283,17 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   }
 
   private void submitBlocking(TX tx, TransactionOutboxEntry entry) {
-    try {
-      submitAsFuture(tx, entry).get();
-    } catch (ExecutionException e) {
-      Utils.uncheckAndThrow(e.getCause());
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
+    Utils.join(submitAsFuture(tx, entry));
   }
 
   private CompletableFuture<Void> submitAsFuture(TX tx, TransactionOutboxEntry entry) {
-    try {
-      await(persistor.save(tx, entry));
-      tx.addPostCommitHook(() -> submitNow(entry));
-      log.debug("Scheduled {}", entry.description());
-      return completedFuture(null);
-    } catch (Exception e) {
-      return failedFuture(e);
-    }
+    return persistor
+        .save(tx, entry)
+        .thenRun(
+            () -> {
+              tx.addPostCommitHook(() -> submitNow(entry));
+              log.debug("Scheduled {}", entry.description());
+            });
   }
 
   private CompletableFuture<Void> submitNow(TransactionOutboxEntry entry) {
@@ -287,30 +302,41 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   }
 
   private CompletableFuture<Boolean> processNow(TransactionOutboxEntry entry, TX tx) {
-    boolean locked = await(persistor.lock(tx, entry));
-    if (!locked) {
-      return completedFuture(false);
-    }
-    log.info("Processing {}", entry.description());
-    await(invoke(entry, tx));
-    if (entry.getUniqueRequestId() == null) {
-      await(persistor.delete(tx, entry));
-    } else {
-      log.debug("Deferring deletion of {} by {}", entry.description(), retentionThreshold);
-      entry.setProcessed(true);
-      entry.setNextAttemptTime(after(retentionThreshold));
-      await(persistor.update(tx, entry));
-    }
-    return completedFuture(true);
+    return persistor
+        .lock(tx, entry)
+        .thenCompose(
+            locked -> {
+              if (!locked) {
+                return completedFuture(false);
+              } else {
+                return invoke(entry, tx)
+                    .thenCompose(
+                        _1 -> {
+                          if (entry.getUniqueRequestId() == null) {
+                            return persistor.delete(tx, entry).thenApply(_2 -> true);
+                          } else {
+                            log.debug(
+                                "Deferring deletion of {} by {}",
+                                entry.description(),
+                                retentionThreshold);
+                            entry.setProcessed(true);
+                            entry.setNextAttemptTime(after(retentionThreshold));
+                            return persistor.update(tx, entry).thenApply(_2 -> true);
+                          }
+                        });
+              }
+            });
   }
 
   private CompletableFuture<Void> invoke(TransactionOutboxEntry entry, TX transaction) {
-    Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
-    log.debug("Created instance {}", instance);
-    Invocation invocation =
-        transactionManager.injectTransaction(entry.getInvocation(), transaction);
     try {
+      log.info("Processing {}", entry.description());
+      Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
+      log.debug("Created instance {}", instance);
+      Invocation invocation =
+          transactionManager.injectTransaction(entry.getInvocation(), transaction);
       Object result = invocation.invoke(instance);
+      log.debug("Successfully invoked, returned {}", result);
       if (result instanceof CompletableFuture<?>) {
         return ((CompletableFuture<?>) result).thenApply(__ -> null);
       } else {
@@ -357,8 +383,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   private CompletableFuture<Void> pushBack(TX transaction, TransactionOutboxEntry entry) {
     entry.setNextAttemptTime(after(attemptFrequency));
     validator.validate(entry);
-    await(persistor.update(transaction, entry));
-    return completedFuture(null);
+    return persistor.update(transaction, entry);
   }
 
   private Instant after(Duration duration) {
@@ -377,35 +402,86 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
             entry.description(),
             cause);
       } else {
-        logAtLevel(
+        if (!logAtLevel(
             log,
             logLevelTemporaryFailure,
             "Temporarily failed to process: {}",
             entry.description(),
-            cause);
+            cause)) {
+          log.info(
+              "Temporarily failed to process: {} ({} - {})",
+              entry.description(),
+              cause.getClass().getSimpleName(),
+              cause.getMessage());
+        }
       }
       entry.setBlacklisted(blacklisted);
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
-      await(
-          transactionManager.transactionally(transaction -> persistor.update(transaction, entry)));
-      listener.failure(entry, cause);
-      if (blacklisted) {
-        listener.blacklisted(entry, cause);
-      }
+      return transactionManager
+          .transactionally(transaction -> persistor.update(transaction, entry))
+          .thenRun(() -> onFailure(entry, cause))
+          .thenRun(
+              () -> {
+                if (blacklisted) {
+                  onBlacklisted(entry, cause);
+                }
+              })
+          .exceptionally(
+              e -> {
+                if (e instanceof OptimisticLockException
+                    || e.getCause() instanceof OptimisticLockException) {
+                  log.warn(
+                      "Failed to update attempt count for {} due to conflicting locks caused by concurrent "
+                          + "run attempts. The attemptFrequency may be set too low combined with a blocking "
+                          + "connection pool causing attempts to overlap. It may be retried more times than "
+                          + "expected.",
+                      entry.description());
+                } else {
+                  log.error(
+                      "Failed to update attempt count for {}. It may be retried more times than expected.",
+                      entry.description(),
+                      e);
+                }
+                return null;
+              });
     } catch (Exception e) {
       log.error(
           "Failed to update attempt count for {}. It may be retried more times than expected.",
           entry.description(),
           e);
+      return completedFuture(null);
     }
-    return completedFuture(null);
   }
 
   private void publishInitializationEvents() {
     InitializationEventBusImpl eventBus = new InitializationEventBusImpl();
     eventBus.subscribe(this);
     eventBus.publish(this);
+  }
+
+  private void onSuccess(TransactionOutboxEntry entry) {
+    try {
+      listener.success(entry);
+    } catch (Exception e1) {
+      log.error("Error dispatching success event", e1);
+    }
+  }
+
+  private void onBlacklisted(TransactionOutboxEntry entry, Throwable cause) {
+    try {
+      listener.blacklisted(entry, cause);
+    } catch (Exception e1) {
+      log.error("Error dispatching blacklisted event", e1);
+    }
+  }
+
+  private void onFailure(TransactionOutboxEntry entry, Throwable cause) {
+    try {
+      listener.failure(entry, cause);
+    } catch (Exception e1) {
+      log.error("Error dispatching failure event", e1);
+    }
   }
 
   private class ParameterizedScheduleBuilderImpl implements ParameterizedScheduleBuilder {
@@ -423,67 +499,6 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     public <T> T schedule(Class<T> clazz) {
       validator.validate(this);
       return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId);
-    }
-  }
-
-  @SuppressWarnings("rawtypes")
-  private static class InitializationEventBusImpl implements InitializationEventBus {
-
-    private final Map<Class<?>, Set<Consumer>> subscribers = new HashMap<>();
-
-    void subscribe(Object owner) {
-      Arrays.stream(owner.getClass().getDeclaredFields())
-          .filter(f -> !isStatic(f.getModifiers()))
-          .forEach(
-              f -> {
-                f.setAccessible(true);
-                try {
-                  Object value = f.get(owner);
-                  if (value instanceof InitializationEventSubscriber) {
-                    log.debug(
-                        "Adding subscriber to startup events: {}", value.getClass().getName());
-                    ((InitializationEventSubscriber) value).onRegisterInitializationEvents(this);
-                  }
-                } catch (IllegalAccessException e) {
-                  throw new RuntimeException(e);
-                }
-              });
-    }
-
-    void publish(Object owner) {
-      Arrays.stream(owner.getClass().getDeclaredFields())
-          .filter(f -> !isStatic(f.getModifiers()))
-          .forEach(
-              f -> {
-                f.setAccessible(true);
-                try {
-                  Object value = f.get(owner);
-                  if (value instanceof InitializationEventPublisher) {
-                    log.debug("Invoking startup event publisher: {}", value.getClass().getName());
-                    ((InitializationEventPublisher) value).onPublishInitializationEvents(this);
-                  }
-                } catch (IllegalAccessException e) {
-                  throw new RuntimeException(e);
-                }
-              });
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T> void sendEvent(Class<T> eventType, T event) {
-      Set<Consumer> consumers = subscribers.get(eventType);
-      if (consumers != null) {
-        consumers.forEach(
-            subscriber -> {
-              log.debug("Dispatching {} to {}", event, subscriber);
-              subscriber.accept(event);
-            });
-      }
-    }
-
-    @Override
-    public <T> void register(Class<T> eventType, Consumer<T> handler) {
-      subscribers.computeIfAbsent(eventType, __ -> new HashSet<>()).add(handler);
     }
   }
 }
