@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox.sql;
 
-import static com.ea.async.Async.*;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.failedFuture;
 
@@ -18,11 +17,9 @@ import com.gruelbox.transactionoutbox.spi.InitializationEventSubscriber;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.Instant;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
@@ -110,32 +107,39 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     if (!migrate) {
       return;
     }
-    tm.transactionally(this::doMigrate).join();
+    tm.transactionally(
+            tx ->
+                createOutboxTableIfNotExists(tx)
+                    .thenCompose(__ -> fetchCurrentVersion(tx))
+                    .thenCompose(
+                        versionResult -> {
+                          if (versionResult.size() != 1) {
+                            return failedFuture(
+                                new IllegalStateException(
+                                    "Unexpected number of version records: "
+                                        + versionResult.size()));
+                          }
+                          int currentVersion = versionResult.get(0);
+                          log.info("Current schema version is {}", currentVersion);
+                          return dialect
+                              .migrations(tableName)
+                              .filter(mig -> mig.getVersion() > currentVersion)
+                              .peek(
+                                  mig ->
+                                      log.info(
+                                          "Running migration {}: {}",
+                                          mig.getVersion(),
+                                          mig.getName()))
+                              .map(
+                                  mig ->
+                                      executeUpdate(tx, mig.getSql())
+                                          .thenCompose(__ -> updateVersion(tx, mig)))
+                              .reduce(
+                                  CompletableFuture.completedFuture(null),
+                                  (f1, f2) -> f1.thenCompose(__ -> f2));
+                        }))
+        .join();
     log.info("Migrations complete");
-  }
-
-  private CompletableFuture<?> doMigrate(TX tx) {
-    await(
-        executeUpdate(
-            tx,
-            "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
-                + dialect.getIntegerCastType()
-                + ") AS version"));
-    List<Integer> versionResult = await(executeFetchVersion(tx, row -> row.get(0, Integer.class)));
-    if (versionResult.size() != 1) {
-      throw new IllegalStateException(
-          "Unexpected number of version records: " + versionResult.size());
-    }
-    int currentVersion = versionResult.get(0);
-    Iterator<SqlMigration> migrationIterator =
-        dialect.migrations(tableName).filter(it -> it.getVersion() > currentVersion).iterator();
-    while (migrationIterator.hasNext()) {
-      var mig = migrationIterator.next();
-      log.info("Running migration {}: {}", mig.getVersion(), mig.getName());
-      await(executeUpdate(tx, mig.getSql()));
-      await(executeUpdate(tx, "UPDATE TXNO_VERSION SET version = " + mig.getVersion()));
-    }
-    return completedFuture(null);
   }
 
   @Override
@@ -189,13 +193,13 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
               writeLockTimeoutSeconds,
               false,
               binder -> binder.bind(0, entry.getId()).bind(1, entry.getVersion()).execute())
-          .thenApply(
+          .thenCompose(
               rows -> {
                 if (rows != 1) {
-                  throw new OptimisticLockException();
+                  return failedFuture(new OptimisticLockException());
                 } else {
                   log.debug("Deleted {}", entry.description());
-                  return null;
+                  return completedFuture(null);
                 }
               });
     } catch (Exception e) {
@@ -223,14 +227,14 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                       .bind(5, entry.getId())
                       .bind(6, entry.getVersion())
                       .execute())
-          .thenApply(
+          .thenCompose(
               rows -> {
                 if (rows != 1) {
-                  throw new OptimisticLockException();
+                  return failedFuture(new OptimisticLockException());
                 } else {
                   log.debug("Updated {}", entry.description());
                   entry.setVersion(entry.getVersion() + 1);
-                  return null;
+                  return completedFuture(null);
                 }
               });
     } catch (Exception e) {
@@ -339,15 +343,26 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     return sqlApi.statement(tx, dialect, clearSql, 0, false, SqlStatement::execute);
   }
 
-  private <T> CompletableFuture<List<T>> executeFetchVersion(
-      TX tx, Function<SqlResultRow, T> mapper) {
+  private CompletableFuture<Integer> createOutboxTableIfNotExists(TX tx) {
+    return executeUpdate(
+        tx,
+        "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
+            + dialect.getIntegerCastType()
+            + ") AS version");
+  }
+
+  private CompletableFuture<List<Integer>> fetchCurrentVersion(TX tx) {
     return sqlApi.statement(
         tx,
         dialect,
         "SELECT version FROM TXNO_VERSION FOR UPDATE",
         0,
         false,
-        binder -> binder.executeQuery(1, mapper));
+        binder -> binder.executeQuery(1, row -> row.get(0, Integer.class)));
+  }
+
+  private CompletableFuture<Integer> updateVersion(TX tx, SqlMigration mig) {
+    return executeUpdate(tx, "UPDATE TXNO_VERSION SET version = " + mig.getVersion());
   }
 
   private CompletableFuture<Integer> executeUpdate(TX tx, String sql) {
