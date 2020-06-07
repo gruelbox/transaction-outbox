@@ -126,12 +126,12 @@ public class R2dbcRawTransactionManager
                     .then(Mono.from(conn.setAutoCommit(false)))
                     .thenMany(fn.apply(conn))
                     .concatWith(
-                        Mono.fromRunnable(() -> log.debug("Closing connection on success"))
+                        Mono.fromRunnable(() -> log.trace("Closing connection on success"))
                             .then(Mono.from(conn.close()))
                             .then(Mono.fromRunnable(openTransactionCount::decrementAndGet)))
                     .onErrorResume(
                         t ->
-                            Mono.fromRunnable(() -> log.debug("Closing connection on error"))
+                            Mono.fromRunnable(() -> log.trace("Closing connection on error"))
                                 .then(Mono.from(conn.close()))
                                 .then(Mono.fromRunnable(openTransactionCount::decrementAndGet))
                                 .then(Mono.error(t))));
@@ -150,7 +150,7 @@ public class R2dbcRawTransactionManager
           .map(WrappedConnection::new)
           .map(
               conn -> {
-                log.debug("Adding transaction for connection {} to map", conn);
+                log.trace("Adding transaction for connection {} to map", conn);
                 contextMap.put(conn, new R2dbcRawTransaction(conn));
                 return conn;
               });
@@ -183,7 +183,7 @@ public class R2dbcRawTransactionManager
             .then(
                 Mono.fromRunnable(
                     () -> {
-                      log.debug("Removing transaction for connection {} from map", this);
+                      log.trace("Removing transaction for connection {} from map", this);
                       contextMap.remove(this);
                     }));
       }
