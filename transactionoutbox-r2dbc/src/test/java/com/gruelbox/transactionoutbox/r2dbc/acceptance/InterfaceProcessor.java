@@ -6,8 +6,6 @@ import java.util.concurrent.CompletableFuture;
 
 interface InterfaceProcessor {
 
-  void process(int foo, String bar);
-
   CompletableFuture<Void> processAsync(int foo, String bar, Connection connection);
 
   CompletableFuture<Void> processAsync(int foo, String bar, R2dbcTransaction r2dbcTransaction);
