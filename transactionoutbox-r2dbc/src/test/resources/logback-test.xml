@@ -8,4 +8,5 @@
   <root level="INFO">
     <appender-ref ref="STDOUT" />
   </root>
+  <logger name="com.gruelbox.transactionoutbox" level="INFO" />
 </configuration>

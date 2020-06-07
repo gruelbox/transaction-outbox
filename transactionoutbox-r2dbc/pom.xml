@@ -111,6 +111,12 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>io.r2dbc</groupId>
+      <artifactId>r2dbc-pool</artifactId>
+      <version>${r2dbc.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>dev.miku</groupId>
       <artifactId>r2dbc-mysql</artifactId>
       <version>0.8.1.RELEASE</version>

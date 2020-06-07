@@ -5,9 +5,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.Persistor;
@@ -16,7 +14,6 @@ import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
-import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransaction;
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
@@ -40,7 +37,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -49,13 +45,6 @@ import org.junit.jupiter.api.Test;
 public abstract class AbstractJdbcAcceptanceTest<
         TX extends JdbcTransaction, TM extends JdbcTransactionManager<TX>>
     extends AbstractSqlAcceptanceTest<Connection, TX, TM> {
-
-  private static final List<AutoCloseable> resources = new ArrayList<>();
-
-  @AfterAll
-  static void cleanup() {
-    Utils.safelyClose(resources);
-  }
 
   protected abstract JdbcConnectionDetails connectionDetails();
 
@@ -127,17 +116,12 @@ public abstract class AbstractJdbcAcceptanceTest<
     txManager.inTransaction(
         tx -> {
           outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee", tx);
-          try {
-            // Should not be fired until after commit
-            assertFalse(latch.await(2, TimeUnit.SECONDS));
-          } catch (InterruptedException e) {
-            fail("Interrupted");
-          }
+          assertNotFired(latch);
         });
 
     // Should be fired after commit
-    assertTrue(chainedLatch.await(2, TimeUnit.SECONDS));
-    assertTrue(latch.await(1, TimeUnit.SECONDS));
+    assertFired(chainedLatch);
+    assertFired(latch);
   }
 
   @Test
@@ -376,7 +360,7 @@ public abstract class AbstractJdbcAcceptanceTest<
         () -> {
           txManager.inTransaction(
               tx -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee", tx));
-          assertTrue(latch.await(15, TimeUnit.SECONDS));
+          assertFired(latch);
         });
   }
 
@@ -405,7 +389,7 @@ public abstract class AbstractJdbcAcceptanceTest<
         () -> {
           txManager.inTransaction(
               () -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(latch.await(15, TimeUnit.SECONDS));
+          assertFired(latch);
         });
   }
 
@@ -436,12 +420,12 @@ public abstract class AbstractJdbcAcceptanceTest<
         () -> {
           txManager.inTransaction(
               () -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blacklistLatch.await(3, TimeUnit.SECONDS));
+          assertFired(blacklistLatch);
           boolean whitelisted =
               txManager.inTransactionReturns(
                   tx -> outbox.whitelist(latchListener.getBlacklisted().getId()));
           assertTrue(whitelisted);
-          assertTrue(successLatch.await(3, TimeUnit.SECONDS));
+          assertFired(successLatch);
         });
   }
 
@@ -470,12 +454,12 @@ public abstract class AbstractJdbcAcceptanceTest<
         () -> {
           txManager.inTransaction(
               tx -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee", tx));
-          assertTrue(blacklistLatch.await(3, TimeUnit.SECONDS));
+          assertFired(blacklistLatch);
           boolean whitelisted =
               txManager.inTransactionReturns(
                   tx -> outbox.whitelist(latchListener.getBlacklisted().getId(), tx));
           assertTrue(whitelisted);
-          assertTrue(successLatch.await(3, TimeUnit.SECONDS));
+          assertFired(successLatch);
         });
   }
 
@@ -526,7 +510,7 @@ public abstract class AbstractJdbcAcceptanceTest<
                                   .process(i * 10 + j, "Whee");
                             }
                           }));
-          assertTrue(latch.await(30, TimeUnit.SECONDS));
+          assertFired(latch);
         });
 
     assertThat(
@@ -583,7 +567,7 @@ public abstract class AbstractJdbcAcceptanceTest<
                                   .process(i * 10 + j, "Whee", tx);
                             }
                           }));
-          assertTrue(latch.await(30, TimeUnit.SECONDS));
+          assertFired(latch, 30);
         });
 
     assertThat(
@@ -600,9 +584,7 @@ public abstract class AbstractJdbcAcceptanceTest<
     config.setUsername(connectionDetails().user());
     config.setPassword(connectionDetails().password());
     config.addDataSourceProperty("cachePrepStmts", "true");
-    var resource = new HikariDataSource(config);
-    resources.add(resource);
-    return resource;
+    return autoClose(new HikariDataSource(config));
   }
 
   private void withBlockingRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)

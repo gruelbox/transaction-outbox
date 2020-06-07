@@ -20,6 +20,8 @@ import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.time.Duration;
+import java.util.Deque;
+import java.util.LinkedList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,10 +32,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.event.Level;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -85,11 +89,17 @@ public abstract class AbstractAcceptanceTest<
   private static BaseTransactionManager<?, ?> staticTxManager;
   protected Persistor<CN, TX> persistor;
   protected TM txManager;
+  private static final Deque<AutoCloseable> resources = new LinkedList<>();
 
   @BeforeAll
   static void cleanState() {
     staticPersistor = null;
     staticTxManager = null;
+  }
+
+  @AfterAll
+  static void cleanup() {
+    Utils.safelyClose(resources);
   }
 
   @SuppressWarnings("unchecked")
@@ -108,7 +118,10 @@ public abstract class AbstractAcceptanceTest<
   }
 
   protected TransactionOutbox.TransactionOutboxBuilder builder() {
-    return TransactionOutbox.builder().transactionManager(txManager).persistor(persistor);
+    return TransactionOutbox.builder()
+        .transactionManager(txManager)
+        .logLevelTemporaryFailure(Level.DEBUG)
+        .persistor(persistor);
   }
 
   @Test
@@ -118,7 +131,7 @@ public abstract class AbstractAcceptanceTest<
     TransactionOutbox outbox =
         builder()
             .instantiator(new LoggingInstantiator())
-            .listener(new LatchListener(latch))
+            .listener(new LatchListener(latch, Level.INFO))
             .build();
 
     cleanDataStore();
@@ -288,7 +301,7 @@ public abstract class AbstractAcceptanceTest<
   /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
   @Test
   final void testHighVolumeUnreliableAsync() throws Exception {
-    int count = 10;
+    int count = 100;
 
     CountDownLatch latch = new CountDownLatch(count * 10);
     ConcurrentHashMap<Integer, Integer> results = new ConcurrentHashMap<>();
@@ -378,5 +391,10 @@ public abstract class AbstractAcceptanceTest<
     log.info("Not testing context injection, not supported by transaction manager");
     Assumptions.assumeTrue(
         false, "Not testing context injection, not supported by transaction manager");
+  }
+
+  protected <T extends AutoCloseable> T autoClose(T resource) {
+    resources.push(resource);
+    return resource;
   }
 }

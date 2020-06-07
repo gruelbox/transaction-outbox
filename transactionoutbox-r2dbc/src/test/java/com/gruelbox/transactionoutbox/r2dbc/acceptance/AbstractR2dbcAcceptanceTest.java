@@ -8,8 +8,11 @@ import com.gruelbox.transactionoutbox.r2dbc.R2dbcPersistor;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcTransaction;
+import io.r2dbc.pool.ConnectionPool;
+import io.r2dbc.pool.ConnectionPoolConfiguration;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.ConnectionFactory;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
@@ -32,8 +35,14 @@ abstract class AbstractR2dbcAcceptanceTest
 
   @Override
   protected final R2dbcRawTransactionManager createTxManager() {
+    ConnectionPoolConfiguration configuration =
+        ConnectionPoolConfiguration.builder(createConnectionFactory())
+            .maxIdleTime(Duration.ofSeconds(10))
+            .maxSize(20)
+            .build();
+    ConnectionPool pool = autoClose(new ConnectionPool(configuration));
     ConnectionFactoryWrapper connectionFactory =
-        R2dbcRawTransactionManager.wrapConnectionFactory(createConnectionFactory());
+        R2dbcRawTransactionManager.wrapConnectionFactory(pool);
     return new R2dbcRawTransactionManager(connectionFactory);
   }
 
