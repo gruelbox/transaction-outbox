@@ -89,15 +89,6 @@ public class Utils {
     }
   }
 
-  @SneakyThrows
-  public static <T> T join(CompletableFuture<T> future) {
-    try {
-      return future.join();
-    } catch (CompletionException e) {
-      throw e.getCause();
-    }
-  }
-
   public static CompletableFuture<Void> toBlockingFuture(ThrowingRunnable runnable) {
     try {
       runnable.run();
@@ -107,26 +98,43 @@ public class Utils {
     }
   }
 
+  @SneakyThrows
+  public static <T> T join(CompletableFuture<T> future) {
+    try {
+      return future.join();
+    } catch (CompletionException e) {
+      throw e.getCause();
+    }
+  }
+
   @SuppressWarnings({"unchecked", "cast"})
   public static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], Object> processor) {
+    BiFunction<Method, Object[], Object> wrapped = (method, args) -> {
+      switch (method.getName()) {
+        case "toString": return "Proxy[" + clazz.getName() + "]";
+        case "hashCode": return processor.hashCode();
+        case "equals": return false;
+        default: return processor.apply(method, args);
+      }
+    };
     if (clazz.isInterface()) {
       // Fastest - we can just proxy an interface directly
       return (T)
           Proxy.newProxyInstance(
               clazz.getClassLoader(),
               new Class[] {clazz},
-              (proxy, method, args) -> processor.apply(method, args));
+              (proxy, method, args) -> wrapped.apply(method, args));
     } else if (hasDefaultConstructor(clazz)) {
       // CGLIB on its own can create an instance
       return (T)
           Enhancer.create(
               clazz,
               (MethodInterceptor)
-                  (o, method, objects, methodProxy) -> processor.apply(method, objects));
+                  (o, method, objects, methodProxy) -> wrapped.apply(method, objects));
     } else {
       // Slowest - we need to use Objenesis and CGLIB together
       MethodInterceptor methodInterceptor =
-          (o, method, objects, methodProxy) -> processor.apply(method, objects);
+          (o, method, objects, methodProxy) -> wrapped.apply(method, objects);
       Enhancer enhancer = new Enhancer();
       enhancer.setSuperclass(clazz);
       enhancer.setCallbackTypes(new Class<?>[] {MethodInterceptor.class});
@@ -168,26 +176,46 @@ public class Utils {
     return one;
   }
 
-  static void logAtLevel(Logger logger, Level level, String message, Object... args) {
+  public static boolean logAtLevel(Logger logger, Level level, String message, Object... args) {
     switch (level) {
       case ERROR:
-        logger.error(message, args);
-        break;
+        if (logger.isErrorEnabled()) {
+          logger.error(message, args);
+          return true;
+        } else {
+          return false;
+        }
       case WARN:
         logger.warn(message, args);
-        break;
+        if (logger.isWarnEnabled()) {
+          logger.warn(message, args);
+          return true;
+        } else {
+          return false;
+        }
       case INFO:
-        logger.info(message, args);
-        break;
+        if (logger.isInfoEnabled()) {
+          logger.info(message, args);
+          return true;
+        } else {
+          return false;
+        }
       case DEBUG:
-        logger.debug(message, args);
-        break;
+        if (logger.isDebugEnabled()) {
+          logger.debug(message, args);
+          return true;
+        } else {
+          return false;
+        }
       case TRACE:
-        logger.trace(message, args);
-        break;
+        if (logger.isTraceEnabled()) {
+          logger.trace(message, args);
+          return true;
+        } else {
+          return false;
+        }
       default:
-        logger.warn(message, args);
-        break;
+        return logAtLevel(logger, Level.WARN, message, args);
     }
   }
 
