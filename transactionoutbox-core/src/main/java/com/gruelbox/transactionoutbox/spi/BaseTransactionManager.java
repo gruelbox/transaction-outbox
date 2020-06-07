@@ -23,6 +23,12 @@ public interface BaseTransactionManager<CN, TX extends BaseTransaction<CN>> {
    * commit on success or rollback on failure, flushing and closing any resources prior to a commit
    * and firing post commit hooks immediately afterwards.
    *
+   * <p><strong>WARNING:</strong> when calling this method it is strongly advised to ensure that all
+   * I/O performed inside the transaction is non-blocking. Implementations may use NIO and not take
+   * kindly to blocking code. Implementations that support blocking I/O will usually provide
+   * variants on this method with blocking semantics and this should be used in preference. This
+   * method is mainly provided for internal use, which all assumes non-blocking semantics.
+   *
    * @param <T> The type returned.
    * @param work Code which must be called while the transaction is active.
    * @return The result of {@code work}.
