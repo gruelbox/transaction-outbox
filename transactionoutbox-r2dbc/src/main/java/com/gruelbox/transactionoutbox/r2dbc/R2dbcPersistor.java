@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
+import com.gruelbox.transactionoutbox.Beta;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.PersistorWrapper;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
@@ -17,8 +18,8 @@ import lombok.extern.slf4j.Slf4j;
  * optionally be automatically created and upgraded by {@link JdbcPersistor}, although this
  * behaviour can be disabled if you wish.
  */
-@SuppressWarnings("WeakerAccess")
 @Slf4j
+@Beta
 public class R2dbcPersistor extends PersistorWrapper<Connection, R2dbcTransaction> {
 
   public static R2dbcPersistor forDialect(Dialect dialect) {

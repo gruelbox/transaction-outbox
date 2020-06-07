@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
+import com.gruelbox.transactionoutbox.Beta;
 import io.r2dbc.spi.Connection;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @AllArgsConstructor
 @Slf4j
+@Beta
 public final class R2dbcRawTransaction implements R2dbcTransaction {
 
   private final List<Supplier<CompletableFuture<Void>>> postCommitHooks = new ArrayList<>();
