@@ -16,6 +16,16 @@ public class RandomFailingInstantiator implements Instantiator {
 
   private static final PrimitiveIterator.OfInt randoms = new Random().ints(0, 19).iterator();
 
+  private final boolean verbose;
+
+  public RandomFailingInstantiator() {
+    this.verbose = true;
+  }
+
+  public RandomFailingInstantiator(boolean verbose) {
+    this.verbose = verbose;
+  }
+
   @Override
   public String getName(Class<?> clazz) {
     return clazz.getName();
@@ -28,16 +38,19 @@ public class RandomFailingInstantiator implements Instantiator {
     return Utils.createProxy(
         clazz,
         (method, args) -> {
-          Utils.logMethodCall("Enter {}.{}({})", clazz, method, args);
+          if (verbose)
+            Utils.logMethodCall("Enter {}.{}({})", clazz, method, args);
           if (randoms.next() == 5) {
-            Utils.logMethodCall("Failed {}.{}({})", clazz, method, args);
+            if (verbose)
+              Utils.logMethodCall("Failed {}.{}({})", clazz, method, args);
             if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
               return failedFuture(new RuntimeException("Temporary failure"));
             } else {
               throw new RuntimeException("Temporary failure");
             }
           }
-          Utils.logMethodCall("Exit {}.{}({})", clazz, method, args);
+          if (verbose)
+            Utils.logMethodCall("Exit {}.{}({})", clazz, method, args);
           return completedFuture(null);
         });
   }

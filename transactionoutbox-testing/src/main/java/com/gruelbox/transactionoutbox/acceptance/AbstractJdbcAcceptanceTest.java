@@ -476,7 +476,7 @@ public abstract class AbstractJdbcAcceptanceTest<
 
     TransactionOutbox outbox =
         builder()
-            .instantiator(new RandomFailingInstantiator())
+            .instantiator(new RandomFailingInstantiator(false))
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
             .flushBatchSize(1000)
@@ -533,7 +533,7 @@ public abstract class AbstractJdbcAcceptanceTest<
 
     TransactionOutbox outbox =
         builder()
-            .instantiator(new RandomFailingInstantiator())
+            .instantiator(new RandomFailingInstantiator(false))
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
             .flushBatchSize(1000)

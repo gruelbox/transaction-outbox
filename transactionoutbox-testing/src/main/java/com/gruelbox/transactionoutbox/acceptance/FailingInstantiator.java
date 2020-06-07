@@ -14,9 +14,16 @@ import lombok.extern.slf4j.Slf4j;
 public class FailingInstantiator implements Instantiator {
 
   private final AtomicInteger attempts;
+  private final boolean verbose;
 
   public FailingInstantiator(AtomicInteger attempts) {
     this.attempts = attempts;
+    this.verbose = true;
+  }
+
+  public FailingInstantiator(AtomicInteger attempts, boolean verbose) {
+    this.attempts = attempts;
+    this.verbose = verbose;
   }
 
   @Override
@@ -31,16 +38,19 @@ public class FailingInstantiator implements Instantiator {
     return Utils.createProxy(
         clazz,
         (method, args) -> {
-          Utils.logMethodCall("Enter {}.{}({})", clazz, method, args);
+          if (verbose)
+            Utils.logMethodCall("Enter {}.{}({})", clazz, method, args);
           if (attempts.incrementAndGet() < 3) {
-            Utils.logMethodCall("Failed {}.{}({})", clazz, method, args);
+            if (verbose)
+              Utils.logMethodCall("Failed {}.{}({})", clazz, method, args);
             if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
               return failedFuture(new RuntimeException("Temporary failure"));
             } else {
               throw new RuntimeException("Temporary failure");
             }
           }
-          Utils.logMethodCall("Exit {}.{}({})", clazz, method, args);
+          if (verbose)
+            Utils.logMethodCall("Exit {}.{}({})", clazz, method, args);
           return completedFuture(null);
         });
   }

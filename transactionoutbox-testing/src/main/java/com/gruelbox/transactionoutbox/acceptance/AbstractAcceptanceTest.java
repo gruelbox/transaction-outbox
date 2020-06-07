@@ -120,7 +120,7 @@ public abstract class AbstractAcceptanceTest<
   }
 
   @Test
-  final void testSimple() {
+  final void testAsyncSimple() {
     CountDownLatch latch = new CountDownLatch(1);
     CountDownLatch chainCompleted = new CountDownLatch(1);
     TransactionOutbox outbox =
@@ -142,7 +142,7 @@ public abstract class AbstractAcceptanceTest<
   }
 
   @Test
-  final void testSimpleWithDatabaseAccessViaTransaction() {
+  final void testAsyncSimpleWithDatabaseAccessViaTransaction() {
     CountDownLatch latch = new CountDownLatch(1);
     CountDownLatch chainCompleted = new CountDownLatch(1);
     TransactionOutbox outbox =
@@ -175,7 +175,7 @@ public abstract class AbstractAcceptanceTest<
   }
 
   @Test
-  final void testSimpleWithDatabaseAccessViaContext() {
+  final void testAsyncSimpleWithDatabaseAccessViaContext() {
     CountDownLatch latch = new CountDownLatch(1);
     CountDownLatch chainCompleted = new CountDownLatch(1);
     TransactionOutbox outbox =
@@ -218,7 +218,7 @@ public abstract class AbstractAcceptanceTest<
   }
 
   @Test
-  final void testBlackAndWhitelistViaTxn() throws Exception {
+  final void testAsyncBlackAndWhitelistViaTxn() throws Exception {
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blacklistLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
@@ -250,7 +250,7 @@ public abstract class AbstractAcceptanceTest<
   }
 
   @Test
-  final void testBlackAndWhitelistViaContext() throws Exception {
+  final void testAsyncBlackAndWhitelistViaContext() throws Exception {
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blacklistLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
@@ -295,8 +295,8 @@ public abstract class AbstractAcceptanceTest<
 
   /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
   @Test
-  final void testHighVolumeUnreliableAsync() throws Exception {
-    int count = 100;
+  final void testAsyncHighVolumeUnreliable() throws Exception {
+    int count = 50;
 
     CountDownLatch latch = new CountDownLatch(count * 10);
     ConcurrentHashMap<Integer, Integer> results = new ConcurrentHashMap<>();
@@ -304,7 +304,7 @@ public abstract class AbstractAcceptanceTest<
 
     TransactionOutbox outbox =
         builder()
-            .instantiator(new RandomFailingInstantiator())
+            .instantiator(new RandomFailingInstantiator(false))
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
             .flushBatchSize(1000)
@@ -336,7 +336,7 @@ public abstract class AbstractAcceptanceTest<
                                   IntStream.range(0, 10)
                                       .mapToObj(j -> scheduleWithTx(outbox, tx, i * 10 + j, "Whee"))
                                       .toArray(CompletableFuture[]::new))));
-          assertFired(latch, 30);
+          assertFired(latch, 60);
         });
 
     assertThat(
