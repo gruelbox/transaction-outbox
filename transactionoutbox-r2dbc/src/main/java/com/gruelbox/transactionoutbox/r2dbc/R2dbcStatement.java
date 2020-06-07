@@ -43,7 +43,8 @@ class R2dbcStatement implements SqlStatement {
     } else {
       if (arg == null) {
         // TODO highlight this as a problem with the R2DBC API
-        statement.bindNull(i, String.class); // Lazy, but does what we need here
+        // Lazy, but does what we need here
+        statement.bindNull(i, String.class);
       } else {
         statement.bind(i, arg);
       }
@@ -65,57 +66,69 @@ class R2dbcStatement implements SqlStatement {
   }
 
   private Mono<Integer> setQueryTimeout(int timeoutSeconds) {
-    if (timeoutSeconds <= 0) {
-      return Mono.empty();
-    }
-    var queryTimeoutSetup = dialect.getQueryTimeoutSetup();
-    if (queryTimeoutSetup == null || queryTimeoutSetup.isEmpty()) {
-      log.warn("Dialect {} not set up with query timeout support", dialect);
-      return Mono.empty();
-    }
-    var sql = queryTimeoutSetup.replace("{{timeout}}", Integer.toString(timeoutSeconds));
-    if (sql.equals(queryTimeoutSetup)) {
-      return new R2dbcStatement(tx, dialect, 0, sql).bind(0, timeoutSeconds).executeInternal();
-    } else {
-      return new R2dbcStatement(tx, dialect, 0, sql).executeInternal();
+    try {
+      if (timeoutSeconds <= 0) {
+        return Mono.empty();
+      }
+      var queryTimeoutSetup = dialect.getQueryTimeoutSetup();
+      if (queryTimeoutSetup == null || queryTimeoutSetup.isEmpty()) {
+        log.warn("Dialect {} not set up with query timeout support", dialect);
+        return Mono.empty();
+      }
+      var sql = queryTimeoutSetup.replace("{{timeout}}", Integer.toString(timeoutSeconds));
+      if (sql.equals(queryTimeoutSetup)) {
+        return new R2dbcStatement(tx, dialect, 0, sql).bind(0, timeoutSeconds).executeInternal();
+      } else {
+        return new R2dbcStatement(tx, dialect, 0, sql).executeInternal();
+      }
+    } catch (Exception e) {
+      return Mono.error(e);
     }
   }
 
   private Mono<Integer> executeInternal() {
-    return Mono.from(statement.execute())
-        .flatMap(result -> Mono.from(result.getRowsUpdated()))
-        .defaultIfEmpty(0);
+    try {
+      return Mono.from(statement.execute())
+          .flatMap(result -> Mono.from(result.getRowsUpdated()))
+          .defaultIfEmpty(0);
+    } catch (Exception e) {
+      return Mono.error(e);
+    }
   }
 
   private <U> Mono<List<U>> executeQueryInternal(
       int expectedRowCount, Function<SqlResultRow, U> rowMapper) {
-    return Mono.from(statement.execute())
-        .map(r -> (io.r2dbc.spi.Result) r)
-        .defaultIfEmpty(EMPTY_RESULT)
-        .flatMapMany(result -> result.map((r, m) -> r))
-        .map(
-            row ->
-                dialect.mapResultFromNative(
-                    new SqlResultRow() {
-                      @SuppressWarnings("unchecked")
-                      @Override
-                      public <V> V get(int index, Class<V> type) {
-                        try {
-                          // TODO suggest Instant support to R2DBC
-                          if (Instant.class.equals(type)) {
-                            return (V)
-                                Objects.requireNonNull(row.get(index, LocalDateTime.class))
-                                    .toInstant(ZoneOffset.UTC);
-                          } else {
-                            return row.get(index, type);
+    try {
+      return Mono.from(statement.execute())
+          .map(r -> (io.r2dbc.spi.Result) r)
+          .defaultIfEmpty(EMPTY_RESULT)
+          .flatMapMany(result -> result.map((r, m) -> r))
+          .map(
+              row ->
+                  dialect.mapResultFromNative(
+                      new SqlResultRow() {
+                        @SuppressWarnings("unchecked")
+                        @Override
+                        public <V> V get(int index, Class<V> type) {
+                          try {
+                            // TODO suggest Instant support to R2DBC
+                            if (Instant.class.equals(type)) {
+                              return (V)
+                                  Objects.requireNonNull(row.get(index, LocalDateTime.class))
+                                      .toInstant(ZoneOffset.UTC);
+                            } else {
+                              return row.get(index, type);
+                            }
+                          } catch (Exception e) {
+                            throw new IllegalArgumentException(
+                                "Failed to fetch field [" + index + "] in " + sql, e);
                           }
-                        } catch (Exception e) {
-                          throw new IllegalArgumentException(
-                              "Failed to fetch field [" + index + "] in " + sql, e);
                         }
-                      }
-                    }))
-        .map(rowMapper)
-        .collect(() -> new ArrayList<>(expectedRowCount), List::add);
+                      }))
+          .map(rowMapper)
+          .collect(() -> new ArrayList<>(expectedRowCount), List::add);
+    } catch (Exception e) {
+      return Mono.error(e);
+    }
   }
 }
