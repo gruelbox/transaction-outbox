@@ -1,8 +1,9 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.jooq.acceptance;
 
 import com.gruelbox.transactionoutbox.JooqTransactionListener;
 import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.ThreadLocalJooqTransactionManager;
+import com.gruelbox.transactionoutbox.acceptance.JdbcConnectionDetails;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;

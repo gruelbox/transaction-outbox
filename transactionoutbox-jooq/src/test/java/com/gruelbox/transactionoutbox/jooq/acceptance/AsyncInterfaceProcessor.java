@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.jooq.acceptance;
 
 import com.gruelbox.transactionoutbox.JooqTransaction;
 import java.util.concurrent.CompletableFuture;

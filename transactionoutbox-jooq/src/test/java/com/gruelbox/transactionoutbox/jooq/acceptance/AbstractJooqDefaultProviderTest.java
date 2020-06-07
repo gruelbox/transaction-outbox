@@ -1,6 +1,6 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.jooq.acceptance;
 
-import static com.gruelbox.transactionoutbox.acceptance.TestUtils.uncheck;
+import static com.gruelbox.transactionoutbox.jooq.acceptance.TestUtils.uncheck;
 import static java.util.concurrent.CompletableFuture.runAsync;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;

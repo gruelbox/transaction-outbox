@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.jooq.acceptance;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.isA;

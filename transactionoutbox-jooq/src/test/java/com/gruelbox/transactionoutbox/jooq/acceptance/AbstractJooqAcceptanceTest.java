@@ -1,8 +1,9 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.jooq.acceptance;
 
 import com.gruelbox.transactionoutbox.JooqTransaction;
 import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.acceptance.AbstractJdbcAcceptanceTest;
 import java.util.concurrent.CompletableFuture;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
