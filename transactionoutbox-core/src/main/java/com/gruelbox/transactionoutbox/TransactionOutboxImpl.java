@@ -196,7 +196,6 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
             found ->
                 CompletableFuture.allOf(
                     found.stream()
-                        .peek(entry -> log.info("Reprocessing {}", entry.description()))
                         .map(
                             entry ->
                                 pushBack(tx, entry)
