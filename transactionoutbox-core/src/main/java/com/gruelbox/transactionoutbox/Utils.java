@@ -109,14 +109,19 @@ public class Utils {
 
   @SuppressWarnings({"unchecked", "cast"})
   public static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], Object> processor) {
-    BiFunction<Method, Object[], Object> wrapped = (method, args) -> {
-      switch (method.getName()) {
-        case "toString": return "Proxy[" + clazz.getName() + "]";
-        case "hashCode": return processor.hashCode();
-        case "equals": return false;
-        default: return processor.apply(method, args);
-      }
-    };
+    BiFunction<Method, Object[], Object> wrapped =
+        (method, args) -> {
+          switch (method.getName()) {
+            case "toString":
+              return "Proxy[" + clazz.getName() + "]";
+            case "hashCode":
+              return processor.hashCode();
+            case "equals":
+              return false;
+            default:
+              return processor.apply(method, args);
+          }
+        };
     if (clazz.isInterface()) {
       // Fastest - we can just proxy an interface directly
       return (T)
