@@ -56,7 +56,7 @@ class TestDefaultInvocationSerializer {
         .forEach(method -> uncheckedly(() -> method.invoke(inner)));
   }
 
-  static class Inner {
+  private static class Inner {
 
     private DefaultInvocationSerializer serializer;
 
