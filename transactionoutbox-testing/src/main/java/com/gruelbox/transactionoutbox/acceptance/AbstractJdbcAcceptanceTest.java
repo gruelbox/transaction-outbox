@@ -33,7 +33,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
@@ -93,7 +92,7 @@ public abstract class AbstractJdbcAcceptanceTest<
   }
 
   @Test
-  final void testBlockingCustomInstantiator() throws InterruptedException {
+  final void testBlockingCustomInstantiator() {
 
     CountDownLatch latch = new CountDownLatch(1);
     CountDownLatch chainedLatch = new CountDownLatch(1);

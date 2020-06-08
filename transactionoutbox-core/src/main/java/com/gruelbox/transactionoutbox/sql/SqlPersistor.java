@@ -192,21 +192,24 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
               deleteSql,
               writeLockTimeoutSeconds,
               false,
-              binder -> binder.bind(0, entry.getId())
-                  .bind(1, entry.getVersion())
-                  .execute())
-          .thenCompose(rows -> {
-            if (rows == 1) {
-              log.debug("Deleted {}", entry.description());
-              return completedFuture(null);
-            } else if (rows == 0) {
-              return failedFuture(new OptimisticLockException());
-            } else {
-              return failedFuture(new IllegalStateException(
-                  "More than one row deleted (" + rows + ") when performing delete"
-                      + " on " + entry.description()));
-            }
-          });
+              binder -> binder.bind(0, entry.getId()).bind(1, entry.getVersion()).execute())
+          .thenCompose(
+              rows -> {
+                if (rows == 1) {
+                  log.debug("Deleted {}", entry.description());
+                  return completedFuture(null);
+                } else if (rows == 0) {
+                  return failedFuture(new OptimisticLockException());
+                } else {
+                  return failedFuture(
+                      new IllegalStateException(
+                          "More than one row deleted ("
+                              + rows
+                              + ") when performing delete"
+                              + " on "
+                              + entry.description()));
+                }
+              });
     } catch (Exception e) {
       return failedFuture(e);
     }
@@ -232,19 +235,24 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                       .bind(5, entry.getId())
                       .bind(6, entry.getVersion())
                       .execute())
-          .thenCompose(rows -> {
-            if (rows == 1) {
-              log.debug("Updated {}", entry.description());
-              entry.setVersion(entry.getVersion() + 1);
-              return completedFuture(null);
-            } else if (rows == 0) {
-              return failedFuture(new OptimisticLockException());
-            } else {
-              return failedFuture(new IllegalStateException(
-                  "More than one row updated (" + rows + ") when performing update"
-                      + " on " + entry.description()));
-            }
-          });
+          .thenCompose(
+              rows -> {
+                if (rows == 1) {
+                  log.debug("Updated {}", entry.description());
+                  entry.setVersion(entry.getVersion() + 1);
+                  return completedFuture(null);
+                } else if (rows == 0) {
+                  return failedFuture(new OptimisticLockException());
+                } else {
+                  return failedFuture(
+                      new IllegalStateException(
+                          "More than one row updated ("
+                              + rows
+                              + ") when performing update"
+                              + " on "
+                              + entry.description()));
+                }
+              });
     } catch (Exception e) {
       return failedFuture(e);
     }

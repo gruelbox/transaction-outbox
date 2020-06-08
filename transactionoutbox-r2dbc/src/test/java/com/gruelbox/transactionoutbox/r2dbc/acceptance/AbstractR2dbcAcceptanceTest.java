@@ -41,8 +41,10 @@ abstract class AbstractR2dbcAcceptanceTest
 
   @BeforeEach
   void checkOpenTransactions() {
-    assertThat("Should be no open transactions at the start of the test",
-        txManager.getOpenTransactionCount(), equalTo(0));
+    assertThat(
+        "Should be no open transactions at the start of the test",
+        txManager.getOpenTransactionCount(),
+        equalTo(0));
   }
 
   @Override

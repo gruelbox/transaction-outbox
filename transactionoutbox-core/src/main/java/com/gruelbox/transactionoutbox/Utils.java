@@ -4,9 +4,11 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.failedFuture;
 import static java.util.stream.Collectors.joining;
 
+import java.lang.StackWalker.StackFrame;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -222,6 +224,11 @@ public class Utils {
       default:
         return logAtLevel(logger, Level.WARN, message, args);
     }
+  }
+
+  public static Optional<StackFrame> traceCaller() {
+    StackWalker stackWalker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+    return stackWalker.walk(stream1 -> stream1.skip(2).findFirst());
   }
 
   private static boolean hasDefaultConstructor(Class<?> clazz) {

@@ -38,19 +38,16 @@ public class RandomFailingInstantiator implements Instantiator {
     return Utils.createProxy(
         clazz,
         (method, args) -> {
-          if (verbose)
-            Utils.logMethodCall("Enter {}.{}({})", clazz, method, args);
+          if (verbose) Utils.logMethodCall("Enter {}.{}({})", clazz, method, args);
           if (randoms.next() == 5) {
-            if (verbose)
-              Utils.logMethodCall("Failed {}.{}({})", clazz, method, args);
+            if (verbose) Utils.logMethodCall("Failed {}.{}({})", clazz, method, args);
             if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
               return failedFuture(new RuntimeException("Temporary failure"));
             } else {
               throw new RuntimeException("Temporary failure");
             }
           }
-          if (verbose)
-            Utils.logMethodCall("Exit {}.{}({})", clazz, method, args);
+          if (verbose) Utils.logMethodCall("Exit {}.{}({})", clazz, method, args);
           return completedFuture(null);
         });
   }

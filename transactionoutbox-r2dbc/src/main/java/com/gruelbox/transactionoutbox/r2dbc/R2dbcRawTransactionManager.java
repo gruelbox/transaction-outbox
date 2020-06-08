@@ -122,12 +122,11 @@ public class R2dbcRawTransactionManager
         .flatMapMany(
             conn ->
                 Mono.fromRunnable(openTransactionCount::incrementAndGet)
-                    .then(conn.getTransactionIsolationLevel().equals(READ_COMMITTED)
-                        ? Mono.empty()
-                        : Mono.from(conn.setTransactionIsolationLevel(READ_COMMITTED)))
-                    .then(conn.isAutoCommit()
-                        ? Mono.empty()
-                        : Mono.from(conn.setAutoCommit(false)))
+                    .then(
+                        READ_COMMITTED.equals(conn.getTransactionIsolationLevel())
+                            ? Mono.empty()
+                            : Mono.from(conn.setTransactionIsolationLevel(READ_COMMITTED)))
+                    .then(conn.isAutoCommit() ? Mono.empty() : Mono.from(conn.setAutoCommit(false)))
                     .thenMany(fn.apply(conn))
                     .concatWith(
                         Mono.fromRunnable(() -> log.trace("Closing connection on success"))

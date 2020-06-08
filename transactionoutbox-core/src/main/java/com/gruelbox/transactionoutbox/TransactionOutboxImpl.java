@@ -138,7 +138,9 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
         .whitelist((TX) tx, entryId)
         .thenApply(
             success -> {
-              if (!success) {
+              if (success) {
+                log.info("Whitelisting of entry {} succeeded", entryId);
+              } else {
                 log.info("Whitelisting of entry {} failed", entryId);
               }
               return success;
@@ -163,14 +165,14 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
             (success, e) -> {
               if (e == null) {
                 if (success) {
-                  log.info("Processed({}) {}", entry.getAttempts(), entry.description());
+                  log.info("Processed({}) {}", entry.getAttempts() + 1, entry.description());
                   onSuccess(entry);
                 } else {
                   log.debug("Skipped task {} - may be locked or already processed", entry.getId());
                 }
                 return CompletableFuture.<Void>completedFuture(null);
               } else {
-                return recordFailedAttempt(entry, e);
+                return updateAttemptCount(entry, e);
               }
             })
         .thenCompose(Function.identity());
@@ -331,7 +333,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   private CompletableFuture<Void> invoke(TransactionOutboxEntry entry, TX transaction) {
     try {
-      log.info("Processing({}) {}", entry.getAttempts(), entry.description());
+      log.info("Processing({}) {}", entry.getAttempts() + 1, entry.description());
       Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
       log.debug("Created instance {}", instance);
       Invocation invocation =
@@ -374,7 +376,6 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
                     serializeMdc && (MDC.getMDCAdapter() != null)
                         ? MDC.getCopyOfContextMap()
                         : null))
-            .attempts(1)
             .nextAttemptTime(after(attemptFrequency))
             .uniqueRequestId(uniqueRequestId)
             .build();
@@ -384,7 +385,6 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   private CompletableFuture<Void> pushBack(TX transaction, TransactionOutboxEntry entry) {
     entry.setNextAttemptTime(after(attemptFrequency));
-    entry.setAttempts(entry.getAttempts() + 1);
     validator.validate(entry);
     return persistor.update(transaction, entry);
   }
@@ -393,9 +393,10 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     return clockProvider.getClock().instant().plus(duration).truncatedTo(MILLIS);
   }
 
-  private CompletableFuture<Void> recordFailedAttempt(
+  private CompletableFuture<Void> updateAttemptCount(
       TransactionOutboxEntry entry, Throwable cause) {
     try {
+      entry.setAttempts(entry.getAttempts() + 1);
       var blacklisted = entry.getAttempts() >= blacklistAfterAttempts;
       if (blacklisted) {
         log.error(
@@ -424,13 +425,14 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       validator.validate(entry);
       return transactionManager
           .transactionally(transaction -> persistor.update(transaction, entry))
-          .thenRun(() -> {
-            log.debug("Successfully updated {}", entry.description());
-            onFailure(entry, cause);
-            if (blacklisted) {
-              onBlacklisted(entry, cause);
-            }
-          })
+          .thenRun(
+              () -> {
+                log.debug("Successfully updated {}", entry.description());
+                onFailure(entry, cause);
+                if (blacklisted) {
+                  onBlacklisted(entry, cause);
+                }
+              })
           .exceptionally(
               e -> {
                 if (e instanceof OptimisticLockException

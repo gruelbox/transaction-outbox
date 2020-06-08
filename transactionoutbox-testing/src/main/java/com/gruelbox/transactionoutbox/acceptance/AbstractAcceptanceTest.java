@@ -18,6 +18,7 @@ import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.sql.Dialect;
+import java.lang.StackWalker.StackFrame;
 import java.time.Duration;
 import java.util.Deque;
 import java.util.LinkedList;
@@ -28,7 +29,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
@@ -100,13 +100,16 @@ public abstract class AbstractAcceptanceTest<
   @SuppressWarnings("unchecked")
   @BeforeEach
   void beforeEach() {
+    log.info("Initialising test");
     if (staticPersistor == null) {
+      log.info("Creating new transaction manager");
       staticPersistor = createPersistor();
       staticTxManager = createTxManager();
       persistor = (Persistor<CN, TX>) staticPersistor;
       txManager = (TM) staticTxManager;
       prepareDataStore();
     } else {
+      log.info("Using existing transaction manager");
       persistor = (Persistor<CN, TX>) staticPersistor;
       txManager = (TM) staticTxManager;
     }
@@ -134,8 +137,9 @@ public abstract class AbstractAcceptanceTest<
     Utils.join(
         txManager
             .transactionally(
-                tx -> scheduleWithTx(outbox, tx, 3, "Whee").thenRun(() -> assertNotFired(latch)))
-            .thenRun(() -> assertFired(latch))
+                tx ->
+                    scheduleWithTx(outbox, tx, 3, "Whee").thenRunAsync(() -> assertNotFired(latch)))
+            .thenRunAsync(() -> assertFired(latch))
             .thenRun(chainCompleted::countDown));
 
     assertFired(chainCompleted);
@@ -158,14 +162,14 @@ public abstract class AbstractAcceptanceTest<
             .transactionally(
                 tx ->
                     scheduleWithTx(outbox, tx, 3, "Whee")
-                        .thenRun(() -> assertNotFired(latch))
+                        .thenRunAsync(() -> assertNotFired(latch))
                         .thenCompose(__ -> countRecords(tx))
                         .thenApply(
                             count -> {
                               assertEquals(0, count);
                               return count;
                             }))
-            .thenRun(() -> assertFired(latch))
+            .thenRunAsync(() -> assertFired(latch))
             .thenRun(chainCompleted::countDown));
 
     assertFired(chainCompleted);
@@ -192,14 +196,14 @@ public abstract class AbstractAcceptanceTest<
               .transactionally(
                   tx ->
                       scheduleWithCtx(outbox, tx.context(), 3, "Whee")
-                          .thenRun(() -> assertNotFired(latch))
+                          .thenRunAsync(() -> assertNotFired(latch))
                           .thenCompose(__ -> countRecords(tx))
-                          .thenApply(
+                          .thenApplyAsync(
                               count -> {
                                 assertEquals(0, count);
                                 return count;
                               }))
-              .thenRun(() -> assertFired(latch))
+              .thenRunAsync(() -> assertFired(latch))
               .thenRun(chainCompleted::countDown));
     } catch (UnsupportedOperationException e) {
       notTestingContextInjection();
@@ -238,14 +242,14 @@ public abstract class AbstractAcceptanceTest<
             Utils.join(
                 txManager
                     .transactionally(tx -> scheduleWithTx(outbox, tx, 3, "Whee"))
-                    .thenRun(() -> assertFired(blacklistLatch))
+                    .thenRunAsync(() -> assertFired(blacklistLatch))
                     .thenCompose(
                         __ ->
                             txManager.transactionally(
                                 tx ->
                                     outbox.whitelistAsync(
                                         latchListener.getBlacklisted().getId(), tx)))
-                    .thenRun(() -> assertFired(successLatch))));
+                    .thenRunAsync(() -> assertFired(successLatch))));
   }
 
   @Test
@@ -270,7 +274,7 @@ public abstract class AbstractAcceptanceTest<
             Utils.join(
                 txManager
                     .transactionally(tx -> scheduleWithCtx(outbox, tx.context(), 3, "Whee"))
-                    .thenRun(() -> assertFired(blacklistLatch))
+                    .thenRunAsync(() -> assertFired(blacklistLatch))
                     .thenCompose(
                         __ ->
                             txManager.transactionally(
@@ -278,7 +282,7 @@ public abstract class AbstractAcceptanceTest<
                                     outbox.whitelistAsync(
                                         latchListener.getBlacklisted().getId(),
                                         (Object) tx.context())))
-                    .thenRun(() -> assertFired(successLatch)));
+                    .thenRunAsync(() -> assertFired(successLatch)));
           } catch (UnsupportedOperationException e) {
             notTestingContextInjection();
           } catch (Exception e) {
@@ -347,13 +351,15 @@ public abstract class AbstractAcceptanceTest<
 
   protected void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
       throws Exception {
+    String caller = Utils.traceCaller().map(StackFrame::getMethodName).orElse("<Unknown>");
     Disposable background =
         Flux.interval(Duration.ofMillis(250))
             .flatMap(__ -> Mono.fromFuture(outbox::flushAsync))
-            .onErrorResume(e -> {
-              log.error("Error in poller", e);
-              return Mono.empty();
-            })
+            .onErrorResume(
+                e -> {
+                  log.error("Error in poller for {}", caller, e);
+                  return Mono.empty();
+                })
             .subscribe();
     try {
       runnable.run();
@@ -368,7 +374,13 @@ public abstract class AbstractAcceptanceTest<
 
   protected void assertFired(CountDownLatch latch, int seconds) {
     try {
-      assertTrue(latch.await(seconds, TimeUnit.SECONDS));
+      boolean fired = latch.await(seconds, TimeUnit.SECONDS);
+      if (fired) {
+        log.info("Hit latch");
+      } else {
+        log.error("Failed to hit latch");
+      }
+      assertTrue(fired);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -376,7 +388,13 @@ public abstract class AbstractAcceptanceTest<
 
   protected void assertNotFired(CountDownLatch latch) {
     try {
-      assertFalse(latch.await(2, TimeUnit.SECONDS));
+      boolean fired = latch.await(2, TimeUnit.SECONDS);
+      if (fired) {
+        log.error("Hit latch unexpectedly");
+      } else {
+        log.info("No latch fired as expected");
+      }
+      assertFalse(fired);
     } catch (InterruptedException e) {
       fail("Interrupted");
     }
