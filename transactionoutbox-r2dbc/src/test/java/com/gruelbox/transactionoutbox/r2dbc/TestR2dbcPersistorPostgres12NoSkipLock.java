@@ -1,33 +1,22 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
+import static com.gruelbox.transactionoutbox.r2dbc.UsesPostgres12.connectionConfiguration;
+
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
-import io.r2dbc.postgresql.PostgresqlConnectionConfiguration;
 import io.r2dbc.postgresql.PostgresqlConnectionFactory;
 import io.r2dbc.spi.Connection;
-import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.testcontainers.containers.JdbcDatabaseContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Hooks;
 
 @Slf4j
-@Testcontainers
-class TestR2dbcPersistorPostgres10NoSkipLock
-    extends AbstractPersistorTest<Connection, R2dbcRawTransaction> {
-
-  @Container
-  @SuppressWarnings("rawtypes")
-  private static final JdbcDatabaseContainer container =
-      (JdbcDatabaseContainer)
-          new PostgreSQLContainer("postgres:10").withStartupTimeout(Duration.ofHours(1));
+class TestR2dbcPersistorPostgres12NoSkipLock
+    extends AbstractPersistorTest<Connection, R2dbcRawTransaction> implements UsesPostgres12 {
 
   @SuppressWarnings("deprecation")
   private final R2dbcPersistor persistor =
@@ -35,14 +24,7 @@ class TestR2dbcPersistorPostgres10NoSkipLock
 
   private final ConnectionFactoryWrapper connectionFactory =
       R2dbcRawTransactionManager.wrapConnectionFactory(
-          new PostgresqlConnectionFactory(
-              PostgresqlConnectionConfiguration.builder()
-                  .host(container.getHost())
-                  .username(container.getUsername())
-                  .password(container.getPassword())
-                  .port(container.getFirstMappedPort())
-                  .database(container.getDatabaseName())
-                  .build()));
+          new PostgresqlConnectionFactory(connectionConfiguration()));
   private final R2dbcRawTransactionManager txManager =
       new R2dbcRawTransactionManager(connectionFactory);
 

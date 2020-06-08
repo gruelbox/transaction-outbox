@@ -1,22 +1,13 @@
 package com.gruelbox.transactionoutbox.r2dbc.acceptance;
 
+import static com.gruelbox.transactionoutbox.r2dbc.UsesMySql5.connectionConfiguration;
+
+import com.gruelbox.transactionoutbox.r2dbc.UsesMySql5;
 import com.gruelbox.transactionoutbox.sql.Dialect;
-import dev.miku.r2dbc.mysql.MySqlConnectionConfiguration;
 import dev.miku.r2dbc.mysql.MySqlConnectionFactory;
 import io.r2dbc.spi.ConnectionFactory;
-import java.time.Duration;
-import org.testcontainers.containers.JdbcDatabaseContainer;
-import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
-class TestR2dbcMySql5 extends AbstractR2dbcAcceptanceTest {
-
-  @Container
-  @SuppressWarnings("rawtypes")
-  private static final JdbcDatabaseContainer container =
-      new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1));
+class TestR2dbcMySql5 extends AbstractR2dbcAcceptanceTest implements UsesMySql5 {
 
   @Override
   protected Dialect dialect() {
@@ -25,13 +16,6 @@ class TestR2dbcMySql5 extends AbstractR2dbcAcceptanceTest {
 
   @Override
   protected ConnectionFactory createConnectionFactory() {
-    return MySqlConnectionFactory.from(
-        MySqlConnectionConfiguration.builder()
-            .host(container.getHost())
-            .username(container.getUsername())
-            .password(container.getPassword())
-            .port(container.getFirstMappedPort())
-            .database(container.getDatabaseName())
-            .build());
+    return MySqlConnectionFactory.from(connectionConfiguration());
   }
 }
