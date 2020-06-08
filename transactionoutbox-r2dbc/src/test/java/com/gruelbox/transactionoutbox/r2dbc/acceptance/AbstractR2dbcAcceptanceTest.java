@@ -17,8 +17,10 @@ import io.r2dbc.spi.ConnectionFactory;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 
 @Slf4j
@@ -32,9 +34,15 @@ abstract class AbstractR2dbcAcceptanceTest
     return R2dbcPersistor.forDialect(dialect());
   }
 
+  @BeforeAll
+  static void initHooks() {
+    Hooks.onOperatorDebug();
+  }
+
   @BeforeEach
   void checkOpenTransactions() {
-    assertThat(txManager.getOpenTransactionCount(), equalTo(0));
+    assertThat("Should be no open transactions at the start of the test",
+        txManager.getOpenTransactionCount(), equalTo(0));
   }
 
   @Override
