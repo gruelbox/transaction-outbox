@@ -113,7 +113,7 @@ public class R2dbcRawTransactionManager
                     e.getClass().getSimpleName(),
                     e.getMessage() == null ? "" : (" - " + e.getMessage())))
         .concatWith(Mono.from(conn.rollbackTransaction()).then(Mono.empty()))
-        .concatWith(Mono.fromRunnable(() -> log.debug("Rollback complete")))
+        .concatWith(Mono.fromRunnable(() -> log.info("Rollback complete")))
         .then(Mono.error(e));
   }
 
@@ -122,8 +122,12 @@ public class R2dbcRawTransactionManager
         .flatMapMany(
             conn ->
                 Mono.fromRunnable(openTransactionCount::incrementAndGet)
-                    .then(Mono.from(conn.setTransactionIsolationLevel(READ_COMMITTED)))
-                    .then(Mono.from(conn.setAutoCommit(false)))
+                    .then(conn.getTransactionIsolationLevel().equals(READ_COMMITTED)
+                        ? Mono.empty()
+                        : Mono.from(conn.setTransactionIsolationLevel(READ_COMMITTED)))
+                    .then(conn.isAutoCommit()
+                        ? Mono.empty()
+                        : Mono.from(conn.setAutoCommit(false)))
                     .thenMany(fn.apply(conn))
                     .concatWith(
                         Mono.fromRunnable(() -> log.trace("Closing connection on success"))
