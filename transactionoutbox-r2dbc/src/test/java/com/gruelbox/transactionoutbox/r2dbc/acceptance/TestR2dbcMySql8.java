@@ -20,7 +20,7 @@ class TestR2dbcMySql8 extends AbstractR2dbcAcceptanceTest {
 
   @Override
   protected Dialect dialect() {
-    return Dialect.MY_SQL_5;
+    return Dialect.MY_SQL_8;
   }
 
   @Override
