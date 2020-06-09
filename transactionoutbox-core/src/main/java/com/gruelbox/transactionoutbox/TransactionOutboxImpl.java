@@ -95,6 +95,26 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     return schedule(clazz, null);
   }
 
+  @SuppressWarnings("unchecked")
+  private <T> T schedule(Class<T> clazz, String uniqueRequestId) {
+    return Utils.createProxy(
+        clazz,
+        (method, args) ->
+            uncheckedly(
+                () -> {
+                  TransactionalInvocation extracted =
+                      transactionManager.extractTransaction(method, args);
+                  var entry = newEntry(uniqueRequestId, extracted);
+                  TX tx = (TX) extracted.getTransaction();
+                  if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
+                    return submitAsFuture(tx, entry);
+                  } else {
+                    submitBlocking(tx, entry);
+                    return null;
+                  }
+                }));
+  }
+
   @Override
   public ParameterizedScheduleBuilder with() {
     return new ParameterizedScheduleBuilderImpl();
@@ -108,11 +128,25 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   @Override
   public CompletableFuture<Boolean> flushAsync() {
     Instant now = clockProvider.getClock().instant();
-    return flush(now)
+    return flushAsync(now)
         .thenApply(batch -> !batch.isEmpty())
-        .thenCompose(didWorkFlushWork ->
-            expireIdempotencyProtection(now)
-                .thenApply(didExpiryWork -> didWorkFlushWork || didExpiryWork));
+        .thenCompose(
+            didWorkFlushWork ->
+                expireIdempotencyProtection(now)
+                    .thenApply(didExpiryWork -> didWorkFlushWork || didExpiryWork));
+  }
+
+  private CompletableFuture<List<TransactionOutboxEntry>> flushAsync(Instant now) {
+    log.info("Flushing stale tasks");
+    return transactionManager
+        .transactionally(tx -> selectBatch(tx, now))
+        .thenApply(
+            batch -> {
+              log.debug("Got batch of {}", batch.size());
+              batch.forEach(this::submitNow);
+              log.debug("Submitted batch");
+              return batch;
+            });
   }
 
   @Override
@@ -180,16 +214,30 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
         .thenCompose(Function.identity());
   }
 
-  private CompletableFuture<List<TransactionOutboxEntry>> flush(Instant now) {
-    log.info("Flushing stale tasks");
-    return transactionManager
-        .transactionally(tx -> selectBatch(tx, now))
-        .thenApply(
-            batch -> {
-              log.debug("Got batch of {}", batch.size());
-              batch.forEach(this::submitNow);
-              log.debug("Submitted batch");
-              return batch;
+  private CompletableFuture<Boolean> processNow(TransactionOutboxEntry entry, TX tx) {
+    return persistor
+        .lock(tx, entry)
+        .thenCompose(
+            locked -> {
+              if (!locked) {
+                return completedFuture(false);
+              } else {
+                return invoke(entry, tx)
+                    .thenCompose(
+                        _1 -> {
+                          if (entry.getUniqueRequestId() == null) {
+                            return persistor.delete(tx, entry).thenApply(_2 -> true);
+                          } else {
+                            log.debug(
+                                "Deferring deletion of {} by {}",
+                                entry.description(),
+                                retentionThreshold);
+                            entry.setProcessed(true);
+                            entry.setNextAttemptTime(after(retentionThreshold));
+                            return persistor.update(tx, entry).thenApply(_2 -> true);
+                          }
+                        });
+              }
             });
   }
 
@@ -249,26 +297,6 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
             });
   }
 
-  @SuppressWarnings("unchecked")
-  private <T> T schedule(Class<T> clazz, String uniqueRequestId) {
-    return Utils.createProxy(
-        clazz,
-        (method, args) ->
-            uncheckedly(
-                () -> {
-                  TransactionalInvocation extracted =
-                      transactionManager.extractTransaction(method, args);
-                  var entry = newEntry(uniqueRequestId, extracted);
-                  TX tx = (TX) extracted.getTransaction();
-                  if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
-                    return submitAsFuture(tx, entry);
-                  } else {
-                    submitBlocking(tx, entry);
-                    return null;
-                  }
-                }));
-  }
-
   private void submitBlocking(TX tx, TransactionOutboxEntry entry) {
     Utils.join(submitAsFuture(tx, entry));
   }
@@ -286,33 +314,6 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   private CompletableFuture<Void> submitNow(TransactionOutboxEntry entry) {
     submitter.submit(entry, this::processNow);
     return completedFuture(null);
-  }
-
-  private CompletableFuture<Boolean> processNow(TransactionOutboxEntry entry, TX tx) {
-    return persistor
-        .lock(tx, entry)
-        .thenCompose(
-            locked -> {
-              if (!locked) {
-                return completedFuture(false);
-              } else {
-                return invoke(entry, tx)
-                    .thenCompose(
-                        _1 -> {
-                          if (entry.getUniqueRequestId() == null) {
-                            return persistor.delete(tx, entry).thenApply(_2 -> true);
-                          } else {
-                            log.debug(
-                                "Deferring deletion of {} by {}",
-                                entry.description(),
-                                retentionThreshold);
-                            entry.setProcessed(true);
-                            entry.setNextAttemptTime(after(retentionThreshold));
-                            return persistor.update(tx, entry).thenApply(_2 -> true);
-                          }
-                        });
-              }
-            });
   }
 
   private CompletableFuture<Void> invoke(TransactionOutboxEntry entry, TX transaction) {

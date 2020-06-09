@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-
 @NotApi
 public interface SchedulerProxyFactory {
 

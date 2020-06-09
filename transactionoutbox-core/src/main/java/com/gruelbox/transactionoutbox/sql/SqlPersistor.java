@@ -280,16 +280,17 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                       .bind(0, entry.getId())
                       .bind(1, entry.getVersion())
                       .executeQuery(1, row -> 1))
-          .handle((list, e) -> {
-            if (e != null) {
-              Throwable t = sqlApi.mapLockException(entry, e);
-              if (t instanceof LockException) {
-                return false;
-              }
-              throw sneakyRethrow(t);
-            }
-            return !list.isEmpty();
-          });
+          .handle(
+              (list, e) -> {
+                if (e != null) {
+                  Throwable t = sqlApi.mapLockException(entry, e);
+                  if (t instanceof LockException) {
+                    return false;
+                  }
+                  throw sneakyRethrow(t);
+                }
+                return !list.isEmpty();
+              });
     } catch (Exception e) {
       return failedFuture(e);
     }
