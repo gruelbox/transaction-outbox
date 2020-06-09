@@ -2,7 +2,7 @@ package com.gruelbox.transactionoutbox.jooq.acceptance;
 
 import com.gruelbox.transactionoutbox.JooqTransaction;
 import com.gruelbox.transactionoutbox.JooqTransactionManager;
-import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.SchedulerProxyFactory;
 import com.gruelbox.transactionoutbox.acceptance.AbstractJdbcAcceptanceTest;
 import java.util.concurrent.CompletableFuture;
 import org.jooq.Configuration;
@@ -13,13 +13,13 @@ public abstract class AbstractJooqAcceptanceTest<TM extends JooqTransactionManag
 
   @Override
   protected CompletableFuture<Void> scheduleWithTx(
-      TransactionOutbox outbox, JooqTransaction tx, int arg1, String arg2) {
+      SchedulerProxyFactory outbox, JooqTransaction tx, int arg1, String arg2) {
     return outbox.schedule(AsyncInterfaceProcessor.class).processAsync(arg1, arg2, tx);
   }
 
   @Override
   protected CompletableFuture<Void> scheduleWithCtx(
-      TransactionOutbox outbox, Object context, int arg1, String arg2) {
+      SchedulerProxyFactory outbox, Object context, int arg1, String arg2) {
     return outbox
         .schedule(AsyncInterfaceProcessor.class)
         .processAsync(arg1, arg2, (Configuration) context);

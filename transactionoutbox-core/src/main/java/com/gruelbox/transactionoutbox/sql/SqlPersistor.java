@@ -6,6 +6,7 @@ import static java.util.concurrent.CompletableFuture.failedFuture;
 import com.gruelbox.transactionoutbox.Beta;
 import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.InvocationSerializer;
+import com.gruelbox.transactionoutbox.LockException;
 import com.gruelbox.transactionoutbox.OptimisticLockException;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
@@ -45,6 +46,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
 
   private final String insertSql;
   private final String selectBatchSql;
+  private final String deleteExpiredSql;
   private final String deleteSql;
   private final String updateSql;
   private final String lockSql;
@@ -79,6 +81,8 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                 + " WHERE nextAttemptTime < ?"
                 + " AND blacklisted = false AND processed = false LIMIT ?"
                 + (dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : ""));
+    this.deleteExpiredSql =
+        mapToNative(dialect.getDeleteExpired().replace("{{table}}", this.tableName));
     this.deleteSql = mapToNative("DELETE FROM " + this.tableName + " WHERE id = ? and version = ?");
     this.updateSql =
         mapToNative(
@@ -167,8 +171,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                       .execute())
           .exceptionally(
               e -> {
-                sqlApi.handleSaveException(entry, e);
-                throw sneakyRethrow(e);
+                throw sneakyRethrow(sqlApi.mapSaveException(entry, e));
               })
           .thenApply(
               rows -> {
@@ -235,6 +238,10 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                       .bind(5, entry.getId())
                       .bind(6, entry.getVersion())
                       .execute())
+          .exceptionally(
+              e -> {
+                throw sneakyRethrow(sqlApi.mapUpdateException(entry, e));
+              })
           .thenCompose(
               rows -> {
                 if (rows == 1) {
@@ -273,15 +280,16 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                       .bind(0, entry.getId())
                       .bind(1, entry.getVersion())
                       .executeQuery(1, row -> 1))
-          .exceptionally(
-              e -> {
-                try {
-                  return sqlApi.handleLockException(entry, e);
-                } catch (Throwable t) {
-                  throw sneakyRethrow(t);
-                }
-              })
-          .thenApply(list -> !list.isEmpty());
+          .handle((list, e) -> {
+            if (e != null) {
+              Throwable t = sqlApi.mapLockException(entry, e);
+              if (t instanceof LockException) {
+                return false;
+              }
+              throw sneakyRethrow(t);
+            }
+            return !list.isEmpty();
+          });
     } catch (Exception e) {
       return failedFuture(e);
     }
@@ -345,7 +353,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
       return sqlApi.statement(
           tx,
           dialect,
-          mapToNative(dialect.getDeleteExpired().replace("{{table}}", tableName)),
+          deleteExpiredSql,
           writeLockTimeoutSeconds,
           false,
           binder -> binder.bind(0, now).bind(1, batchSize).execute());

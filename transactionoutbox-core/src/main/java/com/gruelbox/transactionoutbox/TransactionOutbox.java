@@ -18,7 +18,7 @@ import org.slf4j.event.Level;
  * pattern for Java. See <a href="https://github.com/gruelbox/transaction-outbox">README</a> for
  * usage instructions.
  */
-public interface TransactionOutbox {
+public interface TransactionOutbox extends SchedulerProxyFactory {
 
   /** @return A builder for creating a new instance of {@link TransactionOutbox}. */
   static TransactionOutboxBuilder builder() {
@@ -48,6 +48,7 @@ public interface TransactionOutbox {
    * @param <T> The type to proxy.
    * @return The proxy of {@code X}.
    */
+  @Override
   <T> T schedule(Class<T> clazz);
 
   /**
@@ -345,7 +346,7 @@ public interface TransactionOutbox {
     }
   }
 
-  interface ParameterizedScheduleBuilder {
+  interface ParameterizedScheduleBuilder extends SchedulerProxyFactory {
 
     /**
      * Specifies a unique id for the request. This defaults to {@code null}, but if non-null, will
@@ -378,6 +379,7 @@ public interface TransactionOutbox {
      * @param <T> The type to proxy.
      * @return The proxy of {@code T}.
      */
+    @Override
     <T> T schedule(Class<T> clazz);
   }
 }

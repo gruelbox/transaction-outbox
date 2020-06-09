@@ -18,14 +18,18 @@ import io.r2dbc.spi.IsolationLevel;
 import io.r2dbc.spi.Statement;
 import io.r2dbc.spi.ValidationDepth;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -42,7 +46,9 @@ public class R2dbcRawTransactionManager
     implements R2dbcTransactionManager<R2dbcRawTransaction>, InitializationEventPublisher {
 
   private final ConnectionFactoryWrapper cf;
-  private final AtomicInteger openTransactionCount = new AtomicInteger();
+
+  private final ConcurrentMap<UUID, ConnectionLogger> openTransactions = new ConcurrentHashMap<>();
+  private boolean stackLogging;
 
   public R2dbcRawTransactionManager(ConnectionFactoryWrapper cf) {
     this.cf = cf;
@@ -64,8 +70,13 @@ public class R2dbcRawTransactionManager
   }
 
   // For testing
-  public int getOpenTransactionCount() {
-    return openTransactionCount.get();
+  public Set<ConnectionLogger> getOpenTransactions() {
+    return Set.copyOf(openTransactions.values());
+  }
+
+  public R2dbcRawTransactionManager enableStackLogging() {
+    this.stackLogging = true;
+    return this;
   }
 
   @Override
@@ -118,10 +129,11 @@ public class R2dbcRawTransactionManager
   }
 
   private <T> Flux<T> withConnection(Function<Connection, Flux<T>> fn) {
+    ConnectionLogger connectionLogger = new ConnectionLogger();
     return Mono.from(cf.create())
         .flatMapMany(
             conn ->
-                Mono.fromRunnable(openTransactionCount::incrementAndGet)
+                Mono.fromRunnable(connectionLogger::start)
                     .then(
                         READ_COMMITTED.equals(conn.getTransactionIsolationLevel())
                             ? Mono.empty()
@@ -129,15 +141,39 @@ public class R2dbcRawTransactionManager
                     .then(conn.isAutoCommit() ? Mono.empty() : Mono.from(conn.setAutoCommit(false)))
                     .thenMany(fn.apply(conn))
                     .concatWith(
-                        Mono.fromRunnable(() -> log.trace("Closing connection on success"))
-                            .then(Mono.from(conn.close()))
-                            .then(Mono.fromRunnable(openTransactionCount::decrementAndGet)))
+                        Mono.from(conn.close()).then(Mono.fromRunnable(connectionLogger::end)))
                     .onErrorResume(
                         t ->
-                            Mono.fromRunnable(() -> log.trace("Closing connection on error"))
-                                .then(Mono.from(conn.close()))
-                                .then(Mono.fromRunnable(openTransactionCount::decrementAndGet))
+                            Mono.from(conn.close())
+                                .then(Mono.fromRunnable(connectionLogger::end))
                                 .then(Mono.error(t))));
+  }
+
+  @EqualsAndHashCode
+  public final class ConnectionLogger {
+    UUID key = UUID.randomUUID();
+
+    @EqualsAndHashCode.Exclude
+    StackTraceElement[] stackTrace = stackLogging ? new Throwable().getStackTrace() : null;
+
+    void start() {
+      if (stackLogging) {
+        openTransactions.put(key, this);
+      }
+    }
+
+    void end() {
+      if (stackLogging) {
+        openTransactions.remove(key);
+      }
+    }
+
+    @Override
+    public String toString() {
+      return Arrays.stream(stackTrace)
+          .map(StackTraceElement::toString)
+          .collect(Collectors.joining("\n"));
+    }
   }
 
   @AllArgsConstructor

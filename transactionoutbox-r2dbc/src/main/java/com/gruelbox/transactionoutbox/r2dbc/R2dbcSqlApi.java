@@ -1,8 +1,8 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
+import com.gruelbox.transactionoutbox.PessimisticLockException;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import com.gruelbox.transactionoutbox.sql.SqlApi;
 import com.gruelbox.transactionoutbox.sql.SqlStatement;
@@ -10,7 +10,6 @@ import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException;
 import io.r2dbc.spi.R2dbcNonTransientResourceException;
 import io.r2dbc.spi.R2dbcTimeoutException;
-import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -25,31 +24,41 @@ class R2dbcSqlApi implements SqlApi<Connection, R2dbcTransaction> {
   }
 
   @Override
-  public void handleSaveException(TransactionOutboxEntry entry, Throwable t) {
+  public Throwable mapSaveException(TransactionOutboxEntry entry, Throwable t) {
     try {
-      if (t instanceof CompletionException) {
-        throw t.getCause();
-      } else {
-        throw t;
-      }
+      throw underlying(t);
     } catch (R2dbcDataIntegrityViolationException e) {
-      throw new AlreadyScheduledException("Request " + entry.description() + " already exists", e);
+      return new AlreadyScheduledException("Request " + entry.description() + " already exists", e);
     } catch (Throwable e) {
-      throw (RuntimeException) Utils.uncheckAndThrow(e);
+      return e;
     }
   }
 
   @Override
-  public List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t)
-      throws Throwable {
-    // TODO inconsistencies of drivers - report to R2DBC
-    if (t instanceof R2dbcTimeoutException
-        || t instanceof TimeoutException
-        || ((t instanceof R2dbcNonTransientResourceException)
-            && t.getMessage().contains("timeout"))) {
-      return List.of();
-    } else {
-      throw t;
+  public Throwable mapUpdateException(TransactionOutboxEntry entry, Throwable t) {
+    try {
+      throw underlying(t);
+    } catch (R2dbcTimeoutException | TimeoutException | R2dbcNonTransientResourceException e) {
+      return new PessimisticLockException(t);
+    } catch (Throwable e) {
+      if (e.getMessage().contains("timeout")) {
+        return new PessimisticLockException(t);
+      }
+      return e;
+    }
+  }
+
+  @Override
+  public Throwable mapLockException(TransactionOutboxEntry entry, Throwable t) {
+    try {
+      throw underlying(t);
+    } catch (R2dbcTimeoutException | TimeoutException | R2dbcNonTransientResourceException e) {
+      return new PessimisticLockException(t);
+    } catch (Throwable e) {
+      if (e.getMessage().contains("timeout")) {
+        return new PessimisticLockException(t);
+      }
+      return e;
     }
   }
 
@@ -62,5 +71,13 @@ class R2dbcSqlApi implements SqlApi<Connection, R2dbcTransaction> {
       boolean batchable,
       Function<SqlStatement, T> binding) {
     return binding.apply(new R2dbcStatement(tx, dialect, timeoutSeconds, sql));
+  }
+
+  Throwable underlying(Throwable t) {
+    if (t instanceof CompletionException) {
+      return t.getCause();
+    } else {
+      return t;
+    }
   }
 }

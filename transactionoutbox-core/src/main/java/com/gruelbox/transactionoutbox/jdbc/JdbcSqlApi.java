@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox.jdbc;
 import static com.gruelbox.transactionoutbox.Utils.toBlockingFuture;
 
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
+import com.gruelbox.transactionoutbox.PessimisticLockException;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.sql.Dialect;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
 
@@ -50,32 +52,46 @@ class JdbcSqlApi implements SqlApi<Connection, JdbcTransaction> {
   }
 
   @Override
-  public void handleSaveException(TransactionOutboxEntry entry, Throwable t) {
+  public Throwable mapSaveException(TransactionOutboxEntry entry, Throwable t) {
     try {
-      if (t instanceof CompletionException) {
-        throw t.getCause();
-      } else {
-        throw t;
-      }
+      throw underlying(t);
     } catch (SQLIntegrityConstraintViolationException e) {
-      throw new AlreadyScheduledException("Request " + entry.description() + " already exists", e);
+      return new AlreadyScheduledException("Request " + entry.description() + " already exists", e);
     } catch (Throwable e) {
       if (e.getClass().getName().equals("org.postgresql.util.PSQLException")
           && e.getMessage().contains("constraint")) {
-        throw new AlreadyScheduledException(
+        return new AlreadyScheduledException(
             "Request " + entry.description() + " already exists", e.getCause());
       }
-      throw (RuntimeException) Utils.uncheckAndThrow(e);
+      return e;
     }
   }
 
   @Override
-  public List<Integer> handleLockException(TransactionOutboxEntry entry, Throwable t)
-      throws Throwable {
-    if (t instanceof SQLTimeoutException) {
-      return List.of();
-    } else {
-      throw t;
+  public Throwable mapLockException(TransactionOutboxEntry entry, Throwable t) {
+    try {
+      throw underlying(t);
+    } catch (TimeoutException | SQLTimeoutException e) {
+      return new PessimisticLockException(t);
+    } catch (Throwable e) {
+      if (e.getMessage().contains("timeout")) {
+        return new PessimisticLockException(t);
+      }
+      return e;
+    }
+  }
+
+  @Override
+  public Throwable mapUpdateException(TransactionOutboxEntry entry, Throwable t) {
+    try {
+      throw underlying(t);
+    } catch (TimeoutException | SQLTimeoutException e) {
+      return new PessimisticLockException(t);
+    } catch (Throwable e) {
+      if (e.getMessage().contains("timeout")) {
+        return new PessimisticLockException(t);
+      }
+      return e;
     }
   }
 
@@ -171,6 +187,14 @@ class JdbcSqlApi implements SqlApi<Connection, JdbcTransaction> {
   private void checkNull(int index, ResultSet rs) throws SQLException {
     if (rs.wasNull()) {
       throw new NullPointerException("Unexpected null value for index " + index + " in table");
+    }
+  }
+
+  Throwable underlying(Throwable t) {
+    if (t instanceof CompletionException) {
+      return t.getCause();
+    } else {
+      return t;
     }
   }
 }

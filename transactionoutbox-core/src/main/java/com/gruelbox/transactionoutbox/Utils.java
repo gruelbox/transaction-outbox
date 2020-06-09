@@ -231,6 +231,23 @@ public class Utils {
     return stackWalker.walk(stream1 -> stream1.skip(2).findFirst());
   }
 
+  @SneakyThrows
+  public static RuntimeException sneakyThrow(Throwable t) {
+    if (t instanceof CompletionException) {
+      throw t.getCause();
+    } else {
+      throw t;
+    }
+  }
+
+  public static void sneakyThrowing(ThrowingRunnable runnable) {
+    try {
+      runnable.run();
+    } catch (Exception e) {
+      throw sneakyThrow(e);
+    }
+  }
+
   private static boolean hasDefaultConstructor(Class<?> clazz) {
     try {
       clazz.getConstructor();

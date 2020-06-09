@@ -1,6 +1,8 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
 import static com.gruelbox.transactionoutbox.r2dbc.UsesPostgres12.connectionConfiguration;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.empty;
 
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
@@ -10,7 +12,6 @@ import com.gruelbox.transactionoutbox.sql.Dialect;
 import io.r2dbc.postgresql.PostgresqlConnectionFactory;
 import io.r2dbc.spi.Connection;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.Assertions;
 
 @Slf4j
 class TestR2dbcPersistorPostgres12 extends AbstractPersistorTest<Connection, R2dbcRawTransaction>
@@ -41,6 +42,6 @@ class TestR2dbcPersistorPostgres12 extends AbstractPersistorTest<Connection, R2d
 
   @Override
   protected void validateState() {
-    Assertions.assertEquals(0, txManager.getOpenTransactionCount());
+    assertThat(txManager.getOpenTransactions(), empty());
   }
 }

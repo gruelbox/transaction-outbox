@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import static com.gruelbox.transactionoutbox.Utils.firstNonNull;
 import static com.gruelbox.transactionoutbox.Utils.logAtLevel;
+import static com.gruelbox.transactionoutbox.Utils.sneakyThrow;
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.time.temporal.ChronoUnit.MINUTES;
@@ -24,7 +25,6 @@ import javax.validation.ClockProvider;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.constraints.Length;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
@@ -191,6 +191,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
             });
   }
 
+  // TODO test large batches
   private CompletableFuture<List<TransactionOutboxEntry>> selectBatch(TX tx, Instant now) {
     TransactionOutboxEntry[] result = new TransactionOutboxEntry[flushBatchSize];
     AtomicInteger resultSize = new AtomicInteger();
@@ -204,28 +205,22 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
                             entry ->
                                 pushBack(tx, entry)
                                     .handle(
-                                        (__, e) -> {
-                                          if (e == null) {
+                                        (r, t) -> {
+                                          try {
+                                            if (t != null) throw Utils.sneakyThrow(t);
                                             log.debug("Pushed back {}", entry.description());
                                             result[resultSize.getAndIncrement()] = entry;
                                             return null;
-                                          } else if (e instanceof OptimisticLockException
-                                              || e.getCause() instanceof OptimisticLockException) {
-                                            log.debug(
-                                                "Beaten to optimistic lock on {}",
-                                                entry.description());
+                                          } catch (LockException e) {
+                                            log.warn(
+                                                "Beaten to lock on {} ({})",
+                                                entry.description(),
+                                                e.getMessage());
                                             return null;
-                                          } else {
-                                            throw sneakyThrow(e);
                                           }
                                         }))
                         .toArray(CompletableFuture[]::new)))
         .thenApply(__ -> Arrays.asList(result).subList(0, resultSize.get()));
-  }
-
-  @SneakyThrows
-  private RuntimeException sneakyThrow(Throwable t) {
-    throw t;
   }
 
   private CompletableFuture<Void> expireIdempotencyProtection(Instant now) {
@@ -234,12 +229,16 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
             total -> {
               if (total > 0) {
                 long s = retentionThreshold.toSeconds();
-                String duration =
-                    String.format("%dd:%02dh:%02dm", s / 3600, (s % 3600) / 60, (s % 60));
+                long days = s / 86400;
+                long remaining = s % 86400;
+                long hours = remaining / 3600;
+                remaining = remaining % 3600;
+                long minutes = remaining / 60;
+                long seconds = remaining % 60;
                 log.info(
                     "Expired idempotency protection on {} requests completed more than {} ago",
                     total,
-                    duration);
+                    String.format("%dd %02dh %02dm %02ds", days, hours, minutes, seconds));
               } else {
                 log.debug("No records found to delete as of {}", now);
               }
@@ -434,19 +433,21 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
                 }
               })
           .exceptionally(
-              e -> {
-                if (e instanceof OptimisticLockException
-                    || e.getCause() instanceof OptimisticLockException) {
+              t -> {
+                try {
+                  throw sneakyThrow(t);
+                } catch (LockException e) {
                   log.warn(
-                      "Failed to update attempt count for {} due to conflicting locks caused by "
-                          + "concurrent run attempts. The attemptFrequency may be set too low "
-                          + "combined with a blocking connection pool causing attempts to overlap. "
-                          + "It may be retried more times than expected.",
+                      "Failed to update attempt count for {} due to crossed lock. It may be "
+                          + "retried more times than expected. This warning is expected at high "
+                          + "volumes on databases that do not support SKIP LOCKED or equivalent "
+                          + "features and can be ignored."
+                          + e.getMessage(),
                       entry.description());
-                } else {
+                } catch (Exception e) {
                   log.error(
-                      "Failed to update attempt count for {}. It may be retried more times than "
-                          + "expected.",
+                      "Failed to update attempt count for {} due to unexpected error. It may be "
+                          + "retried more times than expected.",
                       entry.description(),
                       e);
                 }

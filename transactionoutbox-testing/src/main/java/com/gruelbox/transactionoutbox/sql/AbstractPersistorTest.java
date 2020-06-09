@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox.sql;
 
+import static com.gruelbox.transactionoutbox.Utils.sneakyThrowing;
 import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
@@ -105,12 +106,11 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
     assertThat(entries, containsInAnyOrder(entry1, entry2));
 
     TransactionOutboxEntry entry3 = createEntry("FOO3", now, false, "context-clientkey1");
-    Throwable cause =
-        assertThrows(
-                CompletionException.class,
-                () -> txManager().transactionally(tx -> persistor().save(tx, entry3)).join())
-            .getCause();
-    assertThat(cause, isA(AlreadyScheduledException.class));
+    assertThrows(
+        AlreadyScheduledException.class,
+        () ->
+            sneakyThrowing(
+                () -> txManager().transactionally(tx -> persistor().save(tx, entry3)).join()));
 
     entries =
         (txManager().transactionally(tx -> persistor().selectBatch(tx, 100, now.plusSeconds(1))))
@@ -262,18 +262,17 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
     entry2.setProcessed(false);
     entry3.setProcessed(false);
     entry4.setProcessed(false);
-    assertThat(
-        assertThrows(
-                CompletionException.class,
-                () -> txManager().transactionally(tx -> persistor().update(tx, entry2)).join())
-            .getCause(),
-        isA(OptimisticLockException.class));
-    assertThat(
-        assertThrows(
-                CompletionException.class,
-                () -> txManager().transactionally(tx -> persistor().update(tx, entry4)).join())
-            .getCause(),
-        isA(OptimisticLockException.class));
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            sneakyThrowing(
+                () -> txManager().transactionally(tx -> persistor().update(tx, entry2)).join()));
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            sneakyThrowing(
+                () -> txManager().transactionally(tx -> persistor().update(tx, entry4)).join()));
+
     assertDoesNotThrow(
         () -> txManager().transactionally(tx -> persistor().update(tx, entry3)).join());
 
@@ -330,23 +329,23 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
   void testUpdateOptimisticLockFailure() {
     var entry = createEntry("FOO1", now, false);
     AtomicReference<TransactionOutboxEntry> original = new AtomicReference<>();
-    CompletionException completionException =
-        assertThrows(
-            CompletionException.class,
-            () ->
-                txManager()
-                    .transactionally(tx -> persistor().save(tx, entry))
-                    .thenRun(() -> original.set(entry.toBuilder().build()))
-                    .thenRun(() -> entry.setAttempts(1))
-                    .thenCompose(
-                        __ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
-                    .thenRun(() -> original.get().setAttempts(2))
-                    .thenCompose(
-                        __ ->
-                            txManager()
-                                .transactionally(tx -> persistor().update(tx, original.get())))
-                    .join());
-    assertThat(completionException.getCause(), isA(OptimisticLockException.class));
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            sneakyThrowing(
+                () ->
+                    txManager()
+                        .transactionally(tx -> persistor().save(tx, entry))
+                        .thenRun(() -> original.set(entry.toBuilder().build()))
+                        .thenRun(() -> entry.setAttempts(1))
+                        .thenCompose(
+                            __ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
+                        .thenRun(() -> original.get().setAttempts(2))
+                        .thenCompose(
+                            __ ->
+                                txManager()
+                                    .transactionally(tx -> persistor().update(tx, original.get())))
+                        .join()));
   }
 
   @Test

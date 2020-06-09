@@ -1,10 +1,10 @@
 package com.gruelbox.transactionoutbox.r2dbc.acceptance;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.empty;
 
 import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.SchedulerProxyFactory;
 import com.gruelbox.transactionoutbox.acceptance.AbstractSqlAcceptanceTest;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcPersistor;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager;
@@ -17,6 +17,7 @@ import io.r2dbc.spi.ConnectionFactory;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import reactor.core.publisher.Flux;
@@ -40,11 +41,19 @@ abstract class AbstractR2dbcAcceptanceTest
   }
 
   @BeforeEach
-  void checkOpenTransactions() {
+  void checkOpenTransactionsBefore() {
     assertThat(
         "Should be no open transactions at the start of the test",
-        txManager.getOpenTransactionCount(),
-        equalTo(0));
+        txManager.getOpenTransactions(),
+        empty());
+  }
+
+  @AfterEach
+  void checkOpenTransactionsAfter() {
+    assertThat(
+        "Should be no open transactions at the end of the test",
+        txManager.getOpenTransactions(),
+        empty());
   }
 
   @Override
@@ -57,18 +66,20 @@ abstract class AbstractR2dbcAcceptanceTest
     ConnectionPool pool = autoClose(new ConnectionPool(configuration));
     ConnectionFactoryWrapper connectionFactory =
         R2dbcRawTransactionManager.wrapConnectionFactory(pool);
-    return new R2dbcRawTransactionManager(connectionFactory);
+    var tm = new R2dbcRawTransactionManager(connectionFactory);
+    tm.enableStackLogging();
+    return tm;
   }
 
   @Override
   protected CompletableFuture<Void> scheduleWithTx(
-      TransactionOutbox outbox, R2dbcTransaction tx, int arg1, String arg2) {
+      SchedulerProxyFactory outbox, R2dbcTransaction tx, int arg1, String arg2) {
     return outbox.schedule(InterfaceProcessor.class).processAsync(arg1, arg2, tx);
   }
 
   @Override
   protected CompletableFuture<Void> scheduleWithCtx(
-      TransactionOutbox outbox, Object context, int arg1, String arg2) {
+      SchedulerProxyFactory outbox, Object context, int arg1, String arg2) {
     return outbox.schedule(InterfaceProcessor.class).processAsync(arg1, arg2, (Connection) context);
   }
 

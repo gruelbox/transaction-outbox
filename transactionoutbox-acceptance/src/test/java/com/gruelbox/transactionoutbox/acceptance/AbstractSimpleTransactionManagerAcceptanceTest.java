@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
-import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.SchedulerProxyFactory;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
 import java.util.concurrent.CompletableFuture;
@@ -17,13 +17,13 @@ abstract class AbstractSimpleTransactionManagerAcceptanceTest
 
   @Override
   protected CompletableFuture<Void> scheduleWithTx(
-      TransactionOutbox outbox, SimpleTransaction<Void> tx, int arg1, String arg2) {
+      SchedulerProxyFactory outbox, SimpleTransaction<Void> tx, int arg1, String arg2) {
     return outbox.schedule(AsyncInterfaceProcessor.class).processAsync(arg1, arg2, tx);
   }
 
   @Override
   protected CompletableFuture<Void> scheduleWithCtx(
-      TransactionOutbox outbox, Object context, int arg1, String arg2) {
+      SchedulerProxyFactory outbox, Object context, int arg1, String arg2) {
     throw new UnsupportedOperationException();
   }
 }

@@ -5,10 +5,13 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.Persistor;
+import com.gruelbox.transactionoutbox.SchedulerProxyFactory;
 import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
@@ -19,9 +22,12 @@ import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.lang.StackWalker.StackFrame;
+import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +35,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
@@ -66,11 +73,11 @@ public abstract class AbstractAcceptanceTest<
 
   @SuppressWarnings("SameParameterValue")
   protected abstract CompletableFuture<Void> scheduleWithTx(
-      TransactionOutbox outbox, TX tx, int arg1, String arg2);
+      SchedulerProxyFactory outbox, TX tx, int arg1, String arg2);
 
   @SuppressWarnings("SameParameterValue")
   protected abstract CompletableFuture<Void> scheduleWithCtx(
-      TransactionOutbox outbox, Object context, int arg1, String arg2);
+      SchedulerProxyFactory outbox, Object context, int arg1, String arg2);
 
   protected abstract void prepareDataStore();
 
@@ -295,6 +302,100 @@ public abstract class AbstractAcceptanceTest<
         });
   }
 
+  @Test
+  final void testAsyncDuplicateRequests() {
+
+    CountDownLatch priorWorkClear = new CountDownLatch(3);
+    CountDownLatch latch = new CountDownLatch(4);
+    List<Integer> ids = new ArrayList<>();
+    AtomicReference<Clock> clockProvider = new AtomicReference<>(Clock.systemDefaultZone());
+    TransactionOutbox outbox =
+        builder()
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    ids.add((Integer) entry.getInvocation().getArgs()[0]);
+                    priorWorkClear.countDown();
+                    latch.countDown();
+                  }
+                })
+            .instantiator(new LoggingInstantiator())
+            .retentionThreshold(Duration.ofDays(2))
+            .clockProvider(clockProvider::get)
+            .build();
+
+    cleanDataStore();
+
+    // Schedule some work
+    txManager
+        .transactionally(
+            tx -> scheduleWithTx(outbox.with().uniqueRequestId("context-clientkey1"), tx, 1, "Foo"))
+        .join();
+
+    // Make sure we can schedule more work with a different client key
+    txManager
+        .transactionally(
+            tx -> scheduleWithTx(outbox.with().uniqueRequestId("context-clientkey2"), tx, 2, "Foo"))
+        .join();
+
+    // Make sure we can't repeat the same work
+    assertThrows(
+        AlreadyScheduledException.class,
+        () ->
+            Utils.join(
+                txManager.transactionally(
+                    tx ->
+                        scheduleWithTx(
+                            outbox.with().uniqueRequestId("context-clientkey1"), tx, 3, "Bar"))));
+
+    // Run the clock forward to just under the retention threshold
+    clockProvider.set(
+        Clock.fixed(
+            clockProvider.get().instant().plus(Duration.ofDays(2)).minusSeconds(60),
+            clockProvider.get().getZone()));
+    outbox.flush();
+
+    // Make sure we can schedule more work with a different client key
+    txManager
+        .transactionally(
+            tx ->
+                scheduleWithTx(
+                    outbox.with().uniqueRequestId("context-clientkey4"), tx, 4, "Whoohoo"))
+        .join();
+
+    // Make sure we still can't repeat the same work
+    assertThrows(
+        AlreadyScheduledException.class,
+        () ->
+            Utils.join(
+                txManager.transactionally(
+                    tx ->
+                        scheduleWithTx(
+                            outbox.with().uniqueRequestId("context-clientkey1"),
+                            tx,
+                            5,
+                            "Whooops"))));
+
+    assertFired(priorWorkClear);
+
+    // Run the clock over the threshold
+    clockProvider.set(
+        Clock.fixed(clockProvider.get().instant().plusSeconds(120), clockProvider.get().getZone()));
+    outbox.flush();
+
+    // We should now be able to add the work
+    txManager
+        .transactionally(
+            tx ->
+                scheduleWithTx(outbox.with().uniqueRequestId("context-clientkey1"), tx, 6, "Yes!"))
+        .join();
+
+    assertFired(latch);
+
+    assertThat(ids, containsInAnyOrder(1, 2, 4, 6));
+  }
+
   /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
   @Test
   final void testAsyncHighVolumeUnreliable() throws Exception {
@@ -352,6 +453,7 @@ public abstract class AbstractAcceptanceTest<
   protected void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
       throws Exception {
     String caller = Utils.traceCaller().map(StackFrame::getMethodName).orElse("<Unknown>");
+    CountDownLatch finished = new CountDownLatch(1);
     Disposable background =
         Flux.interval(Duration.ofMillis(250))
             .flatMap(__ -> Mono.fromFuture(outbox::flushAsync))
@@ -360,11 +462,20 @@ public abstract class AbstractAcceptanceTest<
                   log.error("Error in poller for {}", caller, e);
                   return Mono.empty();
                 })
+            .doFinally(
+                s -> {
+                  log.info("Background work complete");
+                  finished.countDown();
+                })
             .subscribe();
     try {
       runnable.run();
+      log.info("Test complete");
     } finally {
       background.dispose();
+      log.info("Ordered shutdown of background work");
+      finished.await(30, TimeUnit.SECONDS);
+      log.info("Shutdown complete");
     }
   }
 
