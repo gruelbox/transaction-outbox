@@ -24,6 +24,7 @@ import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.lang.StackWalker.StackFrame;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedList;
@@ -39,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -448,6 +450,53 @@ public abstract class AbstractAcceptanceTest<
         "Only got: " + results.keySet(),
         results.keySet(),
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
+  }
+
+  /** Ensures that we correctly handle expiry of large numbers of   */
+  @Test
+  final void testAsyncLargeExpiryBatches() {
+    int count = 29;
+    CountDownLatch latch = new CountDownLatch(count);
+    AtomicReference<Clock> clockProvider = new AtomicReference<>(Clock.systemDefaultZone());
+    TransactionOutbox outbox =
+        builder()
+            .instantiator(new LoggingInstantiator())
+            .flushBatchSize(10)
+            .clockProvider(clockProvider::get)
+            .retentionThreshold(Duration.ofDays(1))
+            .listener(new LatchListener(latch))
+            .build();
+
+    cleanDataStore();
+
+    txManager.transactionally(
+        tx ->
+            CompletableFuture.allOf(
+                IntStream.range(0, count)
+                    .mapToObj(i -> scheduleWithTx(outbox.with().uniqueRequestId("UQ" + i), tx, i, "Whee"))
+                    .toArray(CompletableFuture[]::new)))
+        .thenRunAsync(() -> assertFired(latch))
+        .thenRunAsync(() -> clockProvider.set(
+            Clock.fixed(
+                clockProvider.get().instant()
+                    .plus(1, ChronoUnit.DAYS)
+                    .plusSeconds(60),
+                clockProvider.get().getZone())))
+        .thenCompose(__ -> outbox.flushAsync())
+        .thenCompose(didWork -> {
+          assertTrue(didWork);
+          return outbox.flushAsync();
+        })
+        .thenCompose(didWork -> {
+          assertTrue(didWork);
+          return outbox.flushAsync();
+        })
+        .thenCompose(didWork -> {
+          assertTrue(didWork);
+          return outbox.flushAsync();
+        })
+        .thenAccept(Assertions::assertFalse)
+        .join();
   }
 
   protected void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)

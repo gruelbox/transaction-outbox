@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
+import org.jooq.exception.DataAccessException;
 
 @Slf4j
 final class ThreadLocalJooqTransactionManagerImpl
@@ -28,20 +29,31 @@ final class ThreadLocalJooqTransactionManagerImpl
         SerializableTypeRequired.class, new SerializableTypeRequired(JooqTransaction.class));
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E, JooqTransaction> work) {
+      ThrowingTransactionalSupplier<T, E, JooqTransaction> work) throws E {
     DSLContext dsl =
         peekTransaction()
             .map(JooqTransaction::context)
             .map(Configuration.class::cast)
             .map(Configuration::dsl)
             .orElse(parentDsl);
-    return dsl.transactionResult(
-        config ->
-            config
-                .dsl()
-                .connectionResult(connection -> work.doWork(peekTransaction().orElseThrow())));
+    try {
+      return dsl.transactionResult(
+          config ->
+              config
+                  .dsl()
+                  .connectionResult(connection -> work.doWork(peekTransaction().orElseThrow())));
+    } catch (DataAccessException dax) {
+      try {
+        throw dax.getCause();
+      } catch (Exception e) {
+        throw (E) e;
+      } catch (Throwable t) {
+        throw dax;
+      }
+    }
   }
 
   @Override

@@ -8,13 +8,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-class TestPostgres10 extends AbstractSimpleTransactionManagerAcceptanceTest {
+class TestJdbcPostgres9 extends AbstractSimpleTransactionManagerAcceptanceTest {
 
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
       (JdbcDatabaseContainer)
-          new PostgreSQLContainer("postgres:10").withStartupTimeout(Duration.ofHours(1));
+          new PostgreSQLContainer("postgres:9").withStartupTimeout(Duration.ofHours(1));
 
   @Override
   protected JdbcConnectionDetails connectionDetails() {

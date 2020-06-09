@@ -2,7 +2,7 @@ package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.sql.Dialect;
 
-class TestH2 extends AbstractSimpleTransactionManagerAcceptanceTest {
+class TestJdbcH2 extends AbstractSimpleTransactionManagerAcceptanceTest {
 
   @Override
   protected JdbcConnectionDetails connectionDetails() {

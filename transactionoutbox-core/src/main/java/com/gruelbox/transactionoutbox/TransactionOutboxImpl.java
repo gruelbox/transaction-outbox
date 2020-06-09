@@ -105,12 +105,14 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     return Utils.join(flushAsync());
   }
 
-  @SuppressWarnings("UnusedReturnValue")
   @Override
   public CompletableFuture<Boolean> flushAsync() {
     Instant now = clockProvider.getClock().instant();
     return flush(now)
-        .thenCompose(batch -> expireIdempotencyProtection(now).thenApply(__ -> !batch.isEmpty()));
+        .thenApply(batch -> !batch.isEmpty())
+        .thenCompose(didWorkFlushWork ->
+            expireIdempotencyProtection(now)
+                .thenApply(didExpiryWork -> didWorkFlushWork || didExpiryWork));
   }
 
   @Override
@@ -191,7 +193,6 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
             });
   }
 
-  // TODO test large batches
   private CompletableFuture<List<TransactionOutboxEntry>> selectBatch(TX tx, Instant now) {
     TransactionOutboxEntry[] result = new TransactionOutboxEntry[flushBatchSize];
     AtomicInteger resultSize = new AtomicInteger();
@@ -223,8 +224,9 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
         .thenApply(__ -> Arrays.asList(result).subList(0, resultSize.get()));
   }
 
-  private CompletableFuture<Void> expireIdempotencyProtection(Instant now) {
-    return expireIdempotencyProtectionBatch(now)
+  private CompletableFuture<Boolean> expireIdempotencyProtection(Instant now) {
+    return transactionManager
+        .transactionally(tx -> persistor.deleteProcessedAndExpired(tx, flushBatchSize, now))
         .thenApply(
             total -> {
               if (total > 0) {
@@ -239,29 +241,12 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
                     "Expired idempotency protection on {} requests completed more than {} ago",
                     total,
                     String.format("%dd %02dh %02dm %02ds", days, hours, minutes, seconds));
+                return true;
               } else {
                 log.debug("No records found to delete as of {}", now);
+                return false;
               }
-              return null;
             });
-  }
-
-  // TODO needs testing!
-  private CompletableFuture<Integer> expireIdempotencyProtectionBatch(Instant now) {
-    return transactionManager
-        .transactionally(tx -> deleteProcessedAndExpired(tx, now))
-        .thenCompose(
-            recordsDeleted -> {
-              if (recordsDeleted > 0) {
-                return expireIdempotencyProtectionBatch(now)
-                    .thenApply(more -> more + recordsDeleted);
-              }
-              return completedFuture(recordsDeleted);
-            });
-  }
-
-  private CompletableFuture<Integer> deleteProcessedAndExpired(TX tx, Instant now) {
-    return persistor.deleteProcessedAndExpired(tx, flushBatchSize, now);
   }
 
   @SuppressWarnings("unchecked")
