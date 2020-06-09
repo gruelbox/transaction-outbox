@@ -452,7 +452,7 @@ public abstract class AbstractAcceptanceTest<
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
   }
 
-  /** Ensures that we correctly handle expiry of large numbers of   */
+  /** Ensures that we correctly handle expiry of large numbers of */
   @Test
   final void testAsyncLargeExpiryBatches() {
     int count = 29;
@@ -469,32 +469,39 @@ public abstract class AbstractAcceptanceTest<
 
     cleanDataStore();
 
-    txManager.transactionally(
-        tx ->
-            CompletableFuture.allOf(
-                IntStream.range(0, count)
-                    .mapToObj(i -> scheduleWithTx(outbox.with().uniqueRequestId("UQ" + i), tx, i, "Whee"))
-                    .toArray(CompletableFuture[]::new)))
+    txManager
+        .transactionally(
+            tx ->
+                CompletableFuture.allOf(
+                    IntStream.range(0, count)
+                        .mapToObj(
+                            i ->
+                                scheduleWithTx(
+                                    outbox.with().uniqueRequestId("UQ" + i), tx, i, "Whee"))
+                        .toArray(CompletableFuture[]::new)))
         .thenRunAsync(() -> assertFired(latch))
-        .thenRunAsync(() -> clockProvider.set(
-            Clock.fixed(
-                clockProvider.get().instant()
-                    .plus(1, ChronoUnit.DAYS)
-                    .plusSeconds(60),
-                clockProvider.get().getZone())))
+        .thenRunAsync(
+            () ->
+                clockProvider.set(
+                    Clock.fixed(
+                        clockProvider.get().instant().plus(1, ChronoUnit.DAYS).plusSeconds(60),
+                        clockProvider.get().getZone())))
         .thenCompose(__ -> outbox.flushAsync())
-        .thenCompose(didWork -> {
-          assertTrue(didWork);
-          return outbox.flushAsync();
-        })
-        .thenCompose(didWork -> {
-          assertTrue(didWork);
-          return outbox.flushAsync();
-        })
-        .thenCompose(didWork -> {
-          assertTrue(didWork);
-          return outbox.flushAsync();
-        })
+        .thenCompose(
+            didWork -> {
+              assertTrue(didWork);
+              return outbox.flushAsync();
+            })
+        .thenCompose(
+            didWork -> {
+              assertTrue(didWork);
+              return outbox.flushAsync();
+            })
+        .thenCompose(
+            didWork -> {
+              assertTrue(didWork);
+              return outbox.flushAsync();
+            })
         .thenAccept(Assertions::assertFalse)
         .join();
   }

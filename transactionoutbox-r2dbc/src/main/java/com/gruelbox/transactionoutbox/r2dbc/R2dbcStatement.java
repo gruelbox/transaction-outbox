@@ -37,12 +37,10 @@ class R2dbcStatement implements SqlStatement {
   @Override
   public R2dbcStatement bind(int i, Object arg) {
     log.trace("Binding {} -> {}", i, arg);
-    // TODO suggest Instant support to R2DBC
     if (arg instanceof Instant) {
       statement.bind(i, LocalDateTime.ofInstant((Instant) arg, ZoneOffset.UTC));
     } else {
       if (arg == null) {
-        // TODO highlight this as a problem with the R2DBC API
         // Lazy, but does what we need here
         statement.bindNull(i, String.class);
       } else {
@@ -111,7 +109,6 @@ class R2dbcStatement implements SqlStatement {
                         @Override
                         public <V> V get(int index, Class<V> type) {
                           try {
-                            // TODO suggest Instant support to R2DBC
                             if (Instant.class.equals(type)) {
                               return (V)
                                   Objects.requireNonNull(row.get(index, LocalDateTime.class))
