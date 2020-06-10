@@ -39,6 +39,11 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
   @Override
   public <T, E extends Exception> T requireTransactionReturns(
       ThrowingTransactionalSupplier<T, E> work) throws E, NoTransactionActiveException {
+
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      throw new NoTransactionActiveException();
+    }
+
     return work.doWork(transactionInstance);
   }
 
@@ -46,15 +51,7 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
 
     @Override
     public Connection connection() {
-      try {
-        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-          throw new RuntimeException("No spring transaction is active.");
-        }
-
-        return DataSourceUtils.getConnection(dataSource);
-      } catch (RuntimeException e) {
-        throw new NoTransactionActiveException(e);
-      }
+      return DataSourceUtils.getConnection(dataSource);
     }
 
     @Override
