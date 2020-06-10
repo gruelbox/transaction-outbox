@@ -309,20 +309,25 @@ public abstract class AbstractAcceptanceTest<
   @Test
   final void testAsyncDuplicateRequests() {
 
-    CountDownLatch priorWorkClear = new CountDownLatch(3);
-    CountDownLatch latch = new CountDownLatch(4);
+    CountDownLatch twoDone = new CountDownLatch(2);
+    CountDownLatch threeDone = new CountDownLatch(3);
+    CountDownLatch fourDone = new CountDownLatch(4);
     List<Integer> ids = new ArrayList<>();
     AtomicReference<Clock> clockProvider =
         new AtomicReference<>(Clock.fixed(Instant.now(), ZoneId.of("Z")));
+    log.info("Clock time: {}", clockProvider.get().instant());
+
     TransactionOutbox outbox =
         builder()
             .listener(
                 new TransactionOutboxListener() {
                   @Override
                   public void success(TransactionOutboxEntry entry) {
-                    ids.add((Integer) entry.getInvocation().getArgs()[0]);
-                    priorWorkClear.countDown();
-                    latch.countDown();
+                    Integer i = (Integer) entry.getInvocation().getArgs()[0];
+                    ids.add(i);
+                    twoDone.countDown();
+                    threeDone.countDown();
+                    fourDone.countDown();
                   }
                 })
             .instantiator(new LoggingInstantiator())
@@ -354,11 +359,14 @@ public abstract class AbstractAcceptanceTest<
                         scheduleWithTx(
                             outbox.with().uniqueRequestId("context-clientkey1"), tx, 3, "Bar"))));
 
+    assertFired(twoDone);
+
     // Run the clock forward to just under the retention threshold
     clockProvider.set(
         Clock.fixed(
             clockProvider.get().instant().plus(Duration.ofDays(2)).minusSeconds(120),
             clockProvider.get().getZone()));
+    log.info("Clock time: {}", clockProvider.get().instant());
     outbox.flush();
 
     // Make sure we can schedule more work with a different client key
@@ -382,12 +390,12 @@ public abstract class AbstractAcceptanceTest<
                             5,
                             "Whooops"))));
 
-    assertFired(priorWorkClear);
+    assertFired(threeDone);
 
     // Run the clock over the threshold
     clockProvider.set(
         Clock.fixed(clockProvider.get().instant().plusSeconds(240), clockProvider.get().getZone()));
-
+    log.info("Clock time: {}", clockProvider.get().instant());
     outbox.flush();
 
     // We should now be able to add the work
@@ -397,7 +405,7 @@ public abstract class AbstractAcceptanceTest<
                 scheduleWithTx(outbox.with().uniqueRequestId("context-clientkey1"), tx, 6, "Yes!"))
         .join();
 
-    assertFired(latch);
+    assertFired(fourDone);
 
     assertThat(ids, containsInAnyOrder(1, 2, 4, 6));
   }

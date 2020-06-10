@@ -41,6 +41,7 @@
     <hamcrest.version>2.2</hamcrest.version>
     <mockito.version>1.10.19</mockito.version>
     <hikari.version>3.4.5</hikari.version>
+    <h2.version>1.4.200</h2.version>
   </properties>
 
   <modules>
@@ -150,7 +151,7 @@
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>1.4.200</version>
+        <version>${h2.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
