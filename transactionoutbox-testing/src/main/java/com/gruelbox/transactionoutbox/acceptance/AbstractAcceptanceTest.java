@@ -383,10 +383,17 @@ public abstract class AbstractAcceptanceTest<
 
     assertFired(priorWorkClear);
 
+    log.info("$** Adjusting clock **$");
+
     // Run the clock over the threshold
     clockProvider.set(
         Clock.fixed(clockProvider.get().instant().plusSeconds(240), clockProvider.get().getZone()));
-    outbox.flush();
+
+    log.info("$** Performing flush **$");
+
+    boolean flushDidWork = outbox.flush();
+
+    log.info("$** Flush did work: {} **$", flushDidWork);
 
     // We should now be able to add the work
     txManager
