@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
 import static io.r2dbc.spi.IsolationLevel.READ_COMMITTED;
+import static reactor.core.publisher.Mono.fromCompletionStage;
 
 import com.gruelbox.transactionoutbox.Beta;
 import com.gruelbox.transactionoutbox.Invocation;
@@ -32,7 +33,6 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -74,6 +74,7 @@ public class R2dbcRawTransactionManager
     return Set.copyOf(openTransactions.values());
   }
 
+  // For testing
   public R2dbcRawTransactionManager enableStackLogging() {
     this.stackLogging = true;
     return this;
@@ -83,15 +84,13 @@ public class R2dbcRawTransactionManager
   public <T> CompletableFuture<T> transactionally(
       Function<R2dbcRawTransaction, CompletableFuture<T>> fn) {
     return withConnection(
-            conn ->
-                begin(conn)
-                    .then(
-                        Mono.fromCompletionStage(
-                            () ->
-                                fn.apply(cf.contextMap.get(conn)).thenApply(Optional::ofNullable)))
-                    .concatWith(commit(conn))
-                    .onErrorResume(t -> rollback(conn, t)))
-        .last(Optional.empty())
+            conn -> {
+              var tx = cf.contextMap.get(conn);
+              return begin(conn)
+                  .then(fromCompletionStage(() -> fn.apply(tx).thenApply(Optional::ofNullable)))
+                  .flatMap(result -> commit(conn, result))
+                  .onErrorResume(t -> rollback(conn, t));
+            })
         .toFuture()
         .thenApply(opt -> opt.orElse(null));
   }
@@ -112,8 +111,8 @@ public class R2dbcRawTransactionManager
     return Mono.from(conn.beginTransaction()).then(Mono.empty());
   }
 
-  private <T> Mono<T> commit(Connection conn) {
-    return Mono.from(conn.commitTransaction()).then(Mono.empty());
+  private <T> Mono<T> commit(Connection conn, T result) {
+    return Mono.from(conn.commitTransaction()).then(Mono.just(result));
   }
 
   private <T> Mono<T> rollback(Connection conn, Throwable e) {
@@ -123,46 +122,46 @@ public class R2dbcRawTransactionManager
                     "Exception in transactional block ({}{}). Rolling back. See later messages for detail",
                     e.getClass().getSimpleName(),
                     e.getMessage() == null ? "" : (" - " + e.getMessage())))
-        .concatWith(Mono.from(conn.rollbackTransaction()).then(Mono.empty()))
-        .concatWith(Mono.fromRunnable(() -> log.info("Rollback complete")))
+        .then(Mono.from(conn.rollbackTransaction()).then(Mono.empty()))
+        .then(Mono.fromRunnable(() -> log.info("Rollback complete")))
         .then(Mono.error(e));
   }
 
-  private <T> Flux<T> withConnection(Function<Connection, Flux<T>> fn) {
-    ConnectionLogger connectionLogger = new ConnectionLogger();
-    return Mono.from(cf.create())
-        .flatMapMany(
-            conn ->
-                Mono.fromRunnable(connectionLogger::start)
-                    .then(
-                        READ_COMMITTED.equals(conn.getTransactionIsolationLevel())
-                            ? Mono.empty()
-                            : Mono.from(conn.setTransactionIsolationLevel(READ_COMMITTED)))
-                    .then(conn.isAutoCommit() ? Mono.empty() : Mono.from(conn.setAutoCommit(false)))
-                    .thenMany(fn.apply(conn))
-                    .concatWith(
-                        Mono.from(conn.close()).then(Mono.fromRunnable(connectionLogger::end)))
-                    .onErrorResume(
-                        t ->
-                            Mono.from(conn.close())
-                                .then(Mono.fromRunnable(connectionLogger::end))
-                                .then(Mono.error(t))));
+  private <T> Mono<T> withConnection(Function<Connection, Mono<T>> fn) {
+    return Mono.usingWhen(
+        Mono.fromCallable(ConnectionLogger::new),
+        logger ->
+            Mono.usingWhen(
+                Mono.from(cf.create()),
+                conn -> setupConnection(conn).then(fn.apply(conn)),
+                conn -> Mono.from(conn.close())),
+        logger -> Mono.fromRunnable(logger::close));
+  }
+
+  private Mono<Void> setupConnection(Connection conn) {
+    return (READ_COMMITTED.equals(conn.getTransactionIsolationLevel())
+            ? Mono.empty()
+            : Mono.from(conn.setTransactionIsolationLevel(READ_COMMITTED)))
+        .then(conn.isAutoCommit() ? Mono.empty() : Mono.from(conn.setAutoCommit(false)));
   }
 
   @EqualsAndHashCode
-  public final class ConnectionLogger {
+  public final class ConnectionLogger implements AutoCloseable {
     UUID key = UUID.randomUUID();
 
-    @EqualsAndHashCode.Exclude
-    StackTraceElement[] stackTrace = stackLogging ? new Throwable().getStackTrace() : null;
+    @EqualsAndHashCode.Exclude StackTraceElement[] stackTrace;
 
-    void start() {
+    ConnectionLogger() {
       if (stackLogging) {
+        this.stackTrace = new Throwable().getStackTrace();
         openTransactions.put(key, this);
+      } else {
+        this.stackTrace = null;
       }
     }
 
-    void end() {
+    @Override
+    public void close() {
       if (stackLogging) {
         openTransactions.remove(key);
       }
@@ -230,7 +229,7 @@ public class R2dbcRawTransactionManager
       @Override
       public Publisher<Void> commitTransaction() {
         return Mono.from(conn.commitTransaction())
-            .then(Mono.fromCompletionStage(() -> contextMap.get(this).processHooks()));
+            .then(fromCompletionStage(() -> contextMap.get(this).processHooks()));
       }
 
       @Override

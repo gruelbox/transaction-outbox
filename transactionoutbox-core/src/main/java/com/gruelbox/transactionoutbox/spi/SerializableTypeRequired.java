@@ -12,8 +12,6 @@ import lombok.Value;
 @Beta
 @Value
 public class SerializableTypeRequired {
-  /**
-   * @return The type required to be serializable.
-   */
+  /** @return The type required to be serializable. */
   Class<?> type;
 }

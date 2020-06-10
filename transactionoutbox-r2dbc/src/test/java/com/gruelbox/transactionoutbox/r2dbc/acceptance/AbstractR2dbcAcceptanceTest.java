@@ -66,9 +66,7 @@ abstract class AbstractR2dbcAcceptanceTest
     ConnectionPool pool = autoClose(new ConnectionPool(configuration));
     ConnectionFactoryWrapper connectionFactory =
         R2dbcRawTransactionManager.wrapConnectionFactory(pool);
-    var tm = new R2dbcRawTransactionManager(connectionFactory);
-    tm.enableStackLogging();
-    return tm;
+    return new R2dbcRawTransactionManager(connectionFactory).enableStackLogging();
   }
 
   @Override

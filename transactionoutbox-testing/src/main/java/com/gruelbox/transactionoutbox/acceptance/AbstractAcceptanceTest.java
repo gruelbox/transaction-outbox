@@ -38,8 +38,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -314,8 +312,8 @@ public abstract class AbstractAcceptanceTest<
     CountDownLatch priorWorkClear = new CountDownLatch(3);
     CountDownLatch latch = new CountDownLatch(4);
     List<Integer> ids = new ArrayList<>();
-    AtomicReference<Clock> clockProvider = new AtomicReference<>(Clock.fixed(Instant.now(),
-        ZoneId.of("Z")));
+    AtomicReference<Clock> clockProvider =
+        new AtomicReference<>(Clock.fixed(Instant.now(), ZoneId.of("Z")));
     TransactionOutbox outbox =
         builder()
             .listener(
@@ -528,26 +526,29 @@ public abstract class AbstractAcceptanceTest<
     }
   }
 
-  CompletableFuture<Boolean> flushRecursive(TransactionOutbox outbox, String caller,
-      AtomicBoolean shutdown) {
-    return outbox.flushAsync()
+  CompletableFuture<Boolean> flushRecursive(
+      TransactionOutbox outbox, String caller, AtomicBoolean shutdown) {
+    return outbox
+        .flushAsync()
         .exceptionally(
             e -> {
               log.error("Error in poller for {}", caller, e);
               return false;
             })
-        .thenCompose(didWork -> {
-          if (shutdown.get()) {
-            return completedFuture(false);
-          } else if (didWork) {
-            return completedFuture(true)
-                .thenComposeAsync(__ -> flushRecursive(outbox, caller, shutdown));
-          } else {
-            return completedFuture(false)
-                .thenComposeAsync(__ -> flushRecursive(outbox, caller, shutdown),
-                    delayedExecutor(250, TimeUnit.MILLISECONDS));
-          }
-        });
+        .thenCompose(
+            didWork -> {
+              if (shutdown.get()) {
+                return completedFuture(false);
+              } else if (didWork) {
+                return completedFuture(true)
+                    .thenComposeAsync(__ -> flushRecursive(outbox, caller, shutdown));
+              } else {
+                return completedFuture(false)
+                    .thenComposeAsync(
+                        __ -> flushRecursive(outbox, caller, shutdown),
+                        delayedExecutor(250, TimeUnit.MILLISECONDS));
+              }
+            });
   }
 
   protected void assertFired(CountDownLatch latch) {

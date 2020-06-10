@@ -1,8 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-import com.gruelbox.transactionoutbox.Beta;
-import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.spi.InitializationEventBus;

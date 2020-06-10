@@ -8,7 +8,6 @@ import com.gruelbox.transactionoutbox.sql.SqlApi;
 import com.gruelbox.transactionoutbox.sql.SqlStatement;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException;
-import io.r2dbc.spi.R2dbcNonTransientResourceException;
 import io.r2dbc.spi.R2dbcTimeoutException;
 import io.r2dbc.spi.R2dbcTransientResourceException;
 import java.util.concurrent.CompletionException;
