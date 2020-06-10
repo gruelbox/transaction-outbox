@@ -10,6 +10,7 @@ import com.gruelbox.transactionoutbox.LockException;
 import com.gruelbox.transactionoutbox.OptimisticLockException;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
+import com.gruelbox.transactionoutbox.UncheckedException;
 import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
@@ -111,39 +112,58 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     if (!migrate) {
       return;
     }
-    tm.transactionally(
-            tx ->
-                createOutboxTableIfNotExists(tx)
-                    .thenCompose(__ -> fetchCurrentVersion(tx))
-                    .thenCompose(
-                        versionResult -> {
-                          if (versionResult.size() != 1) {
-                            return failedFuture(
-                                new IllegalStateException(
-                                    "Unexpected number of version records: "
-                                        + versionResult.size()));
-                          }
-                          int currentVersion = versionResult.get(0);
-                          log.info("Current schema version is {}", currentVersion);
-                          return dialect
-                              .migrations(tableName)
-                              .filter(mig -> mig.getVersion() > currentVersion)
-                              .peek(
-                                  mig ->
-                                      log.info(
-                                          "Running migration {}: {}",
-                                          mig.getVersion(),
-                                          mig.getName()))
-                              .map(
-                                  mig ->
-                                      executeUpdate(tx, mig.getSql())
-                                          .thenCompose(__ -> updateVersion(tx, mig)))
-                              .reduce(
-                                  CompletableFuture.completedFuture(null),
-                                  (f1, f2) -> f1.thenCompose(__ -> f2));
-                        }))
-        .join();
-    log.info("Migrations complete");
+    log.info("Checking version table...");
+    int attempts = 0;
+    do {
+      try {
+        tm.transactionally(this::createVersionTableIfNotExists).join();
+        log.info("Checking for new migrations...");
+        Utils.join(
+            tm.transactionally(
+                tx ->
+                    fetchCurrentVersionAndLock(tx)
+                        .thenCompose(
+                            versionResult -> {
+                              if (versionResult.size() != 1) {
+                                return failedFuture(
+                                    new IllegalStateException(
+                                        "Unexpected number of version records: "
+                                            + versionResult.size()));
+                              }
+                              int currentVersion = versionResult.get(0);
+                              log.info("Current schema version is {}", currentVersion);
+                              return dialect
+                                  .migrations(tableName)
+                                  .filter(mig -> mig.getVersion() > currentVersion)
+                                  .peek(
+                                      mig ->
+                                          log.info(
+                                              "Running migration {}: {}",
+                                              mig.getVersion(),
+                                              mig.getName()))
+                                  .map(
+                                      mig ->
+                                          executeUpdate(tx, mig.getSql())
+                                              .thenCompose(_2 -> updateVersion(tx, mig)))
+                                  .reduce(
+                                      CompletableFuture.completedFuture(null),
+                                      (f1, f2) -> f1.thenCompose(_3 -> f2));
+                            })));
+        log.info("Migrations complete");
+        return;
+      } catch (Exception e) {
+        log.error("Failed migration attempt {}. Retrying in 15s", ++attempts);
+        try {
+          Thread.sleep(15000);
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+          throw new UncheckedException(ex);
+        }
+      }
+    } while (attempts < 5);
+    throw new IllegalStateException(
+        "Repeated attempts to migrate database failed. See earlier"
+            + " errors for more information.");
   }
 
   @Override
@@ -368,7 +388,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     return sqlApi.statement(tx, dialect, clearSql, 0, false, SqlStatement::execute);
   }
 
-  private CompletableFuture<Integer> createOutboxTableIfNotExists(TX tx) {
+  private CompletableFuture<Integer> createVersionTableIfNotExists(TX tx) {
     return executeUpdate(
         tx,
         "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
@@ -376,12 +396,12 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
             + ") AS version");
   }
 
-  private CompletableFuture<List<Integer>> fetchCurrentVersion(TX tx) {
+  private CompletableFuture<List<Integer>> fetchCurrentVersionAndLock(TX tx) {
     return sqlApi.statement(
         tx,
         dialect,
         "SELECT version FROM TXNO_VERSION FOR UPDATE",
-        0,
+        60,
         false,
         binder -> binder.executeQuery(1, row -> row.get(0, Integer.class)));
   }
