@@ -26,6 +26,8 @@ import com.gruelbox.transactionoutbox.sql.Dialect;
 import java.lang.StackWalker.StackFrame;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -312,7 +314,8 @@ public abstract class AbstractAcceptanceTest<
     CountDownLatch priorWorkClear = new CountDownLatch(3);
     CountDownLatch latch = new CountDownLatch(4);
     List<Integer> ids = new ArrayList<>();
-    AtomicReference<Clock> clockProvider = new AtomicReference<>(Clock.systemDefaultZone());
+    AtomicReference<Clock> clockProvider = new AtomicReference<>(Clock.fixed(Instant.now(),
+        ZoneId.of("Z")));
     TransactionOutbox outbox =
         builder()
             .listener(
@@ -383,17 +386,11 @@ public abstract class AbstractAcceptanceTest<
 
     assertFired(priorWorkClear);
 
-    log.info("$** Adjusting clock **$");
-
     // Run the clock over the threshold
     clockProvider.set(
         Clock.fixed(clockProvider.get().instant().plusSeconds(240), clockProvider.get().getZone()));
 
-    log.info("$** Performing flush **$");
-
-    boolean flushDidWork = outbox.flush();
-
-    log.info("$** Flush did work: {} **$", flushDidWork);
+    outbox.flush();
 
     // We should now be able to add the work
     txManager
