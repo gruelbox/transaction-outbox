@@ -12,8 +12,9 @@ import com.gruelbox.transactionoutbox.StubPersistor;
 import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
+import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
 import com.gruelbox.transactionoutbox.jdbc.StubParameterContextJdbcTransactionManager;
-import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
+import com.gruelbox.transactionoutbox.jdbc.StubSimpleTransactionManager;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import java.math.BigDecimal;
@@ -36,8 +37,8 @@ class TestStubbingBlocking {
 
   @Test
   void testStubbingWithThreadLocalContext() {
-    StubThreadLocalJdbcTransactionManager<SimpleTransaction<Void>> transactionManager =
-        new StubThreadLocalJdbcTransactionManager<>(
+    SimpleTransactionManager transactionManager =
+        new StubSimpleTransactionManager(
             () -> new SimpleTransaction<>(Mockito.mock(Connection.class), null));
     TransactionOutbox outbox = createOutbox(transactionManager);
 

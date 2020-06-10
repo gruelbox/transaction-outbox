@@ -4,6 +4,7 @@ import static com.gruelbox.transactionoutbox.r2dbc.UsesPostgres12.connectionConf
 
 import com.gruelbox.transactionoutbox.r2dbc.UsesPostgres12;
 import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.Dialects;
 import io.r2dbc.postgresql.PostgresqlConnectionFactory;
 import io.r2dbc.spi.ConnectionFactory;
 
@@ -11,7 +12,7 @@ class TestR2dbcPostgres12 extends AbstractR2dbcAcceptanceTest implements UsesPos
 
   @Override
   protected Dialect dialect() {
-    return Dialect.POSTGRESQL_9;
+    return Dialects.POSTGRESQL_9;
   }
 
   @Override

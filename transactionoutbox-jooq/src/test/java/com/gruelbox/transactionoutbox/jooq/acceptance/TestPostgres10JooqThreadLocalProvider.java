@@ -4,7 +4,7 @@ import com.gruelbox.transactionoutbox.JooqTransactionListener;
 import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.ThreadLocalJooqTransactionManager;
 import com.gruelbox.transactionoutbox.acceptance.JdbcConnectionDetails;
-import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.Dialects;
 import java.time.Duration;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
@@ -27,7 +27,7 @@ public class TestPostgres10JooqThreadLocalProvider extends AbstractJooqThreadLoc
   @Override
   protected JdbcConnectionDetails connectionDetails() {
     return JdbcConnectionDetails.builder()
-        .dialect(Dialect.POSTGRESQL_9)
+        .dialect(Dialects.POSTGRESQL_9)
         .driverClassName("org.postgresql.Driver")
         .url(container.getJdbcUrl())
         .user(container.getUsername())

@@ -26,7 +26,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+/**
+ * Utility methods used by transaction outbox. These are very firmly {@link NotApi}. Don't use them
+ * in your code as they may be modified or removed without warning.
+ */
 @Slf4j
+@NotApi
 public class Utils {
 
   private static final Objenesis objenesis = new ObjenesisStd();

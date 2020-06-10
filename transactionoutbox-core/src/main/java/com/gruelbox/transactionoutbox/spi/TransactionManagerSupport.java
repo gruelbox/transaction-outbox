@@ -9,6 +9,10 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Function;
 
+/**
+ * Various static methods intended to support creation of {@link BaseTransactionManager}
+ * implementations.
+ */
 @Beta
 public final class TransactionManagerSupport {
 
@@ -16,9 +20,10 @@ public final class TransactionManagerSupport {
 
   /**
    * Obtains the active transaction by parsing the method arguments for a {@link BaseTransaction} or
-   * a context object. All such arguments are removed from the invocation adn replaced with nulls
+   * a context object. All such arguments are removed from the invocation and replaced with nulls
    * before saving. They will be "rehydrated" later upon actual invocation using the
-   * transaction/context at the time of invocation.
+   * transaction/context at the time of invocation ({@link
+   * #injectTransactionIntoInvocation(Invocation, Class, BaseTransaction)} can assist with this).
    *
    * @param method The method called.
    * @param args The method arguments.

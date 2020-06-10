@@ -1,5 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.Beta;
+import com.gruelbox.transactionoutbox.Persistor;
+import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
@@ -8,6 +11,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Wraps an instance of {@link Persistor} allowing its behaviour to be composed.
+ *
+ * @param <CN> The type which the persistor uses to interact with the data store.
+ * @param <TX> The transaction type.
+ */
 @Beta
 public class PersistorWrapper<CN, TX extends BaseTransaction<CN>>
     implements Persistor<CN, TX>, InitializationEventSubscriber {

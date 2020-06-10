@@ -2,7 +2,7 @@ package com.gruelbox.transactionoutbox.sql;
 
 import java.util.stream.Stream;
 
-class MySqlDialect extends Dialect {
+final class MySqlDialect extends Dialect {
 
   private final boolean supportsSkipLock;
 

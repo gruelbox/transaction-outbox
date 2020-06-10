@@ -1,36 +1,18 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
-import static com.gruelbox.transactionoutbox.Utils.uncheck;
-
-import com.gruelbox.transactionoutbox.Invocation;
-import com.gruelbox.transactionoutbox.TransactionalInvocation;
+import com.gruelbox.transactionoutbox.NoTransactionActiveException;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
-import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
-import com.gruelbox.transactionoutbox.spi.InitializationEventPublisher;
-import com.gruelbox.transactionoutbox.spi.SerializableTypeRequired;
 import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
-import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
-import java.lang.reflect.Method;
-import java.sql.SQLException;
+import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalWork;
 import javax.sql.DataSource;
-import lombok.Builder;
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * A simple JDBC {@link BaseTransactionManager} implementation suitable for applications with no
- * existing transaction management.
+ * existing transaction management. Uses thread-local transaction scopes and uses no transaction
+ * context, leaving client code needing to interact directly with {@link
+ * SimpleTransaction#connection()}.
  */
-@Slf4j
-@Builder
-public final class SimpleTransactionManager
-    extends AbstractThreadLocalJdbcTransactionManager<SimpleTransaction<Void>>
-    implements InitializationEventPublisher {
-
-  private final JdbcConnectionProvider connectionProvider;
-
-  private SimpleTransactionManager(JdbcConnectionProvider connectionProvider) {
-    this.connectionProvider = connectionProvider;
-  }
+public interface SimpleTransactionManager extends JdbcTransactionManager<SimpleTransaction<Void>> {
 
   /**
    * Creates a simple transaction manager which uses the specified {@link DataSource} to source
@@ -43,9 +25,11 @@ public final class SimpleTransactionManager
    * @param dataSource The data source.
    * @return The transaction manager.
    */
-  public static SimpleTransactionManager fromDataSource(DataSource dataSource) {
-    return new SimpleTransactionManager(
-        DataSourceJdbcConnectionProvider.builder().dataSource(dataSource).build());
+  static SimpleTransactionManager fromDataSource(DataSource dataSource) {
+    return builder()
+        .connectionProvider(
+            DataSourceJdbcConnectionProvider.builder().dataSource(dataSource).build())
+        .build();
   }
 
   /**
@@ -62,93 +46,56 @@ public final class SimpleTransactionManager
    * @param password The password.
    * @return The transaction manager.
    */
-  public static SimpleTransactionManager fromConnectionDetails(
+  static SimpleTransactionManager fromConnectionDetails(
       String driverClass, String url, String username, String password) {
-    return new SimpleTransactionManager(
-        DriverJdbcConnectionProvider.builder()
-            .driverClassName(driverClass)
-            .url(url)
-            .user(username)
-            .password(password)
-            .build());
+    return builder()
+        .connectionProvider(
+            DriverJdbcConnectionProvider.builder()
+                .driverClassName(driverClass)
+                .url(url)
+                .user(username)
+                .password(password)
+                .build())
+        .build();
   }
 
-  @Override
-  public void onPublishInitializationEvents(InitializationEventBus eventBus) {
-    eventBus.sendEvent(
-        SerializableTypeRequired.class, new SerializableTypeRequired(JdbcTransaction.class));
-    eventBus.sendEvent(
-        SerializableTypeRequired.class, new SerializableTypeRequired(SimpleTransaction.class));
+  static SimpleTransactionManagerBuilder builder() {
+    return new SimpleTransactionManagerImpl.Builder();
   }
 
-  @Override
-  public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E, SimpleTransaction<Void>> work) throws E {
-    return withTransaction(
-        atx -> {
-          T result = processAndCommitOrRollback(work, atx);
-          atx.processHooks();
-          return result;
-        });
-  }
+  /**
+   * Runs the specified work in the context of the "current" transaction (the definition of which is
+   * up to the implementation).
+   *
+   * @param work Code which must be called while the transaction is active.
+   * @param <E> The exception type.
+   * @throws E If any exception is thrown by {@link Runnable}.
+   * @throws NoTransactionActiveException If a transaction is not currently active.
+   */
+  <E extends Exception> void requireTransaction(
+      ThrowingTransactionalWork<E, SimpleTransaction<Void>> work)
+      throws E, NoTransactionActiveException;
 
-  @Override
-  public TransactionalInvocation extractTransaction(Method method, Object[] args) {
-    return TransactionManagerSupport.extractTransactionFromInvocationOptional(
-            method, args, Void.class, ctx -> null)
-        .orElse(super.extractTransaction(method, args));
-  }
+  /**
+   * Runs the specified work in the context of the "current" transaction (the definition of which is
+   * up to the implementation).
+   *
+   * @param work Code which must be called while the transaction is active.
+   * @param <T> The type returned.
+   * @param <E> The exception type.
+   * @return The value returned by {@code work}.
+   * @throws E If any exception is thrown by {@link Runnable}.
+   * @throws NoTransactionActiveException If a transaction is not currently active.
+   * @throws UnsupportedOperationException If the transaction manager does not support thread-local
+   *     context.
+   */
+  <T, E extends Exception> T requireTransactionReturns(
+      ThrowingTransactionalSupplier<T, E, SimpleTransaction<Void>> work)
+      throws E, NoTransactionActiveException;
 
-  @Override
-  public Invocation injectTransaction(Invocation invocation, SimpleTransaction<Void> transaction) {
-    return TransactionManagerSupport.injectTransactionIntoInvocation(
-        invocation, Void.class, transaction);
-  }
+  interface SimpleTransactionManagerBuilder {
+    SimpleTransactionManagerBuilder connectionProvider(JdbcConnectionProvider connectionProvider);
 
-  private <T, E extends Exception> T processAndCommitOrRollback(
-      ThrowingTransactionalSupplier<T, E, SimpleTransaction<Void>> work,
-      SimpleTransaction<Void> transaction)
-      throws E {
-    try {
-      log.debug("Processing work");
-      T result = work.doWork(transaction);
-      transaction.flushBatches();
-      log.debug("Committing transaction");
-      transaction.commit();
-      return result;
-    } catch (Exception e) {
-      try {
-        log.warn(
-            "Exception in transactional block ({}{}). Rolling back. See later messages for detail",
-            e.getClass().getSimpleName(),
-            e.getMessage() == null ? "" : (" - " + e.getMessage()));
-        transaction.rollback();
-      } catch (Exception ex) {
-        log.warn("Failed to roll back", ex);
-      }
-      throw e;
-    }
-  }
-
-  private <T, E extends Exception> T withTransaction(
-      ThrowingTransactionalSupplier<T, E, SimpleTransaction<Void>> work) throws E {
-    try (var connection = connectionProvider.obtainConnection();
-        var transaction = pushTransaction(new SimpleTransaction<>(connection, null))) {
-      log.debug("Got connection {}", connection);
-      boolean autoCommit = transaction.connection().getAutoCommit();
-      if (autoCommit) {
-        log.debug("Setting auto-commit false");
-        uncheck(() -> transaction.connection().setAutoCommit(false));
-      }
-      try {
-        return work.doWork(transaction);
-      } finally {
-        connection.setAutoCommit(autoCommit);
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    } finally {
-      popTransaction();
-    }
+    SimpleTransactionManager build();
   }
 }

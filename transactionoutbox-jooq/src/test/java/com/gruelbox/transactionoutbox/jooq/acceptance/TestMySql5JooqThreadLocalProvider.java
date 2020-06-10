@@ -4,7 +4,7 @@ import com.gruelbox.transactionoutbox.JooqTransactionListener;
 import com.gruelbox.transactionoutbox.JooqTransactionManager;
 import com.gruelbox.transactionoutbox.ThreadLocalJooqTransactionManager;
 import com.gruelbox.transactionoutbox.acceptance.JdbcConnectionDetails;
-import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.Dialects;
 import java.time.Duration;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
@@ -27,7 +27,7 @@ public class TestMySql5JooqThreadLocalProvider extends AbstractJooqThreadLocalPr
   @Override
   protected JdbcConnectionDetails connectionDetails() {
     return JdbcConnectionDetails.builder()
-        .dialect(Dialect.MY_SQL_5)
+        .dialect(Dialects.MY_SQL_5)
         .driverClassName("com.mysql.cj.jdbc.Driver")
         .url(container.getJdbcUrl())
         .user(container.getUsername())

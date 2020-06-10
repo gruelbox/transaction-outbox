@@ -15,9 +15,9 @@ import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
-import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
-import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
+import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
+import com.gruelbox.transactionoutbox.jdbc.StubSimpleTransactionManager;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -42,7 +42,7 @@ class TestGuiceBinding {
   @Inject @Remote private MyService remote;
 
   /** We need this to schedule the work */
-  @Inject private JdbcTransactionManager<SimpleTransaction<Void>> transactionManager;
+  @Inject private SimpleTransactionManager transactionManager;
 
   @Test
   void testProviderInjection() {
@@ -87,15 +87,14 @@ class TestGuiceBinding {
 
     @Provides
     @Singleton
-    JdbcTransactionManager<SimpleTransaction<Void>> manager() {
-      return new StubThreadLocalJdbcTransactionManager<>(
+    SimpleTransactionManager manager() {
+      return new StubSimpleTransactionManager(
           () -> new SimpleTransaction<>(Mockito.mock(Connection.class), null));
     }
 
     @Provides
     @Singleton
-    TransactionOutbox outbox(
-        Injector injector, JdbcTransactionManager<SimpleTransaction<Void>> transactionManager) {
+    TransactionOutbox outbox(Injector injector, SimpleTransactionManager transactionManager) {
       return TransactionOutbox.builder()
           .instantiator(GuiceInstantiator.builder().injector(injector).build())
           .persistor(StubPersistor.builder().build())

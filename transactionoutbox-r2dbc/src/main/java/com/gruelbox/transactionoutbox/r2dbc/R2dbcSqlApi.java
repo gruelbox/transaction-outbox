@@ -10,6 +10,7 @@ import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.R2dbcDataIntegrityViolationException;
 import io.r2dbc.spi.R2dbcNonTransientResourceException;
 import io.r2dbc.spi.R2dbcTimeoutException;
+import io.r2dbc.spi.R2dbcTransientResourceException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -38,7 +39,7 @@ class R2dbcSqlApi implements SqlApi<Connection, R2dbcTransaction> {
   public Throwable mapUpdateException(TransactionOutboxEntry entry, Throwable t) {
     try {
       throw underlying(t);
-    } catch (R2dbcTimeoutException | TimeoutException | R2dbcNonTransientResourceException e) {
+    } catch (R2dbcTimeoutException | TimeoutException | R2dbcTransientResourceException e) {
       return new PessimisticLockException(t);
     } catch (Throwable e) {
       if (e.getMessage().contains("timeout")) {
@@ -52,7 +53,7 @@ class R2dbcSqlApi implements SqlApi<Connection, R2dbcTransaction> {
   public Throwable mapLockException(TransactionOutboxEntry entry, Throwable t) {
     try {
       throw underlying(t);
-    } catch (R2dbcTimeoutException | TimeoutException | R2dbcNonTransientResourceException e) {
+    } catch (R2dbcTimeoutException | TimeoutException | R2dbcTransientResourceException e) {
       return new PessimisticLockException(t);
     } catch (Throwable e) {
       if (e.getMessage().contains("timeout")) {

@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox.jdbc;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.Dialects;
 import java.sql.Connection;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +21,7 @@ class TestJdbcPersistorMySql5 extends AbstractPersistorTest<Connection, SimpleTr
   private static final JdbcDatabaseContainer container =
       new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1));
 
-  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialect.MY_SQL_5).build();
+  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialects.MY_SQL_5).build();
   private SimpleTransactionManager txManager =
       SimpleTransactionManager.fromConnectionDetails(
           "com.mysql.cj.jdbc.Driver",
@@ -30,7 +31,7 @@ class TestJdbcPersistorMySql5 extends AbstractPersistorTest<Connection, SimpleTr
 
   @Override
   protected Dialect dialect() {
-    return Dialect.MY_SQL_5;
+    return Dialects.MY_SQL_5;
   }
 
   @SuppressWarnings("unchecked")

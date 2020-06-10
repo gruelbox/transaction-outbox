@@ -10,6 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * A stub transaction manager that assumes no underlying database, and a transaction context of the
  * specified type.
+ *
+ * @deprecated Use {@link
+ *     com.gruelbox.transactionoutbox.jdbc.StubParameterContextJdbcTransactionManager} for
+ *     equivalent functionality.
  */
 @Slf4j
 @Deprecated

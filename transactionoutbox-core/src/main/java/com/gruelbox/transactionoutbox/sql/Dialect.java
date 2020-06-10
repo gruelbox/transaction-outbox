@@ -16,14 +16,6 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public abstract class Dialect {
 
-  public static final Dialect MY_SQL_5 = new MySqlDialect(false);
-  public static final Dialect MY_SQL_8 = new MySqlDialect(true);
-  public static final Dialect H2 = new H2Dialect();
-  public static final Dialect POSTGRESQL_9 = new PostgreSqlDialect(true);
-
-  @Deprecated
-  public static final Dialect POSTGRESQL__TEST_NO_SKIP_LOCK = new PostgreSqlDialect(false);
-
   /**
    * The database migrations required to bring any database with no transaction outbox schema
    * elements up to the latest version on this database dialect.

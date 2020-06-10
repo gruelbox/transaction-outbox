@@ -14,10 +14,14 @@ import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * A stub transaction manager that assumes no underlying database, and a transaction context of the
- * specified type.
+ * Base class for stub transaction managers that assume no underlying database, and a transaction
+ * context of the specified type.
+ *
+ * @param <CX> The class that represents the context. Must support equals/hashCode.
+ * @param <TX> The transaction type.
  */
 @Slf4j
+@Beta
 public class StubParameterContextJdbcTransactionManager<CX, TX extends JdbcTransaction>
     implements JdbcTransactionManager<TX> {
 

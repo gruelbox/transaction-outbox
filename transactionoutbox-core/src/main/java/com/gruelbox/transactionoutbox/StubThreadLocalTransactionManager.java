@@ -2,12 +2,15 @@ package com.gruelbox.transactionoutbox;
 
 import com.gruelbox.transactionoutbox.jdbc.AbstractThreadLocalJdbcTransactionManager;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
+import com.gruelbox.transactionoutbox.jdbc.StubSimpleTransactionManager;
 import java.sql.Connection;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * A stub transaction manager that assumes no underlying database and thread local transaction
  * management.
+ *
+ * @deprecated Use {@link StubSimpleTransactionManager} for equivalent functionality.
  */
 @Slf4j
 @Deprecated

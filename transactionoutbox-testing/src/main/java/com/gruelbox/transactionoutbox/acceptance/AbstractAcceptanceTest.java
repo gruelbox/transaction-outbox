@@ -1,5 +1,7 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
+import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.concurrent.CompletableFuture.delayedExecutor;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
@@ -34,8 +36,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
@@ -46,9 +51,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.event.Level;
-import reactor.core.Disposable;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Generalised, non-blocking acceptance tests which all combinations of transaction manager,
@@ -509,30 +511,39 @@ public abstract class AbstractAcceptanceTest<
   protected void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
       throws Exception {
     String caller = Utils.traceCaller().map(StackFrame::getMethodName).orElse("<Unknown>");
-    CountDownLatch finished = new CountDownLatch(1);
-    Disposable background =
-        Flux.interval(Duration.ofMillis(250))
-            .flatMap(__ -> Mono.fromFuture(outbox::flushAsync))
-            .onErrorResume(
-                e -> {
-                  log.error("Error in poller for {}", caller, e);
-                  return Mono.empty();
-                })
-            .doFinally(
-                s -> {
-                  log.info("Background work complete");
-                  finished.countDown();
-                })
-            .subscribe();
+    AtomicBoolean shutdown = new AtomicBoolean();
+    CompletableFuture<Boolean> background = flushRecursive(outbox, caller, shutdown);
     try {
       runnable.run();
       log.info("Test complete");
     } finally {
-      background.dispose();
       log.info("Ordered shutdown of background work");
-      finished.await(30, TimeUnit.SECONDS);
+      shutdown.set(true);
+      background.join();
       log.info("Shutdown complete");
     }
+  }
+
+  CompletableFuture<Boolean> flushRecursive(TransactionOutbox outbox, String caller,
+      AtomicBoolean shutdown) {
+    return outbox.flushAsync()
+        .exceptionally(
+            e -> {
+              log.error("Error in poller for {}", caller, e);
+              return false;
+            })
+        .thenCompose(didWork -> {
+          if (shutdown.get()) {
+            return completedFuture(false);
+          } else if (didWork) {
+            return completedFuture(true)
+                .thenComposeAsync(__ -> flushRecursive(outbox, caller, shutdown));
+          } else {
+            return completedFuture(false)
+                .thenComposeAsync(__ -> flushRecursive(outbox, caller, shutdown),
+                    delayedExecutor(250, TimeUnit.MILLISECONDS));
+          }
+        });
   }
 
   protected void assertFired(CountDownLatch latch) {

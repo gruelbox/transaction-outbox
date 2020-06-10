@@ -8,7 +8,8 @@ import com.gruelbox.transactionoutbox.StubPersistor;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransaction;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
-import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
+import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
+import com.gruelbox.transactionoutbox.jdbc.StubSimpleTransactionManager;
 import java.sql.Connection;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -23,8 +24,8 @@ class TestMDC {
   @Test
   final void testMDCPassedToTask() throws InterruptedException {
 
-    StubThreadLocalJdbcTransactionManager<SimpleTransaction<Void>> transactionManager =
-        new StubThreadLocalJdbcTransactionManager<>(
+    SimpleTransactionManager transactionManager =
+        new StubSimpleTransactionManager(
             () -> new SimpleTransaction<>(Mockito.mock(Connection.class), null));
 
     CountDownLatch latch = new CountDownLatch(1);

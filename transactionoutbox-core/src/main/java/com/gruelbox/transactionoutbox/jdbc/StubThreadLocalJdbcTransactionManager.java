@@ -4,6 +4,8 @@ import com.gruelbox.transactionoutbox.Beta;
 import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
 import java.util.function.Supplier;
 
+/** @param <TX> */
+@Beta
 public class StubThreadLocalJdbcTransactionManager<TX extends JdbcTransaction>
     extends AbstractThreadLocalJdbcTransactionManager<TX> {
 

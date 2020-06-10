@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox.jdbc;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.Dialects;
 import java.sql.Connection;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +23,7 @@ class TestJdbcPersistorPostgres10
       (JdbcDatabaseContainer)
           new PostgreSQLContainer("postgres:10").withStartupTimeout(Duration.ofHours(1));
 
-  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialect.POSTGRESQL_9).build();
+  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialects.POSTGRESQL_9).build();
   private SimpleTransactionManager txManager =
       SimpleTransactionManager.fromConnectionDetails(
           "org.postgresql.Driver",
@@ -32,7 +33,7 @@ class TestJdbcPersistorPostgres10
 
   @Override
   protected Dialect dialect() {
-    return Dialect.POSTGRESQL_9;
+    return Dialects.POSTGRESQL_9;
   }
 
   @SuppressWarnings("unchecked")

@@ -8,7 +8,7 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
-import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.Dialects;
 import java.sql.Connection;
 import java.time.Duration;
 import java.util.Currency;
@@ -58,7 +58,7 @@ class TestComplexConfigurationExample {
                 JdbcPersistor.builder()
                     // Selecting the right SQL dialect ensures that features such as SKIP LOCKED are
                     // used correctly.
-                    .dialect(Dialect.POSTGRESQL_9)
+                    .dialect(Dialects.POSTGRESQL_9)
                     // Override the table name (defaults to "TXNO_OUTBOX")
                     .tableName("transactionOutbox")
                     // Shorten the time we will wait for write locks (defaults to 2)

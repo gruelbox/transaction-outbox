@@ -4,7 +4,7 @@ import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.SpringInstantiator;
 import com.gruelbox.transactionoutbox.SpringTransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
-import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.Dialects;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -24,7 +24,7 @@ public class TransactionOutboxSpringDemoApplication {
     return TransactionOutbox.builder()
         .instantiator(instantiator)
         .transactionManager(transactionManager)
-        .persistor(Persistor.forDialect(Dialect.H2))
+        .persistor(Persistor.forDialect(Dialects.H2))
         .build();
   }
 }

@@ -21,7 +21,7 @@ public interface JdbcTransaction extends BaseTransaction<Connection> {
 
   /**
    * Blocking implementation of {@link #addPostCommitHook(Supplier)}, allowing idiomatic use in
-   * blocking client code.
+   * blocking client code in preference to {@link #addPostCommitHook(Supplier).}
    *
    * @param hook The code to run post-commit.
    */

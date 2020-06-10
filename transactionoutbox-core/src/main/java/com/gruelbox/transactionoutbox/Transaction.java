@@ -7,7 +7,8 @@ import java.util.function.Supplier;
 /**
  * Represents a transaction in JDBC-land.
  *
- * @deprecated Use {@link com.gruelbox.transactionoutbox.jdbc.JdbcTransaction}.
+ * @deprecated Use {@link com.gruelbox.transactionoutbox.jdbc.JdbcTransaction} for equivalent
+ *     functionality.
  */
 @Deprecated
 public interface Transaction extends JdbcTransaction {

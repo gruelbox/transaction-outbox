@@ -2,7 +2,7 @@ package com.gruelbox.transactionoutbox.sql;
 
 import java.util.stream.Stream;
 
-class H2Dialect extends Dialect {
+final class H2Dialect extends Dialect {
 
   @Override
   public Stream<SqlMigration> migrations(String tableName) {

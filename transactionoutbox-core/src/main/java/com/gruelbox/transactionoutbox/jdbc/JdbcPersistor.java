@@ -1,8 +1,8 @@
 package com.gruelbox.transactionoutbox.jdbc;
 
 import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.PersistorWrapper;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.PersistorWrapper;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import com.gruelbox.transactionoutbox.sql.SqlPersistor;
 import java.sql.Connection;

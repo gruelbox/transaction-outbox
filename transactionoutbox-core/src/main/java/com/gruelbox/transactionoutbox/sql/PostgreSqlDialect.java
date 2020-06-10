@@ -2,7 +2,7 @@ package com.gruelbox.transactionoutbox.sql;
 
 import java.util.stream.Stream;
 
-class PostgreSqlDialect extends Dialect {
+final class PostgreSqlDialect extends Dialect {
 
   private final boolean supportsSkipLock;
 

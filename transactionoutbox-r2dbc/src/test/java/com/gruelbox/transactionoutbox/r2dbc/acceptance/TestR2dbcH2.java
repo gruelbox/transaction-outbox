@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.r2dbc.acceptance;
 
 import com.gruelbox.transactionoutbox.sql.Dialect;
+import com.gruelbox.transactionoutbox.sql.Dialects;
 import io.r2dbc.h2.H2ConnectionConfiguration;
 import io.r2dbc.h2.H2ConnectionFactory;
 import io.r2dbc.spi.ConnectionFactory;
@@ -9,7 +10,7 @@ class TestR2dbcH2 extends AbstractR2dbcAcceptanceTest {
 
   @Override
   protected Dialect dialect() {
-    return Dialect.H2;
+    return Dialects.H2;
   }
 
   @Override
