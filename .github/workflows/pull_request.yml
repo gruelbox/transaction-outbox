@@ -20,12 +20,18 @@ jobs:
 
       - name: Build with Maven
         run: mvn -B package
+        
+      - name: Create a temporary tag branch
+        run: |
+          git config --global user.name 'GitHub'
+          git config --global user.email 'noreply@github.com'
+          git checkout -b temp-${GITHUB_REF:10}
+          git push --set-upstream origin temp-${GITHUB_REF:10}
 
-      - name: Updating README and creating pull request branch
+      - name: Update READMEs
         run: |
           set -e
           revision=${GITHUB_REF##*/}
-          git checkout -b "${revision}-update-version"
           echo "Updating READMEs"
           sed -i "s_\(<version>\)[^<]*_\1${revision}_g" README.md
           sed -i "s_\(<version>\)[^<]*_\1${revision}_g" transactionoutbox-guice/README.md
@@ -43,3 +49,7 @@ jobs:
           title: Update versions in READMEs
           body: Updates the versions in the README files following the release
           branch: update-readme-versions
+          base: master
+          
+      - name: Delete tag branch
+        run: git push --delete origin temp-${GITHUB_REF:10}
