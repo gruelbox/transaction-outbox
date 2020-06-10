@@ -25,6 +25,7 @@ public final class TransactionManagerSupport {
    * transaction/context at the time of invocation ({@link
    * #injectTransactionIntoInvocation(Invocation, Class, BaseTransaction)} can assist with this).
    *
+   * @param <CX> The type expected for the transaction context.
    * @param method The method called.
    * @param args The method arguments.
    * @param contextType The type expected for the transaction context.
@@ -54,6 +55,7 @@ public final class TransactionManagerSupport {
    * before saving. They will be "rehydrated" later upon actual invocation using the
    * transaction/context at the time of invocation.
    *
+   * @param <CX> The type expected for the transaction context.
    * @param method The method called.
    * @param oldArgs The method arguments.
    * @param contextType The type expected for the transaction context.

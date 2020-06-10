@@ -30,7 +30,8 @@ public final class TransactionOutboxEntry {
 
   /**
    * @param uniqueRequestId A unique, client-supplied key for the entry. If supplied, it must be
-   *     globally unique
+   *     globally unique.
+   * @return A unique, client-supplied key for the entry. If supplied, it must be globally unique.
    */
   @SuppressWarnings("JavaDoc")
   @Getter

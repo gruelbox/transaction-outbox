@@ -40,6 +40,7 @@ public interface Persistor<CN, TX extends BaseTransaction<?>> {
    *
    * @param tx The current {@link BaseTransaction}.
    * @param entry The entry to save. All properties on the object should be saved recursively.
+   * @return Void result.
    */
   CompletableFuture<Void> save(TX tx, TransactionOutboxEntry entry);
 
@@ -52,6 +53,7 @@ public interface Persistor<CN, TX extends BaseTransaction<?>> {
    *
    * @param tx The current {@link BaseTransaction}.
    * @param entry The entry to be deleted.
+   * @return Void result.
    */
   CompletableFuture<Void> delete(TX tx, TransactionOutboxEntry entry);
 
@@ -63,6 +65,7 @@ public interface Persistor<CN, TX extends BaseTransaction<?>> {
    *
    * @param tx The current {@link BaseTransaction}.
    * @param entry The entry to be updated.
+   * @return Void result.
    */
   CompletableFuture<Void> update(TX tx, TransactionOutboxEntry entry);
 

@@ -433,6 +433,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
      *     write lock. There's no point making this long; it's always better to just back off as
      *     quickly as possible and try another record. Generally these lock timeouts only kick in if
      *     {@link Dialect#isSupportsSkipLock()} is false.
+     * @return this
      */
     @SuppressWarnings("unchecked")
     public T writeLockTimeoutSeconds(Integer writeLockTimeoutSeconds) {
@@ -440,14 +441,20 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
       return (T) this;
     }
 
-    /** @param dialect The database dialect to use. Required. */
+    /**
+     * @param dialect The database dialect to use. Required.
+     * @return this
+     */
     @SuppressWarnings("unchecked")
     public T dialect(Dialect dialect) {
       this.dialect = dialect;
       return (T) this;
     }
 
-    /** @param tableName The database table name. The default is {@code TXNO_OUTBOX}. */
+    /**
+     * @param tableName The database table name. The default is {@code TXNO_OUTBOX}.
+     * @return this
+     */
     @SuppressWarnings("unchecked")
     public T tableName(String tableName) {
       this.tableName = tableName;
@@ -459,6 +466,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
      *     if the default migration behaviour interferes with your existing toolset, and you prefer
      *     to manage the migrations explicitly (e.g. using FlyWay or Liquibase), or your do not give
      *     the application DDL permissions at runtime.
+     * @return this
      */
     @SuppressWarnings("unchecked")
     public T migrate(Boolean migrate) {
@@ -469,7 +477,8 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     /**
      * @param serializer The serializer to use for {@link Invocation}s. See {@link
      *     InvocationSerializer} for more information. Defaults to {@link
-     *     InvocationSerializer#createDefaultJsonSerializer()} with no whitelisted classes..
+     *     InvocationSerializer#createDefaultJsonSerializer()} with no whitelisted classes.
+     * @return this
      */
     @SuppressWarnings("unchecked")
     public T serializer(InvocationSerializer serializer) {

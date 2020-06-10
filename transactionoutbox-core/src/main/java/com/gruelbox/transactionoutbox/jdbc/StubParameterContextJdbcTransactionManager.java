@@ -33,6 +33,7 @@ public class StubParameterContextJdbcTransactionManager<CX, TX extends JdbcTrans
   /**
    * @param contextClass The class that represents the context. Must support equals/hashCode.
    * @param contextFactory Generates context instances when transactions are started.
+   * @param transactionFactory Creates a transaction from a context.
    */
   @Beta
   public StubParameterContextJdbcTransactionManager(

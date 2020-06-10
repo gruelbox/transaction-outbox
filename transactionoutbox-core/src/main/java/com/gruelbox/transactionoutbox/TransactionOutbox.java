@@ -167,6 +167,7 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
    * and should not generally otherwise be called.
    *
    * @param entry The entry.
+   * @return Void result.
    */
   @Beta
   CompletableFuture<Void> processNow(TransactionOutboxEntry entry);
