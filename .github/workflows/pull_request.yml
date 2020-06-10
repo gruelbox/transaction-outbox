@@ -21,7 +21,7 @@ jobs:
       - name: Build with Maven
         run: mvn -B package
 
-      - name: Updating READMEs and creating pull request branch
+      - name: Updating README and creating pull request branch
         run: |
           set -e
           revision=${GITHUB_REF##*/}
