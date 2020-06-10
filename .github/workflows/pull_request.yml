@@ -21,7 +21,7 @@ jobs:
       - name: Build with Maven
         run: mvn -B package
         
-      - name: Create a temporary tag branch
+      - name: Create temporary tag branch
         run: |
           git config --global user.name 'GitHub'
           git config --global user.email 'noreply@github.com'
