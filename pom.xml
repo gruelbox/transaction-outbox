@@ -37,7 +37,7 @@
     <logback.version>1.2.3</logback.version>
     <revision>2.1.99999-SNAPSHOT</revision>
     <junit.jupiter.version>5.7.0-M1</junit.jupiter.version>
-    <testcontainers.version>1.14.2</testcontainers.version>
+    <testcontainers.version>1.14.3</testcontainers.version>
     <cglib.version>3.3.0</cglib.version>
     <objenesis.version>3.1</objenesis.version>
   </properties>
@@ -177,7 +177,7 @@
       <dependency>
         <groupId>org.postgresql</groupId>
         <artifactId>postgresql</artifactId>
-        <version>42.2.12</version>
+        <version>42.2.13</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -213,7 +213,7 @@
       <plugin>
         <groupId>com.coveo</groupId>
         <artifactId>fmt-maven-plugin</artifactId>
-        <version>2.9</version>
+        <version>2.10</version>
         <configuration>
           <filesNamePattern>.*\.java</filesNamePattern>
           <skip>${skip.format}</skip>

@@ -5,10 +5,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
+import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.internal.SessionImpl;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,8 +22,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class SpringTransactionManager implements ThreadLocalContextTransactionManager {
 
   private final SpringTransaction transactionInstance = new SpringTransaction();
+  private final DataSource dataSource;
 
-  @PersistenceContext private EntityManager entityManager;
+  @Autowired
+  SpringTransactionManager(DataSource dataSource) {
+    this.dataSource = dataSource;
+  }
 
   @Override
   @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -35,6 +39,11 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
   @Override
   public <T, E extends Exception> T requireTransactionReturns(
       ThrowingTransactionalSupplier<T, E> work) throws E, NoTransactionActiveException {
+
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      throw new NoTransactionActiveException();
+    }
+
     return work.doWork(transactionInstance);
   }
 
@@ -42,12 +51,7 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
 
     @Override
     public Connection connection() {
-      try {
-        SessionImpl delegate = (SessionImpl) entityManager.getDelegate();
-        return delegate.connection();
-      } catch (RuntimeException e) {
-        throw new NoTransactionActiveException(e);
-      }
+      return DataSourceUtils.getConnection(dataSource);
     }
 
     @Override
