@@ -16,8 +16,7 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-          server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
-          settings-path: ${{ github.workspace }} # location for the settings.xml file
+          settings-path: ~ # location for the settings.xml file
 
       - name: Set up testcontainers reuse
         run: |
