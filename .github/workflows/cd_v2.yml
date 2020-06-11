@@ -23,7 +23,7 @@ jobs:
         run: |
           echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
 
-      - name: Build, publish snapshot to OSSRH
+      - name: Build and publish snapshot to OSSRH
         run: |
           if [ "$GITHUB_REPOSITORY" == "gruelbox/transaction-outbox" ]; then
             revision="2.1.$GITHUB_RUN_NUMBER-SNAPSHOT"
