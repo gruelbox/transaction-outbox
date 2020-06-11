@@ -23,17 +23,20 @@ jobs:
         run: |
           echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
 
-      - name: Build, publish to GPR and tag
+      - name: Build, publish snapshot to OSSRH
         run: |
           if [ "$GITHUB_REPOSITORY" == "gruelbox/transaction-outbox" ]; then
             revision="2.1.$GITHUB_RUN_NUMBER-SNAPSHOT"
-            echo "Building $revision at $GITHUB_SHA"
-            mvn -Pdelombok -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision="$revision"
-            echo "Tagging $revision"
-            git tag $revision
-            git push origin $revision
+            echo ${{ secrets.GPG_SECRETKEYS }} | base64 --decode | $GPG_EXECUTABLE --import --no-tty --batch --yes
+            echo ${{ secrets.GPG_OWNERTRUST }} | base64 --decode | $GPG_EXECUTABLE --import-ownertrust --no-tty --batch --yes
+            mvn -Prelease,delombok -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision=$revision
           else
             mvn -Pdelombok -B package
           fi
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          GPG_EXECUTABLE: gpg
+          GPG_KEYNAME: ${{ secrets.GPG_KEYNAME }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
