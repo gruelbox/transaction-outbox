@@ -39,7 +39,7 @@ jobs:
           sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-jooq:\)[^']*_\1${revision}_g" transactionoutbox-jooq/README.md
           sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-spring:\)[^']*_\1${revision}_g" transactionoutbox-spring/README.md
 
-      - name: Create Pull Request
+      - name: Create version update pull request
         uses: gruelbox/create-pull-request@v2
         with:
           commit-message: "Update versions in READMEs [skip ci]"
