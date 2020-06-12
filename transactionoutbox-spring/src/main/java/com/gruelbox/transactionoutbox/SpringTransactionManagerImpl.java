@@ -3,21 +3,23 @@ package com.gruelbox.transactionoutbox;
 import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
 import java.lang.reflect.Method;
-import javax.persistence.EntityManager;
+import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Beta
 @Slf4j
 @Service
-public class SpringTransactionManagerImpl implements SpringTransactionManager {
+class SpringTransactionManagerImpl implements SpringTransactionManager {
 
   private final SpringTransaction transaction;
   private final SpringTransactionEntryPoints entryPoints;
 
-  public SpringTransactionManagerImpl(
-      EntityManager entityManager, SpringTransactionEntryPoints entryPoints) {
-    this.transaction = new SpringTransaction(entityManager);
+  @Autowired
+  SpringTransactionManagerImpl(DataSource dataSource, SpringTransactionEntryPoints entryPoints) {
+    this.transaction = new SpringTransactionImpl(dataSource);
     this.entryPoints = entryPoints;
   }
 
@@ -25,7 +27,10 @@ public class SpringTransactionManagerImpl implements SpringTransactionManager {
   public <T, E extends Exception> T requireTransactionReturns(
       ThrowingTransactionalSupplier<T, E, SpringTransaction> work)
       throws E, NoTransactionActiveException {
-    return entryPoints.requireTransactionReturns(work, transaction);
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      throw new NoTransactionActiveException();
+    }
+    return work.doWork(transaction);
   }
 
   @Override

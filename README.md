@@ -124,7 +124,7 @@ In-built support for:
 
 - Data APIs: **JDBC** (blocking - fully suppported) and **R2DBC** (non-blocking - currently in beta)
 - SQL dialects: **MySQL 5 & 8**, **PostgreSQL 9-12** and **H2**
-- Transaction management: **Spring Txn**, **Hibernate** and **jOOQ**
+- Transaction management: **Spring Txn** and **jOOQ**
 - Dependency injection: **Spring DI** and **Guice**.
 
 Other integrations are easy to create. Please ask if you need help.
@@ -146,14 +146,14 @@ The latest stable release is available from Maven Central. Stable releases are [
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
-  <version>1.3.109</version>
+  <version>1.3.127</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-core:1.3.109'
+implementation 'com.gruelbox:transactionoutbox-core:1.3.127'
 ```
 
 ### Development snapshots
