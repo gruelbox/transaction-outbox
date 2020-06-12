@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.spring.acceptance;
 
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;

@@ -26,7 +26,12 @@ public class InsertingInstantiator implements Instantiator {
         Class.forName(name),
         (method, args) -> {
           Utils.logMethodCall("Enter {}.{}({})", method.getDeclaringClass(), method, args);
-          return inserter.apply(args[2]);
+          try {
+            return inserter.apply(args[2]);
+          } catch (Exception e) {
+            log.error("Error in task", e);
+            throw e;
+          }
         });
   }
 }

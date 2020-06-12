@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.spring.acceptance;
 
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import java.time.LocalDateTime;

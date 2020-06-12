@@ -68,28 +68,35 @@ public final class TransactionManagerSupport {
       Object[] oldArgs,
       Class<CX> contextType,
       Function<CX, ? extends BaseTransaction<?>> transactionFromContext) {
-    Object[] newArgs = Arrays.copyOf(oldArgs, oldArgs.length);
-    var params = Arrays.copyOf(method.getParameterTypes(), method.getParameterCount());
+    Object[] newArgs;
+    Class<?>[] params;
     BaseTransaction<?> transaction = null;
-    for (int i = 0; i < newArgs.length; i++) {
-      Object candidate = newArgs[i];
-      if (candidate instanceof BaseTransaction) {
-        transaction = (BaseTransaction<?>) candidate;
-        newArgs[i] = null;
-      } else if (contextType.isInstance(candidate)) {
-        if (transaction == null) {
-          transaction = transactionFromContext.apply((CX) candidate);
+    if (oldArgs == null) {
+      newArgs = new Object[0];
+      params = new Class<?>[0];
+    } else {
+      newArgs = Arrays.copyOf(oldArgs, oldArgs.length);
+      params = Arrays.copyOf(method.getParameterTypes(), method.getParameterCount());
+      for (int i = 0; i < newArgs.length; i++) {
+        Object candidate = newArgs[i];
+        if (candidate instanceof BaseTransaction) {
+          transaction = (BaseTransaction<?>) candidate;
+          newArgs[i] = null;
+        } else if (contextType.isInstance(candidate)) {
           if (transaction == null) {
-            throw new IllegalArgumentException(
-                candidate.getClass().getName()
-                    + " context passed to "
-                    + method
-                    + " does not relate to a known transaction. This either indicates that the context object was not "
-                    + "created by normal means or the transaction manager is incorrectly configured.");
+            transaction = transactionFromContext.apply((CX) candidate);
+            if (transaction == null) {
+              throw new IllegalArgumentException(
+                  candidate.getClass().getName()
+                      + " context passed to "
+                      + method
+                      + " does not relate to a known transaction. This either indicates that the context object was not "
+                      + "created by normal means or the transaction manager is incorrectly configured.");
+            }
           }
+          newArgs[i] = null;
+          params[i] = TransactionContextPlaceholder.class;
         }
-        newArgs[i] = null;
-        params[i] = TransactionContextPlaceholder.class;
       }
     }
     return Optional.ofNullable(transaction)
@@ -139,12 +146,24 @@ public final class TransactionManagerSupport {
   }
 
   public static TransactionalInvocation toTransactionalInvocation(
-      Method method, Object[] args, BaseTransaction<?> transaction) {
+      Method method, Object[] oldArgs, BaseTransaction<?> transaction) {
+    Object[] newArgs;
+    if (oldArgs == null) {
+      newArgs = new Object[] {};
+    } else {
+      newArgs = Arrays.copyOf(oldArgs, oldArgs.length);
+      for (int i = 0; i < newArgs.length; i++) {
+        Object candidate = newArgs[i];
+        if (candidate instanceof BaseTransaction) {
+          newArgs[i] = null;
+        }
+      }
+    }
     return new TransactionalInvocation(
         method.getDeclaringClass(),
         method.getName(),
         method.getParameterTypes(),
-        args,
+        newArgs,
         transaction);
   }
 }

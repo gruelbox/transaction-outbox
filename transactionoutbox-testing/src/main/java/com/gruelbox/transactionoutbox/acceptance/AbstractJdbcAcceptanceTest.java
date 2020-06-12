@@ -64,6 +64,10 @@ public abstract class AbstractJdbcAcceptanceTest<
     } else {
       connection = (Connection) txOrContext;
     }
+    if (connection == null) {
+      throw new IllegalStateException(
+          "No connection found in transaction or context: " + txOrContext);
+    }
     try (Statement stmt = connection.createStatement()) {
       stmt.execute(sql);
     } catch (SQLException e) {

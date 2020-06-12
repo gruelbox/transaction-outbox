@@ -1,21 +1,19 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.spring.acceptance;
 
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.SpringInstantiator;
 import com.gruelbox.transactionoutbox.SpringTransactionManager;
+import com.gruelbox.transactionoutbox.SpringTransactionOutboxConfiguration;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.sql.Dialects;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Lazy;
 
-@SpringBootApplication
-public class TransactionOutboxSpringDemoApplication {
-
-  public static void main(String[] args) {
-    SpringApplication.run(TransactionOutboxSpringDemoApplication.class, args);
-  }
+@Configuration
+@Import({SpringTransactionOutboxConfiguration.class})
+class ExternalsConfiguration {
 
   @Bean
   @Lazy

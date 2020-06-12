@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.spring.acceptance;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.isA;
@@ -19,7 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 
 @Slf4j
-class StubSpringTransactionManagerTest {
+class TestStubSpringTransactionManagerT {
 
   private SpringTransactionManager transactionManager = new StubSpringTransactionManager();
 

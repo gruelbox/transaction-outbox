@@ -57,6 +57,12 @@
 
     <!-- Test -->
     <dependency>
+      <groupId>com.gruelbox</groupId>
+      <artifactId>transactionoutbox-testing</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
     </dependency>
@@ -89,6 +95,14 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <version>${spring.boot.version}</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-all</artifactId>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>

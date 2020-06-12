@@ -1,5 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
+import com.gruelbox.transactionoutbox.spi.InitializationEventPublisher;
+import com.gruelbox.transactionoutbox.spi.SerializableTypeRequired;
 import com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
 import java.lang.reflect.Method;
@@ -8,19 +11,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Beta
 @Slf4j
 @Service
-class SpringTransactionManagerImpl implements SpringTransactionManager {
+class SpringTransactionManagerImpl
+    implements SpringTransactionManager, InitializationEventPublisher {
 
   private final SpringTransaction transaction;
-  private final SpringTransactionEntryPoints entryPoints;
+  private final TransactionTemplate transactionTemplate;
 
   @Autowired
-  SpringTransactionManagerImpl(DataSource dataSource, SpringTransactionEntryPoints entryPoints) {
+  SpringTransactionManagerImpl(DataSource dataSource, TransactionTemplate transactionTemplate) {
     this.transaction = new SpringTransactionImpl(dataSource);
-    this.entryPoints = entryPoints;
+    this.transactionTemplate = transactionTemplate;
   }
 
   @Override
@@ -36,7 +41,18 @@ class SpringTransactionManagerImpl implements SpringTransactionManager {
   @Override
   public <T, E extends Exception> T inTransactionReturnsThrows(
       ThrowingTransactionalSupplier<T, E, SpringTransaction> work) throws E {
-    return entryPoints.inTransactionReturnsThrows(work, transaction);
+    try {
+      return transactionTemplate.execute(
+          ts -> {
+            try {
+              return work.doWork(transaction);
+            } catch (Exception e) {
+              throw new UncheckedException(e);
+            }
+          });
+    } catch (UncheckedException e) {
+      throw Utils.sneakyThrow(e.getCause());
+    }
   }
 
   @Override
@@ -46,6 +62,13 @@ class SpringTransactionManagerImpl implements SpringTransactionManager {
 
   @Override
   public Invocation injectTransaction(Invocation invocation, SpringTransaction transaction) {
-    return invocation;
+    return TransactionManagerSupport.injectTransactionIntoInvocation(
+        invocation, Void.class, transaction);
+  }
+
+  @Override
+  public void onPublishInitializationEvents(InitializationEventBus eventBus) {
+    eventBus.sendEvent(
+        SerializableTypeRequired.class, new SerializableTypeRequired(SpringTransaction.class));
   }
 }
