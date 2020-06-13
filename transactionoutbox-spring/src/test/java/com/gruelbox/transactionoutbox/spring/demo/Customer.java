@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.spring.acceptance;
+package com.gruelbox.transactionoutbox.spring.demo;
 
 import javax.persistence.Entity;
 import javax.persistence.Id;

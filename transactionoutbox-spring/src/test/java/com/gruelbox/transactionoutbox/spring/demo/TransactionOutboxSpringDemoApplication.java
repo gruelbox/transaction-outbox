@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.spring.acceptance;
+package com.gruelbox.transactionoutbox.spring.demo;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
