@@ -269,7 +269,13 @@ public class TransactionOutbox {
                           uniqueRequestId);
                   validator.validate(entry);
                   persistor.save(extracted.getTransaction(), entry);
-                  extracted.getTransaction().addPostCommitHook(() -> submitNow(entry));
+                  extracted
+                      .getTransaction()
+                      .addPostCommitHook(
+                          () -> {
+                            listener.scheduled(entry);
+                            submitNow(entry);
+                          });
                   log.debug(
                       "Scheduled {} for running after transaction commit", entry.description());
                   return null;
