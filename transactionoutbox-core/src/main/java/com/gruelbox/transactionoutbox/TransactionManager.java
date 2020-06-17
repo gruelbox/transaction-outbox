@@ -1,18 +1,21 @@
 package com.gruelbox.transactionoutbox;
 
+import static com.gruelbox.transactionoutbox.Utils.toBlockingFuture;
 import static com.gruelbox.transactionoutbox.Utils.uncheck;
 import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
-import java.lang.reflect.Method;
+import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
+import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import javax.sql.DataSource;
 
 /**
- * Key interface giving {@link TransactionOutbox} access to JDBC.
- *
- * <p>In practice, most implementations should extend {@link ThreadLocalContextTransactionManager}
- * or {@link ParameterContextTransactionManager}.
+ * @deprecated Use {@link com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager} for equivalent
+ *     functionality.
  */
-public interface TransactionManager {
+@Deprecated
+public interface TransactionManager extends JdbcTransactionManager<Transaction> {
 
   /**
    * Creates a simple transaction manager which uses the specified {@link DataSource} to source
@@ -26,9 +29,7 @@ public interface TransactionManager {
    * @return The transaction manager.
    */
   static ThreadLocalContextTransactionManager fromDataSource(DataSource dataSource) {
-    return SimpleTransactionManager.builder()
-        .connectionProvider(DataSourceConnectionProvider.builder().dataSource(dataSource).build())
-        .build();
+    return new JdbcShimTransactionManager(SimpleTransactionManager.fromDataSource(dataSource));
   }
 
   /**
@@ -47,15 +48,8 @@ public interface TransactionManager {
    */
   static ThreadLocalContextTransactionManager fromConnectionDetails(
       String driverClass, String url, String username, String password) {
-    return SimpleTransactionManager.builder()
-        .connectionProvider(
-            DriverConnectionProvider.builder()
-                .driverClassName(driverClass)
-                .url(url)
-                .user(username)
-                .password(password)
-                .build())
-        .build();
+    return new JdbcShimTransactionManager(
+        SimpleTransactionManager.fromConnectionDetails(driverClass, url, username, password));
   }
 
   /**
@@ -123,25 +117,16 @@ public interface TransactionManager {
   <T, E extends Exception> T inTransactionReturnsThrows(ThrowingTransactionalSupplier<T, E> work)
       throws E;
 
-  /**
-   * All transaction managers need to be able to take a method call at the time it is scheduled and
-   * determine the {@link Transaction} to use to pass to {@link Persistor} and save the request.
-   * They can do this either by examining some current application state or by parsing the method
-   * and arguments.
-   *
-   * @param method The method called.
-   * @param args The method arguments.
-   * @return The extracted transaction and any modifications to the method and arguments.
-   */
-  TransactionalInvocation extractTransaction(Method method, Object[] args);
+  @Override
+  default <T, E extends Exception> T inTransactionReturnsThrows(
+      com.gruelbox.transactionoutbox.spi.ThrowingTransactionalSupplier<T, E, Transaction> work)
+      throws E {
+    return inTransactionReturnsThrows(work::doWork);
+  }
 
-  /**
-   * Makes any modifications to an invocation at runtime necessary to inject the current transaction
-   * or transaction context.
-   *
-   * @param invocation The invocation.
-   * @param transaction The transaction that the invocation will be run in.
-   * @return The modified invocation.
-   */
-  Invocation injectTransaction(Invocation invocation, Transaction transaction);
+  @Override
+  default <T> CompletableFuture<T> transactionally(
+      Function<Transaction, CompletableFuture<T>> work) {
+    return toBlockingFuture(() -> inTransactionReturnsThrows(tx -> Utils.join(work.apply(tx))));
+  }
 }

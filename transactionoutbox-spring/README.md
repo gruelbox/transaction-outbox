@@ -72,7 +72,7 @@ public TransactionOutbox transactionOutbox(SpringTransactionManager springTransa
   return TransactionOutbox.builder()
       .instantiator(springInstantiator)
       .transactionManager(springTransactionManager)
-      .persistor(Persistor.forDialect(Dialect.H2))
+      .persistor(Persistor.forDialect(Dialects.H2))
       .build();
 
 ```
