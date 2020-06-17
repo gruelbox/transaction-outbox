@@ -4,6 +4,21 @@ package com.gruelbox.transactionoutbox;
 public interface TransactionOutboxListener {
 
   /**
+   * Fired when a transaction outbox task is scheduled.
+   *
+   * <p>This event is not guaranteed to fire in the event of a JVM failure or power loss. It is
+   * fired <em>after</em> the commit to the database adding the scheduled task but before the task
+   * is submitted for processing. It will, except in extreme circumstances (although this is not
+   * guaranteed), fire prior to any subsequent {@link #success(TransactionOutboxEntry)} or {@link
+   * #failure(TransactionOutboxEntry, Throwable)}.
+   *
+   * @param entry The outbox entry scheduled.
+   */
+  default void scheduled(TransactionOutboxEntry entry) {
+    // No-op
+  }
+
+  /**
    * Fired when a transaction outbox task is successfully completed <em>and</em> recorded as such in
    * the database such that it will not be re-attempted. Note that:
    *
@@ -56,6 +71,12 @@ public interface TransactionOutboxListener {
   default TransactionOutboxListener andThen(TransactionOutboxListener other) {
     var self = this;
     return new TransactionOutboxListener() {
+
+      @Override
+      public void scheduled(TransactionOutboxEntry entry) {
+        self.scheduled(entry);
+        other.scheduled(entry);
+      }
 
       @Override
       public void success(TransactionOutboxEntry entry) {

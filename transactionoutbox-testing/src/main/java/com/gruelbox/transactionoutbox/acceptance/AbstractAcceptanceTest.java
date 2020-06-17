@@ -137,10 +137,19 @@ public abstract class AbstractAcceptanceTest<
   final void testAsyncSimple() {
     CountDownLatch latch = new CountDownLatch(1);
     CountDownLatch chainCompleted = new CountDownLatch(1);
+    AtomicBoolean scheduled = new AtomicBoolean();
     TransactionOutbox outbox =
         builder()
             .instantiator(new LoggingInstantiator())
-            .listener(new LatchListener(latch, Level.INFO))
+            .listener(
+                new LatchListener(latch, Level.INFO)
+                    .andThen(
+                        new TransactionOutboxListener() {
+                          @Override
+                          public void scheduled(TransactionOutboxEntry entry) {
+                            scheduled.set(true);
+                          }
+                        }))
             .build();
 
     cleanDataStore();
@@ -154,6 +163,7 @@ public abstract class AbstractAcceptanceTest<
             .thenRun(chainCompleted::countDown));
 
     assertFired(chainCompleted);
+    assertTrue(scheduled.get());
   }
 
   @Test

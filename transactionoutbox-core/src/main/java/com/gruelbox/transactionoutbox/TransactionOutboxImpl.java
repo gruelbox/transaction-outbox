@@ -306,7 +306,11 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
         .save(tx, entry)
         .thenRun(
             () -> {
-              tx.addPostCommitHook(() -> submitNow(entry));
+              tx.addPostCommitHook(
+                  () -> {
+                    listener.scheduled(entry);
+                    return submitNow(entry);
+                  });
               log.debug("Scheduled {}", entry.description());
             });
   }

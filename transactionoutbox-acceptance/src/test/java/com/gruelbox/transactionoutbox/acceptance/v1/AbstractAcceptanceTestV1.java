@@ -45,6 +45,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
@@ -77,6 +78,7 @@ abstract class AbstractAcceptanceTestV1 {
 
     CountDownLatch latch = new CountDownLatch(1);
     CountDownLatch chainedLatch = new CountDownLatch(1);
+    AtomicBoolean gotScheduled = new AtomicBoolean();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
@@ -86,6 +88,13 @@ abstract class AbstractAcceptanceTestV1 {
                 new LatchListener(latch)
                     .andThen(
                         new TransactionOutboxListener() {
+
+                          @Override
+                          public void scheduled(TransactionOutboxEntry entry) {
+                            log.info("Got scheduled event");
+                            gotScheduled.set(true);
+                          }
+
                           @Override
                           public void success(TransactionOutboxEntry entry) {
                             chainedLatch.countDown();
@@ -110,6 +119,7 @@ abstract class AbstractAcceptanceTestV1 {
     // Should be fired after commit
     assertTrue(chainedLatch.await(2, TimeUnit.SECONDS));
     assertTrue(latch.await(1, TimeUnit.SECONDS));
+    assertTrue(gotScheduled.get());
   }
 
   @Test
