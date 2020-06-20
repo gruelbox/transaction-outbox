@@ -37,10 +37,9 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
@@ -76,6 +75,7 @@ abstract class AbstractAcceptanceTest {
 
     CountDownLatch latch = new CountDownLatch(1);
     CountDownLatch chainedLatch = new CountDownLatch(1);
+    AtomicBoolean gotScheduled = new AtomicBoolean();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
@@ -89,6 +89,13 @@ abstract class AbstractAcceptanceTest {
                 new LatchListener(latch)
                     .andThen(
                         new TransactionOutboxListener() {
+
+                          @Override
+                          public void scheduled(TransactionOutboxEntry entry) {
+                            log.info("Got scheduled event");
+                            gotScheduled.set(true);
+                          }
+
                           @Override
                           public void success(TransactionOutboxEntry entry) {
                             chainedLatch.countDown();
@@ -113,6 +120,7 @@ abstract class AbstractAcceptanceTest {
     // Should be fired after commit
     assertTrue(chainedLatch.await(2, TimeUnit.SECONDS));
     assertTrue(latch.await(1, TimeUnit.SECONDS));
+    assertTrue(gotScheduled.get());
   }
 
   @Test
@@ -482,22 +490,24 @@ abstract class AbstractAcceptanceTest {
 
   private void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
       throws Exception {
-    Thread backgroundThread = new Thread(() -> {
-      while (!Thread.interrupted()) {
-        try {
-          // Keep flushing work until there's nothing left to flush
-          //noinspection StatementWithEmptyBody
-          while (outbox.flush()) {}
-        } catch (Exception e) {
-          log.error("Error flushing transaction outbox. Pausing", e);
-        }
-        try {
-          Thread.sleep(250);
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
-    });
+    Thread backgroundThread =
+        new Thread(
+            () -> {
+              while (!Thread.interrupted()) {
+                try {
+                  // Keep flushing work until there's nothing left to flush
+                  //noinspection StatementWithEmptyBody
+                  while (outbox.flush()) {}
+                } catch (Exception e) {
+                  log.error("Error flushing transaction outbox. Pausing", e);
+                }
+                try {
+                  Thread.sleep(250);
+                } catch (InterruptedException e) {
+                  break;
+                }
+              }
+            });
     backgroundThread.start();
     try {
       runnable.run();

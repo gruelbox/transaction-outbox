@@ -8,7 +8,7 @@
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox/badge)](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox)
 
-A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. `TransactionOutbox` has a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks. Every aspect is highly configurable or overridable. It features out-of-the-box support for **Spring DI**, **Spring Txn**, **Hibernate**, **Guice**, **MySQL 5 & 8**, **PostgreSQL 9-12** and **H2**.
+A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. `TransactionOutbox` has a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks. Every aspect is highly configurable or overridable. It features out-of-the-box support for **Spring DI**, **Spring Txn**, **Guice**, **MySQL 5 & 8**, **PostgreSQL 9-12** and **H2**.
 
 ## Contents
 
@@ -120,14 +120,14 @@ The latest stable release is available from Maven Central. Stable releases are [
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
-  <version>1.3.109</version>
+  <version>1.3.127</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-core:1.3.109'
+implementation 'com.gruelbox:transactionoutbox-core:1.3.127'
 ```
 
 ### Development snapshots
