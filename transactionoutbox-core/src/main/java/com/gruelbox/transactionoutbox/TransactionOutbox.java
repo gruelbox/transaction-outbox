@@ -155,7 +155,7 @@ public class TransactionOutbox {
   }
 
   private List<TransactionOutboxEntry> flush(Instant now) {
-    log.info("Flushing stale tasks");
+    log.debug("Flushing stale tasks");
     var batch =
         transactionManager.inTransactionReturns(
             transaction -> {
