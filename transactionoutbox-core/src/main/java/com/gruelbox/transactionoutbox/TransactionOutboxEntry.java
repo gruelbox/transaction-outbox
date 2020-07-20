@@ -7,6 +7,7 @@ import java.util.Arrays;
 import javax.validation.constraints.Future;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.PositiveOrZero;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -46,7 +47,8 @@ public class TransactionOutboxEntry {
   @SuppressWarnings("JavaDoc")
   @NotNull
   @Getter
-  private final Invocation invocation;
+  @Setter(AccessLevel.PACKAGE)
+  private Invocation invocation;
 
   /**
    * @param nextAttemptTime The timestamp after which the task is available for re-attempting.

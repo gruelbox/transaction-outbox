@@ -36,6 +36,9 @@ import lombok.extern.slf4j.Slf4j;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class DefaultPersistor implements Persistor {
 
+  private static final String ALL_FIELDS =
+      "id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version";
+
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
    *     lock. There's no point making this long; it's always better to just back off as quickly as
@@ -88,9 +91,7 @@ public class DefaultPersistor implements Persistor {
   public void save(Transaction tx, TransactionOutboxEntry entry)
       throws SQLException, AlreadyScheduledException {
     var insertSql =
-        "INSERT INTO "
-            + tableName
-            + " (id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO " + tableName + " (" + ALL_FIELDS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
     if (entry.getUniqueRequestId() == null) {
@@ -177,15 +178,33 @@ public class DefaultPersistor implements Persistor {
             .prepareStatement(
                 dialect.isSupportsSkipLock()
                     // language=MySQL
-                    ? "SELECT id FROM "
+                    ? "SELECT id, invocation FROM "
                         + tableName
                         + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
                     // language=MySQL
-                    : "SELECT id FROM " + tableName + " WHERE id = ? AND version = ? FOR UPDATE")) {
+                    : "SELECT id, invocation FROM "
+                        + tableName
+                        + " WHERE id = ? AND version = ? FOR UPDATE")) {
       stmt.setString(1, entry.getId());
       stmt.setInt(2, entry.getVersion());
       stmt.setQueryTimeout(writeLockTimeoutSeconds);
-      return gotRecord(entry, stmt);
+      try {
+        try (ResultSet rs = stmt.executeQuery()) {
+          if (!rs.next()) {
+            return false;
+          }
+          // Ensure that subsequent processing uses a deserialized invocation rather than
+          // the object from the caller, which might not serialize well and thus cause a
+          // difference between immediate and retry processing
+          try (Reader invocationStream = rs.getCharacterStream("invocation")) {
+            entry.setInvocation(serializer.deserializeInvocation(invocationStream));
+          }
+          return true;
+        }
+      } catch (SQLTimeoutException e) {
+        log.debug("Lock attempt timed out on {}", entry.description());
+        return false;
+      }
     }
   }
 
@@ -210,7 +229,9 @@ public class DefaultPersistor implements Persistor {
         tx.connection()
             .prepareStatement(
                 // language=MySQL
-                "SELECT id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version FROM "
+                "SELECT "
+                    + ALL_FIELDS
+                    + " FROM "
                     + tableName
                     + " WHERE nextAttemptTime < ? AND blacklisted = false AND processed = false LIMIT ?"
                     + forUpdate)) {
@@ -241,18 +262,6 @@ public class DefaultPersistor implements Persistor {
       }
       log.debug("Found {} results", result.size());
       return result;
-    }
-  }
-
-  private boolean gotRecord(TransactionOutboxEntry entry, PreparedStatement stmt)
-      throws SQLException {
-    try {
-      try (ResultSet rs = stmt.executeQuery()) {
-        return rs.next();
-      }
-    } catch (SQLTimeoutException e) {
-      log.debug("Lock attempt timed out on {}", entry.description());
-      return false;
     }
   }
 
