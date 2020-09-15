@@ -84,7 +84,7 @@ public class DefaultPersistor implements Persistor {
 
   @Override
   public void migrate(TransactionManager transactionManager) {
-    DefaultMigrationManager.migrate(transactionManager);
+    DefaultMigrationManager.migrate(transactionManager, dialect);
   }
 
   @Override
