@@ -4,7 +4,11 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import javax.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 class DefaultMigrationManager {
 
-  /** Migrations are currently the same for all dialects so no disambiguation needed. */
+  /** Migrations can be dialect specific **/
   private static final List<Migration> MIGRATIONS =
       List.of(
           new Migration(
@@ -39,16 +43,26 @@ class DefaultMigrationManager {
           new Migration(
               4,
               "Add flush index",
-              "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blacklisted, nextAttemptTime)"));
+              "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blacklisted, nextAttemptTime)"),
+          new Migration(
+              5,
+              "Increase size of uniqueRequestId",
+              "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN uniqueRequestId VARCHAR(250)",
+                  Map.of(
+                      Dialect.POSTGRESQL_9,
+                          "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)",
+                      Dialect.H2,
+                          "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")
+          ));
 
-  static void migrate(TransactionManager transactionManager) {
+  static void migrate(TransactionManager transactionManager, @NotNull Dialect dialect) {
     transactionManager.inTransaction(
         transaction -> {
           try {
             int currentVersion = currentVersion(transaction.connection());
             MIGRATIONS.stream()
                 .filter(migration -> migration.version > currentVersion)
-                .forEach(migration -> runSql(transaction.connection(), migration));
+                .forEach(migration -> runSql(transaction.connection(), migration, dialect));
           } catch (Exception e) {
             throw new RuntimeException("Migrations failed", e);
           }
@@ -56,10 +70,10 @@ class DefaultMigrationManager {
   }
 
   @SneakyThrows
-  private static void runSql(Connection connection, Migration migration) {
+  private static void runSql(Connection connection, Migration migration, @NotNull Dialect dialect) {
     log.info("Running migration: {}", migration.name);
     try (Statement s = connection.createStatement()) {
-      s.execute(migration.sql);
+      s.execute(migration.sqlFor(dialect));
       if (s.executeUpdate("UPDATE TXNO_VERSION SET version = " + migration.version) != 1) {
         s.execute("INSERT INTO TXNO_VERSION VALUES (" + migration.version + ")");
       }
@@ -89,5 +103,14 @@ class DefaultMigrationManager {
     private final int version;
     private final String name;
     private final String sql;
+    private final Map<Dialect, String> dialectSpecific;
+
+    Migration(int version, String name, String sql) {
+      this(version, name, sql, Collections.emptyMap());
+    }
+
+    String sqlFor(Dialect dialect) {
+      return dialectSpecific.getOrDefault(dialect, sql);
+    }
   }
 }
