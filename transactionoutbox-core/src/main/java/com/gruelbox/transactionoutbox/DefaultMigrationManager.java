@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,12 +48,12 @@ class DefaultMigrationManager {
               5,
               "Increase size of uniqueRequestId",
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN uniqueRequestId VARCHAR(250)",
-              Optional.of(
                   Map.of(
                       Dialect.POSTGRESQL_9,
                           "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)",
                       Dialect.H2,
-                          "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)"))));
+                          "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")
+          ));
 
   static void migrate(TransactionManager transactionManager, @NotNull Dialect dialect) {
     transactionManager.inTransaction(
@@ -102,14 +103,14 @@ class DefaultMigrationManager {
     private final int version;
     private final String name;
     private final String sql;
-    private final Optional<Map<Dialect, String>> dialectSpecific;
+    private final Map<Dialect, String> dialectSpecific;
 
     Migration(int version, String name, String sql) {
-      this(version, name, sql, Optional.empty());
+      this(version, name, sql, Collections.emptyMap());
     }
 
     String sqlFor(Dialect dialect) {
-      return dialectSpecific.map(it -> it.get(dialect)).orElse(sql);
+      return dialectSpecific.getOrDefault(dialect, sql);
     }
   }
 }
