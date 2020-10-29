@@ -71,13 +71,13 @@ public class TransactionOutboxEntry {
   private int attempts;
 
   /**
-   * @param blacklisted True if the task has exceeded the configured maximum number of attempts.
+   * @param failed True if the task has exceeded the configured maximum number of attempts.
    * @return True if the task has exceeded the configured maximum number of attempts.
    */
   @SuppressWarnings("JavaDoc")
   @Getter
   @Setter
-  private boolean blacklisted;
+  private boolean failed;
 
   /**
    * @param processed True if the task has been processed but has been retained to prevent duplicate

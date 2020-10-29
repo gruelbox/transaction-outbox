@@ -43,7 +43,7 @@ public class TransactionOutbox {
   @NotNull private final Level logLevelTemporaryFailure;
 
   @Min(1)
-  private final int blacklistAfterAttempts;
+  private final int markFailedAfterAttempts;
 
   @Min(1)
   private final int flushBatchSize;
@@ -59,7 +59,7 @@ public class TransactionOutbox {
       Instantiator instantiator,
       Submitter submitter,
       Duration attemptFrequency,
-      int blacklistAfterAttempts,
+      int markFailedAfterAttempts,
       int flushBatchSize,
       ClockProvider clockProvider,
       TransactionOutboxListener listener,
@@ -72,7 +72,7 @@ public class TransactionOutbox {
     this.persistor = persistor;
     this.submitter = Utils.firstNonNull(submitter, Submitter::withDefaultExecutor);
     this.attemptFrequency = Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
-    this.blacklistAfterAttempts = blacklistAfterAttempts < 1 ? 5 : blacklistAfterAttempts;
+    this.markFailedAfterAttempts = markFailedAfterAttempts < 1 ? 5 : markFailedAfterAttempts;
     this.flushBatchSize = flushBatchSize < 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
     this.clockProvider = Utils.firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
     this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {});
@@ -129,7 +129,7 @@ public class TransactionOutbox {
   /**
    * Identifies any stale tasks queued using {@link #schedule(Class)} (those which were queued more
    * than {@link #attemptFrequency} ago and have been tried less than {@link
-   * #blacklistAfterAttempts} times) and attempts to resubmit them.
+   * #markFailedAfterAttempts} times) and attempts to resubmit them.
    *
    * <p>As long as {@link #submitter} is non-blocking (e.g. uses a bounded queue with a {@link
    * java.util.concurrent.RejectedExecutionHandler} which throws such as {@link
@@ -202,52 +202,54 @@ public class TransactionOutbox {
   }
 
   /**
-   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction and a transaction manager that supports thread local context.
+   * Clears a failed entry of its failed state and resets the attempt count so that it will be
+   * retried again. Requires an active transaction and a transaction manager that supports thread
+   * local context.
    *
    * @param entryId The entry id.
-   * @return True if the whitelisting request was successful. May return false if another thread
-   *     whitelisted the entry first.
+   * @return True if the request to clear the failed state of the entry was successful. May return
+   *     false if another thread cleared the entry of its failed state first.
    */
-  public boolean whitelist(String entryId) {
+  public boolean retryable(String entryId) {
     if (!(transactionManager instanceof ThreadLocalContextTransactionManager)) {
       throw new UnsupportedOperationException(
           "This method requires a ThreadLocalContextTransactionManager");
     }
-    log.info("Whitelisting entry {}", entryId);
+    log.info("Removing/ clearing failed state of entry {} so that it can be reprocessed.", entryId);
     try {
       return ((ThreadLocalContextTransactionManager) transactionManager)
-          .requireTransactionReturns(tx -> persistor.whitelist(tx, entryId));
+          .requireTransactionReturns(tx -> persistor.retryable(tx, entryId));
     } catch (Exception e) {
       throw (RuntimeException) Utils.uncheckAndThrow(e);
     }
   }
 
   /**
-   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction and a transaction manager that supports supplied context.
+   * Clears a failed entry of its failed state and resets the attempt count so that it will be
+   * retried again. Requires an active transaction and a transaction manager that supports supplied
+   * context.
    *
    * @param entryId The entry id.
    * @param transactionContext The transaction context ({@link TransactionManager} implementation
    *     specific).
-   * @return True if the whitelisting request was successful. May return false if another thread
-   *     whitelisted the entry first.
+   * @return True if the request to clear the failed state of the entry was successful. May return
+   *     false if another thread cleared the entry of its failed state first.
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
-  public boolean whitelist(String entryId, Object transactionContext) {
+  public boolean retryable(String entryId, Object transactionContext) {
     if (!(transactionManager instanceof ParameterContextTransactionManager)) {
       throw new UnsupportedOperationException(
           "This method requires a ParameterContextTransactionManager");
     }
-    log.info("Whitelisting entry {}", entryId);
+    log.info("Resetting failed entry {} back to retryable", entryId);
     try {
       if (transactionContext instanceof Transaction) {
-        return persistor.whitelist((Transaction) transactionContext, entryId);
+        return persistor.retryable((Transaction) transactionContext, entryId);
       }
       Transaction transaction =
           ((ParameterContextTransactionManager) transactionManager)
               .transactionFromContext(transactionContext);
-      return persistor.whitelist(transaction, entryId);
+      return persistor.retryable(transaction, entryId);
     } catch (Exception e) {
       throw (RuntimeException) Utils.uncheckAndThrow(e);
     }
@@ -370,24 +372,26 @@ public class TransactionOutbox {
   private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
-      var blacklisted = entry.getAttempts() >= blacklistAfterAttempts;
-      entry.setBlacklisted(blacklisted);
+      var failed = entry.getAttempts() >= markFailedAfterAttempts;
+      entry.setFailed(failed);
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
       transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));
       listener.failure(entry, cause);
-      if (blacklisted) {
+      if (failed) {
         log.error(
-            "Blacklisting failing process after {} attempts: {}",
+            "Marking entry {} as failed after {} attempts: {}",
+            entry.getId(),
             entry.getAttempts(),
             entry.description(),
             cause);
-        listener.blacklisted(entry, cause);
+        listener.markFailed(entry, cause);
       } else {
         logAtLevel(
             log,
             logLevelTemporaryFailure,
-            "Temporarily failed to process: {}",
+            "Temporarily failed to process entry {} : {}",
+            entry.getId(),
             entry.description(),
             cause);
       }
@@ -407,7 +411,7 @@ public class TransactionOutbox {
     private Instantiator instantiator;
     private Submitter submitter;
     private Duration attemptFrequency;
-    private int blacklistAfterAttempts;
+    private int markFailedAfterAttempts;
     private int flushBatchSize;
     private ClockProvider clockProvider;
     private TransactionOutboxListener listener;
@@ -464,12 +468,12 @@ public class TransactionOutbox {
     }
 
     /**
-     * @param blacklistAfterAttempts After now many attempts a task should be blacklisted. Defaults
-     *     to 5.
+     * @param markFailedAfterAttempts how many attempts a task should be retried before being marked
+     *     as failed. Defaults to 5.
      * @return Builder.
      */
-    public TransactionOutboxBuilder blacklistAfterAttempts(int blacklistAfterAttempts) {
-      this.blacklistAfterAttempts = blacklistAfterAttempts;
+    public TransactionOutboxBuilder markFailedAfterAttempts(int markFailedAfterAttempts) {
+      this.markFailedAfterAttempts = markFailedAfterAttempts;
       return this;
     }
 
@@ -496,7 +500,7 @@ public class TransactionOutbox {
 
     /**
      * @param listener Event listener. Allows client code to react to tasks running, failing or
-     *     getting blacklisted.
+     *     getting marked as failed.
      * @return Builder.
      */
     public TransactionOutboxBuilder listener(TransactionOutboxListener listener) {
@@ -561,7 +565,7 @@ public class TransactionOutbox {
           instantiator,
           submitter,
           attemptFrequency,
-          blacklistAfterAttempts,
+          markFailedAfterAttempts,
           flushBatchSize,
           clockProvider,
           listener,

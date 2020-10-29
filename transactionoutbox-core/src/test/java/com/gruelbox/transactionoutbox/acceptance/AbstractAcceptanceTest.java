@@ -377,15 +377,15 @@ abstract class AbstractAcceptanceTest {
   }
 
   /**
-   * Runs a piece of work which will fail enough times to be blacklisted but will then pass when
-   * re-whitelisted.
+   * Runs a piece of work which will fail enough times to be marked as failed but will then pass
+   * when re-tried after the failed status is cleared.
    */
   @Test
-  final void blacklistAndWhitelist() throws Exception {
+  final void markFailedAndThenRetry() throws Exception {
     TransactionManager transactionManager = simpleTxnManager();
     CountDownLatch successLatch = new CountDownLatch(1);
-    CountDownLatch blacklistLatch = new CountDownLatch(1);
-    LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
+    CountDownLatch markFailedLatch = new CountDownLatch(1);
+    LatchListener latchListener = new LatchListener(successLatch, markFailedLatch);
     AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -394,7 +394,7 @@ abstract class AbstractAcceptanceTest {
             .instantiator(new FailingInstantiator(attempts))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
-            .blacklistAfterAttempts(2)
+            .markFailedAfterAttempts(2)
             .build();
 
     clearOutbox();
@@ -404,10 +404,10 @@ abstract class AbstractAcceptanceTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blacklistLatch.await(3, TimeUnit.SECONDS));
+          assertTrue(markFailedLatch.await(3, TimeUnit.SECONDS));
           assertTrue(
               transactionManager.inTransactionReturns(
-                  tx -> outbox.whitelist(latchListener.getBlacklisted().getId())));
+                  tx -> outbox.retryable(latchListener.getFailed().getId())));
           assertTrue(successLatch.await(3, TimeUnit.SECONDS));
         });
   }

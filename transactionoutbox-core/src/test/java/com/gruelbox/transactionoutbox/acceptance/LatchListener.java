@@ -7,18 +7,18 @@ import lombok.Getter;
 
 final class LatchListener implements TransactionOutboxListener {
   private final CountDownLatch successLatch;
-  private final CountDownLatch blacklistLatch;
+  private final CountDownLatch markFailedLatch;
 
-  @Getter private volatile TransactionOutboxEntry blacklisted;
+  @Getter private volatile TransactionOutboxEntry failed;
 
-  LatchListener(CountDownLatch successLatch, CountDownLatch blacklistLatch) {
+  LatchListener(CountDownLatch successLatch, CountDownLatch markFailedLatch) {
     this.successLatch = successLatch;
-    this.blacklistLatch = blacklistLatch;
+    this.markFailedLatch = markFailedLatch;
   }
 
   LatchListener(CountDownLatch successLatch) {
     this.successLatch = successLatch;
-    this.blacklistLatch = new CountDownLatch(1);
+    this.markFailedLatch = new CountDownLatch(1);
   }
 
   @Override
@@ -27,8 +27,8 @@ final class LatchListener implements TransactionOutboxListener {
   }
 
   @Override
-  public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
-    this.blacklisted = entry;
-    blacklistLatch.countDown();
+  public void markFailed(TransactionOutboxEntry entry, Throwable cause) {
+    this.failed = entry;
+    markFailedLatch.countDown();
   }
 }

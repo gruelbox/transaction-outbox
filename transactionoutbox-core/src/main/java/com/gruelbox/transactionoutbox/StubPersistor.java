@@ -36,7 +36,7 @@ public class StubPersistor implements Persistor {
   }
 
   @Override
-  public boolean whitelist(Transaction tx, String entryId) {
+  public boolean retryable(Transaction tx, String entryId) {
     return true;
   }
 
