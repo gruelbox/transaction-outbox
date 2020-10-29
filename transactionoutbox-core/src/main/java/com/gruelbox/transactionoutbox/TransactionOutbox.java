@@ -72,8 +72,8 @@ public class TransactionOutbox {
     this.persistor = persistor;
     this.submitter = Utils.firstNonNull(submitter, Submitter::withDefaultExecutor);
     this.attemptFrequency = Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
-    this.blacklistAfterAttempts = blacklistAfterAttempts <= 1 ? 5 : blacklistAfterAttempts;
-    this.flushBatchSize = flushBatchSize <= 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
+    this.blacklistAfterAttempts = blacklistAfterAttempts < 1 ? 5 : blacklistAfterAttempts;
+    this.flushBatchSize = flushBatchSize < 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
     this.clockProvider = Utils.firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
     this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {});
     this.logLevelTemporaryFailure = Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
