@@ -80,13 +80,13 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
   private final Gson gson;
 
   @Builder
-  DefaultInvocationSerializer(Set<Class<?>> whitelistedTypes, Integer version) {
+  DefaultInvocationSerializer(Set<Class<?>> serializableTypes, Integer version) {
     this.gson =
         new GsonBuilder()
             .registerTypeAdapter(
                 Invocation.class,
                 new InvocationJsonSerializer(
-                    whitelistedTypes == null ? Set.of() : whitelistedTypes,
+                    serializableTypes == null ? Set.of() : serializableTypes,
                     version == null ? 2 : version))
             .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
             .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
@@ -114,7 +114,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
     private Map<Class<?>, String> classToName = new HashMap<>();
     private Map<String, Class<?>> nameToClass = new HashMap<>();
 
-    InvocationJsonSerializer(Set<Class<?>> whitelistedClasses, int version) {
+    InvocationJsonSerializer(Set<Class<?>> serializableClasses, int version) {
       this.version = version;
       addClassPair(byte.class, "byte");
       addClassPair(short.class, "short");
@@ -157,7 +157,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       addClassPair(Transaction.class, "Transaction");
       addClassPair(TransactionContextPlaceholder.class, "TransactionContext");
 
-      whitelistedClasses.forEach(clazz -> addClassPair(clazz, clazz.getName()));
+      serializableClasses.forEach(clazz -> addClassPair(clazz, clazz.getName()));
     }
 
     private void addClassPair(Class<?> clazz, String name) {

@@ -9,9 +9,9 @@ import java.io.Writer;
  * host of code injection attacks. At the same time, allowing possibly-unstable types into
  * serialized {@link Invocation}s can result in compatibility issues, with still unprocessed entries
  * in the database containing older versions of your classes. To avoid this, it makes sense to
- * whitelist the types supported and restrict this whitelist to known-stable types such as
- * primitives and common JDK value types. {@link #createDefaultJsonSerializer()} provides exactly
- * this and is used by default. However, if you want to extend this list or use a different
+ * specify the types supported and restrict this set of serializable classes to known-stable types
+ * such as primitives and common JDK value types. {@link #createDefaultJsonSerializer()} provides
+ * exactly this and is used by default. However, if you want to extend this list or use a different
  * serialization format, you can create your own implementation here, at your own risk.
  */
 public interface InvocationSerializer {

@@ -145,7 +145,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testBlacklistedExcluded() throws Exception {
+  void testBlockedEntriesExcluded() throws Exception {
     txManager()
         .inTransactionThrows(
             tx -> {
@@ -344,22 +344,21 @@ abstract class AbstractDefaultPersistorTest {
     }
   }
 
-  private TransactionOutboxEntry createEntry(
-      String id, Instant nextAttemptTime, boolean blacklisted) {
+  private TransactionOutboxEntry createEntry(String id, Instant nextAttemptTime, boolean blocked) {
     return TransactionOutboxEntry.builder()
         .id(id)
         .invocation(createInvocation())
-        .blacklisted(blacklisted)
+        .blocked(blocked)
         .nextAttemptTime(nextAttemptTime.truncatedTo(MILLIS))
         .build();
   }
 
   private TransactionOutboxEntry createEntry(
-      String id, Instant nextAttemptTime, boolean blacklisted, String uniqueId) {
+      String id, Instant nextAttemptTime, boolean blocked, String uniqueId) {
     return TransactionOutboxEntry.builder()
         .id(id)
         .invocation(createInvocation())
-        .blacklisted(blacklisted)
+        .blocked(blocked)
         .nextAttemptTime(nextAttemptTime.truncatedTo(MILLIS))
         .uniqueRequestId(uniqueId)
         .build();

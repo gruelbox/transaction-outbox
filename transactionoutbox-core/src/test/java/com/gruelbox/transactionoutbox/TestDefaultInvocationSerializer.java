@@ -47,7 +47,7 @@ class TestDefaultInvocationSerializer {
     Inner(Integer version) {
       this.serializer =
           DefaultInvocationSerializer.builder()
-              .whitelistedTypes(Set.of(ExampleCustomEnum.class, ExampleCustomClass.class))
+              .serializableTypes(Set.of(ExampleCustomEnum.class, ExampleCustomClass.class))
               .version(version)
               .build();
     }

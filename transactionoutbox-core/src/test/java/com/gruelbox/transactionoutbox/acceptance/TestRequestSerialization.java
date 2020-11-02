@@ -33,7 +33,7 @@ public class TestRequestSerialization {
                     .dialect(connectionDetails().dialect())
                     .serializer(
                         DefaultInvocationSerializer.builder()
-                            .whitelistedTypes(Set.of(Arg.class))
+                            .serializableTypes(Set.of(Arg.class))
                             .build())
                     .build())
             .listener(new LatchListener(latch))

@@ -94,14 +94,14 @@ Here's what happens:
 - [`TransactionOutbox`](https://www.javadoc.io/static/com.gruelbox/transactionoutbox-core/0.1.57/com/gruelbox/transactionoutbox/TransactionOutbox.html) creates a proxy of `MessageQueue`. Any method calls on the proxy are serialized and written to the `TXNO_OUTBOX` table (by default) _in the same transaction_ as the `SaleRepository` call. The call returns immediately rather than actually invoking the real method.
 - If the transaction rolls back, so do the serialized requests.
 - Immediately after the transaction is successfully committed, another thread will attempt to make the _real_ call to `MessageQueue` asynchronously.
-- If that call fails, or the application dies before the call is attempted, a [background "mop-up" thread](#set-up-the-background-worker) will re-attempt the call a configurable number of times, with configurable time between each, before [blacklisting](#managing-the-dead-letter-queue) the request and firing and event for it to be investigated (similar to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue)).
-- Blacklisted requests can be easily [whitelisted](#managing-the-dead-letter-queue) again once the underlying issue is resolved.
+- If that call fails, or the application dies before the call is attempted, a [background "mop-up" thread](#set-up-the-background-worker) will re-attempt the call a configurable number of times, with configurable time between each, before [blocking](#managing-the-dead-letter-queue) the request and firing and event for it to be investigated (similar to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue)).
+- Blocked requests can be easily [unblocked](#managing-the-dead-letter-queue) again once the underlying issue is resolved.
 
 Our service is now resilient and explicitly eventually consistent, as long as all three elements (`SaleRepository` and the downstream event handlers) are idempotent, since those messages will be attempted repeatedly until confirmed successful, which means they could occur multiple times.
 
 If you find yourself wondering _why bother with the queues now_? You're quite right. As we now have outgoing buffers, we already have most of the benefits of middleware (at least for some use cases). We could replace the calls to a message queue with direct queues to the other services' load balancers and switch to a peer-to-peer architecture, if we so choose.
 
-> Note that for the above example to work, `StockReductionEvent` and `IncomeEvent` need to be whitelisted for serialization. See [Configuration reference](#configuration-reference).
+> Note that for the above example to work, `StockReductionEvent` and `IncomeEvent` need to be included for serialization. See [Configuration reference](#configuration-reference).
 
 ## Installation
 
@@ -265,31 +265,31 @@ Don't worry about it running on multiple instances simultaneously. It's designed
 
 ## Managing the "dead letter queue"
 
-Work might be retried too many times and get blacklisted. You should set up an alert to allow you to manage this when it occurs, resolve the issue and un-blacklist the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
+Work might be retried too many times and enter a blocked state. You should set up an alert to allow you to manage this when it occurs, resolve the issue and unblock the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
 
 ```java
 TransactionOutbox.builder()
     ...
     .listener(new TransactionOutboxListener() {
         @Override
-        public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
+        public void blocked(TransactionOutboxEntry entry, Throwable cause) {
            // Spring example
-           applicationEventPublisher.publishEvent(new TransactionOutboxBlacklistEvent(entry.getId(), cause);
+           applicationEventPublisher.publishEvent(new TransactionOutboxBlockedEvent(entry.getId(), cause);
         }
     })
     .build();
 ```
 
-To mark the work for reprocessing, just use [`TransactionOutbox.whitelist()`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html). Its failure count will be marked back down to zero and it will get reprocessed on the next call to `flush()`:
+To mark the work for reprocessing, just use [`TransactionOutbox.unblock()`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html). Its failure count will be marked back down to zero and it will get reprocessed on the next call to `flush()`:
 
 ```
-transactionOutboxEntry.whitelist(entryId);
+transactionOutboxEntry.unblock(entryId);
 ```
 
 Or if using a `TransactionManager` that relies on explicit context (such as a non-thread local [`JooqTransactionManager`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-jooq/latest/com/gruelbox/transactionoutbox/JooqTransactionManager.html)):
 
 ```
-transactionOutboxEntry.whitelist(entryId, context);
+transactionOutboxEntry.unblock(entryId, context);
 ```
 
 A good approach here is to use the [`TransactionOutboxListener`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutboxListener.html) callback to post an [interactive Slack message](https://api.slack.com/legacy/interactive-messages) - this can operate as both the alert and the "button" allowing a support engineer to submit the work for reprocessing.
@@ -367,7 +367,7 @@ TransactionOutbox outbox = TransactionOutbox.builder()
         .migrate(false)
         // Allow the SaleType enum and Money class to be used in arguments (see example below)
         .serializer(DefaultInvocationSerializer.builder()
-            .whitelistedTypes(Set.of(SaleType.class, Money.class))
+            .serializableTypes(Set.of(SaleType.class, Money.class))
             .build())
         .build())
     // GuiceInstantiator and SpringInstantiator are great if you are using Guice or Spring DI, but what if you
@@ -384,8 +384,8 @@ TransactionOutbox outbox = TransactionOutbox.builder()
         .build())
     // Lower the log level when a task fails temporarily from the default WARN.
     .logLevelTemporaryFailure(Level.INFO)
-    // 10 attempts at a task before blacklisting it
-    .blacklistAfterAttempts(10)
+    // 10 attempts at a task before blocking it.
+    .blockAfterAttempts(10)
     // When calling flush(), select 0.5m records at a time.
     .flushBatchSize(500_000)
     // Flush once every 15 minutes only
@@ -397,9 +397,9 @@ TransactionOutbox outbox = TransactionOutbox.builder()
     // Sets how long we should keep records of requests with a unique request id so duplicate requests
     // can be rejected. Defaults to 7 days.
     .retentionThreshold(Duration.ofDays(1))
-    // We can intercept task successes, failures and blacklistings. The most common use is to catch blacklistings
+    // We can intercept task successes, single failures and blocked tasks. The most common use is to catch blocked tasks
     // and raise alerts for these to be investigated. A Slack interactive message is particularly effective here
-    // since it can be wired up to call whitelist() automatically.
+    // since it can be wired up to call unblock() automatically.
     .listener(new TransactionOutboxListener() {
 
       @Override
@@ -408,8 +408,8 @@ TransactionOutbox outbox = TransactionOutbox.builder()
       }
 
       @Override
-      public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
-        eventPublisher.publish(new BlacklistedOutboxTaskEvent(entry.getId()));
+      public void blocked(TransactionOutboxEntry entry, Throwable cause) {
+        eventPublisher.publish(new BlockedOutboxTaskEvent(entry.getId()));
       }
 
     })

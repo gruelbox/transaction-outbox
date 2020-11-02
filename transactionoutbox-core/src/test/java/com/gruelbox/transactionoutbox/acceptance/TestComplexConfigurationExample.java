@@ -70,7 +70,7 @@ class TestComplexConfigurationExample {
                     // below)
                     .serializer(
                         DefaultInvocationSerializer.builder()
-                            .whitelistedTypes(Set.of(SaleType.class, Money.class))
+                            .serializableTypes(Set.of(SaleType.class, Money.class))
                             .build())
                     .build())
             .instantiator(Instantiator.using(myServiceLocator::createInstance))
@@ -88,8 +88,8 @@ class TestComplexConfigurationExample {
                     .build())
             // Lower the log level when a task fails temporarily from the default WARN.
             .logLevelTemporaryFailure(Level.INFO)
-            // 10 attempts at a task before blacklisting it
-            .blacklistAfterAttempts(10)
+            // 10 attempts at a task before it is blocked (and would require intervention)
+            .blockAfterAttempts(10)
             // When calling flush(), select 0.5m records at a time.
             .flushBatchSize(500_000)
             // Flush once every 15 minutes only
@@ -100,11 +100,12 @@ class TestComplexConfigurationExample {
             // like user ids and
             // request ids across invocations.
             .serializeMdc(true)
-            // We can intercept task successes, failures and blacklistings. The most common use is
-            // to catch blacklistings
+            // We can intercept task successes, single failures and blocked tasks. The most common
+            // use is
+            // to catch blocked tasks.
             // and raise alerts for these to be investigated. A Slack interactive message is
             // particularly effective here
-            // since it can be wired up to call whitelist() automatically.
+            // since it can be wired up to call unblock() automatically.
             .listener(
                 new TransactionOutboxListener() {
 
@@ -114,8 +115,8 @@ class TestComplexConfigurationExample {
                   }
 
                   @Override
-                  public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
-                    eventPublisher.publish(new BlacklistedOutboxTaskEvent(entry.getId()));
+                  public void blocked(TransactionOutboxEntry entry, Throwable cause) {
+                    eventPublisher.publish(new BlockedOutboxTaskEvent(entry.getId()));
                   }
                 })
             .build();
@@ -148,7 +149,7 @@ class TestComplexConfigurationExample {
   }
 
   @Value
-  private static class BlacklistedOutboxTaskEvent {
+  private static class BlockedOutboxTaskEvent {
     String id;
   }
 

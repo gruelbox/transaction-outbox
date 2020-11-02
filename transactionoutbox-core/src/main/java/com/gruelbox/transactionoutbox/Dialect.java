@@ -17,7 +17,7 @@ public enum Dialect {
   MY_SQL_8(true, Constants.DEFAULT_DELETE_EXPIRED_STMT),
   POSTGRESQL_9(
       true,
-      "DELETE FROM {{table}} WHERE ctid IN (SELECT ctid FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blacklisted = false LIMIT ?)"),
+      "DELETE FROM {{table}} WHERE ctid IN (SELECT ctid FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?)"),
   H2(false, Constants.DEFAULT_DELETE_EXPIRED_STMT);
 
   /**
@@ -34,6 +34,6 @@ public enum Dialect {
 
   private static class Constants {
     static final String DEFAULT_DELETE_EXPIRED_STMT =
-        "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blacklisted = false LIMIT ?";
+        "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?";
   }
 }

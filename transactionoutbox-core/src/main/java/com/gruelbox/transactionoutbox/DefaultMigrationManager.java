@@ -7,7 +7,6 @@ import java.sql.Statement;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import javax.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
@@ -20,7 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 class DefaultMigrationManager {
 
-  /** Migrations can be dialect specific **/
+  /** Migrations can be dialect specific * */
   private static final List<Migration> MIGRATIONS =
       List.of(
           new Migration(
@@ -48,12 +47,20 @@ class DefaultMigrationManager {
               5,
               "Increase size of uniqueRequestId",
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN uniqueRequestId VARCHAR(250)",
-                  Map.of(
-                      Dialect.POSTGRESQL_9,
-                          "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)",
-                      Dialect.H2,
-                          "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")
-          ));
+              Map.of(
+                  Dialect.POSTGRESQL_9,
+                  "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)",
+                  Dialect.H2,
+                  "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")),
+          new Migration(
+              6,
+              "Rename column blacklisted to blocked",
+              "ALTER TABLE TXNO_OUTBOX CHANGE COLUMN blacklisted blocked VARCHAR(250)",
+              Map.of(
+                  Dialect.POSTGRESQL_9,
+                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked",
+                  Dialect.H2,
+                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")));
 
   static void migrate(TransactionManager transactionManager, @NotNull Dialect dialect) {
     transactionManager.inTransaction(
