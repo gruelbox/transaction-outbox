@@ -95,7 +95,7 @@ Here's what happens:
 - If the transaction rolls back, so do the serialized requests.
 - Immediately after the transaction is successfully committed, another thread will attempt to make the _real_ call to `MessageQueue` asynchronously.
 - If that call fails, or the application dies before the call is attempted, a [background "mop-up" thread](#set-up-the-background-worker) will re-attempt the call a configurable number of times, with configurable time between each, before [blocking](#managing-the-dead-letter-queue) the request and firing and event for it to be investigated (similar to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue)).
-- Failed requests can be easily [retried](#managing-the-dead-letter-queue) again once the underlying issue is resolved.
+- Blocked requests can be easily [unblocked](#managing-the-dead-letter-queue) again once the underlying issue is resolved.
 
 Our service is now resilient and explicitly eventually consistent, as long as all three elements (`SaleRepository` and the downstream event handlers) are idempotent, since those messages will be attempted repeatedly until confirmed successful, which means they could occur multiple times.
 
@@ -265,7 +265,7 @@ Don't worry about it running on multiple instances simultaneously. It's designed
 
 ## Managing the "dead letter queue"
 
-Work might be retried too many times and enter a blocked state. You should set up an alert to allow you to manage this when it occurs, resolve the issue and clear the blocked state of the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
+Work might be retried too many times and enter a blocked state. You should set up an alert to allow you to manage this when it occurs, resolve the issue and unblock the work, since the work not being complete will usually be a sign that your system is out of sync in some way.
 
 ```java
 TransactionOutbox.builder()
