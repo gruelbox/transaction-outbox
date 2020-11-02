@@ -19,7 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 class DefaultMigrationManager {
 
-  /** Migrations can be dialect specific **/
+  /** Migrations can be dialect specific * */
   private static final List<Migration> MIGRATIONS =
       List.of(
           new Migration(
