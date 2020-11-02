@@ -379,7 +379,7 @@ public class TransactionOutbox {
       listener.failure(entry, cause);
       if (blocked) {
         log.error(
-            "Blocking failing process {} after {} attempts: {}",
+            "Blocking failing entry {} after {} attempts: {}",
             entry.getId(),
             entry.getAttempts(),
             entry.description(),
