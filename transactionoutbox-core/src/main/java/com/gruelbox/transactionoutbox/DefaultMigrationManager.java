@@ -19,7 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 class DefaultMigrationManager {
 
-  /** Migrations can be dialect specific * */
+  /** Migrations can be dialect specific **/
   private static final List<Migration> MIGRATIONS =
       List.of(
           new Migration(
@@ -54,13 +54,13 @@ class DefaultMigrationManager {
                   "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")),
           new Migration(
               6,
-              "Rename column blacklisted to failed",
-              "ALTER TABLE TXNO_OUTBOX CHANGE COLUMN blacklisted failed VARCHAR(250)",
+              "Rename column blacklisted to blocked",
+              "ALTER TABLE TXNO_OUTBOX CHANGE COLUMN blacklisted blocked VARCHAR(250)",
               Map.of(
                   Dialect.POSTGRESQL_9,
-                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO failed",
+                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked",
                   Dialect.H2,
-                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO failed")));
+                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")));
 
   static void migrate(TransactionManager transactionManager, @NotNull Dialect dialect) {
     transactionManager.inTransaction(

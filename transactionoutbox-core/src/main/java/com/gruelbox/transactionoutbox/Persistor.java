@@ -80,18 +80,18 @@ public interface Persistor {
   boolean lock(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
   /**
-   * Clears the failed flag and resets the attempt count to zero.
+   * Clears the blocked flag and resets the attempt count to zero.
    *
    * @param tx The current {@link Transaction}.
    * @param entryId The entry id.
-   * @return true if the update was successful. This will be false if the record was no longer in a
-   *     failed state or didn't exist anymore.
+   * @return true if the update was successful. This will be false if the record was no longer
+   *     blocked or didn't exist anymore.
    * @throws Exception Any other exception.
    */
-  boolean retryable(Transaction tx, String entryId) throws Exception;
+  boolean unblock(Transaction tx, String entryId) throws Exception;
 
   /**
-   * Selects up to a specified maximum number of non-failed records which have passed their {@link
+   * Selects up to a specified maximum number of non-blocked records which have passed their {@link
    * TransactionOutboxEntry#getNextAttemptTime()}. Until a subsequent call to {@link
    * #lock(Transaction, TransactionOutboxEntry)}, these records may be selected by another instance
    * for processing.

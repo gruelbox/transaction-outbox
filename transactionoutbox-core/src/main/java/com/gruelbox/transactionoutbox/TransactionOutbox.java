@@ -43,7 +43,7 @@ public class TransactionOutbox {
   @NotNull private final Level logLevelTemporaryFailure;
 
   @Min(1)
-  private final int markFailedAfterAttempts;
+  private final int blockedAfterAttempts;
 
   @Min(1)
   private final int flushBatchSize;
@@ -59,7 +59,7 @@ public class TransactionOutbox {
       Instantiator instantiator,
       Submitter submitter,
       Duration attemptFrequency,
-      int markFailedAfterAttempts,
+      int blockedAfterAttempts,
       int flushBatchSize,
       ClockProvider clockProvider,
       TransactionOutboxListener listener,
@@ -72,13 +72,13 @@ public class TransactionOutbox {
     this.persistor = persistor;
     this.submitter = Utils.firstNonNull(submitter, Submitter::withDefaultExecutor);
     this.attemptFrequency = Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
-    this.markFailedAfterAttempts = markFailedAfterAttempts < 1 ? 5 : markFailedAfterAttempts;
+    this.blockedAfterAttempts = blockedAfterAttempts < 1 ? 5 : blockedAfterAttempts;
     this.flushBatchSize = flushBatchSize < 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
     this.clockProvider = Utils.firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
     this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {});
     this.logLevelTemporaryFailure = Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
     this.validator = new Validator(this.clockProvider);
-    this.serializeMdc = serializeMdc == null ? true : serializeMdc;
+    this.serializeMdc = serializeMdc == null || serializeMdc;
     this.retentionThreshold = retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold;
     this.validator.validate(this);
     this.persistor.migrate(transactionManager);
@@ -129,7 +129,7 @@ public class TransactionOutbox {
   /**
    * Identifies any stale tasks queued using {@link #schedule(Class)} (those which were queued more
    * than {@link #attemptFrequency} ago and have been tried less than {@link
-   * #markFailedAfterAttempts} times) and attempts to resubmit them.
+   * #blockedAfterAttempts} times) and attempts to resubmit them.
    *
    * <p>As long as {@link #submitter} is non-blocking (e.g. uses a bounded queue with a {@link
    * java.util.concurrent.RejectedExecutionHandler} which throws such as {@link
@@ -202,23 +202,23 @@ public class TransactionOutbox {
   }
 
   /**
-   * Clears a failed entry of its failed state and resets the attempt count so that it will be
+   * Unblocks a blocked entry and resets the attempt count so that it will be
    * retried again. Requires an active transaction and a transaction manager that supports thread
    * local context.
    *
    * @param entryId The entry id.
-   * @return True if the request to clear the failed state of the entry was successful. May return
-   *     false if another thread cleared the entry of its failed state first.
+   * @return True if the request to unblock the entry was successful. May return
+   *     false if another thread unblocked the entry first.
    */
-  public boolean retryable(String entryId) {
+  public boolean unblock(String entryId) {
     if (!(transactionManager instanceof ThreadLocalContextTransactionManager)) {
       throw new UnsupportedOperationException(
           "This method requires a ThreadLocalContextTransactionManager");
     }
-    log.info("Removing/ clearing failed state of entry {} so that it can be reprocessed.", entryId);
+    log.info("Marking entry {} for retry.", entryId);
     try {
       return ((ThreadLocalContextTransactionManager) transactionManager)
-          .requireTransactionReturns(tx -> persistor.retryable(tx, entryId));
+          .requireTransactionReturns(tx -> persistor.unblock(tx, entryId));
     } catch (Exception e) {
       throw (RuntimeException) Utils.uncheckAndThrow(e);
     }
@@ -236,20 +236,20 @@ public class TransactionOutbox {
    *     false if another thread cleared the entry of its failed state first.
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
-  public boolean retryable(String entryId, Object transactionContext) {
+  public boolean unblock(String entryId, Object transactionContext) {
     if (!(transactionManager instanceof ParameterContextTransactionManager)) {
       throw new UnsupportedOperationException(
           "This method requires a ParameterContextTransactionManager");
     }
-    log.info("Resetting failed entry {} back to retryable", entryId);
+    log.info("Marking entry {} for retry", entryId);
     try {
       if (transactionContext instanceof Transaction) {
-        return persistor.retryable((Transaction) transactionContext, entryId);
+        return persistor.unblock((Transaction) transactionContext, entryId);
       }
       Transaction transaction =
           ((ParameterContextTransactionManager) transactionManager)
               .transactionFromContext(transactionContext);
-      return persistor.retryable(transaction, entryId);
+      return persistor.unblock(transaction, entryId);
     } catch (Exception e) {
       throw (RuntimeException) Utils.uncheckAndThrow(e);
     }
@@ -372,20 +372,20 @@ public class TransactionOutbox {
   private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
-      var failed = entry.getAttempts() >= markFailedAfterAttempts;
-      entry.setFailed(failed);
+      var blocked = entry.getAttempts() >= blockedAfterAttempts;
+      entry.setBlocked(blocked);
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
       transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));
       listener.failure(entry, cause);
-      if (failed) {
+      if (blocked) {
         log.error(
-            "Marking entry {} as failed after {} attempts: {}",
+            "Marking entry {} as blocked after {} attempts: {}",
             entry.getId(),
             entry.getAttempts(),
             entry.description(),
             cause);
-        listener.markFailed(entry, cause);
+        listener.blocked(entry, cause);
       } else {
         logAtLevel(
             log,
@@ -411,7 +411,7 @@ public class TransactionOutbox {
     private Instantiator instantiator;
     private Submitter submitter;
     private Duration attemptFrequency;
-    private int markFailedAfterAttempts;
+    private int blockAfterAttempts;
     private int flushBatchSize;
     private ClockProvider clockProvider;
     private TransactionOutboxListener listener;
@@ -468,12 +468,12 @@ public class TransactionOutbox {
     }
 
     /**
-     * @param markFailedAfterAttempts how many attempts a task should be retried before being marked
-     *     as failed. Defaults to 5.
+     * @param blockAfterAttempts how many attempts a task should be retried before it is permanently blocked.
+     * Defaults to 5.
      * @return Builder.
      */
-    public TransactionOutboxBuilder markFailedAfterAttempts(int markFailedAfterAttempts) {
-      this.markFailedAfterAttempts = markFailedAfterAttempts;
+    public TransactionOutboxBuilder blockAfterAttempts(int blockAfterAttempts) {
+      this.blockAfterAttempts = blockAfterAttempts;
       return this;
     }
 
@@ -500,7 +500,7 @@ public class TransactionOutbox {
 
     /**
      * @param listener Event listener. Allows client code to react to tasks running, failing or
-     *     getting marked as failed.
+     *     getting blocked.
      * @return Builder.
      */
     public TransactionOutboxBuilder listener(TransactionOutboxListener listener) {
@@ -565,7 +565,7 @@ public class TransactionOutbox {
           instantiator,
           submitter,
           attemptFrequency,
-          markFailedAfterAttempts,
+          blockAfterAttempts,
           flushBatchSize,
           clockProvider,
           listener,

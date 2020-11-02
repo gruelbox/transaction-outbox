@@ -88,8 +88,8 @@ class TestComplexConfigurationExample {
                     .build())
             // Lower the log level when a task fails temporarily from the default WARN.
             .logLevelTemporaryFailure(Level.INFO)
-            // 10 attempts at a task before marking it as failed
-            .markFailedAfterAttempts(10)
+            // 10 attempts at a task before it is blocked (and would require intervention)
+            .blockAfterAttempts(10)
             // When calling flush(), select 0.5m records at a time.
             .flushBatchSize(500_000)
             // Flush once every 15 minutes only
@@ -100,12 +100,12 @@ class TestComplexConfigurationExample {
             // like user ids and
             // request ids across invocations.
             .serializeMdc(true)
-            // We can intercept task successes, single failures and failed tasks. The most common
+            // We can intercept task successes, single failures and blocked tasks. The most common
             // use is
-            // to catch failed tasks.
+            // to catch blocked tasks.
             // and raise alerts for these to be investigated. A Slack interactive message is
             // particularly effective here
-            // since it can be wired up to call retryable() automatically.
+            // since it can be wired up to call unblock() automatically.
             .listener(
                 new TransactionOutboxListener() {
 
@@ -115,8 +115,8 @@ class TestComplexConfigurationExample {
                   }
 
                   @Override
-                  public void markFailed(TransactionOutboxEntry entry, Throwable cause) {
-                    eventPublisher.publish(new FailedOutboxTaskEvent(entry.getId()));
+                  public void blocked(TransactionOutboxEntry entry, Throwable cause) {
+                    eventPublisher.publish(new BlockedOutboxTaskEvent(entry.getId()));
                   }
                 })
             .build();
@@ -149,7 +149,7 @@ class TestComplexConfigurationExample {
   }
 
   @Value
-  private static class FailedOutboxTaskEvent {
+  private static class BlockedOutboxTaskEvent {
     String id;
   }
 

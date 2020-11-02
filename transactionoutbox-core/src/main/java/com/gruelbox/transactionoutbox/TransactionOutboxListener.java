@@ -39,7 +39,7 @@ public interface TransactionOutboxListener {
   /**
    * Fired when a transaction outbox task fails. This may occur multiple times until the maximum
    * number of retries, at which point this will be fired <em>and then</em> {@link
-   * #markFailed(TransactionOutboxEntry, Throwable)}. This event is not guaranteed to fire in the
+   * #blocked(TransactionOutboxEntry, Throwable)}. This event is not guaranteed to fire in the
    * event of a JVM failure or power loss. It is fired <em>after</em> the commit to the database
    * marking the task as failed.
    *
@@ -52,14 +52,14 @@ public interface TransactionOutboxListener {
 
   /**
    * Fired when a transaction outbox task has passed the maximum number of retries and has been
-   * designated as a failed task. This event is not guaranteed to fire in the event of a JVM failure
+   * blocked. This event is not guaranteed to fire in the event of a JVM failure
    * or power loss. It is fired <em>after</em> the commit to the database marking the task as
-   * failed.
+   * blocked.
    *
-   * @param entry The outbox entry to be marked as failed.
+   * @param entry The outbox entry to be marked as blocked.
    * @param cause The cause of the most recent failure.
    */
-  default void markFailed(TransactionOutboxEntry entry, Throwable cause) {
+  default void blocked(TransactionOutboxEntry entry, Throwable cause) {
     // No-op
   }
 
@@ -92,9 +92,9 @@ public interface TransactionOutboxListener {
       }
 
       @Override
-      public void markFailed(TransactionOutboxEntry entry, Throwable cause) {
-        self.markFailed(entry, cause);
-        other.markFailed(entry, cause);
+      public void blocked(TransactionOutboxEntry entry, Throwable cause) {
+        self.blocked(entry, cause);
+        other.blocked(entry, cause);
       }
     };
   }
