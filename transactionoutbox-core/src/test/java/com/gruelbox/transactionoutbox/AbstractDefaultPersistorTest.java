@@ -23,7 +23,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -364,7 +363,6 @@ abstract class AbstractDefaultPersistorTest {
         .build();
   }
 
-  @NotNull
   private Invocation createInvocation() {
     return new Invocation(
         "Foo",

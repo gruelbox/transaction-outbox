@@ -13,7 +13,6 @@ import java.sql.Connection;
 import java.time.Duration;
 import java.util.Currency;
 import java.util.Set;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import javax.sql.DataSource;
 import lombok.Value;
@@ -35,7 +34,6 @@ class TestComplexConfigurationExample {
 
     DataSource dataSource = Mockito.mock(DataSource.class);
     ServiceLocator myServiceLocator = Mockito.mock(ServiceLocator.class);
-    Executor executor = ForkJoinPool.commonPool();
     EventPublisher eventPublisher = Mockito.mock(EventPublisher.class);
 
     TransactionManager transactionManager = TransactionManager.fromDataSource(dataSource);
