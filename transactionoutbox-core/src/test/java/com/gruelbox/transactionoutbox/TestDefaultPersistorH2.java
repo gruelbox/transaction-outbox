@@ -1,9 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
-import lombok.extern.slf4j.Slf4j;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Slf4j
 @Testcontainers
 class TestDefaultPersistorH2 extends AbstractDefaultPersistorTest {
 

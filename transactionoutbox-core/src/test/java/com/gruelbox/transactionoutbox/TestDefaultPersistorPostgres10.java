@@ -1,13 +1,11 @@
 package com.gruelbox.transactionoutbox;
 
 import java.time.Duration;
-import lombok.extern.slf4j.Slf4j;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Slf4j
 @Testcontainers
 class TestDefaultPersistorPostgres10 extends AbstractDefaultPersistorTest {
 

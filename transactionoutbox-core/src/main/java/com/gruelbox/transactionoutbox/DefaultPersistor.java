@@ -284,7 +284,7 @@ public class DefaultPersistor implements Persistor {
   }
 
   // For testing. Assumed low volume.
-  void clear(Transaction tx) throws SQLException {
+  public void clear(Transaction tx) throws SQLException {
     try (Statement stmt = tx.connection().createStatement()) {
       stmt.execute("DELETE FROM " + tableName);
     }
