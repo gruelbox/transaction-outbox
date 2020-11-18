@@ -9,6 +9,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
+import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
@@ -485,7 +486,17 @@ abstract class AbstractAcceptanceTest {
   }
 
   private void clearOutbox() {
-    TestUtils.runSql(simpleTxnManager(), "DELETE FROM TXNO_OUTBOX");
+    DefaultPersistor persistor = Persistor.forDialect(connectionDetails().dialect());
+    TransactionManager transactionManager = simpleTxnManager();
+    persistor.migrate(transactionManager);
+    transactionManager.inTransaction(
+        tx -> {
+          try {
+            persistor.clear(tx);
+          } catch (SQLException e) {
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   private void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
