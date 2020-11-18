@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.validation.ClockProvider;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
@@ -29,7 +29,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
   private static final int DEFAULT_FLUSH_BATCH_SIZE = 4096;
 
   @NotNull private final TransactionManager transactionManager;
-  @Valid @NotNull private final Supplier<Persistor> persistor;
+  @Valid @NotNull private final Persistor persistor;
   @Valid @NotNull private final Instantiator instantiator;
   @NotNull private final Submitter submitter;
   @NotNull private final Duration attemptFrequency;
@@ -46,6 +46,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
   private final boolean serializeMdc;
   private final Validator validator;
   @NotNull private final Duration retentionThreshold;
+  private final AtomicBoolean initialized = new AtomicBoolean();
 
   private TransactionOutboxImpl(
       TransactionManager transactionManager,
@@ -59,18 +60,11 @@ class TransactionOutboxImpl implements TransactionOutbox {
       Persistor persistor,
       Level logLevelTemporaryFailure,
       Boolean serializeMdc,
-      Duration retentionThreshold) {
+      Duration retentionThreshold,
+      Boolean initializeImmediately) {
     this.transactionManager = transactionManager;
     this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
-    this.persistor =
-        Utils.memoise(
-            () -> {
-              // Delay migration until the persistor is needed. Safest since most applications will
-              // have a structured startup which might mean the persistor doesn't work until some
-              // time after the construction of the outbox instance.
-              persistor.migrate(transactionManager);
-              return persistor;
-            });
+    this.persistor = persistor;
     this.submitter = Utils.firstNonNull(submitter, Submitter::withDefaultExecutor);
     this.attemptFrequency = Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
     this.blockAfterAttempts = blockAfterAttempts < 1 ? 5 : blockAfterAttempts;
@@ -82,10 +76,25 @@ class TransactionOutboxImpl implements TransactionOutbox {
     this.serializeMdc = serializeMdc == null || serializeMdc;
     this.retentionThreshold = retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold;
     this.validator.validate(this);
+    if (initializeImmediately == null || initializeImmediately) {
+      initialize();
+    }
   }
 
   static TransactionOutboxBuilder builder() {
     return new TransactionOutboxBuilderImpl();
+  }
+
+  @Override
+  public void initialize() {
+    if (initialized.compareAndSet(false, true)) {
+      try {
+        persistor.migrate(transactionManager);
+      } catch (Exception e) {
+        initialized.set(false);
+        throw e;
+      }
+    }
   }
 
   @Override
@@ -101,6 +110,9 @@ class TransactionOutboxImpl implements TransactionOutbox {
   @SuppressWarnings("UnusedReturnValue")
   @Override
   public boolean flush() {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
     Instant now = clockProvider.getClock().instant();
     List<TransactionOutboxEntry> batch = flush(now);
     expireIdempotencyProtection(now);
@@ -113,7 +125,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
         transactionManager.inTransactionReturns(
             transaction -> {
               List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
-              uncheckedly(() -> persistor.get().selectBatch(transaction, flushBatchSize, now))
+              uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize, now))
                   .forEach(
                       entry -> {
                         log.debug("Reprocessing {}", entry.description());
@@ -139,8 +151,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
       recordsDeleted =
           transactionManager.inTransactionReturns(
               tx ->
-                  uncheckedly(
-                      () -> persistor.get().deleteProcessedAndExpired(tx, flushBatchSize, now)));
+                  uncheckedly(() -> persistor.deleteProcessedAndExpired(tx, flushBatchSize, now)));
       totalRecordsDeleted += recordsDeleted;
     } while (recordsDeleted > 0);
     if (totalRecordsDeleted > 0) {
@@ -157,6 +168,9 @@ class TransactionOutboxImpl implements TransactionOutbox {
 
   @Override
   public boolean unblock(String entryId) {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
     if (!(transactionManager instanceof ThreadLocalContextTransactionManager)) {
       throw new UnsupportedOperationException(
           "This method requires a ThreadLocalContextTransactionManager");
@@ -164,7 +178,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
     log.info("Unblocking entry {} for retry.", entryId);
     try {
       return ((ThreadLocalContextTransactionManager) transactionManager)
-          .requireTransactionReturns(tx -> persistor.get().unblock(tx, entryId));
+          .requireTransactionReturns(tx -> persistor.unblock(tx, entryId));
     } catch (Exception e) {
       throw (RuntimeException) Utils.uncheckAndThrow(e);
     }
@@ -173,6 +187,9 @@ class TransactionOutboxImpl implements TransactionOutbox {
   @Override
   @SuppressWarnings({"unchecked", "rawtypes"})
   public boolean unblock(String entryId, Object transactionContext) {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
     if (!(transactionManager instanceof ParameterContextTransactionManager)) {
       throw new UnsupportedOperationException(
           "This method requires a ParameterContextTransactionManager");
@@ -180,18 +197,21 @@ class TransactionOutboxImpl implements TransactionOutbox {
     log.info("Unblocking entry {} for retry", entryId);
     try {
       if (transactionContext instanceof Transaction) {
-        return persistor.get().unblock((Transaction) transactionContext, entryId);
+        return persistor.unblock((Transaction) transactionContext, entryId);
       }
       Transaction transaction =
           ((ParameterContextTransactionManager) transactionManager)
               .transactionFromContext(transactionContext);
-      return persistor.get().unblock(transaction, entryId);
+      return persistor.unblock(transaction, entryId);
     } catch (Exception e) {
       throw (RuntimeException) Utils.uncheckAndThrow(e);
     }
   }
 
   private <T> T schedule(Class<T> clazz, String uniqueRequestId) {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
     return Utils.createProxy(
         clazz,
         (method, args) ->
@@ -206,7 +226,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
                           extracted.getArgs(),
                           uniqueRequestId);
                   validator.validate(entry);
-                  persistor.get().save(extracted.getTransaction(), entry);
+                  persistor.save(extracted.getTransaction(), entry);
                   extracted
                       .getTransaction()
                       .addPostCommitHook(
@@ -228,22 +248,23 @@ class TransactionOutboxImpl implements TransactionOutbox {
   @SuppressWarnings("WeakerAccess")
   public void processNow(TransactionOutboxEntry entry) {
     try {
+      initialize();
       var success =
           transactionManager.inTransactionReturnsThrows(
               transaction -> {
-                if (!persistor.get().lock(transaction, entry)) {
+                if (!persistor.lock(transaction, entry)) {
                   return false;
                 }
                 log.info("Processing {}", entry.description());
                 invoke(entry, transaction);
                 if (entry.getUniqueRequestId() == null) {
-                  persistor.get().delete(transaction, entry);
+                  persistor.delete(transaction, entry);
                 } else {
                   log.debug(
                       "Deferring deletion of {} by {}", entry.description(), retentionThreshold);
                   entry.setProcessed(true);
                   entry.setNextAttemptTime(after(retentionThreshold));
-                  persistor.get().update(transaction, entry);
+                  persistor.update(transaction, entry);
                 }
                 return true;
               });
@@ -288,7 +309,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
     try {
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
-      persistor.get().update(transaction, entry);
+      persistor.update(transaction, entry);
     } catch (OptimisticLockException e) {
       throw e;
     } catch (Exception e) {
@@ -307,8 +328,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
       entry.setBlocked(blocked);
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
-      transactionManager.inTransactionThrows(
-          transaction -> persistor.get().update(transaction, entry));
+      transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));
       listener.failure(entry, cause);
       if (blocked) {
         log.error(
@@ -355,7 +375,8 @@ class TransactionOutboxImpl implements TransactionOutbox {
           persistor,
           logLevelTemporaryFailure,
           serializeMdc,
-          retentionThreshold);
+          retentionThreshold,
+          initializeImmediately);
     }
   }
 

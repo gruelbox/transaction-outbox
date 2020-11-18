@@ -103,8 +103,10 @@ abstract class AbstractAcceptanceTest {
                           }
                         }))
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .initializeImmediately(false)
             .build();
 
+    outbox.initialize();
     clearOutbox();
 
     transactionManager.inTransaction(
@@ -122,6 +124,36 @@ abstract class AbstractAcceptanceTest {
     assertTrue(chainedLatch.await(2, TimeUnit.SECONDS));
     assertTrue(latch.await(1, TimeUnit.SECONDS));
     assertTrue(gotScheduled.get());
+  }
+
+  @Test
+  final void noAutomaticInitialization() {
+
+    TransactionManager transactionManager = simpleTxnManager();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(
+                Instantiator.using(
+                    clazz ->
+                        (InterfaceProcessor)
+                            (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
+            .submitter(Submitter.withDefaultExecutor())
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .initializeImmediately(false)
+            .build();
+
+    Persistor.forDialect(connectionDetails().dialect()).migrate(simpleTxnManager());
+    clearOutbox();
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> {
+          transactionManager.inTransaction(
+              () -> {
+                outbox.schedule(InterfaceProcessor.class).process(3, "Whee");
+              });
+        });
   }
 
   @Test
@@ -488,7 +520,6 @@ abstract class AbstractAcceptanceTest {
   private void clearOutbox() {
     DefaultPersistor persistor = Persistor.forDialect(connectionDetails().dialect());
     TransactionManager transactionManager = simpleTxnManager();
-    persistor.migrate(transactionManager);
     transactionManager.inTransaction(
         tx -> {
           try {

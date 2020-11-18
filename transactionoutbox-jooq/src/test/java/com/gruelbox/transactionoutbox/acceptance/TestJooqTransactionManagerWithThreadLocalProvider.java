@@ -25,7 +25,6 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;

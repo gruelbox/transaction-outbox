@@ -150,48 +150,12 @@ class Utils {
     }
   }
 
-  static <T> Supplier<T> memoise(Supplier<T> supplier) {
-    return new Memoiser<>(supplier);
-  }
-
   private static boolean hasDefaultConstructor(Class<?> clazz) {
     try {
       clazz.getConstructor();
       return true;
     } catch (NoSuchMethodException e) {
       return false;
-    }
-  }
-
-  /**
-   * Strongly inspired by the {@code MemoizingSupplier} in <a
-   * href="https://github.com/google/guava">Guava</a>.
-   *
-   * @param <T> The type memoised.
-   */
-  private static class Memoiser<T> implements Supplier<T> {
-    private volatile Supplier<T> supplier;
-    private volatile boolean initialized;
-    private T value;
-
-    private Memoiser(Supplier<T> supplier) {
-      this.supplier = supplier;
-    }
-
-    @Override
-    public T get() {
-      if (!this.initialized) {
-        synchronized (this) {
-          if (!this.initialized) {
-            T t = this.supplier.get();
-            this.value = t;
-            this.initialized = true;
-            this.supplier = null;
-            return t;
-          }
-        }
-      }
-      return this.value;
     }
   }
 }
