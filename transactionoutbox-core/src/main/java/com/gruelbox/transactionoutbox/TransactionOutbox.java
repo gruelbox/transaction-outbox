@@ -22,6 +22,13 @@ public interface TransactionOutbox {
   }
 
   /**
+   * Performs initial setup, making the instance usable. If {@link
+   * TransactionOutboxBuilder#initializeImmediately(boolean)} is true, which is the default, this
+   * method is called automatically when the instance is constructed.
+   */
+  void initialize();
+
+  /**
    * The main entry point for submitting new transaction outbox tasks.
    *
    * <p>Returns a proxy of {@code T} which, when called, will instantly return and schedule a call
@@ -130,6 +137,7 @@ public interface TransactionOutbox {
     protected Level logLevelTemporaryFailure;
     protected Boolean serializeMdc;
     protected Duration retentionThreshold;
+    protected Boolean initializeImmediately;
 
     protected TransactionOutboxBuilder() {}
 
@@ -262,6 +270,17 @@ public interface TransactionOutbox {
      */
     public TransactionOutboxBuilder retentionThreshold(Duration retentionThreshold) {
       this.retentionThreshold = retentionThreshold;
+      return this;
+    }
+
+    /**
+     * @param initializeImmediately If true, {@link TransactionOutbox#initialize()} is called
+     *     automatically on creation (this is the default). Set to false in environments where
+     *     structured startup means that the database should not be accessed until later.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder initializeImmediately(boolean initializeImmediately) {
+      this.initializeImmediately = initializeImmediately;
       return this;
     }
 
