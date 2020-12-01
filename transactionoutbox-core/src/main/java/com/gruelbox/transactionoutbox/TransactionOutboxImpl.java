@@ -285,7 +285,9 @@ class TransactionOutboxImpl implements TransactionOutbox {
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
     log.debug("Created instance {}", instance);
-    transactionManager.injectTransaction(entry.getInvocation(), transaction).invoke(instance);
+    transactionManager
+        .injectTransaction(entry.getInvocation(), transaction)
+        .invoke(instance, listener);
   }
 
   private TransactionOutboxEntry newEntry(

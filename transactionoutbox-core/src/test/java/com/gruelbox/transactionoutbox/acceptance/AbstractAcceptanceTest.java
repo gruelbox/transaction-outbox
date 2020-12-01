@@ -148,12 +148,9 @@ abstract class AbstractAcceptanceTest {
 
     Assertions.assertThrows(
         IllegalStateException.class,
-        () -> {
-          transactionManager.inTransaction(
-              () -> {
-                outbox.schedule(InterfaceProcessor.class).process(3, "Whee");
-              });
-        });
+        () ->
+            transactionManager.inTransaction(
+                () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee")));
   }
 
   @Test
@@ -500,7 +497,7 @@ abstract class AbstractAcceptanceTest {
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
   }
 
-  private TransactionManager simpleTxnManager() {
+  protected TransactionManager simpleTxnManager() {
     return TransactionManager.fromConnectionDetails(
         connectionDetails().driverClassName(),
         connectionDetails().url(),
@@ -517,7 +514,7 @@ abstract class AbstractAcceptanceTest {
     return new HikariDataSource(config);
   }
 
-  private void clearOutbox() {
+  protected void clearOutbox() {
     DefaultPersistor persistor = Persistor.forDialect(connectionDetails().dialect());
     TransactionManager transactionManager = simpleTxnManager();
     transactionManager.inTransaction(
@@ -544,6 +541,7 @@ abstract class AbstractAcceptanceTest {
                   log.error("Error flushing transaction outbox. Pausing", e);
                 }
                 try {
+                  //noinspection BusyWait
                   Thread.sleep(250);
                 } catch (InterruptedException e) {
                   break;
