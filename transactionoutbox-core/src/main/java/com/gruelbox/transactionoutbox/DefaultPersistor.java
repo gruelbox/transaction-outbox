@@ -37,7 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultPersistor implements Persistor {
 
   private static final String ALL_FIELDS =
-      "id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version";
+      "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blacklisted, processed, version";
 
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
@@ -91,7 +91,7 @@ public class DefaultPersistor implements Persistor {
   public void save(Transaction tx, TransactionOutboxEntry entry)
       throws SQLException, AlreadyScheduledException {
     var insertSql =
-        "INSERT INTO " + tableName + " (" + ALL_FIELDS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO " + tableName + " (" + ALL_FIELDS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
     if (entry.getUniqueRequestId() == null) {
@@ -123,11 +123,13 @@ public class DefaultPersistor implements Persistor {
     stmt.setString(1, entry.getId());
     stmt.setString(2, entry.getUniqueRequestId());
     stmt.setString(3, writer.toString());
-    stmt.setTimestamp(4, Timestamp.from(entry.getNextAttemptTime()));
-    stmt.setInt(5, entry.getAttempts());
-    stmt.setBoolean(6, entry.isBlacklisted());
-    stmt.setBoolean(7, entry.isProcessed());
-    stmt.setInt(8, entry.getVersion());
+    stmt.setTimestamp(
+        4, entry.getLastAttemptTime() == null ? null : Timestamp.from(entry.getLastAttemptTime()));
+    stmt.setTimestamp(5, Timestamp.from(entry.getNextAttemptTime()));
+    stmt.setInt(6, entry.getAttempts());
+    stmt.setBoolean(7, entry.isBlacklisted());
+    stmt.setBoolean(8, entry.isProcessed());
+    stmt.setInt(9, entry.getVersion());
   }
 
   @Override
@@ -154,15 +156,18 @@ public class DefaultPersistor implements Persistor {
                 "UPDATE "
                     + tableName
                     + " "
-                    + "SET nextAttemptTime = ?, attempts = ?, blacklisted = ?, processed = ?, version = ? "
+                    + "SET lastAttemptTime = ?, nextAttemptTime = ?, attempts = ?, blacklisted = ?, processed = ?, version = ? "
                     + "WHERE id = ? and version = ?")) {
-      stmt.setTimestamp(1, Timestamp.from(entry.getNextAttemptTime()));
-      stmt.setInt(2, entry.getAttempts());
-      stmt.setBoolean(3, entry.isBlacklisted());
-      stmt.setBoolean(4, entry.isProcessed());
-      stmt.setInt(5, entry.getVersion() + 1);
-      stmt.setString(6, entry.getId());
-      stmt.setInt(7, entry.getVersion());
+      stmt.setTimestamp(
+          1,
+          entry.getLastAttemptTime() == null ? null : Timestamp.from(entry.getLastAttemptTime()));
+      stmt.setTimestamp(2, Timestamp.from(entry.getNextAttemptTime()));
+      stmt.setInt(3, entry.getAttempts());
+      stmt.setBoolean(4, entry.isBlacklisted());
+      stmt.setBoolean(5, entry.isProcessed());
+      stmt.setInt(6, entry.getVersion() + 1);
+      stmt.setString(7, entry.getId());
+      stmt.setInt(8, entry.getVersion());
       if (stmt.executeUpdate() != 1) {
         throw new OptimisticLockException();
       }
@@ -272,6 +277,10 @@ public class DefaultPersistor implements Persistor {
               .id(rs.getString("id"))
               .uniqueRequestId(rs.getString("uniqueRequestId"))
               .invocation(serializer.deserializeInvocation(invocationStream))
+              .lastAttemptTime(
+                  rs.getTimestamp("lastAttemptTime") == null
+                      ? null
+                      : rs.getTimestamp("lastAttemptTime").toInstant())
               .nextAttemptTime(rs.getTimestamp("nextAttemptTime").toInstant())
               .attempts(rs.getInt("attempts"))
               .blacklisted(rs.getBoolean("blacklisted"))
