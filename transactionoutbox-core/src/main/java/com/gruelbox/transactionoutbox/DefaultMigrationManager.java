@@ -19,9 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 class DefaultMigrationManager {
 
-  /**
-   * Migrations can be dialect specific *
-   */
+  /** Migrations can be dialect specific * */
   private static final List<Migration> MIGRATIONS =
       List.of(
           new Migration(
@@ -52,9 +50,19 @@ class DefaultMigrationManager {
               Map.of(
                   Dialect.POSTGRESQL_9,
                   "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)",
-                  Dialect.H2, "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")),
+                  Dialect.H2,
+                  "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")),
           new Migration(
               6,
+              "Rename column blacklisted to blocked",
+              "ALTER TABLE TXNO_OUTBOX CHANGE COLUMN blacklisted blocked VARCHAR(250)",
+              Map.of(
+                  Dialect.POSTGRESQL_9,
+                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked",
+                  Dialect.H2,
+                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")),
+          new Migration(
+              7,
               "Add lastAttemptTime column to outbox",
               "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) AFTER invocation",
               Map.of(

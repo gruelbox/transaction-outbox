@@ -9,6 +9,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
+import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
@@ -102,8 +103,10 @@ abstract class AbstractAcceptanceTest {
                           }
                         }))
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .initializeImmediately(false)
             .build();
 
+    outbox.initialize();
     clearOutbox();
 
     transactionManager.inTransaction(
@@ -121,6 +124,33 @@ abstract class AbstractAcceptanceTest {
     assertTrue(chainedLatch.await(2, TimeUnit.SECONDS));
     assertTrue(latch.await(1, TimeUnit.SECONDS));
     assertTrue(gotScheduled.get());
+  }
+
+  @Test
+  final void noAutomaticInitialization() {
+
+    TransactionManager transactionManager = simpleTxnManager();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(
+                Instantiator.using(
+                    clazz ->
+                        (InterfaceProcessor)
+                            (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
+            .submitter(Submitter.withDefaultExecutor())
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .initializeImmediately(false)
+            .build();
+
+    Persistor.forDialect(connectionDetails().dialect()).migrate(simpleTxnManager());
+    clearOutbox();
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () ->
+            transactionManager.inTransaction(
+                () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee")));
   }
 
   @Test
@@ -377,15 +407,15 @@ abstract class AbstractAcceptanceTest {
   }
 
   /**
-   * Runs a piece of work which will fail enough times to be blacklisted but will then pass when
-   * re-whitelisted.
+   * Runs a piece of work which will fail enough times to enter a blocked state but will then pass
+   * when re-tried after it is unblocked.
    */
   @Test
-  final void blacklistAndWhitelist() throws Exception {
+  final void blockAndThenUnblockForRetry() throws Exception {
     TransactionManager transactionManager = simpleTxnManager();
     CountDownLatch successLatch = new CountDownLatch(1);
-    CountDownLatch blacklistLatch = new CountDownLatch(1);
-    LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    LatchListener latchListener = new LatchListener(successLatch, blockLatch);
     AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -394,7 +424,7 @@ abstract class AbstractAcceptanceTest {
             .instantiator(new FailingInstantiator(attempts))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
-            .blacklistAfterAttempts(2)
+            .blockAfterAttempts(2)
             .build();
 
     clearOutbox();
@@ -404,10 +434,10 @@ abstract class AbstractAcceptanceTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blacklistLatch.await(3, TimeUnit.SECONDS));
+          assertTrue(blockLatch.await(3, TimeUnit.SECONDS));
           assertTrue(
               transactionManager.inTransactionReturns(
-                  tx -> outbox.whitelist(latchListener.getBlacklisted().getId())));
+                  tx -> outbox.unblock(latchListener.getBlocked().getId())));
           assertTrue(successLatch.await(3, TimeUnit.SECONDS));
         });
   }
@@ -467,7 +497,7 @@ abstract class AbstractAcceptanceTest {
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
   }
 
-  private TransactionManager simpleTxnManager() {
+  protected TransactionManager simpleTxnManager() {
     return TransactionManager.fromConnectionDetails(
         connectionDetails().driverClassName(),
         connectionDetails().url(),
@@ -484,8 +514,17 @@ abstract class AbstractAcceptanceTest {
     return new HikariDataSource(config);
   }
 
-  private void clearOutbox() {
-    TestUtils.runSql(simpleTxnManager(), "DELETE FROM TXNO_OUTBOX");
+  protected void clearOutbox() {
+    DefaultPersistor persistor = Persistor.forDialect(connectionDetails().dialect());
+    TransactionManager transactionManager = simpleTxnManager();
+    transactionManager.inTransaction(
+        tx -> {
+          try {
+            persistor.clear(tx);
+          } catch (SQLException e) {
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   private void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
@@ -502,6 +541,7 @@ abstract class AbstractAcceptanceTest {
                   log.error("Error flushing transaction outbox. Pausing", e);
                 }
                 try {
+                  //noinspection BusyWait
                   Thread.sleep(250);
                 } catch (InterruptedException e) {
                   break;

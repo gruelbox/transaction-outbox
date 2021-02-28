@@ -37,7 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultPersistor implements Persistor {
 
   private static final String ALL_FIELDS =
-      "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blacklisted, processed, version";
+      "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
 
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
@@ -75,7 +75,7 @@ public class DefaultPersistor implements Persistor {
   /**
    * @param serializer The serializer to use for {@link Invocation}s. See {@link
    *     InvocationSerializer} for more information. Defaults to {@link
-   *     InvocationSerializer#createDefaultJsonSerializer()} with no whitelisted classes..
+   *     InvocationSerializer#createDefaultJsonSerializer()} with no custom serializable classes..
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
@@ -127,7 +127,7 @@ public class DefaultPersistor implements Persistor {
         4, entry.getLastAttemptTime() == null ? null : Timestamp.from(entry.getLastAttemptTime()));
     stmt.setTimestamp(5, Timestamp.from(entry.getNextAttemptTime()));
     stmt.setInt(6, entry.getAttempts());
-    stmt.setBoolean(7, entry.isBlacklisted());
+    stmt.setBoolean(7, entry.isBlocked());
     stmt.setBoolean(8, entry.isProcessed());
     stmt.setInt(9, entry.getVersion());
   }
@@ -156,14 +156,14 @@ public class DefaultPersistor implements Persistor {
                 "UPDATE "
                     + tableName
                     + " "
-                    + "SET lastAttemptTime = ?, nextAttemptTime = ?, attempts = ?, blacklisted = ?, processed = ?, version = ? "
+                    + "SET lastAttemptTime = ?, nextAttemptTime = ?, attempts = ?, blocked = ?, processed = ?, version = ? "
                     + "WHERE id = ? and version = ?")) {
       stmt.setTimestamp(
           1,
           entry.getLastAttemptTime() == null ? null : Timestamp.from(entry.getLastAttemptTime()));
       stmt.setTimestamp(2, Timestamp.from(entry.getNextAttemptTime()));
       stmt.setInt(3, entry.getAttempts());
-      stmt.setBoolean(4, entry.isBlacklisted());
+      stmt.setBoolean(4, entry.isBlocked());
       stmt.setBoolean(5, entry.isProcessed());
       stmt.setInt(6, entry.getVersion() + 1);
       stmt.setString(7, entry.getId());
@@ -214,13 +214,13 @@ public class DefaultPersistor implements Persistor {
   }
 
   @Override
-  public boolean whitelist(Transaction tx, String entryId) throws Exception {
+  public boolean unblock(Transaction tx, String entryId) throws Exception {
     PreparedStatement stmt =
         tx.prepareBatchStatement(
             "UPDATE "
                 + tableName
-                + " SET attempts = 0, blacklisted = false "
-                + "WHERE blacklisted = true AND processed = false AND id = ?");
+                + " SET attempts = 0, blocked = false "
+                + "WHERE blocked = true AND processed = false AND id = ?");
     stmt.setString(1, entryId);
     stmt.setQueryTimeout(writeLockTimeoutSeconds);
     return stmt.executeUpdate() != 0;
@@ -238,7 +238,7 @@ public class DefaultPersistor implements Persistor {
                     + ALL_FIELDS
                     + " FROM "
                     + tableName
-                    + " WHERE nextAttemptTime < ? AND blacklisted = false AND processed = false LIMIT ?"
+                    + " WHERE nextAttemptTime < ? AND blocked = false AND processed = false LIMIT ?"
                     + forUpdate)) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
@@ -283,7 +283,7 @@ public class DefaultPersistor implements Persistor {
                       : rs.getTimestamp("lastAttemptTime").toInstant())
               .nextAttemptTime(rs.getTimestamp("nextAttemptTime").toInstant())
               .attempts(rs.getInt("attempts"))
-              .blacklisted(rs.getBoolean("blacklisted"))
+              .blocked(rs.getBoolean("blocked"))
               .processed(rs.getBoolean("processed"))
               .version(rs.getInt("version"))
               .build();
@@ -293,7 +293,7 @@ public class DefaultPersistor implements Persistor {
   }
 
   // For testing. Assumed low volume.
-  void clear(Transaction tx) throws SQLException {
+  public void clear(Transaction tx) throws SQLException {
     try (Statement stmt = tx.connection().createStatement()) {
       stmt.execute("DELETE FROM " + tableName);
     }

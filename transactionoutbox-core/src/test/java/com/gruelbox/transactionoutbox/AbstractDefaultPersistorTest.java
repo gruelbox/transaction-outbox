@@ -23,7 +23,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -145,7 +144,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testBlacklistedExcluded() throws Exception {
+  void testBlockedEntriesExcluded() throws Exception {
     txManager()
         .inTransactionThrows(
             tx -> {
@@ -344,28 +343,26 @@ abstract class AbstractDefaultPersistorTest {
     }
   }
 
-  private TransactionOutboxEntry createEntry(
-      String id, Instant nextAttemptTime, boolean blacklisted) {
+  private TransactionOutboxEntry createEntry(String id, Instant nextAttemptTime, boolean blocked) {
     return TransactionOutboxEntry.builder()
         .id(id)
         .invocation(createInvocation())
-        .blacklisted(blacklisted)
+        .blocked(blocked)
         .nextAttemptTime(nextAttemptTime.truncatedTo(MILLIS))
         .build();
   }
 
   private TransactionOutboxEntry createEntry(
-      String id, Instant nextAttemptTime, boolean blacklisted, String uniqueId) {
+      String id, Instant nextAttemptTime, boolean blocked, String uniqueId) {
     return TransactionOutboxEntry.builder()
         .id(id)
         .invocation(createInvocation())
-        .blacklisted(blacklisted)
+        .blocked(blocked)
         .nextAttemptTime(nextAttemptTime.truncatedTo(MILLIS))
         .uniqueRequestId(uniqueId)
         .build();
   }
 
-  @NotNull
   private Invocation createInvocation() {
     return new Invocation(
         "Foo",

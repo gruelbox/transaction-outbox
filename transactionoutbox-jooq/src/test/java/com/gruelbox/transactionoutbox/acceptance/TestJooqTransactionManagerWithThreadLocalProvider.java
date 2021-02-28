@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.JooqTransactionListener;
@@ -24,6 +25,7 @@ import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -418,7 +420,16 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
   }
 
   private void clearOutbox(TransactionManager transactionManager) {
-    TestUtils.runSql(transactionManager, "DELETE FROM TXNO_OUTBOX");
+    DefaultPersistor persistor = Persistor.forDialect(Dialect.H2);
+    persistor.migrate(transactionManager);
+    transactionManager.inTransaction(
+        tx -> {
+          try {
+            persistor.clear(tx);
+          } catch (SQLException e) {
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   private void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
