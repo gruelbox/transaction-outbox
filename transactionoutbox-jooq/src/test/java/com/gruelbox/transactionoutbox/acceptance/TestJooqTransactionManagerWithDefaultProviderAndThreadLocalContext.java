@@ -66,7 +66,6 @@ class TestJooqTransactionManagerWithDefaultProviderAndThreadLocalContext {
 
   @AfterEach
   void afterEach() {
-    dsl.close();
     dataSource.close();
   }
 
@@ -276,7 +275,6 @@ class TestJooqTransactionManagerWithDefaultProviderAndThreadLocalContext {
   @Test
   void retryBehaviour() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)

@@ -18,7 +18,6 @@ import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.Submitter;
 import com.gruelbox.transactionoutbox.ThreadLocalContextTransactionManager;
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
-import com.gruelbox.transactionoutbox.Transaction;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
@@ -41,7 +40,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.MatcherAssert;
-import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
@@ -71,7 +69,6 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
 
   @AfterEach
   void afterEach() {
-    dsl.close();
     dataSource.close();
   }
 
@@ -339,7 +336,6 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
   @Test
   void retryBehaviour() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
@@ -470,14 +466,6 @@ class TestJooqTransactionManagerWithThreadLocalProvider {
     @SuppressWarnings("SameParameterValue")
     void process(int i) {
       TestUtils.writeRecord(transactionManager, i);
-    }
-
-    void process(int i, Transaction transaction) {
-      TestUtils.writeRecord(transaction, i);
-    }
-
-    void process(int i, Configuration configuration) {
-      TestUtils.writeRecord(configuration, i);
     }
   }
 
