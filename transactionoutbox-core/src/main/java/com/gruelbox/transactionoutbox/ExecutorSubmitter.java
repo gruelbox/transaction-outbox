@@ -4,7 +4,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
-import javax.validation.constraints.NotNull;
+
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.event.Level;
