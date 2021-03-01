@@ -7,7 +7,8 @@ import java.sql.Statement;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import javax.validation.constraints.NotNull;
+
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
  * Simple database migration manager. Inspired by Flyway, Liquibase, Morf etc, just trimmed down for
  * minimum dependencies.
  */
+@SuppressWarnings("SqlResolve")
 @Slf4j
 class DefaultMigrationManager {
 

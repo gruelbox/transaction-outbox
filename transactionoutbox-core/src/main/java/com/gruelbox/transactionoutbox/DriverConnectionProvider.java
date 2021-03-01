@@ -4,7 +4,8 @@ import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import javax.validation.constraints.NotBlank;
+
+import jakarta.validation.constraints.NotBlank;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -27,7 +28,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 final class DriverConnectionProvider implements ConnectionProvider {
 
-  @NotBlank private final String driverClassName;
+  @NotBlank
+  private final String driverClassName;
 
   @NotBlank private final String url;
 
