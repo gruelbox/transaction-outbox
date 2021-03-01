@@ -21,13 +21,10 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
@@ -41,9 +38,6 @@ import org.junit.jupiter.api.Test;
 @Slf4j
 class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
 
-  private final ExecutorService unreliablePool =
-      new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
-
   private HikariDataSource dataSource;
   private DSLContext dsl;
 
@@ -56,7 +50,6 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
 
   @AfterEach
   void afterEach() {
-    dsl.close();
     dataSource.close();
   }
 
@@ -133,18 +126,17 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
 
     clearOutbox(createTransactionManager());
 
-    try (DSLContext dsl = createDsl()) {
-      dsl.transaction(
-          cx1 -> {
-            outbox.schedule(Worker.class).process(1, cx1);
-            try {
-              // Should not be fired until after commit
-              assertFalse(latch.await(2, TimeUnit.SECONDS));
-            } catch (InterruptedException e) {
-              fail("Interrupted");
-            }
-          });
-    }
+    DSLContext dsl = createDsl();
+    dsl.transaction(
+        cx1 -> {
+          outbox.schedule(Worker.class).process(1, cx1);
+          try {
+            // Should not be fired until after commit
+            assertFalse(latch.await(2, TimeUnit.SECONDS));
+          } catch (InterruptedException e) {
+            fail("Interrupted");
+          }
+        });
 
     // Should be fired after commit
     assertTrue(latch.await(2, TimeUnit.SECONDS));
