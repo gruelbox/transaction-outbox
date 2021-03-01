@@ -5,7 +5,6 @@ import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.SpringInstantiator;
 import com.gruelbox.transactionoutbox.SpringTransactionManager;
 import com.gruelbox.transactionoutbox.SpringTransactionOutboxConfiguration;
-import com.gruelbox.transactionoutbox.SpringTransactionOutboxFactory;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

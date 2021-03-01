@@ -75,14 +75,9 @@
         <version>7.0.1.Final</version>
       </dependency>
       <dependency>
-        <groupId>javax.el</groupId>
-        <artifactId>javax.el-api</artifactId>
-        <version>3.0.0</version>
-      </dependency>
-      <dependency>
         <groupId>org.glassfish</groupId>
-        <artifactId>javax.el</artifactId>
-        <version>3.0.0</version>
+        <artifactId>jakarta.el</artifactId>
+        <version>4.0.1</version>
       </dependency>
 
       <dependency>
