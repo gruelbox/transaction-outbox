@@ -34,6 +34,6 @@ class TestDefaultPersistorMySql8 extends AbstractDefaultPersistorTest {
 
   @Override
   protected Dialect dialect() {
-    return Dialect.MY_SQL_5;
+    return Dialect.MY_SQL_8;
   }
 }

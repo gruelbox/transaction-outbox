@@ -3,11 +3,7 @@ package com.gruelbox.transactionoutbox;
 import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.empty;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -23,6 +19,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
+import org.hamcrest.Description;
+import org.hamcrest.TypeSafeMatcher;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -157,17 +155,58 @@ abstract class AbstractDefaultPersistorTest {
             tx -> assertThat(persistor().selectBatch(tx, 3, now.plusMillis(1)), hasSize(2)));
   }
 
+  static class TransactionOutboxEntryMatcher extends TypeSafeMatcher<TransactionOutboxEntry> {
+      private final TransactionOutboxEntry entry;
+
+      TransactionOutboxEntryMatcher(TransactionOutboxEntry entry){
+          this.entry = entry;
+      }
+
+      @Override
+      protected boolean matchesSafely(TransactionOutboxEntry other) {
+          return entry.getId().equals(other.getId())
+              && entry.getInvocation().equals(other.getInvocation())
+              && entry.getNextAttemptTime().equals(other.getNextAttemptTime())
+              && entry.getAttempts() == other.getAttempts()
+              && entry.getVersion() == other.getVersion()
+              && entry.isBlocked() == other.isBlocked()
+              && entry.isProcessed() == other.isProcessed()
+              ;
+      }
+
+      @Override
+      public void describeTo(Description description) {
+        description.appendText("Should match on all fields outside of lastAttemptTime :").appendText(entry.toString());
+      }
+  }
+
+  TransactionOutboxEntryMatcher matches(TransactionOutboxEntry e){
+      return new TransactionOutboxEntryMatcher(e);
+  }
+
   @Test
   void testUpdate() throws Exception {
     var entry = createEntry("FOO1", now, false);
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
     entry.setAttempts(1);
     txManager().inTransaction(tx -> assertDoesNotThrow(() -> persistor().update(tx, entry)));
+    var updatedEntry1 =  txManager()
+          .inTransactionReturnsThrows(
+              tx -> persistor().selectBatch(tx, 1, now.plusMillis(1)));
+    assertThat(updatedEntry1.size(), equalTo(1));
+    assertThat(updatedEntry1.get(0), matches(entry));
+    assertThat(updatedEntry1.get(0).getLastAttemptTime(), nullValue());
+
     entry.setAttempts(2);
+    entry.setLastAttemptTime(now);
     txManager().inTransaction(tx -> assertDoesNotThrow(() -> persistor().update(tx, entry)));
-    txManager()
-        .inTransactionThrows(
-            tx -> assertThat(persistor().selectBatch(tx, 1, now.plusMillis(1)), contains(entry)));
+
+    var updatedEntry2 =  txManager()
+        .inTransactionReturnsThrows(
+            tx -> persistor().selectBatch(tx, 1, now.plusMillis(1)));
+    assertThat(updatedEntry2.size(), equalTo(1));
+    assertThat(updatedEntry2.get(0), matches(entry));
+    assertThat(updatedEntry2.get(0).getLastAttemptTime(), notNullValue());
   }
 
   @Test
@@ -348,6 +387,7 @@ abstract class AbstractDefaultPersistorTest {
         .id(id)
         .invocation(createInvocation())
         .blocked(blocked)
+        .lastAttemptTime(null)
         .nextAttemptTime(nextAttemptTime.truncatedTo(MILLIS))
         .build();
   }
@@ -358,6 +398,7 @@ abstract class AbstractDefaultPersistorTest {
         .id(id)
         .invocation(createInvocation())
         .blocked(blocked)
+        .lastAttemptTime(null)
         .nextAttemptTime(nextAttemptTime.truncatedTo(MILLIS))
         .uniqueRequestId(uniqueId)
         .build();

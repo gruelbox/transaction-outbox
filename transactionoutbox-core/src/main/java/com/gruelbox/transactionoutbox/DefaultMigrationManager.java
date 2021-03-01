@@ -64,7 +64,7 @@ class DefaultMigrationManager {
           new Migration(
               7,
               "Add lastAttemptTime column to outbox",
-              "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) AFTER invocation",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation",
               Map.of(
                   Dialect.POSTGRESQL_9,
                   "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6)")));
