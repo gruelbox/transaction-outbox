@@ -2,11 +2,7 @@ package com.gruelbox.transactionoutbox.acceptance;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.DefaultPersistor;
@@ -405,6 +401,48 @@ abstract class AbstractAcceptanceTest {
           assertTrue(latch.await(15, TimeUnit.SECONDS));
         });
   }
+
+    @Test
+    final void lastAttemptTime_updatesEveryTime() throws Exception {
+        TransactionManager transactionManager = simpleTxnManager();
+        CountDownLatch successLatch = new CountDownLatch(1);
+        CountDownLatch blockLatch = new CountDownLatch(1);
+        AtomicInteger attempts = new AtomicInteger();
+        var orderedEntryListener = new OrderedEntryListener(successLatch, blockLatch);
+        TransactionOutbox outbox =
+            TransactionOutbox.builder()
+                .transactionManager(transactionManager)
+                .persistor(Persistor.forDialect(connectionDetails().dialect()))
+                .instantiator(new FailingInstantiator(attempts))
+                .submitter(Submitter.withExecutor(unreliablePool))
+                .attemptFrequency(Duration.ofMillis(500))
+                .listener(orderedEntryListener)
+                .blockAfterAttempts(2)
+                .build();
+
+        clearOutbox();
+
+        withRunningFlusher(
+            outbox,
+            () -> {
+                transactionManager.inTransaction(
+                    () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
+                assertTrue(blockLatch.await(10, TimeUnit.SECONDS));
+                assertTrue(
+                    transactionManager.inTransactionReturns(
+                        tx -> outbox.unblock(orderedEntryListener.getBlocked().getId())));
+                assertTrue(successLatch.await(10, TimeUnit.SECONDS));
+                var orderedEntryEvents = orderedEntryListener.getOrderedEntries();
+                log.info("The entry life cycle is: {}", orderedEntryEvents);
+
+                //then we are only dealing in terms of a single outbox entry.
+                assertEquals(1, orderedEntryEvents.stream().map(TransactionOutboxEntry::getId).distinct().count());
+                //the first, scheduled entry has no lastAttemptTime set
+                assertNull(orderedEntryEvents.get(0).getLastAttemptTime());
+                //all subsequent entries (2 x failures (second of which 'blocks'), 1x success updates against db) have a distinct lastAttemptTime set on them.
+                assertEquals(3, orderedEntryEvents.stream().skip(1).map(TransactionOutboxEntry::getLastAttemptTime).distinct().count());
+            });
+    }
 
   /**
    * Runs a piece of work which will fail enough times to enter a blocked state but will then pass

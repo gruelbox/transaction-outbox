@@ -311,6 +311,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
   private void pushBack(Transaction transaction, TransactionOutboxEntry entry)
       throws OptimisticLockException {
     try {
+      entry.setLastAttemptTime(clockProvider.getClock().instant());
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
       persistor.update(transaction, entry);

@@ -156,32 +156,33 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   static class TransactionOutboxEntryMatcher extends TypeSafeMatcher<TransactionOutboxEntry> {
-      private final TransactionOutboxEntry entry;
+    private final TransactionOutboxEntry entry;
 
-      TransactionOutboxEntryMatcher(TransactionOutboxEntry entry){
-          this.entry = entry;
-      }
+    TransactionOutboxEntryMatcher(TransactionOutboxEntry entry) {
+      this.entry = entry;
+    }
 
-      @Override
-      protected boolean matchesSafely(TransactionOutboxEntry other) {
-          return entry.getId().equals(other.getId())
-              && entry.getInvocation().equals(other.getInvocation())
-              && entry.getNextAttemptTime().equals(other.getNextAttemptTime())
-              && entry.getAttempts() == other.getAttempts()
-              && entry.getVersion() == other.getVersion()
-              && entry.isBlocked() == other.isBlocked()
-              && entry.isProcessed() == other.isProcessed()
-              ;
-      }
+    @Override
+    protected boolean matchesSafely(TransactionOutboxEntry other) {
+      return entry.getId().equals(other.getId())
+          && entry.getInvocation().equals(other.getInvocation())
+          && entry.getNextAttemptTime().equals(other.getNextAttemptTime())
+          && entry.getAttempts() == other.getAttempts()
+          && entry.getVersion() == other.getVersion()
+          && entry.isBlocked() == other.isBlocked()
+          && entry.isProcessed() == other.isProcessed();
+    }
 
-      @Override
-      public void describeTo(Description description) {
-        description.appendText("Should match on all fields outside of lastAttemptTime :").appendText(entry.toString());
-      }
+    @Override
+    public void describeTo(Description description) {
+      description
+          .appendText("Should match on all fields outside of lastAttemptTime :")
+          .appendText(entry.toString());
+    }
   }
 
-  TransactionOutboxEntryMatcher matches(TransactionOutboxEntry e){
-      return new TransactionOutboxEntryMatcher(e);
+  TransactionOutboxEntryMatcher matches(TransactionOutboxEntry e) {
+    return new TransactionOutboxEntryMatcher(e);
   }
 
   @Test
@@ -190,9 +191,9 @@ abstract class AbstractDefaultPersistorTest {
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
     entry.setAttempts(1);
     txManager().inTransaction(tx -> assertDoesNotThrow(() -> persistor().update(tx, entry)));
-    var updatedEntry1 =  txManager()
-          .inTransactionReturnsThrows(
-              tx -> persistor().selectBatch(tx, 1, now.plusMillis(1)));
+    var updatedEntry1 =
+        txManager()
+            .inTransactionReturnsThrows(tx -> persistor().selectBatch(tx, 1, now.plusMillis(1)));
     assertThat(updatedEntry1.size(), equalTo(1));
     assertThat(updatedEntry1.get(0), matches(entry));
     assertThat(updatedEntry1.get(0).getLastAttemptTime(), nullValue());
@@ -201,9 +202,9 @@ abstract class AbstractDefaultPersistorTest {
     entry.setLastAttemptTime(now);
     txManager().inTransaction(tx -> assertDoesNotThrow(() -> persistor().update(tx, entry)));
 
-    var updatedEntry2 =  txManager()
-        .inTransactionReturnsThrows(
-            tx -> persistor().selectBatch(tx, 1, now.plusMillis(1)));
+    var updatedEntry2 =
+        txManager()
+            .inTransactionReturnsThrows(tx -> persistor().selectBatch(tx, 1, now.plusMillis(1)));
     assertThat(updatedEntry2.size(), equalTo(1));
     assertThat(updatedEntry2.get(0), matches(entry));
     assertThat(updatedEntry2.get(0).getLastAttemptTime(), notNullValue());
