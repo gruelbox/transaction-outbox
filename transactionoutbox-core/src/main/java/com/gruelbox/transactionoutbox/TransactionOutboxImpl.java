@@ -263,6 +263,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
                   log.debug(
                       "Deferring deletion of {} by {}", entry.description(), retentionThreshold);
                   entry.setProcessed(true);
+                  entry.setLastAttemptTime(Instant.now(clockProvider.getClock()));
                   entry.setNextAttemptTime(after(retentionThreshold));
                   persistor.update(transaction, entry);
                 }
@@ -301,6 +302,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
                 params,
                 args,
                 serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null))
+        .lastAttemptTime(null)
         .nextAttemptTime(after(attemptFrequency))
         .uniqueRequestId(uniqueRequestId)
         .build();
@@ -309,6 +311,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
   private void pushBack(Transaction transaction, TransactionOutboxEntry entry)
       throws OptimisticLockException {
     try {
+      entry.setLastAttemptTime(clockProvider.getClock().instant());
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
       persistor.update(transaction, entry);
@@ -328,6 +331,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
       entry.setAttempts(entry.getAttempts() + 1);
       var blocked = entry.getAttempts() >= blockAfterAttempts;
       entry.setBlocked(blocked);
+      entry.setLastAttemptTime(Instant.now(clockProvider.getClock()));
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
       transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));

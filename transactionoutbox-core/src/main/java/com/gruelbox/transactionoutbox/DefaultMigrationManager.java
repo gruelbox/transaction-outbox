@@ -61,7 +61,14 @@ class DefaultMigrationManager {
                   Dialect.POSTGRESQL_9,
                   "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked",
                   Dialect.H2,
-                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")));
+                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")),
+          new Migration(
+              7,
+              "Add lastAttemptTime column to outbox",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation",
+              Map.of(
+                  Dialect.POSTGRESQL_9,
+                  "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6)")));
 
   static void migrate(TransactionManager transactionManager, @NotNull Dialect dialect) {
     transactionManager.inTransaction(
