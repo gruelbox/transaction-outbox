@@ -260,6 +260,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
                                 entry.description(),
                                 retentionThreshold);
                             entry.setProcessed(true);
+                            entry.setLastAttemptTime(Instant.now(clockProvider.getClock()));
                             entry.setNextAttemptTime(after(retentionThreshold));
                             return persistor.update(tx, entry).thenApply(_2 -> true);
                           }
@@ -392,6 +393,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
                     serializeMdc && (MDC.getMDCAdapter() != null)
                         ? MDC.getCopyOfContextMap()
                         : null))
+            .lastAttemptTime(null)
             .nextAttemptTime(after(attemptFrequency))
             .uniqueRequestId(uniqueRequestId)
             .build();
@@ -400,6 +402,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   }
 
   private CompletableFuture<Void> pushBack(TX transaction, TransactionOutboxEntry entry) {
+    entry.setLastAttemptTime(clockProvider.getClock().instant());
     entry.setNextAttemptTime(after(attemptFrequency));
     validator.validate(entry);
     return persistor.update(transaction, entry);

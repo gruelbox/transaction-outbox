@@ -45,6 +45,10 @@ final class H2Dialect extends Dialect {
             "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked"),
         new SqlMigration(
             7,
+            "Add lastAttemptTime column to outbox",
+            "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation"),
+        new SqlMigration(
+            8,
             "Make nextAttemptTime not null",
             "ALTER TABLE " + tableName + " ALTER COLUMN nextAttemptTime TIMESTAMP(6) NOT NULL"));
   }

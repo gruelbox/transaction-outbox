@@ -11,7 +11,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
@@ -110,9 +109,8 @@ class R2dbcStatement implements SqlStatement {
                         public <V> V get(int index, Class<V> type) {
                           try {
                             if (Instant.class.equals(type)) {
-                              return (V)
-                                  Objects.requireNonNull(row.get(index, LocalDateTime.class))
-                                      .toInstant(ZoneOffset.UTC);
+                              LocalDateTime value = row.get(index, LocalDateTime.class);
+                              return (V) (value == null ? null : value.toInstant(ZoneOffset.UTC));
                             } else {
                               return row.get(index, type);
                             }

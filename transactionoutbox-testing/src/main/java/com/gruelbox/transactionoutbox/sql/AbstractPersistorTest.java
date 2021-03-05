@@ -11,6 +11,8 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.isA;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,6 +23,7 @@ import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.OptimisticLockException;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
+import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import java.math.BigDecimal;
@@ -37,6 +40,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
+import org.hamcrest.Description;
+import org.hamcrest.TypeSafeMatcher;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -286,6 +291,36 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
         containsInAnyOrder("FOO1", "FOO3"));
   }
 
+  static class TransactionOutboxEntryMatcher extends TypeSafeMatcher<TransactionOutboxEntry> {
+    private final TransactionOutboxEntry entry;
+
+    TransactionOutboxEntryMatcher(TransactionOutboxEntry entry) {
+      this.entry = entry;
+    }
+
+    @Override
+    protected boolean matchesSafely(TransactionOutboxEntry other) {
+      return entry.getId().equals(other.getId())
+          && entry.getInvocation().equals(other.getInvocation())
+          && entry.getNextAttemptTime().equals(other.getNextAttemptTime())
+          && entry.getAttempts() == other.getAttempts()
+          && entry.getVersion() == other.getVersion()
+          && entry.isBlocked() == other.isBlocked()
+          && entry.isProcessed() == other.isProcessed();
+    }
+
+    @Override
+    public void describeTo(Description description) {
+      description
+          .appendText("Should match on all fields outside of lastAttemptTime :")
+          .appendText(entry.toString());
+    }
+  }
+
+  TransactionOutboxEntryMatcher matches(TransactionOutboxEntry e) {
+    return new TransactionOutboxEntryMatcher(e);
+  }
+
   @Test
   void testUpdate() {
     var entry = createEntry("FOO1", now, false);
@@ -294,18 +329,35 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
             .transactionally(tx -> persistor().save(tx, entry))
             .thenRun(() -> entry.setAttempts(1))
             .thenCompose(__ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
-            .thenRun(() -> entry.setAttempts(2))
+            .thenRun(
+                () -> {
+                  List<TransactionOutboxEntry> found =
+                      Utils.join(
+                          txManager()
+                              .transactionally(
+                                  tx -> persistor().selectBatch(tx, 1, now.plusMillis(1))));
+                  assertThat(found.size(), equalTo(1));
+                  assertThat(found.get(0), matches(entry));
+                  assertThat(found.get(0).getLastAttemptTime(), nullValue());
+                })
+            .thenRun(
+                () -> {
+                  entry.setAttempts(2);
+                  entry.setLastAttemptTime(now);
+                })
             .thenCompose(__ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
             .thenCompose(
                 __ ->
                     txManager()
                         .transactionally(tx -> persistor().selectBatch(tx, 1, now.plusSeconds(1))))
             .join();
-    assertThat(entries, containsInAnyOrder(entry));
+    assertThat(entries.size(), equalTo(1));
+    assertThat(entries.get(0), matches(entry));
+    assertThat(entries.get(0).getLastAttemptTime(), notNullValue());
   }
 
   @Test
-  void testWhitelist() {
+  void testUnblock() {
     var entry1 = createEntry("FOOx", now, false);
     var entry2 = createEntry("FOOy", now, false);
     entry2.setBlocked(true);

@@ -48,6 +48,15 @@ public final class TransactionOutboxEntry {
   private Invocation invocation;
 
   /**
+   * @param lastAttemptTime The timestamp at which the task was last processed.
+   * @return The timestamp at which the task was last processed.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  @Setter
+  private Instant lastAttemptTime;
+
+  /**
    * @param nextAttemptTime The timestamp after which the task is available for re-attempting.
    * @return The timestamp after which the task is available for re-attempting.
    */

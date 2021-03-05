@@ -39,7 +39,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     implements Persistor<CN, TX>, InitializationEventSubscriber {
 
   private static final String ALL_FIELDS =
-      "id, uniqueRequestId, invocation, nextAttemptTime, attempts, blocked, processed, version";
+      "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
 
   private final int writeLockTimeoutSeconds;
   private final Dialect dialect;
@@ -78,10 +78,12 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                 + " ("
                 + ALL_FIELDS
                 + ") "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     this.selectBatchSql =
         mapToNative(
-            "SELECT id, uniqueRequestId, invocation, nextAttemptTime, attempts, blocked, processed, version "
+            "SELECT "
+                + ALL_FIELDS
+                + " "
                 + "FROM "
                 + this.tableName
                 + " WHERE nextAttemptTime < ?"
@@ -94,7 +96,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
         mapToNative(
             "UPDATE "
                 + this.tableName
-                + " SET nextAttemptTime = ?, attempts = ?,"
+                + " SET lastAttemptTime = ?, nextAttemptTime = ?, attempts = ?,"
                 + " blocked = ?, processed = ?, version = ?"
                 + " WHERE id = ? and version = ?");
     this.lockSql =
@@ -188,11 +190,12 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                       .bind(0, entry.getId())
                       .bind(1, entry.getUniqueRequestId())
                       .bind(2, writer.toString())
-                      .bind(3, entry.getNextAttemptTime())
-                      .bind(4, entry.getAttempts())
-                      .bind(5, entry.isBlocked())
-                      .bind(6, entry.isProcessed())
-                      .bind(7, entry.getVersion())
+                      .bind(3, entry.getLastAttemptTime())
+                      .bind(4, entry.getNextAttemptTime())
+                      .bind(5, entry.getAttempts())
+                      .bind(6, entry.isBlocked())
+                      .bind(7, entry.isProcessed())
+                      .bind(8, entry.getVersion())
                       .execute())
           .exceptionally(
               e -> {
@@ -255,13 +258,14 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
               false,
               binder ->
                   binder
-                      .bind(0, entry.getNextAttemptTime())
-                      .bind(1, entry.getAttempts())
-                      .bind(2, entry.isBlocked())
-                      .bind(3, entry.isProcessed())
-                      .bind(4, entry.getVersion() + 1)
-                      .bind(5, entry.getId())
-                      .bind(6, entry.getVersion())
+                      .bind(0, entry.getLastAttemptTime())
+                      .bind(1, entry.getNextAttemptTime())
+                      .bind(2, entry.getAttempts())
+                      .bind(3, entry.isBlocked())
+                      .bind(4, entry.isProcessed())
+                      .bind(5, entry.getVersion() + 1)
+                      .bind(6, entry.getId())
+                      .bind(7, entry.getVersion())
                       .execute())
           .exceptionally(
               e -> {
@@ -369,11 +373,12 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                               .invocation(
                                   serializer.deserializeInvocation(
                                       new StringReader(rs.get(2, String.class))))
-                              .nextAttemptTime(rs.get(3, Instant.class))
-                              .attempts(rs.get(4, Integer.class))
-                              .blocked(rs.get(5, Boolean.class))
-                              .processed(rs.get(6, Boolean.class))
-                              .version(rs.get(7, Integer.class))
+                              .lastAttemptTime(rs.get(3, Instant.class))
+                              .nextAttemptTime(rs.get(4, Instant.class))
+                              .attempts(rs.get(5, Integer.class))
+                              .blocked(rs.get(6, Boolean.class))
+                              .processed(rs.get(7, Boolean.class))
+                              .version(rs.get(8, Integer.class))
                               .build()));
     } catch (Exception e) {
       return failedFuture(e);

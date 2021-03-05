@@ -51,6 +51,10 @@ final class MySqlDialect extends Dialect {
             "ALTER TABLE TXNO_OUTBOX CHANGE COLUMN blacklisted blocked VARCHAR(250)"),
         new SqlMigration(
             7,
+            "Add lastAttemptTime column to outbox",
+            "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation"),
+        new SqlMigration(
+            8,
             "Use datetime datatype for the next process date",
             "ALTER TABLE " + tableName + " MODIFY COLUMN nextAttemptTime DATETIME(6) NOT NULL"));
   }

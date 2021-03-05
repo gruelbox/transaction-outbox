@@ -166,7 +166,8 @@ class JdbcSqlApi implements SqlApi<Connection, JdbcTransaction> {
                                   checkNull(index + 1, rs);
                                   return (V) value;
                                 } else if (Instant.class.equals(type)) {
-                                  return (V) rs.getTimestamp(index + 1).toInstant();
+                                  Timestamp value = rs.getTimestamp(index + 1);
+                                  return (V) (value == null ? null : value.toInstant());
                                 } else {
                                   throw new IllegalArgumentException(
                                       "Unsupported data type " + type);
