@@ -5,35 +5,3 @@ updates:
   schedule:
     interval: daily
   open-pull-requests-limit: 10
-  ignore:
-  - dependency-name: org.springframework.boot:spring-boot-starter-test
-    versions:
-    - 2.4.4
-  - dependency-name: org.springframework.boot:spring-boot-starter-web
-    versions:
-    - 2.4.4
-  - dependency-name: org.springframework.boot:spring-boot-starter-data-jpa
-    versions:
-    - 2.4.4
-  - dependency-name: org.springframework:spring-context
-    versions:
-    - 5.3.5
-  - dependency-name: org.springframework:spring-jdbc
-    versions:
-    - 5.3.5
-  - dependency-name: org.springframework:spring-tx
-    versions:
-    - 5.3.5
-  - dependency-name: org.jooq:jooq
-    versions:
-    - 3.14.6
-    - 3.14.7
-  - dependency-name: com.zaxxer:HikariCP
-    versions:
-    - 4.0.1
-  - dependency-name: org.hibernate.validator:hibernate-validator
-    versions:
-    - 7.0.0.Final
-  - dependency-name: org.projectlombok:lombok-maven-plugin
-    versions:
-    - 1.18.16.0
