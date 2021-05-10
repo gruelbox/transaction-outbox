@@ -54,6 +54,17 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
+  void testInsertWithUniqueRequestIdFailureBubblesExceptionUp() {
+    var invalidEntry =
+        createEntry("FOO", now, false).toBuilder()
+            .uniqueRequestId("INTENTIONALLY_TOO_LONG_TO_CAUSE_BLOW_UP".repeat(10))
+            .build();
+    assertThrows(
+        RuntimeException.class,
+        () -> txManager().inTransactionThrows(tx -> persistor().save(tx, invalidEntry)));
+  }
+
+  @Test
   void testInsertDuplicate() throws Exception {
     TransactionOutboxEntry entry1 = createEntry("FOO1", now, false, "context-clientkey1");
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry1));
