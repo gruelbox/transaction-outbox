@@ -68,7 +68,12 @@ class DefaultMigrationManager {
               "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation",
               Map.of(
                   Dialect.POSTGRESQL_9,
-                  "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6)")));
+                  "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6)")),
+          new Migration(
+              8,
+              "Update length of invocation column on outbox for MySQL dialects only.",
+              "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation MEDIUMTEXT",
+              Map.of(Dialect.POSTGRESQL_9, "", Dialect.H2, "")));
 
   static void migrate(TransactionManager transactionManager, @NotNull Dialect dialect) {
     transactionManager.inTransaction(
