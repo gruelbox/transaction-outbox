@@ -114,6 +114,7 @@ public class DefaultPersistor implements Persistor {
           throw new AlreadyScheduledException(
               "Request " + entry.description() + " already exists", e);
         }
+        throw e;
       }
     }
   }

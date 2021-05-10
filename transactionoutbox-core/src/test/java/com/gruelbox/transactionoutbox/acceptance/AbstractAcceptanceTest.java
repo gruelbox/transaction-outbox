@@ -3,22 +3,9 @@ package com.gruelbox.transactionoutbox.acceptance;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.gruelbox.transactionoutbox.AlreadyScheduledException;
-import com.gruelbox.transactionoutbox.DefaultPersistor;
-import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.Instantiator;
-import com.gruelbox.transactionoutbox.NoTransactionActiveException;
-import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.Submitter;
-import com.gruelbox.transactionoutbox.ThreadLocalContextTransactionManager;
-import com.gruelbox.transactionoutbox.ThrowingRunnable;
-import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
-import com.gruelbox.transactionoutbox.Transaction;
-import com.gruelbox.transactionoutbox.TransactionManager;
-import com.gruelbox.transactionoutbox.TransactionOutbox;
-import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.*;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
@@ -45,6 +32,9 @@ import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
+import org.junit.Assume;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -399,6 +389,65 @@ abstract class AbstractAcceptanceTest {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
           assertTrue(latch.await(15, TimeUnit.SECONDS));
+        });
+  }
+
+  @Test
+  final void onSchedulingFailure_BubbleExceptionsUp() throws Exception {
+    TransactionManager transactionManager = simpleTxnManager();
+    CountDownLatch latch = new CountDownLatch(1);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(
+                Instantiator.using(
+                    clazz ->
+                        (InterfaceProcessor)
+                            (foo, bar) ->
+                                LOGGER.info(
+                                    "Entered the method to process successfully. Processing ({}, {})",
+                                    foo,
+                                    bar)))
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .submitter(Submitter.withExecutor(unreliablePool))
+            .attemptFrequency(Duration.ofMillis(500))
+            .listener(new LatchListener(latch))
+            .build();
+
+    clearOutbox();
+
+    withRunningFlusher(
+        outbox,
+        () -> {
+          // run for mysql only.
+          var dialect = connectionDetails().dialect();
+          Assume.assumeThat(
+              dialect,
+              new Matcher<>() {
+                @Override
+                public void describeTo(Description description) {}
+
+                @Override
+                public boolean matches(Object o) {
+                  return Dialect.MY_SQL_8.equals(o) || Dialect.MY_SQL_5.equals(o);
+                }
+
+                @Override
+                public void describeMismatch(Object o, Description description) {}
+
+                @Override
+                public void _dont_implement_Matcher___instead_extend_BaseMatcher_() {}
+              });
+          assertThrows(
+              Exception.class,
+              () ->
+                  transactionManager.inTransaction(
+                      () ->
+                          outbox
+                              .with()
+                              .uniqueRequestId("some_unique_id")
+                              .schedule(InterfaceProcessor.class)
+                              .process(1, "This invocation is too long".repeat(650000))));
         });
   }
 
