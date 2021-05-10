@@ -2,11 +2,12 @@ package com.gruelbox.transactionoutbox;
 
 import static java.util.stream.Collectors.joining;
 
+import java.time.Instant;
+import java.util.Arrays;
+
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
-import java.time.Instant;
-import java.util.Arrays;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
