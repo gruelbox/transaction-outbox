@@ -23,6 +23,7 @@ import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.OptimisticLockException;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
+import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import java.math.BigDecimal;
@@ -90,6 +91,17 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
             .join();
     assertThat(entries, hasSize(1));
     assertThat(entries, contains(entry));
+  }
+
+  @Test
+  void testInsertWithUniqueRequestIdFailureBubblesExceptionUp() {
+    var invalidEntry =
+        createEntry("FOO", now, false).toBuilder()
+            .uniqueRequestId("INTENTIONALLY_TOO_LONG_TO_CAUSE_BLOW_UP".repeat(10))
+            .build();
+    assertThrows(
+        RuntimeException.class,
+        () -> Utils.join(txManager().transactionally(tx -> persistor().save(tx, invalidEntry))));
   }
 
   @Test

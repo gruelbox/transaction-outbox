@@ -54,11 +54,13 @@ final class PostgreSqlDialect extends Dialect {
             "Add lastAttemptTime column to outbox",
             "ALTER TABLE " + tableName + " ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL"),
         new SqlMigration(
-            8,
+            8, "Update length of invocation column on outbox for MySQL dialects only.", ""),
+        new SqlMigration(
+            9,
             "Make nextAttemptTime not null",
             "ALTER TABLE " + tableName + " ALTER COLUMN nextAttemptTime SET NOT NULL"),
         new SqlMigration(
-            9,
+            10,
             "Fix data types on blocked and processed columns",
             String.format(
                 "UPDATE %s SET processed = FALSE WHERE processed IS NULL;\n"

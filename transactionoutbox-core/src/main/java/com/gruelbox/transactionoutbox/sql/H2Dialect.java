@@ -50,11 +50,13 @@ final class H2Dialect extends Dialect {
                 + tableName
                 + " ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation"),
         new SqlMigration(
-            8,
+            8, "Update length of invocation column on outbox for MySQL dialects only.", ""),
+        new SqlMigration(
+            9,
             "Make nextAttemptTime not null",
             "ALTER TABLE " + tableName + " ALTER COLUMN nextAttemptTime TIMESTAMP(6) NOT NULL"),
         new SqlMigration(
-            9,
+            10,
             "Fix data types on blocked and processed columns",
             String.format(
                 "UPDATE %s SET blocked = false WHERE blocked IS NULL;\n"

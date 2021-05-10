@@ -57,20 +57,24 @@ final class MySqlDialect extends Dialect {
                 + " ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation"),
         new SqlMigration(
             8,
+            "Update length of invocation column on outbox for MySQL dialects only.",
+            "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation MEDIUMTEXT"),
+        new SqlMigration(
+            9,
             "Use datetime datatype for the next process date",
             "ALTER TABLE " + tableName + " MODIFY COLUMN nextAttemptTime DATETIME(6) NOT NULL"),
         new SqlMigration(
-            9,
+            10,
             "Repair nulls on blocked column",
             String.format(
                 "UPDATE %s SET blocked = CASE WHEN blocked = 'TRUE' or blocked = 'true' or blocked = '1' or blocked = 't' or blocked = 'y' or blocked = 'yes' or blocked = 'on' THEN '1' ELSE '0' END",
                 tableName)),
         new SqlMigration(
-            10,
+            11,
             "Repair nulls on processed column",
             String.format("UPDATE %s SET processed = 0 WHERE processed IS NULL", tableName)),
         new SqlMigration(
-            11,
+            12,
             "Fix data types on blocked and processed columns",
             String.format(
                 "ALTER TABLE %s\n"
