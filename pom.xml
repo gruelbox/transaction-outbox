@@ -34,9 +34,9 @@
     <skip.format>false</skip.format>
 
     <!-- Dependency versions -->
-    <logback.version>1.2.3</logback.version>
+    <logback.version>1.2.5</logback.version>
     <revision>1.3.99999-SNAPSHOT</revision>
-    <junit.jupiter.version>5.7.1</junit.jupiter.version>
+    <junit.jupiter.version>5.7.2</junit.jupiter.version>
     <testcontainers.version>1.15.3</testcontainers.version>
   </properties>
 
@@ -279,7 +279,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
-            <version>1.6</version>
+            <version>3.0.1</version>
             <executions>
               <execution>
                 <id>sign-artifacts</id>
@@ -353,7 +353,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-javadoc-plugin</artifactId>
-            <version>3.2.0</version>
+            <version>3.3.0</version>
             <configuration>
               <failOnError>true</failOnError>
               <quiet>true</quiet>
