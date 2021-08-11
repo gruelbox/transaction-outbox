@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
@@ -14,6 +13,8 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+
+import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

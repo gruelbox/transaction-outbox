@@ -5,10 +5,6 @@ import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.time.temporal.ChronoUnit.MINUTES;
 
-import jakarta.validation.ClockProvider;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,6 +12,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import jakarta.validation.ClockProvider;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.constraints.Length;
@@ -28,8 +29,10 @@ class TransactionOutboxImpl implements TransactionOutbox {
 
   private static final int DEFAULT_FLUSH_BATCH_SIZE = 4096;
 
-  @NotNull private final TransactionManager transactionManager;
-  @Valid @NotNull private final Persistor persistor;
+  @NotNull
+  private final TransactionManager transactionManager;
+  @Valid
+  @NotNull private final Persistor persistor;
   @Valid @NotNull private final Instantiator instantiator;
   @NotNull private final Submitter submitter;
   @NotNull private final Duration attemptFrequency;

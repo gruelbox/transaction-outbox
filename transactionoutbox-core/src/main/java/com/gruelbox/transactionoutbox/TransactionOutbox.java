@@ -1,9 +1,10 @@
 package com.gruelbox.transactionoutbox;
 
-import jakarta.validation.ClockProvider;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.Executor;
+
+import jakarta.validation.ClockProvider;
 import lombok.ToString;
 import org.slf4j.MDC;
 import org.slf4j.event.Level;
