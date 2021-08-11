@@ -7,8 +7,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
-
-import jakarta.validation.ValidationException;
+import javax.validation.ValidationException;
 import org.junit.jupiter.api.Test;
 
 class TestValidator {

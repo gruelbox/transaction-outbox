@@ -30,7 +30,7 @@ class EventuallyConsistentControllerTest {
   void testCheck() throws Exception {
     ResponseEntity<String> response =
         template.getForEntity(base.toString() + "/createCustomer", String.class);
-    assertThat("Done").isEqualTo(response.getBody());
+    assertThat("Done".equals(response.getBody()));
 
     for (int i = 0; i < 10; i++) {
       ResponseEntity<String> exists =
