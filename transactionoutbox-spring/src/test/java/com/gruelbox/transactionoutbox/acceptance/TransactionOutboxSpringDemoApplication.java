@@ -4,17 +4,12 @@ import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.SpringInstantiator;
 import com.gruelbox.transactionoutbox.SpringTransactionManager;
-import com.gruelbox.transactionoutbox.SpringTransactionOutboxConfiguration;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Lazy;
 
-@Import({
-  SpringTransactionOutboxConfiguration.class,
-})
 @SpringBootApplication
 public class TransactionOutboxSpringDemoApplication {
 

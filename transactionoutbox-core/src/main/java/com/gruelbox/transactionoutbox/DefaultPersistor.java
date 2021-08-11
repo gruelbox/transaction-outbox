@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
@@ -14,6 +13,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import javax.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,7 +31,6 @@ import lombok.extern.slf4j.Slf4j;
  * the other hand, you want to use a completely non-relational underlying data store or do something
  * equally esoteric, you may prefer to implement {@link Persistor} from the ground up.
  */
-@SuppressWarnings("SqlResolve")
 @Slf4j
 @SuperBuilder
 @AllArgsConstructor(access = AccessLevel.PROTECTED)

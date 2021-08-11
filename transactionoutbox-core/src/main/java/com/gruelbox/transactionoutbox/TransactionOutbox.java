@@ -1,9 +1,9 @@
 package com.gruelbox.transactionoutbox;
 
-import jakarta.validation.ClockProvider;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.Executor;
+import javax.validation.ClockProvider;
 import lombok.ToString;
 import org.slf4j.MDC;
 import org.slf4j.event.Level;
@@ -109,7 +109,7 @@ public interface TransactionOutbox {
    * @return True if the request to unblock the entry was successful. May return false if another
    *     thread unblocked the entry first.
    */
-  @SuppressWarnings({"unused"})
+  @SuppressWarnings({"unchecked", "rawtypes"})
   boolean unblock(String entryId, Object transactionContext);
 
   /**

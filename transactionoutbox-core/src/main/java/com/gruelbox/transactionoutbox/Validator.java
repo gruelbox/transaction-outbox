@@ -1,12 +1,12 @@
 package com.gruelbox.transactionoutbox;
 
-import jakarta.validation.ClockProvider;
-import jakarta.validation.Validation;
-import jakarta.validation.ValidationException;
+import javax.validation.ClockProvider;
+import javax.validation.Validation;
+import javax.validation.ValidationException;
 
 class Validator {
 
-  private final jakarta.validation.Validator validator;
+  private final javax.validation.Validator validator;
 
   Validator(ClockProvider clockProvider) {
     this.validator =

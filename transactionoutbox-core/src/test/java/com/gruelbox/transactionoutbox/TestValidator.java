@@ -3,11 +3,11 @@ package com.gruelbox.transactionoutbox;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import jakarta.validation.ValidationException;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import javax.validation.ValidationException;
 import org.junit.jupiter.api.Test;
 
 class TestValidator {
