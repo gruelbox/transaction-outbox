@@ -146,14 +146,14 @@ The latest stable release is available from Maven Central. Stable releases are [
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
-  <version>3.1.195</version>
+  <version>4.1.214</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-core:3.1.195'
+implementation 'com.gruelbox:transactionoutbox-core:4.1.214'
 ```
 
 ### Development snapshots
