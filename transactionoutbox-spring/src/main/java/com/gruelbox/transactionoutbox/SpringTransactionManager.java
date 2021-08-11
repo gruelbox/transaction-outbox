@@ -1,5 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
+import static com.gruelbox.transactionoutbox.Utils.uncheck;
+import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
+
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -27,6 +30,32 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
   @Autowired
   SpringTransactionManager(DataSource dataSource) {
     this.dataSource = dataSource;
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void inTransaction(Runnable runnable) {
+    uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromRunnable(runnable)));
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void inTransaction(TransactionalWork work) {
+    uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work)));
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public <T> T inTransactionReturns(TransactionalSupplier<T> supplier) {
+    return uncheckedly(
+        () -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromSupplier(supplier)));
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public <E extends Exception> void inTransactionThrows(ThrowingTransactionalWork<E> work)
+      throws E {
+    inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work));
   }
 
   @Override
