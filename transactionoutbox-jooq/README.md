@@ -20,14 +20,14 @@ jOOQ gives you the option to either use thread-local transaction management or e
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-jooq</artifactId>
-  <version>1.3.137</version>
+  <version>1.3.146</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-jooq:1.3.137'
+implementation 'com.gruelbox:transactionoutbox-jooq:1.3.146'
 ```
 
 ### Development snapshots
