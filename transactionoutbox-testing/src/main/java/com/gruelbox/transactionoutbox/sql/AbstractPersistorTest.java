@@ -308,14 +308,14 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
   void testWhitelist() {
     var entry1 = createEntry("FOOx", now, false);
     var entry2 = createEntry("FOOy", now, false);
-    entry2.setBlacklisted(true);
+    entry2.setBlocked(true);
     entry2.setAttempts(3);
     txManager().transactionally(tx -> persistor().save(tx, entry1)).join();
     txManager().transactionally(tx -> persistor().save(tx, entry2)).join();
-    assertFalse(txManager().transactionally(tx -> persistor().whitelist(tx, "FOOx")).join());
-    assertTrue(txManager().transactionally(tx -> persistor().whitelist(tx, "FOOy")).join());
-    assertFalse(txManager().transactionally(tx -> persistor().whitelist(tx, "FOOy")).join());
-    entry2.setBlacklisted(false);
+    assertFalse(txManager().transactionally(tx -> persistor().unblock(tx, "FOOx")).join());
+    assertTrue(txManager().transactionally(tx -> persistor().unblock(tx, "FOOy")).join());
+    assertFalse(txManager().transactionally(tx -> persistor().unblock(tx, "FOOy")).join());
+    entry2.setBlocked(false);
     entry2.setVersion(entry2.getVersion() + 1);
     entry2.setAttempts(0);
     List<TransactionOutboxEntry> entries =
@@ -603,23 +603,22 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
     }
   }
 
-  private TransactionOutboxEntry createEntry(
-      String id, Instant nextAttemptTime, boolean blacklisted) {
+  private TransactionOutboxEntry createEntry(String id, Instant nextAttemptTime, boolean blocked) {
     return TransactionOutboxEntry.builder()
         .id(id)
         .invocation(createInvocation())
-        .blacklisted(blacklisted)
+        .blocked(blocked)
         .nextAttemptTime(nextAttemptTime)
         .build();
   }
 
   @SuppressWarnings("SameParameterValue")
   private TransactionOutboxEntry createEntry(
-      String id, Instant nextAttemptTime, boolean blacklisted, String uniqueId) {
+      String id, Instant nextAttemptTime, boolean blocked, String uniqueId) {
     return TransactionOutboxEntry.builder()
         .id(id)
         .invocation(createInvocation())
-        .blacklisted(blacklisted)
+        .blocked(blocked)
         .nextAttemptTime(nextAttemptTime)
         .uniqueRequestId(uniqueId)
         .build();

@@ -14,16 +14,20 @@ final class H2Dialect extends Dialect {
                 + tableName
                 + " (\n"
                 + "    id VARCHAR(36) PRIMARY KEY,\n"
-                + "    uniqueRequestId VARCHAR(100) NULL UNIQUE,\n"
-                + "    invocation TEXT NOT NULL,\n"
-                + "    nextAttemptTime TIMESTAMP(6) NOT NULL,\n"
-                + "    attempts INT NOT NULL,\n"
-                + "    processed BOOLEAN NOT NULL,\n"
-                + "    blacklisted BOOLEAN NOT NULL,\n"
-                + "    version INT NOT NULL\n"
+                + "    invocation TEXT,\n"
+                + "    nextAttemptTime TIMESTAMP(6),\n"
+                + "    attempts INT,\n"
+                + "    blacklisted BOOLEAN,\n"
+                + "    version INT\n"
                 + ")"),
         new SqlMigration(
             2,
+            "Add unique request id",
+            "ALTER TABLE " + tableName + " ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE"),
+        new SqlMigration(
+            3, "Add processed flag", "ALTER TABLE " + tableName + " ADD COLUMN processed BOOLEAN"),
+        new SqlMigration(
+            4,
             "Add flush index",
             "CREATE INDEX IX_"
                 + tableName
@@ -32,9 +36,17 @@ final class H2Dialect extends Dialect {
                 + tableName
                 + " (processed, blacklisted, nextAttemptTime)"),
         new SqlMigration(
-            3,
+            5,
             "Increase size of uniqueRequestId",
-            "ALTER TABLE " + tableName + " ALTER COLUMN uniqueRequestId VARCHAR(250)"));
+            "ALTER TABLE " + tableName + " ALTER COLUMN uniqueRequestId VARCHAR(250)"),
+        new SqlMigration(
+            6,
+            "Rename column blacklisted to blocked",
+            "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked"),
+        new SqlMigration(
+            7,
+            "Make nextAttemptTime not null",
+            "ALTER TABLE " + tableName + " ALTER COLUMN nextAttemptTime TIMESTAMP(6) NOT NULL"));
   }
 
   @Override

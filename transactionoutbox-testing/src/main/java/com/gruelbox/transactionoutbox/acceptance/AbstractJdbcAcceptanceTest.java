@@ -395,22 +395,22 @@ public abstract class AbstractJdbcAcceptanceTest<
   }
 
   /**
-   * Runs a piece of work which will fail enough times to be blacklisted but will then pass when
-   * re-whitelisted.
+   * Runs a piece of work which will fail enough times to be blocked but will then pass when
+   * unblocked.
    */
   @Test
   final void testBlockingBlackAndWhitelistThreadLocal() throws Exception {
     Assumptions.assumeTrue(supportsThreadLocalContext());
 
     CountDownLatch successLatch = new CountDownLatch(1);
-    CountDownLatch blacklistLatch = new CountDownLatch(1);
-    LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    LatchListener latchListener = new LatchListener(successLatch, blockLatch);
     TransactionOutbox outbox =
         builder()
             .instantiator(new FailingInstantiator(2))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
-            .blacklistAfterAttempts(2)
+            .blockAfterAttempts(2)
             .build();
 
     cleanDataStore();
@@ -420,30 +420,30 @@ public abstract class AbstractJdbcAcceptanceTest<
         () -> {
           txManager.inTransaction(
               () -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee"));
-          assertFired(blacklistLatch);
-          boolean whitelisted =
+          assertFired(blockLatch);
+          boolean allowed =
               txManager.inTransactionReturns(
-                  tx -> outbox.whitelist(latchListener.getBlacklisted().getId()));
-          assertTrue(whitelisted);
+                  tx -> outbox.unblock(latchListener.getBlocked().getId()));
+          assertTrue(allowed);
           assertFired(successLatch);
         });
   }
 
   /**
-   * Runs a piece of work which will fail enough times to be blacklisted but will then pass when
-   * re-whitelisted.
+   * Runs a piece of work which will fail enough times to be blocked but will then pass when
+   * unblocked.
    */
   @Test
   final void testBlockingBlackAndWhitelistDirectTx() throws Exception {
     CountDownLatch successLatch = new CountDownLatch(1);
-    CountDownLatch blacklistLatch = new CountDownLatch(1);
-    LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    LatchListener latchListener = new LatchListener(successLatch, blockLatch);
     TransactionOutbox outbox =
         builder()
             .instantiator(new FailingInstantiator(2))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
-            .blacklistAfterAttempts(2)
+            .blockAfterAttempts(2)
             .build();
 
     cleanDataStore();
@@ -453,11 +453,11 @@ public abstract class AbstractJdbcAcceptanceTest<
         () -> {
           txManager.inTransaction(
               tx -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee", tx));
-          assertFired(blacklistLatch);
-          boolean whitelisted =
+          assertFired(blockLatch);
+          boolean unblocked =
               txManager.inTransactionReturns(
-                  tx -> outbox.whitelist(latchListener.getBlacklisted().getId(), tx));
-          assertTrue(whitelisted);
+                  tx -> outbox.unblock(latchListener.getBlocked().getId(), tx));
+          assertTrue(unblocked);
           assertFired(successLatch);
         });
   }

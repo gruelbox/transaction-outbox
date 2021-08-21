@@ -39,9 +39,9 @@ public interface TransactionOutboxListener {
   /**
    * Fired when a transaction outbox task fails. This may occur multiple times until the maximum
    * number of retries, at which point this will be fired <em>and then</em> {@link
-   * #blacklisted(TransactionOutboxEntry, Throwable)}. This event is not guaranteed to fire in the
-   * event of a JVM failure or power loss. It is fired <em>after</em> the commit to the database
-   * marking the task as failed.
+   * #blocked(TransactionOutboxEntry, Throwable)}. This event is not guaranteed to fire in the event
+   * of a JVM failure or power loss. It is fired <em>after</em> the commit to the database marking
+   * the task as failed.
    *
    * @param entry The outbox entry failed.
    * @param cause The cause of the most recent failure.
@@ -52,13 +52,13 @@ public interface TransactionOutboxListener {
 
   /**
    * Fired when a transaction outbox task has passed the maximum number of retries and has been
-   * blacklisted. This event is not guaranteed to fire in the event of a JVM failure or power loss.
-   * It is fired <em>after</em> the commit to the database marking the task as blacklisted.
+   * blocked. This event is not guaranteed to fire in the event of a JVM failure or power loss. It
+   * is fired <em>after</em> the commit to the database marking the task as blocked.
    *
-   * @param entry The outbox entry blacklisted.
+   * @param entry The outbox entry to be marked as blocked.
    * @param cause The cause of the most recent failure.
    */
-  default void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
+  default void blocked(TransactionOutboxEntry entry, Throwable cause) {
     // No-op
   }
 
@@ -91,9 +91,9 @@ public interface TransactionOutboxListener {
       }
 
       @Override
-      public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
-        self.blacklisted(entry, cause);
-        other.blacklisted(entry, cause);
+      public void blocked(TransactionOutboxEntry entry, Throwable cause) {
+        self.blocked(entry, cause);
+        other.blocked(entry, cause);
       }
     };
   }

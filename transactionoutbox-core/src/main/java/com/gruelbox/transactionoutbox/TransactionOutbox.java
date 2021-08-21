@@ -61,7 +61,7 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
 
   /**
    * Identifies any stale tasks queued using {@link #schedule(Class)} (those which were queued more
-   * than {@code attemptFrequency} ago and have been tried less than {@code blacklistAfterAttempts}
+   * than {@code attemptFrequency} ago and have been tried less than {@code blockAfterAttempts}
    * times) and attempts to resubmit them.
    *
    * <p>As long as the {@link Submitter} is non-blocking (e.g. uses a bounded queue with a {@link
@@ -83,7 +83,7 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
 
   /**
    * Identifies any stale tasks queued using {@link #schedule(Class)} (those which were queued more
-   * than {@code attemptFrequency} ago and have been tried less than {@code blacklistAfterAttempts}
+   * than {@code attemptFrequency} ago and have been tried less than {@code blockAfterAttempts}
    * times) and attempts to resubmit them.
    *
    * <p>As long as the {@link Submitter} is non-blocking (e.g. uses a bounded queue with a {@link
@@ -104,63 +104,63 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
   CompletableFuture<Boolean> flushAsync();
 
   /**
-   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction and a transaction manager that supports thread local context.
+   * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
+   * transaction and a transaction manager that supports thread local context.
    *
    * @param entryId The entry id.
-   * @return True if the whitelisting request was successful. May return false if another thread
-   *     whitelisted the entry first.
+   * @return True if the unblocking request was successful. May return false if another thread
+   *     unblocked the entry first.
    */
-  boolean whitelist(String entryId);
+  boolean unblock(String entryId);
 
   /**
-   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction to be supplied.
+   * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
+   * transaction to be supplied.
    *
    * @param entryId The entry id.
    * @param transaction The transaction ({@link BaseTransactionManager} implementation specific).
-   * @return True if the whitelisting request was successful. May return false if another thread
-   *     whitelisted the entry first.
+   * @return True if the unblocking request was successful. May return false if another thread
+   *     unblocked the entry first.
    */
-  boolean whitelist(String entryId, BaseTransaction<?> transaction);
+  boolean unblock(String entryId, BaseTransaction<?> transaction);
 
   /**
-   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction and a transaction manager that supports thread local context. Will run
+   * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
+   * transaction and a transaction manager that supports thread local context. Will run
    * asynchronously if the underlying database API supports it.
    *
    * @param entryId The entry id.
-   * @return True if the whitelisting request was successful. May return false if another thread
-   *     whitelisted the entry first.
+   * @return True if the unblocking request was successful. May return false if another thread
+   *     unblocked the entry first.
    */
-  CompletableFuture<Boolean> whitelistAsync(String entryId);
+  CompletableFuture<Boolean> unblockAsync(String entryId);
 
   /**
-   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction to be supplied.
+   * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
+   * transaction to be supplied.
    *
    * <p>Will run asynchronously if the underlying database API supports it.
    *
    * @param entryId The entry id.
    * @param transaction The transaction ({@link BaseTransactionManager} implementation specific).
-   * @return True if the whitelisting request was successful. May return false if another thread
-   *     whitelisted the entry first.
+   * @return True if the unblocking request was successful. May return false if another thread
+   *     unblocked the entry first.
    */
-  CompletableFuture<Boolean> whitelistAsync(String entryId, BaseTransaction<?> transaction);
+  CompletableFuture<Boolean> unblockAsync(String entryId, BaseTransaction<?> transaction);
 
   /**
-   * Marks a blacklisted entry back to not blacklisted and resets the attempt count. Requires an
-   * active transaction to be supplied via the implementation-specific context.
+   * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
+   * transaction to be supplied via the implementation-specific context.
    *
    * <p>Will run asynchronously if the underlying database API supports it.
    *
    * @param entryId The entry id.
    * @param transactionContext The transaction context ({@link BaseTransactionManager}
    *     implementation specific).
-   * @return True if the whitelisting request was successful. May return false if another thread
-   *     whitelisted the entry first.
+   * @return True if the unblocking request was successful. May return false if another thread
+   *     unblocked the entry first.
    */
-  CompletableFuture<Boolean> whitelistAsync(String entryId, Object transactionContext);
+  CompletableFuture<Boolean> unblockAsync(String entryId, Object transactionContext);
 
   /**
    * Processes an entry immediately. Intended for use in custom implementations of {@link Submitter}
@@ -180,7 +180,7 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
     private Instantiator instantiator;
     private Submitter submitter;
     private Duration attemptFrequency;
-    private int blacklistAfterAttempts;
+    private int blockAfterAttempts;
     private int flushBatchSize;
     private ClockProvider clockProvider;
     private TransactionOutboxListener listener;
@@ -238,12 +238,11 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
     }
 
     /**
-     * @param blacklistAfterAttempts After now many attempts a task should be blacklisted. Defaults
-     *     to 5.
+     * @param blockAfterAttempts After now many attempts a task should be blocked. Defaults to 5.
      * @return Builder.
      */
-    public TransactionOutboxBuilder blacklistAfterAttempts(int blacklistAfterAttempts) {
-      this.blacklistAfterAttempts = blacklistAfterAttempts;
+    public TransactionOutboxBuilder blockAfterAttempts(int blockAfterAttempts) {
+      this.blockAfterAttempts = blockAfterAttempts;
       return this;
     }
 
@@ -270,7 +269,7 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
 
     /**
      * @param listener Event listener. Allows client code to react to tasks running, failing or
-     *     getting blacklisted.
+     *     getting blocked.
      * @return Builder.
      */
     public TransactionOutboxBuilder listener(TransactionOutboxListener listener) {
@@ -336,7 +335,7 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
           instantiator,
           submitter,
           attemptFrequency,
-          blacklistAfterAttempts,
+          blockAfterAttempts,
           flushBatchSize,
           clockProvider,
           listener,

@@ -47,6 +47,10 @@ final class PostgreSqlDialect extends Dialect {
             "ALTER TABLE " + tableName + " ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)"),
         new SqlMigration(
             6,
+            "Rename column blacklisted to blocked",
+            "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked"),
+        new SqlMigration(
+            7,
             "Make nextAttemptTime not null",
             "ALTER TABLE " + tableName + " ALTER COLUMN nextAttemptTime SET NOT NULL"));
   }

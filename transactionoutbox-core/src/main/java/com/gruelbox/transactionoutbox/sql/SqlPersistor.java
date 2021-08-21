@@ -39,7 +39,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     implements Persistor<CN, TX>, InitializationEventSubscriber {
 
   private static final String ALL_FIELDS =
-      "id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version";
+      "id, uniqueRequestId, invocation, nextAttemptTime, attempts, blocked, processed, version";
 
   private final int writeLockTimeoutSeconds;
   private final Dialect dialect;
@@ -54,7 +54,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   private final String deleteSql;
   private final String updateSql;
   private final String lockSql;
-  private final String whitelistSql;
+  private final String blockSql;
   private final String clearSql;
 
   private SqlPersistor(
@@ -81,11 +81,11 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     this.selectBatchSql =
         mapToNative(
-            "SELECT id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version "
+            "SELECT id, uniqueRequestId, invocation, nextAttemptTime, attempts, blocked, processed, version "
                 + "FROM "
                 + this.tableName
                 + " WHERE nextAttemptTime < ?"
-                + " AND blacklisted = false AND processed = false LIMIT ?"
+                + " AND blocked = false AND processed = false LIMIT ?"
                 + (dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : ""));
     this.deleteExpiredSql =
         mapToNative(dialect.getDeleteExpired().replace("{{table}}", this.tableName));
@@ -95,7 +95,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
             "UPDATE "
                 + this.tableName
                 + " SET nextAttemptTime = ?, attempts = ?,"
-                + " blacklisted = ?, processed = ?, version = ?"
+                + " blocked = ?, processed = ?, version = ?"
                 + " WHERE id = ? and version = ?");
     this.lockSql =
         mapToNative(
@@ -103,12 +103,12 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                 + this.tableName
                 + " WHERE id = ? AND version = ? FOR UPDATE"
                 + (dialect.isSupportsSkipLock() ? " SKIP LOCKED" : ""));
-    this.whitelistSql =
+    this.blockSql =
         mapToNative(
             "UPDATE "
                 + this.tableName
-                + " SET attempts = 0, blacklisted = false, version = version + 1 "
-                + "WHERE blacklisted = true AND processed = false AND id = ?");
+                + " SET attempts = 0, blocked = false, version = version + 1 "
+                + "WHERE blocked = true AND processed = false AND id = ?");
     this.clearSql = dialect.mapStatementToNative("DELETE FROM " + this.tableName);
   }
 
@@ -190,7 +190,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                       .bind(2, writer.toString())
                       .bind(3, entry.getNextAttemptTime())
                       .bind(4, entry.getAttempts())
-                      .bind(5, entry.isBlacklisted())
+                      .bind(5, entry.isBlocked())
                       .bind(6, entry.isProcessed())
                       .bind(7, entry.getVersion())
                       .execute())
@@ -257,7 +257,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                   binder
                       .bind(0, entry.getNextAttemptTime())
                       .bind(1, entry.getAttempts())
-                      .bind(2, entry.isBlacklisted())
+                      .bind(2, entry.isBlocked())
                       .bind(3, entry.isProcessed())
                       .bind(4, entry.getVersion() + 1)
                       .bind(5, entry.getId())
@@ -330,13 +330,13 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public final CompletableFuture<Boolean> whitelist(TX tx, String entryId) {
+  public final CompletableFuture<Boolean> unblock(TX tx, String entryId) {
     try {
       return sqlApi
           .statement(
               tx,
               dialect,
-              whitelistSql,
+              blockSql,
               writeLockTimeoutSeconds,
               false,
               binder -> binder.bind(0, entryId).execute())
@@ -371,7 +371,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                                       new StringReader(rs.get(2, String.class))))
                               .nextAttemptTime(rs.get(3, Instant.class))
                               .attempts(rs.get(4, Integer.class))
-                              .blacklisted(rs.get(5, Boolean.class))
+                              .blocked(rs.get(5, Boolean.class))
                               .processed(rs.get(6, Boolean.class))
                               .version(rs.get(7, Integer.class))
                               .build()));
@@ -510,7 +510,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     /**
      * @param serializer The serializer to use for {@link Invocation}s. See {@link
      *     InvocationSerializer} for more information. Defaults to {@link
-     *     InvocationSerializer#createDefaultJsonSerializer()} with no whitelisted classes.
+     *     InvocationSerializer#createDefaultJsonSerializer()} with no permitted classes.
      * @return this
      */
     @SuppressWarnings("unchecked")

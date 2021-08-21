@@ -377,15 +377,15 @@ abstract class AbstractAcceptanceTestV1 {
   }
 
   /**
-   * Runs a piece of work which will fail enough times to be blacklisted but will then pass when
-   * re-whitelisted.
+   * Runs a piece of work which will fail enough times to be blocked but will then pass when
+   * unblocked.
    */
   @Test
-  final void blacklistAndWhitelist() throws Exception {
+  final void blockAndUnblock() throws Exception {
     TransactionManager transactionManager = simpleTxnManager();
     CountDownLatch successLatch = new CountDownLatch(1);
-    CountDownLatch blacklistLatch = new CountDownLatch(1);
-    LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    LatchListener latchListener = new LatchListener(successLatch, blockLatch);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
@@ -393,7 +393,7 @@ abstract class AbstractAcceptanceTestV1 {
             .instantiator(new FailingInstantiator(2))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
-            .blacklistAfterAttempts(2)
+            .blockAfterAttempts(2)
             .build();
 
     clearOutbox();
@@ -403,10 +403,10 @@ abstract class AbstractAcceptanceTestV1 {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blacklistLatch.await(3, TimeUnit.SECONDS));
+          assertTrue(blockLatch.await(3, TimeUnit.SECONDS));
           assertTrue(
               transactionManager.inTransactionReturns(
-                  tx -> outbox.whitelist(latchListener.getBlacklisted().getId())));
+                  tx -> outbox.unblock(latchListener.getBlocked().getId())));
           assertTrue(successLatch.await(3, TimeUnit.SECONDS));
         });
   }

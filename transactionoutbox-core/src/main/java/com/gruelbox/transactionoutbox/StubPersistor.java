@@ -41,7 +41,7 @@ public class StubPersistor implements Persistor {
   }
 
   @Override
-  public CompletableFuture<Boolean> whitelist(BaseTransaction tx, String entryId) {
+  public CompletableFuture<Boolean> unblock(BaseTransaction tx, String entryId) {
     return completedFuture(true);
   }
 

@@ -44,7 +44,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   @NotNull private final Level logLevelTemporaryFailure;
 
   @Min(1)
-  private final int blacklistAfterAttempts;
+  private final int blockAfterAttempts;
 
   @Min(1)
   private final int flushBatchSize;
@@ -54,14 +54,14 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   private final boolean serializeMdc;
   private final Validator validator;
   @NotNull private final Duration retentionThreshold;
-  private final Method whitelistMethod;
+  private final Method unblockMethod;
 
   TransactionOutboxImpl(
       BaseTransactionManager<CN, TX> transactionManager,
       Instantiator instantiator,
       Submitter submitter,
       Duration attemptFrequency,
-      int blacklistAfterAttempts,
+      int blockAfterAttempts,
       int flushBatchSize,
       ClockProvider clockProvider,
       TransactionOutboxListener listener,
@@ -75,17 +75,17 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     this.persistor = persistor;
     this.submitter = firstNonNull(submitter, Submitter::withDefaultExecutor);
     this.attemptFrequency = firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
-    this.blacklistAfterAttempts = blacklistAfterAttempts < 1 ? 5 : blacklistAfterAttempts;
+    this.blockAfterAttempts = blockAfterAttempts < 1 ? 5 : blockAfterAttempts;
     this.flushBatchSize = flushBatchSize < 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
     this.clockProvider = firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
     this.listener = firstNonNull(listener, () -> new TransactionOutboxListener() {});
     this.logLevelTemporaryFailure = firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
     this.validator = new Validator(this.clockProvider);
-    this.serializeMdc = serializeMdc == null ? true : serializeMdc;
+    this.serializeMdc = serializeMdc == null || serializeMdc;
     this.retentionThreshold = retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold;
     this.validator.validate(this);
-    this.whitelistMethod =
-        uncheckedly(() -> getClass().getMethod("whitelistAsync", String.class, Object.class));
+    this.unblockMethod =
+        uncheckedly(() -> getClass().getMethod("unblockAsync", String.class, Object.class));
     publishInitializationEvents();
     this.persistor.migrate(transactionManager);
   }
@@ -150,28 +150,28 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   }
 
   @Override
-  public boolean whitelist(String entryId) {
-    return Utils.join(whitelistAsync(entryId));
+  public boolean unblock(String entryId) {
+    return Utils.join(unblockAsync(entryId));
   }
 
   @Override
-  public boolean whitelist(String entryId, BaseTransaction<?> transaction) {
-    return Utils.join(whitelistAsync(entryId, transaction));
+  public boolean unblock(String entryId, BaseTransaction<?> transaction) {
+    return Utils.join(unblockAsync(entryId, transaction));
   }
 
   @Override
-  public CompletableFuture<Boolean> whitelistAsync(String entryId) {
+  public CompletableFuture<Boolean> unblockAsync(String entryId) {
     TransactionalInvocation invocation =
-        transactionManager.extractTransaction(whitelistMethod, new Object[] {entryId, null});
-    return whitelistAsync(entryId, invocation.getTransaction());
+        transactionManager.extractTransaction(unblockMethod, new Object[] {entryId, null});
+    return unblockAsync(entryId, invocation.getTransaction());
   }
 
   @Override
   @SuppressWarnings("unchecked")
-  public CompletableFuture<Boolean> whitelistAsync(String entryId, BaseTransaction<?> tx) {
+  public CompletableFuture<Boolean> unblockAsync(String entryId, BaseTransaction<?> tx) {
     log.info("Whitelisting entry {}", entryId);
     return persistor
-        .whitelist((TX) tx, entryId)
+        .unblock((TX) tx, entryId)
         .thenApply(
             success -> {
               if (success) {
@@ -184,13 +184,13 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   }
 
   @Override
-  public CompletableFuture<Boolean> whitelistAsync(String entryId, Object context) {
+  public CompletableFuture<Boolean> unblockAsync(String entryId, Object context) {
     if (context instanceof BaseTransaction) {
-      return whitelistAsync(entryId, (BaseTransaction<?>) context);
+      return unblockAsync(entryId, (BaseTransaction<?>) context);
     }
     TransactionalInvocation invocation =
-        transactionManager.extractTransaction(whitelistMethod, new Object[] {entryId, context});
-    return whitelistAsync(entryId, invocation.getTransaction());
+        transactionManager.extractTransaction(unblockMethod, new Object[] {entryId, context});
+    return unblockAsync(entryId, invocation.getTransaction());
   }
 
   @Override
@@ -386,8 +386,8 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       TransactionOutboxEntry entry, Throwable cause) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
-      var blacklisted = entry.getAttempts() >= blacklistAfterAttempts;
-      if (blacklisted) {
+      var blocked = entry.getAttempts() >= blockAfterAttempts;
+      if (blocked) {
         log.error(
             "Blacklisting failing process after {} attempts: {}",
             entry.getAttempts(),
@@ -409,7 +409,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
               cause.getMessage());
         }
       }
-      entry.setBlacklisted(blacklisted);
+      entry.setBlocked(blocked);
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
       return transactionManager
@@ -418,8 +418,8 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
               () -> {
                 log.debug("Successfully updated {}", entry.description());
                 onFailure(entry, cause);
-                if (blacklisted) {
-                  onBlacklisted(entry, cause);
+                if (blocked) {
+                  onBlocked(entry, cause);
                 }
               })
           .exceptionally(
@@ -466,11 +466,11 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     }
   }
 
-  private void onBlacklisted(TransactionOutboxEntry entry, Throwable cause) {
+  private void onBlocked(TransactionOutboxEntry entry, Throwable cause) {
     try {
-      listener.blacklisted(entry, cause);
+      listener.blocked(entry, cause);
     } catch (Exception e1) {
-      log.error("Error dispatching blacklisted event", e1);
+      log.error("Error dispatching blocked event", e1);
     }
   }
 

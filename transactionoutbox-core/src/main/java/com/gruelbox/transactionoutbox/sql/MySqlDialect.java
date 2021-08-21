@@ -47,6 +47,10 @@ final class MySqlDialect extends Dialect {
             "ALTER TABLE " + tableName + " MODIFY COLUMN uniqueRequestId VARCHAR(250)"),
         new SqlMigration(
             6,
+            "Rename column blacklisted to blocked",
+            "ALTER TABLE TXNO_OUTBOX CHANGE COLUMN blacklisted blocked VARCHAR(250)"),
+        new SqlMigration(
+            7,
             "Use datetime datatype for the next process date",
             "ALTER TABLE " + tableName + " MODIFY COLUMN nextAttemptTime DATETIME(6) NOT NULL"));
   }

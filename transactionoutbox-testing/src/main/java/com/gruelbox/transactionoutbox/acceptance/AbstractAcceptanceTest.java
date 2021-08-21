@@ -245,14 +245,14 @@ public abstract class AbstractAcceptanceTest<
   @Test
   final void testAsyncBlackAndWhitelistViaTxn() throws Exception {
     CountDownLatch successLatch = new CountDownLatch(1);
-    CountDownLatch blacklistLatch = new CountDownLatch(1);
-    LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    LatchListener latchListener = new LatchListener(successLatch, blockLatch);
     TransactionOutbox outbox =
         builder()
             .instantiator(new FailingInstantiator(2))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
-            .blacklistAfterAttempts(2)
+            .blockAfterAttempts(2)
             .build();
 
     cleanDataStore();
@@ -263,27 +263,25 @@ public abstract class AbstractAcceptanceTest<
             Utils.join(
                 txManager
                     .transactionally(tx -> scheduleWithTx(outbox, tx, 3, "Whee"))
-                    .thenRunAsync(() -> assertFired(blacklistLatch))
+                    .thenRunAsync(() -> assertFired(blockLatch))
                     .thenCompose(
                         __ ->
                             txManager.transactionally(
-                                tx ->
-                                    outbox.whitelistAsync(
-                                        latchListener.getBlacklisted().getId(), tx)))
+                                tx -> outbox.unblockAsync(latchListener.getBlocked().getId(), tx)))
                     .thenRunAsync(() -> assertFired(successLatch))));
   }
 
   @Test
   final void testAsyncBlackAndWhitelistViaContext() throws Exception {
     CountDownLatch successLatch = new CountDownLatch(1);
-    CountDownLatch blacklistLatch = new CountDownLatch(1);
-    LatchListener latchListener = new LatchListener(successLatch, blacklistLatch);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    LatchListener latchListener = new LatchListener(successLatch, blockLatch);
     TransactionOutbox outbox =
         builder()
             .instantiator(new FailingInstantiator(2, false))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
-            .blacklistAfterAttempts(2)
+            .blockAfterAttempts(2)
             .build();
 
     cleanDataStore();
@@ -295,14 +293,13 @@ public abstract class AbstractAcceptanceTest<
             Utils.join(
                 txManager
                     .transactionally(tx -> scheduleWithCtx(outbox, tx.context(), 3, "Whee"))
-                    .thenRunAsync(() -> assertFired(blacklistLatch))
+                    .thenRunAsync(() -> assertFired(blockLatch))
                     .thenCompose(
                         __ ->
                             txManager.transactionally(
                                 tx ->
-                                    outbox.whitelistAsync(
-                                        latchListener.getBlacklisted().getId(),
-                                        (Object) tx.context())))
+                                    outbox.unblockAsync(
+                                        latchListener.getBlocked().getId(), (Object) tx.context())))
                     .thenRunAsync(() -> assertFired(successLatch)));
           } catch (UnsupportedOperationException e) {
             notTestingContextInjection();

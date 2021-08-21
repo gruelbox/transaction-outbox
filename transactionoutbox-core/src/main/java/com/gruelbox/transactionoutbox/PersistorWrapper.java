@@ -50,8 +50,8 @@ public class PersistorWrapper<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public CompletableFuture<Boolean> whitelist(TX tx, String entryId) {
-    return delegate.whitelist(tx, entryId);
+  public CompletableFuture<Boolean> unblock(TX tx, String entryId) {
+    return delegate.unblock(tx, entryId);
   }
 
   @Override

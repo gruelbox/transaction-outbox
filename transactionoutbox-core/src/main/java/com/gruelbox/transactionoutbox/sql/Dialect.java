@@ -35,12 +35,12 @@ public abstract class Dialect {
   public abstract boolean isSupportsSkipLock();
 
   /**
-   * @return The statement required to delete a limited-size batch of processed, non-blacklisted
-   *     records which have passed their expiry date.
+   * @return The statement required to delete a limited-size batch of processed, non-blocked records
+   *     which have passed their expiry date.
    */
   @Beta
   public String getDeleteExpired() {
-    return "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blacklisted = false LIMIT ?";
+    return "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?";
   }
 
   /** @return The type to use for a cast to integer. */

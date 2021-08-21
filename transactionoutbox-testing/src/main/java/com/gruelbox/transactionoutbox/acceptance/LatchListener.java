@@ -12,26 +12,26 @@ import org.slf4j.event.Level;
 public final class LatchListener implements TransactionOutboxListener {
   private final CountDownLatch successLatch;
   private final Level logLevel;
-  private final CountDownLatch blacklistLatch;
+  private final CountDownLatch blockLatch;
 
-  @Getter private volatile TransactionOutboxEntry blacklisted;
+  @Getter private volatile TransactionOutboxEntry blocked;
 
-  public LatchListener(CountDownLatch successLatch, CountDownLatch blacklistLatch) {
+  public LatchListener(CountDownLatch successLatch, CountDownLatch blockLatch) {
     this.successLatch = successLatch;
     this.logLevel = Level.DEBUG;
-    this.blacklistLatch = blacklistLatch;
+    this.blockLatch = blockLatch;
   }
 
   public LatchListener(CountDownLatch successLatch) {
     this.successLatch = successLatch;
     this.logLevel = Level.DEBUG;
-    this.blacklistLatch = new CountDownLatch(1);
+    this.blockLatch = new CountDownLatch(1);
   }
 
   public LatchListener(CountDownLatch successLatch, Level logLevel) {
     this.successLatch = successLatch;
     this.logLevel = logLevel;
-    this.blacklistLatch = new CountDownLatch(1);
+    this.blockLatch = new CountDownLatch(1);
   }
 
   @Override
@@ -41,10 +41,10 @@ public final class LatchListener implements TransactionOutboxListener {
   }
 
   @Override
-  public void blacklisted(TransactionOutboxEntry entry, Throwable cause) {
+  public void blocked(TransactionOutboxEntry entry, Throwable cause) {
     Utils.logAtLevel(log, logLevel, "Got blackisting: {}", entry);
-    this.blacklisted = entry;
-    blacklistLatch.countDown();
+    this.blocked = entry;
+    blockLatch.countDown();
   }
 
   @Override

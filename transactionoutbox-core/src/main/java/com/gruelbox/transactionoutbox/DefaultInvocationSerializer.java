@@ -87,10 +87,11 @@ public final class DefaultInvocationSerializer
   private final InvocationJsonSerializer gsonSerializer;
 
   @Builder
-  DefaultInvocationSerializer(Set<Class<?>> whitelistedTypes, Integer version) {
+  DefaultInvocationSerializer(Set<Class<?>> serializableTypes, Integer version) {
     this.gsonSerializer =
         new InvocationJsonSerializer(
-            whitelistedTypes == null ? Set.of() : whitelistedTypes, version == null ? 2 : version);
+            serializableTypes == null ? Set.of() : serializableTypes,
+            version == null ? 2 : version);
     this.gson =
         new GsonBuilder()
             .registerTypeAdapter(Invocation.class, gsonSerializer)
@@ -127,7 +128,7 @@ public final class DefaultInvocationSerializer
     private Map<Class<?>, String> classToName = new HashMap<>();
     private Map<String, Class<?>> nameToClass = new HashMap<>();
 
-    InvocationJsonSerializer(Set<Class<?>> whitelistedClasses, int version) {
+    InvocationJsonSerializer(Set<Class<?>> serializableClasses, int version) {
       this.version = version;
       addClassPair(byte.class, "byte");
       addClassPair(short.class, "short");
@@ -173,7 +174,7 @@ public final class DefaultInvocationSerializer
       addClassPair(JdbcTransaction.class, "Transaction");
       addClassPair(TransactionContextPlaceholder.class, "TransactionContext");
 
-      whitelistedClasses.forEach(clazz -> addClassPair(clazz, clazz.getName()));
+      serializableClasses.forEach(clazz -> addClassPair(clazz, clazz.getName()));
     }
 
     private void addClassPair(Class<?> clazz, String name) {

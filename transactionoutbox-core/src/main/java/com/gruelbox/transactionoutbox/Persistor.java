@@ -80,18 +80,18 @@ public interface Persistor<CN, TX extends BaseTransaction<?>> {
   CompletableFuture<Boolean> lock(TX tx, TransactionOutboxEntry entry);
 
   /**
-   * Clears the blacklisted flag and resets the attempt count to zero.
+   * Clears the blocked flag and resets the attempt count to zero.
    *
    * @param tx The current {@link BaseTransaction}.
    * @param entryId The entry id.
    * @return true if the update was successful. This will be false if the record was no longer
-   *     blacklisted or didn't exist anymore.
+   *     blocked or didn't exist anymore.
    */
-  CompletableFuture<Boolean> whitelist(TX tx, String entryId);
+  CompletableFuture<Boolean> unblock(TX tx, String entryId);
 
   /**
-   * Selects up to a specified maximum number of non-blacklisted records which have passed their
-   * {@link TransactionOutboxEntry#getNextAttemptTime()}. Until a subsequent call to {@link
+   * Selects up to a specified maximum number of non-blocked records which have passed their {@link
+   * TransactionOutboxEntry#getNextAttemptTime()}. Until a subsequent call to {@link
    * #lock(BaseTransaction, TransactionOutboxEntry)}, these records may be selected by another
    * instance for processing.
    *
