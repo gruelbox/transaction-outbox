@@ -258,7 +258,7 @@ public abstract class AbstractAcceptanceTest<
   }
 
   @Test
-  final void testAsyncBlackAndWhitelistViaTxn() throws Exception {
+  final void testAsyncBlockAndUnblockViaTxn() throws Exception {
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blockLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blockLatch);

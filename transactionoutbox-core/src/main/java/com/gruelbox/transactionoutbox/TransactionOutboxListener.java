@@ -1,5 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
+import java.lang.reflect.InvocationTargetException;
+
 /** A listener for events fired by {@link TransactionOutbox}. */
 public interface TransactionOutboxListener {
 
@@ -16,6 +18,25 @@ public interface TransactionOutboxListener {
    */
   default void scheduled(TransactionOutboxEntry entry) {
     // No-op
+  }
+
+  /**
+   * Implement this method to intercept and decorate all outbox invocations. In general, you should
+   * call {@code invocation.run()} which actually calls the underlying method, unless you are
+   * deliberately trying to suppress the method call.
+   *
+   * @param invocator A runnable which performs the work of the scheduled task.
+   * @throws IllegalAccessException If thrown by the method invocation.
+   * @throws IllegalArgumentException If thrown by the method invocation.
+   * @throws InvocationTargetException If thrown by the method invocation.
+   */
+  default Object wrapInvocation(Invocator invocator)
+      throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+    return invocator.run();
+  }
+
+  interface Invocator {
+    Object run() throws IllegalAccessException, IllegalArgumentException, InvocationTargetException;
   }
 
   /**
@@ -76,6 +97,12 @@ public interface TransactionOutboxListener {
       public void scheduled(TransactionOutboxEntry entry) {
         self.scheduled(entry);
         other.scheduled(entry);
+      }
+
+      @Override
+      public Object wrapInvocation(Invocator invocator)
+          throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        return self.wrapInvocation(() -> other.wrapInvocation(invocator));
       }
 
       @Override

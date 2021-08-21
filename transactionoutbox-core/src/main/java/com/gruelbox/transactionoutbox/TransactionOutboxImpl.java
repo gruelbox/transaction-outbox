@@ -354,7 +354,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       log.debug("Created instance {}", instance);
       Invocation invocation =
           transactionManager.injectTransaction(entry.getInvocation(), transaction);
-      Object result = invocation.invoke(instance);
+      Object result = invocation.invoke(instance, listener);
       log.debug("Successfully invoked, returned {}", result);
       if (result instanceof CompletableFuture<?>) {
         return ((CompletableFuture<?>) result).thenApply(__ -> null);
