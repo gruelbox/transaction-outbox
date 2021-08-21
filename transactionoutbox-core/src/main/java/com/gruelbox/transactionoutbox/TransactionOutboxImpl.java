@@ -75,8 +75,8 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     this.persistor = persistor;
     this.submitter = firstNonNull(submitter, Submitter::withDefaultExecutor);
     this.attemptFrequency = firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
-    this.blacklistAfterAttempts = blacklistAfterAttempts <= 1 ? 5 : blacklistAfterAttempts;
-    this.flushBatchSize = flushBatchSize <= 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
+    this.blacklistAfterAttempts = blacklistAfterAttempts < 1 ? 5 : blacklistAfterAttempts;
+    this.flushBatchSize = flushBatchSize < 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
     this.clockProvider = firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
     this.listener = firstNonNull(listener, () -> new TransactionOutboxListener() {});
     this.logLevelTemporaryFailure = firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
