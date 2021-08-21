@@ -44,7 +44,8 @@ public final class TransactionOutboxEntry {
   @SuppressWarnings("JavaDoc")
   @NotNull
   @Getter
-  private final Invocation invocation;
+  @Setter
+  private Invocation invocation;
 
   /**
    * @param nextAttemptTime The timestamp after which the task is available for re-attempting.

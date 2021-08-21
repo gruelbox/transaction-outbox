@@ -38,6 +38,9 @@ import lombok.extern.slf4j.Slf4j;
 public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     implements Persistor<CN, TX>, InitializationEventSubscriber {
 
+  private static final String ALL_FIELDS =
+      "id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version";
+
   private final int writeLockTimeoutSeconds;
   private final Dialect dialect;
   private final String tableName;
@@ -72,7 +75,9 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
         mapToNative(
             "INSERT INTO "
                 + this.tableName
-                + " (id, uniqueRequestId, invocation, nextAttemptTime, attempts, blacklisted, processed, version) "
+                + " ("
+                + ALL_FIELDS
+                + ") "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     this.selectBatchSql =
         mapToNative(
@@ -94,7 +99,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                 + " WHERE id = ? and version = ?");
     this.lockSql =
         mapToNative(
-            "SELECT id FROM "
+            "SELECT id, invocation FROM "
                 + this.tableName
                 + " WHERE id = ? AND version = ? FOR UPDATE"
                 + (dialect.isSupportsSkipLock() ? " SKIP LOCKED" : ""));
@@ -299,7 +304,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                   binder
                       .bind(0, entry.getId())
                       .bind(1, entry.getVersion())
-                      .executeQuery(1, row -> 1))
+                      .executeQuery(1, row -> row.get(1, String.class)))
           .handle(
               (list, e) -> {
                 if (e != null) {
@@ -309,7 +314,15 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                   }
                   throw sneakyRethrow(t);
                 }
-                return !list.isEmpty();
+                if (list.isEmpty()) {
+                  return false;
+                }
+                // Ensure that subsequent processing uses a deserialized invocation rather than
+                // the object from the caller, which might not serialize well and thus cause a
+                // difference between immediate and retry processing
+                entry.setInvocation(
+                    serializer.deserializeInvocation(new StringReader(list.get(0))));
+                return true;
               });
     } catch (Exception e) {
       return failedFuture(e);
