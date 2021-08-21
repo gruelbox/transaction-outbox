@@ -484,7 +484,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   private class ParameterizedScheduleBuilderImpl implements ParameterizedScheduleBuilder {
 
-    @Length(max = 100)
+    @Length(max = 250)
     private String uniqueRequestId;
 
     @Override

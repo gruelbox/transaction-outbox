@@ -359,7 +359,7 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
      * basis).
      *
      * @param uniqueRequestId The unique request id. May be {@code null}, but if non-null may be a
-     *     maximum of 100 characters in length. It is advised that if these ids are client-supplied,
+     *     maximum of 250 characters in length. It is advised that if these ids are client-supplied,
      *     they be prepended with some sort of context identifier to ensure global uniqueness.
      * @return Builder.
      */
