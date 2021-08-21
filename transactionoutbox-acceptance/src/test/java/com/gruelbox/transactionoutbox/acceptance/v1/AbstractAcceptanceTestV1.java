@@ -382,7 +382,7 @@ abstract class AbstractAcceptanceTestV1 {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
-            .instantiator(new FailingInstantiator(0))
+            .instantiator(new FailingInstantiator(2))
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(orderedEntryListener)
