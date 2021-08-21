@@ -19,12 +19,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import javax.validation.ClockProvider;
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.constraints.Length;
 import org.hibernate.validator.internal.engine.DefaultClockProvider;
@@ -54,6 +56,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   private final boolean serializeMdc;
   private final Validator validator;
   @NotNull private final Duration retentionThreshold;
+  private final AtomicBoolean initialized = new AtomicBoolean();
   private final Method unblockMethod;
 
   TransactionOutboxImpl(
@@ -68,7 +71,8 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       Persistor<CN, TX> persistor,
       Level logLevelTemporaryFailure,
       Boolean serializeMdc,
-      Duration retentionThreshold) {
+      Duration retentionThreshold,
+      Boolean initializeImmediately) {
 
     this.transactionManager = transactionManager;
     this.instantiator = firstNonNull(instantiator, Instantiator::usingReflection);
@@ -86,8 +90,22 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     this.validator.validate(this);
     this.unblockMethod =
         uncheckedly(() -> getClass().getMethod("unblockAsync", String.class, Object.class));
-    publishInitializationEvents();
-    this.persistor.migrate(transactionManager);
+    if (initializeImmediately == null || initializeImmediately) {
+      initialize();
+    }
+  }
+
+  @Override
+  public void initialize() {
+    if (initialized.compareAndSet(false, true)) {
+      try {
+        publishInitializationEvents();
+        persistor.migrate(transactionManager);
+      } catch (Exception e) {
+        initialized.set(false);
+        throw e;
+      }
+    }
   }
 
   @Override
@@ -97,6 +115,9 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   @SuppressWarnings("unchecked")
   private <T> T schedule(Class<T> clazz, String uniqueRequestId) {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
     return Utils.createProxy(
         clazz,
         (method, args) ->
@@ -137,6 +158,9 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   }
 
   private CompletableFuture<List<TransactionOutboxEntry>> flushAsync(Instant now) {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
     log.debug("Flushing stale tasks");
     return transactionManager
         .transactionally(tx -> selectBatch(tx, now))
@@ -169,6 +193,9 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   @Override
   @SuppressWarnings("unchecked")
   public CompletableFuture<Boolean> unblockAsync(String entryId, BaseTransaction<?> tx) {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
     log.info("Whitelisting entry {}", entryId);
     return persistor
         .unblock((TX) tx, entryId)
@@ -479,6 +506,32 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       listener.failure(entry, cause);
     } catch (Exception e1) {
       log.error("Error dispatching failure event", e1);
+    }
+  }
+
+  @ToString
+  static class Builder extends TransactionOutboxBuilder {
+
+    Builder() {
+      super();
+    }
+
+    @SuppressWarnings("unchecked")
+    public TransactionOutbox build() {
+      return new TransactionOutboxImpl(
+          transactionManager,
+          instantiator,
+          submitter,
+          attemptFrequency,
+          blockAfterAttempts,
+          flushBatchSize,
+          clockProvider,
+          listener,
+          persistor,
+          logLevelTemporaryFailure,
+          serializeMdc,
+          retentionThreshold,
+          initializeImmediately);
     }
   }
 

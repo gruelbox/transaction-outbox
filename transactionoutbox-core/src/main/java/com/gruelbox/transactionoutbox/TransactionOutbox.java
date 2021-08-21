@@ -22,15 +22,23 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
 
   /** @return A builder for creating a new instance of {@link TransactionOutbox}. */
   static TransactionOutboxBuilder builder() {
-    return new TransactionOutboxBuilder();
+    return new TransactionOutboxImpl.Builder();
   }
+
+  /**
+   * Performs initial setup, making the instance usable. If {@link
+   * TransactionOutboxBuilder#initializeImmediately(boolean)} is true, which is the default, this
+   * method is called automatically when the instance is constructed.
+   */
+  void initialize();
 
   /**
    * The main entry point for submitting new transaction outbox tasks.
    *
    * <p>Returns a proxy of {@code T} which, when called, will instantly return and schedule a call
    * of the <em>real</em> method to occur after the current transaction is committed (as such a
-   * transaction needs to be active and accessible from {@link BaseTransactionManager}.)
+   * transaction needs to be active and accessible from the transaction manager supplied to {@link
+   * TransactionOutboxBuilder#transactionManager(BaseTransactionManager)}).
    *
    * <p>Usage:
    *
@@ -40,9 +48,11 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
    * <p>This will write a record to the database using the supplied {@link Persistor} and {@link
    * Instantiator}, using the current database transaction, which will get rolled back if the rest
    * of the transaction is, and thus never processed. However, if the transaction is committed, the
-   * real method will be called immediately afterwards using the supplied {@link Submitter}. Should
-   * that fail, the call will be reattempted whenever {@link #flush()} is called, provided at least
-   * {@code attemptFrequency} has passed since the time the task was last attempted.
+   * real method will be called immediately afterwards using the submitter supplied to {@link
+   * TransactionOutboxBuilder#submitter(Submitter)}. Should that fail, the call will be reattempted
+   * whenever {@link #flush()} is called, provided at least supplied {@link
+   * TransactionOutboxBuilder#attemptFrequency(Duration)} has passed since the time the task was
+   * last attempted.
    *
    * @param clazz The class to proxy.
    * @param <T> The type to proxy.
@@ -61,15 +71,16 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
 
   /**
    * Identifies any stale tasks queued using {@link #schedule(Class)} (those which were queued more
-   * than {@code attemptFrequency} ago and have been tried less than {@code blockAfterAttempts}
-   * times) and attempts to resubmit them.
+   * than supplied {@link TransactionOutboxBuilder#attemptFrequency(Duration)} ago and have been
+   * tried less than {@link TransactionOutboxBuilder#blockAfterAttempts(int)} )} times) and attempts
+   * to resubmit them.
    *
-   * <p>As long as the {@link Submitter} is non-blocking (e.g. uses a bounded queue with a {@link
-   * java.util.concurrent.RejectedExecutionHandler} which throws such as {@link
-   * java.util.concurrent.ThreadPoolExecutor.AbortPolicy}), this method will return quickly.
-   * However, if the {@link Submitter}uses a bounded queue with a blocking policy, this method could
-   * block for a long time, depending on how long the scheduled work takes and how large {@code
-   * flushBatchSize} is.
+   * <p>As long as the {@link TransactionOutboxBuilder#submitter(Submitter)} is non-blocking (e.g.
+   * uses a bounded queue with a {@link java.util.concurrent.RejectedExecutionHandler} which throws
+   * such as {@link java.util.concurrent.ThreadPoolExecutor.AbortPolicy}), this method will return
+   * quickly. However, if the {@link TransactionOutboxBuilder#submitter(Submitter)} uses a bounded
+   * queue with a blocking policy, this method could block for a long time, depending on how long
+   * the scheduled work takes and how large {@link TransactionOutboxBuilder#flushBatchSize(int)} is.
    *
    * <p>Calls {@link BaseTransactionManager#transactionally(Function)} to start a new transaction
    * for the fetch.
@@ -134,7 +145,6 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
    *     unblocked the entry first.
    */
   CompletableFuture<Boolean> unblockAsync(String entryId);
-
   /**
    * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
    * transaction to be supplied.
@@ -174,20 +184,21 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
 
   /** Builder for {@link TransactionOutbox}. */
   @ToString
-  class TransactionOutboxBuilder {
+  abstract class TransactionOutboxBuilder {
 
-    private BaseTransactionManager<?, ?> transactionManager;
-    private Instantiator instantiator;
-    private Submitter submitter;
-    private Duration attemptFrequency;
-    private int blockAfterAttempts;
-    private int flushBatchSize;
-    private ClockProvider clockProvider;
-    private TransactionOutboxListener listener;
-    private Persistor<?, ?> persistor;
-    private Level logLevelTemporaryFailure;
-    private Boolean serializeMdc;
-    private Duration retentionThreshold;
+    protected BaseTransactionManager<?, ?> transactionManager;
+    protected Instantiator instantiator;
+    protected Submitter submitter;
+    protected Duration attemptFrequency;
+    protected int blockAfterAttempts;
+    protected int flushBatchSize;
+    protected ClockProvider clockProvider;
+    protected TransactionOutboxListener listener;
+    protected Persistor<?, ?> persistor;
+    protected Level logLevelTemporaryFailure;
+    protected Boolean serializeMdc;
+    protected Duration retentionThreshold;
+    protected Boolean initializeImmediately;
 
     TransactionOutboxBuilder() {}
 
@@ -324,26 +335,22 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
     }
 
     /**
+     * @param initializeImmediately If true, {@link TransactionOutbox#initialize()} is called
+     *     automatically on creation (this is the default). Set to false in environments where
+     *     structured startup means that the database should not be accessed until later.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder initializeImmediately(boolean initializeImmediately) {
+      this.initializeImmediately = initializeImmediately;
+      return this;
+    }
+
+    /**
      * Creates and initialises the {@link TransactionOutbox}.
      *
      * @return The outbox implementation.
      */
-    @SuppressWarnings("unchecked")
-    public TransactionOutbox build() {
-      return new TransactionOutboxImpl(
-          transactionManager,
-          instantiator,
-          submitter,
-          attemptFrequency,
-          blockAfterAttempts,
-          flushBatchSize,
-          clockProvider,
-          listener,
-          persistor,
-          logLevelTemporaryFailure,
-          serializeMdc,
-          retentionThreshold);
-    }
+    public abstract TransactionOutbox build();
   }
 
   interface ParameterizedScheduleBuilder extends SchedulerProxyFactory {

@@ -150,8 +150,10 @@ public abstract class AbstractAcceptanceTest<
                             scheduled.set(true);
                           }
                         }))
+            .initializeImmediately(false)
             .build();
 
+    outbox.initialize();
     cleanDataStore();
 
     Utils.join(
@@ -164,6 +166,19 @@ public abstract class AbstractAcceptanceTest<
 
     assertFired(chainCompleted);
     assertTrue(scheduled.get());
+  }
+
+  @Test
+  final void noAutomaticInitialization() {
+    TransactionOutbox outbox =
+        builder().instantiator(new LoggingInstantiator()).initializeImmediately(false).build();
+
+    persistor.migrate(txManager);
+    cleanDataStore();
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> Utils.join(txManager.transactionally(tx -> scheduleWithTx(outbox, tx, 3, "Whee"))));
   }
 
   @Test
