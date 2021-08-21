@@ -137,7 +137,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   }
 
   private CompletableFuture<List<TransactionOutboxEntry>> flushAsync(Instant now) {
-    log.info("Flushing stale tasks");
+    log.debug("Flushing stale tasks");
     return transactionManager
         .transactionally(tx -> selectBatch(tx, now))
         .thenApply(
