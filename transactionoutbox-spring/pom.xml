@@ -16,8 +16,8 @@
   </description>
 
   <properties>
-    <spring.boot.version>2.3.1.RELEASE</spring.boot.version>
-    <spring.version>5.2.7.RELEASE</spring.version>
+    <spring.boot.version>2.3.3.RELEASE</spring.boot.version>
+    <spring.version>5.2.8.RELEASE</spring.version>
   </properties>
 
   <dependencies>
