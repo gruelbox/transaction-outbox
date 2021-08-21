@@ -13,7 +13,7 @@ import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.datasource.DataSourceUtils;
-import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @AllArgsConstructor(access = AccessLevel.PACKAGE)
@@ -35,7 +35,7 @@ final class SpringTransactionImpl implements SpringTransaction {
   @Override
   public void addPostCommitHook(Supplier<CompletableFuture<Void>> hook) {
     TransactionSynchronizationManager.registerSynchronization(
-        new TransactionSynchronizationAdapter() {
+        new TransactionSynchronization() {
           @Override
           @SneakyThrows
           public void afterCommit() {
@@ -50,7 +50,7 @@ final class SpringTransactionImpl implements SpringTransaction {
         Utils.uncheckedly(
             () -> BatchCountingStatementHandler.countBatches(connection().prepareStatement(sql)));
     TransactionSynchronizationManager.registerSynchronization(
-        new TransactionSynchronizationAdapter() {
+        new TransactionSynchronization() {
           @Override
           public void beforeCommit(boolean readOnly) {
             if (preparedStatement.getBatchCount() != 0) {

@@ -37,10 +37,10 @@
     <logback.version>1.2.3</logback.version>
     <revision>5.1.99999-SNAPSHOT</revision>
     <junit.jupiter.version>5.7.0</junit.jupiter.version>
-    <testcontainers.version>1.15.0</testcontainers.version>
+    <testcontainers.version>1.15.1</testcontainers.version>
     <hamcrest.version>2.2</hamcrest.version>
     <mockito.version>1.10.19</mockito.version>
-    <hikari.version>3.4.5</hikari.version>
+    <hikari.version>4.0.2</hikari.version>
     <h2.version>1.4.200</h2.version>
   </properties>
 
@@ -95,7 +95,7 @@
       <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
-        <version>1.18.16</version>
+        <version>1.18.18</version>
         <scope>provided</scope>
       </dependency>
 
@@ -186,7 +186,7 @@
       <dependency>
         <groupId>mysql</groupId>
         <artifactId>mysql-connector-java</artifactId>
-        <version>8.0.22</version>
+        <version>8.0.23</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -346,12 +346,12 @@
           <plugin>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok-maven-plugin</artifactId>
-            <version>1.18.12.0</version>
+            <version>1.18.18.0</version>
             <dependencies>
               <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
-                <version>1.18.16</version>
+                <version>1.18.18</version>
               </dependency>
             </dependencies>
             <executions>
