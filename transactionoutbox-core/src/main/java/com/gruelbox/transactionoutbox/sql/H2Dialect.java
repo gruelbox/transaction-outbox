@@ -30,7 +30,11 @@ final class H2Dialect extends Dialect {
                 + "_1 "
                 + "ON "
                 + tableName
-                + " (processed, blacklisted, nextAttemptTime)"));
+                + " (processed, blacklisted, nextAttemptTime)"),
+        new SqlMigration(
+            3,
+            "Increase size of uniqueRequestId",
+            "ALTER TABLE " + tableName + " ALTER COLUMN uniqueRequestId VARCHAR(250)"));
   }
 
   @Override

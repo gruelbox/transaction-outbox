@@ -43,6 +43,10 @@ final class MySqlDialect extends Dialect {
                 + " (processed, blacklisted, nextAttemptTime)"),
         new SqlMigration(
             5,
+            "Increase size of uniqueRequestId",
+            "ALTER TABLE " + tableName + " MODIFY COLUMN uniqueRequestId VARCHAR(250)"),
+        new SqlMigration(
+            6,
             "Use datetime datatype for the next process date",
             "ALTER TABLE " + tableName + " MODIFY COLUMN nextAttemptTime DATETIME(6) NOT NULL"));
   }

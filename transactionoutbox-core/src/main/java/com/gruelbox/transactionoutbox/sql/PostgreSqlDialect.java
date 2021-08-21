@@ -43,6 +43,10 @@ final class PostgreSqlDialect extends Dialect {
                 + " (processed, blacklisted, nextAttemptTime)"),
         new SqlMigration(
             5,
+            "Increase size of uniqueRequestId",
+            "ALTER TABLE " + tableName + " ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)"),
+        new SqlMigration(
+            6,
             "Make nextAttemptTime not null",
             "ALTER TABLE " + tableName + " ALTER COLUMN nextAttemptTime SET NOT NULL"));
   }
