@@ -13,6 +13,8 @@ import com.gruelbox.transactionoutbox.sql.Dialects;
 import io.r2dbc.postgresql.PostgresqlConnectionFactory;
 import io.r2dbc.spi.Connection;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.BeforeAll;
+import reactor.core.publisher.Hooks;
 
 @Slf4j
 class TestR2dbcPersistorPostgres12 extends AbstractPersistorTest<Connection, R2dbcRawTransaction>
@@ -24,6 +26,11 @@ class TestR2dbcPersistorPostgres12 extends AbstractPersistorTest<Connection, R2d
           new PostgresqlConnectionFactory(connectionConfiguration()));
   private final R2dbcRawTransactionManager txManager =
       new R2dbcRawTransactionManager(connectionFactory);
+
+  @BeforeAll
+  static void beforeAll() {
+    Hooks.onOperatorDebug();
+  }
 
   @Override
   protected Dialect dialect() {
