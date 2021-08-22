@@ -59,10 +59,9 @@ final class H2Dialect extends Dialect {
             String.format(
                 "UPDATE %s SET blocked = false WHERE blocked IS NULL;\n"
                     + "UPDATE %s SET processed = false WHERE processed IS NULL;\n"
-                    + "ALTER TABLE %s\n"
-                    + "ALTER COLUMN processed BOOLEAN NOT NULL,\n"
-                    + "ALTER COLUMN blocked BOOLEAN NOT NULL;",
-                tableName, tableName, tableName)));
+                    + "ALTER TABLE %s ALTER COLUMN processed BOOLEAN NOT NULL;\n"
+                    + "ALTER TABLE %s ALTER COLUMN blocked BOOLEAN NOT NULL;",
+                tableName, tableName, tableName, tableName)));
   }
 
   @Override
