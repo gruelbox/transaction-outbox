@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
 import static com.gruelbox.transactionoutbox.r2dbc.UsesPostgres12.connectionConfiguration;
+import static com.gruelbox.transactionoutbox.sql.Dialects.POSTGRESQL_9;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
 
@@ -9,7 +10,6 @@ import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.Connectio
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
-import com.gruelbox.transactionoutbox.sql.Dialects;
 import io.r2dbc.postgresql.PostgresqlConnectionFactory;
 import io.r2dbc.spi.Connection;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,8 @@ import reactor.core.publisher.Hooks;
 class TestR2dbcPersistorPostgres12 extends AbstractPersistorTest<Connection, R2dbcRawTransaction>
     implements UsesPostgres12 {
 
-  private final R2dbcPersistor persistor = R2dbcPersistor.forDialect(Dialects.POSTGRESQL_9);
+  private final R2dbcPersistor persistor =
+      R2dbcPersistor.builder().dialect(POSTGRESQL_9).migrationRetries(0).build();
   private final ConnectionFactoryWrapper connectionFactory =
       R2dbcRawTransactionManager.wrapConnectionFactory(
           new PostgresqlConnectionFactory(connectionConfiguration()));
@@ -34,7 +35,7 @@ class TestR2dbcPersistorPostgres12 extends AbstractPersistorTest<Connection, R2d
 
   @Override
   protected Dialect dialect() {
-    return Dialects.POSTGRESQL_9;
+    return POSTGRESQL_9;
   }
 
   @SuppressWarnings("unchecked")

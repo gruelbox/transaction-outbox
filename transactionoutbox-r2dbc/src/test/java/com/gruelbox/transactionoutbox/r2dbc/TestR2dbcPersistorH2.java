@@ -1,11 +1,12 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
+import static com.gruelbox.transactionoutbox.sql.Dialects.H2;
+
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
-import com.gruelbox.transactionoutbox.sql.Dialects;
 import io.r2dbc.h2.H2ConnectionConfiguration;
 import io.r2dbc.h2.H2ConnectionFactory;
 import io.r2dbc.spi.Connection;
@@ -16,7 +17,8 @@ import reactor.core.publisher.Hooks;
 @Slf4j
 class TestR2dbcPersistorH2 extends AbstractPersistorTest<Connection, R2dbcRawTransaction> {
 
-  private final R2dbcPersistor persistor = R2dbcPersistor.forDialect(Dialects.H2);
+  private final R2dbcPersistor persistor =
+      R2dbcPersistor.builder().dialect(H2).migrationRetries(0).build();
   private final ConnectionFactoryWrapper connectionFactory =
       R2dbcRawTransactionManager.wrapConnectionFactory(
           new H2ConnectionFactory(
@@ -36,7 +38,7 @@ class TestR2dbcPersistorH2 extends AbstractPersistorTest<Connection, R2dbcRawTra
 
   @Override
   protected Dialect dialect() {
-    return Dialects.H2;
+    return H2;
   }
 
   @SuppressWarnings("unchecked")

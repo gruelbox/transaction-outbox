@@ -7,7 +7,6 @@ import com.gruelbox.transactionoutbox.acceptance.JdbcConnectionDetails;
 import com.gruelbox.transactionoutbox.sql.Dialects;
 import java.time.Duration;
 import java.util.Map;
-
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.jooq.impl.DataSourceConnectionProvider;
@@ -24,8 +23,9 @@ public class TestMySql5JooqThreadLocalProvider extends AbstractJooqThreadLocalPr
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1))
-        .withTmpFs(Map.of("/var/lib/mysql", "rw,noexec,nosuid,size=512m"));
+      new MySQLContainer<>("mysql:5")
+          .withStartupTimeout(Duration.ofHours(1))
+          .withTmpFs(Map.of("/var/lib/mysql", "rw,noexec,nosuid,size=512m"));
 
   @Override
   protected JdbcConnectionDetails connectionDetails() {

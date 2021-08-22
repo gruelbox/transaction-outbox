@@ -1,13 +1,13 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
 import static com.gruelbox.transactionoutbox.r2dbc.UsesMySql8.connectionConfiguration;
+import static com.gruelbox.transactionoutbox.sql.Dialects.MY_SQL_8;
 
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
-import com.gruelbox.transactionoutbox.sql.Dialects;
 import dev.miku.r2dbc.mysql.MySqlConnectionFactory;
 import io.r2dbc.spi.Connection;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +18,8 @@ import reactor.core.publisher.Hooks;
 class TestR2dbcPersistorMySql8 extends AbstractPersistorTest<Connection, R2dbcRawTransaction>
     implements UsesMySql8 {
 
-  private final R2dbcPersistor persistor = R2dbcPersistor.forDialect(Dialects.MY_SQL_8);
+  private final R2dbcPersistor persistor =
+      R2dbcPersistor.builder().dialect(MY_SQL_8).migrationRetries(0).build();
   private final ConnectionFactoryWrapper connectionFactory =
       R2dbcRawTransactionManager.wrapConnectionFactory(
           MySqlConnectionFactory.from(connectionConfiguration()));
@@ -32,7 +33,7 @@ class TestR2dbcPersistorMySql8 extends AbstractPersistorTest<Connection, R2dbcRa
 
   @Override
   protected Dialect dialect() {
-    return Dialects.MY_SQL_8;
+    return MY_SQL_8;
   }
 
   @SuppressWarnings("unchecked")

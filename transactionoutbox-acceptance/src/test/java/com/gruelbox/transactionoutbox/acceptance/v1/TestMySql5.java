@@ -4,7 +4,6 @@ import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.acceptance.JdbcConnectionDetails;
 import java.time.Duration;
 import java.util.Map;
-
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -16,9 +15,10 @@ class TestMySql5 extends AbstractAcceptanceTestV1 {
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1))
-        .withReuse(true)
-        .withTmpFs(Map.of("/var/lib/mysql", "rw,noexec,nosuid,size=512m"));
+      new MySQLContainer<>("mysql:5")
+          .withStartupTimeout(Duration.ofHours(1))
+          .withReuse(true)
+          .withTmpFs(Map.of("/var/lib/mysql", "rw,noexec,nosuid,size=512m"));
 
   @SuppressWarnings("deprecation")
   @Override

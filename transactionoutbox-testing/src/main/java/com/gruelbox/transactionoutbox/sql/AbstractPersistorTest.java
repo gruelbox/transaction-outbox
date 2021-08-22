@@ -23,7 +23,6 @@ import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.OptimisticLockException;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.Utils;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import java.math.BigDecimal;
@@ -74,6 +73,7 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
     validateState();
     log.info("Clearing old records");
     txManager().transactionally(persistor()::clear).get(10, TimeUnit.SECONDS);
+    log.info("Cleared");
   }
 
   @Test
@@ -329,13 +329,12 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
             .transactionally(tx -> persistor().save(tx, entry))
             .thenRun(() -> entry.setAttempts(1))
             .thenCompose(__ -> txManager().transactionally(tx -> persistor().update(tx, entry)))
-            .thenRun(
-                () -> {
-                  List<TransactionOutboxEntry> found =
-                      Utils.join(
-                          txManager()
-                              .transactionally(
-                                  tx -> persistor().selectBatch(tx, 1, now.plusMillis(1))));
+            .thenCompose(
+                __ ->
+                    txManager()
+                        .transactionally(tx -> persistor().selectBatch(tx, 1, now.plusMillis(1))))
+            .thenAccept(
+                found -> {
                   assertThat(found.size(), equalTo(1));
                   assertThat(found.get(0), matches(entry));
                   assertThat(found.get(0).getLastAttemptTime(), nullValue());
