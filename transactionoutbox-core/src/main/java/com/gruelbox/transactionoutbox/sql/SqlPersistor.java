@@ -126,7 +126,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     int attempts = 0;
     do {
       try {
-        tm.transactionally(this::createVersionTableIfNotExists).join();
+        Utils.join(tm.transactionally(this::createVersionTableIfNotExists));
         log.info("Checking for new migrations...");
         Utils.join(
             tm.transactionally(
@@ -423,6 +423,9 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
         "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
             + dialect.getIntegerCastType()
             + ") AS version");
+//    return executeUpdate(
+//      tx,
+//      "CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
   }
 
   private CompletableFuture<List<Integer>> fetchCurrentVersionAndLock(TX tx) {
