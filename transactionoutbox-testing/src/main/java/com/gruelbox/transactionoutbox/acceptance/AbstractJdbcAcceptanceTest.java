@@ -509,7 +509,7 @@ public abstract class AbstractJdbcAcceptanceTest<
                                   .process(i * 10 + j, "Whee");
                             }
                           }));
-          assertFired(latch);
+          assertFired(latch, 20);
         });
 
     assertThat(
