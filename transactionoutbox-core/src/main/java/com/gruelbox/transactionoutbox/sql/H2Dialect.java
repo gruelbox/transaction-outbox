@@ -42,15 +42,27 @@ final class H2Dialect extends Dialect {
         new SqlMigration(
             6,
             "Rename column blacklisted to blocked",
-            "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked"),
+            "ALTER TABLE " + tableName + " RENAME COLUMN blacklisted TO blocked"),
         new SqlMigration(
             7,
             "Add lastAttemptTime column to outbox",
-            "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation"),
+            "ALTER TABLE "
+                + tableName
+                + " ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation"),
         new SqlMigration(
             8,
             "Make nextAttemptTime not null",
-            "ALTER TABLE " + tableName + " ALTER COLUMN nextAttemptTime TIMESTAMP(6) NOT NULL"));
+            "ALTER TABLE " + tableName + " ALTER COLUMN nextAttemptTime TIMESTAMP(6) NOT NULL"),
+        new SqlMigration(
+            9,
+            "Fix data types on blocked and processed columns",
+            String.format(
+                "UPDATE %s SET blocked = false WHERE blocked IS NULL;\n"
+                    + "UPDATE %s SET processed = false WHERE processed IS NULL;\n"
+                    + "ALTER TABLE %s\n"
+                    + "ALTER COLUMN processed BOOLEAN NOT NULL,\n"
+                    + "ALTER COLUMN blocked BOOLEAN NOT NULL;",
+                tableName, tableName, tableName)));
   }
 
   @Override

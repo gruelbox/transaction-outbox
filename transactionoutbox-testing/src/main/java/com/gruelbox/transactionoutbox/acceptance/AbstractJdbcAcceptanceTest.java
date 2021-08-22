@@ -89,10 +89,10 @@ public abstract class AbstractJdbcAcceptanceTest<
     }
   }
 
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings({"unchecked", "rawtypes"})
   @Override
   protected final Persistor<Connection, TX> createPersistor() {
-    return (Persistor) JdbcPersistor.forDialect(dialect());
+    return (Persistor) JdbcPersistor.builder().dialect(dialect()).migrationRetries(0).build();
   }
 
   @Test

@@ -48,15 +48,35 @@ final class MySqlDialect extends Dialect {
         new SqlMigration(
             6,
             "Rename column blacklisted to blocked",
-            "ALTER TABLE TXNO_OUTBOX CHANGE COLUMN blacklisted blocked VARCHAR(250)"),
+            "ALTER TABLE " + tableName + " CHANGE COLUMN blacklisted blocked VARCHAR(250)"),
         new SqlMigration(
             7,
             "Add lastAttemptTime column to outbox",
-            "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation"),
+            "ALTER TABLE "
+                + tableName
+                + " ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation"),
         new SqlMigration(
             8,
             "Use datetime datatype for the next process date",
-            "ALTER TABLE " + tableName + " MODIFY COLUMN nextAttemptTime DATETIME(6) NOT NULL"));
+            "ALTER TABLE " + tableName + " MODIFY COLUMN nextAttemptTime DATETIME(6) NOT NULL"),
+        new SqlMigration(
+            9,
+            "Repair nulls on blocked column",
+            String.format(
+                "UPDATE %s SET blocked = CASE WHEN blocked = 'TRUE' or blocked = 'true' or blocked = '1' or blocked = 't' or blocked = 'y' or blocked = 'yes' or blocked = 'on' THEN '1' ELSE '0' END",
+                tableName)),
+        new SqlMigration(
+            10,
+            "Repair nulls on processed column",
+            String.format("UPDATE %s SET processed = 0 WHERE processed IS NULL", tableName)),
+        new SqlMigration(
+            11,
+            "Fix data types on blocked and processed columns",
+            String.format(
+                "ALTER TABLE %s\n"
+                    + " MODIFY COLUMN processed BOOLEAN NOT NULL,\n"
+                    + " MODIFY COLUMN blocked BOOLEAN NOT NULL",
+                tableName)));
   }
 
   @Override

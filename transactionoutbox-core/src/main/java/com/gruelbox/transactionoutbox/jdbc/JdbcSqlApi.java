@@ -123,14 +123,23 @@ class JdbcSqlApi implements SqlApi<Connection, JdbcTransaction> {
       public SqlStatement bind(int index, Object value) {
         try {
           log.debug(" - Binding {} --> {}", index, value);
-          if (value instanceof Instant) {
-            statement.setObject(index + 1, Timestamp.from((Instant) value));
-          } else {
-            statement.setObject(index + 1, value);
-          }
+          statement.setObject(index + 1, mapObj(value));
           return this;
         } catch (SQLException e) {
           throw new RuntimeException(e);
+        }
+      }
+
+      @Override
+      public SqlStatement bindNull(int index, Class<?> clazz) {
+        return bind(index, null);
+      }
+
+      private Object mapObj(Object o) {
+        if (o instanceof Instant) {
+          return Timestamp.from((Instant) o);
+        } else {
+          return o;
         }
       }
 

@@ -45,6 +45,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   private final Dialect dialect;
   private final String tableName;
   private final boolean migrate;
+  private final int migrationRetries;
   private final InvocationSerializer serializer;
   private final SqlApi<CN, TX> sqlApi;
 
@@ -62,12 +63,14 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
       Dialect dialect,
       String tableName,
       Boolean migrate,
+      Integer migrationRetries,
       InvocationSerializer serializer,
       SqlApi<CN, TX> sqlApi) {
     this.writeLockTimeoutSeconds = writeLockTimeoutSeconds == null ? 2 : writeLockTimeoutSeconds;
     this.dialect = Objects.requireNonNull(dialect);
     this.tableName = tableName == null ? "TXNO_OUTBOX" : tableName;
     this.migrate = migrate == null ? true : migrate;
+    this.migrationRetries = migrationRetries == null ? 5 : migrationRetries;
     this.serializer =
         Utils.firstNonNull(serializer, InvocationSerializer::createDefaultJsonSerializer);
     this.sqlApi = Objects.requireNonNull(sqlApi);
@@ -111,7 +114,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                 + this.tableName
                 + " SET attempts = 0, blocked = false, version = version + 1 "
                 + "WHERE blocked = true AND processed = false AND id = ?");
-    this.clearSql = dialect.mapStatementToNative("DELETE FROM " + this.tableName);
+    this.clearSql = dialect.mapStatementToNative("TRUNCATE TABLE " + this.tableName);
   }
 
   @Override
@@ -129,48 +132,56 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
             tm.transactionally(
                 tx ->
                     fetchCurrentVersionAndLock(tx)
-                        .thenCompose(
+                        .thenApply(
                             versionResult -> {
                               if (versionResult.size() != 1) {
-                                return failedFuture(
-                                    new IllegalStateException(
-                                        "Unexpected number of version records: "
-                                            + versionResult.size()));
+                                throw new IllegalStateException(
+                                    "Unexpected number of version records: "
+                                        + versionResult.size());
                               }
                               int currentVersion = versionResult.get(0);
                               log.info("Current schema version is {}", currentVersion);
-                              return dialect
-                                  .migrations(tableName)
-                                  .filter(mig -> mig.getVersion() > currentVersion)
-                                  .peek(
-                                      mig ->
-                                          log.info(
-                                              "Running migration {}: {}",
-                                              mig.getVersion(),
-                                              mig.getName()))
-                                  .map(
-                                      mig ->
-                                          executeUpdate(tx, mig.getSql())
-                                              .thenCompose(_2 -> updateVersion(tx, mig)))
-                                  .reduce(
-                                      CompletableFuture.completedFuture(null),
-                                      (f1, f2) -> f1.thenCompose(_3 -> f2));
+                              return currentVersion;
+                            })
+                        .thenCompose(
+                            currentVersion -> {
+                              CompletableFuture<?> chain = CompletableFuture.completedFuture(null);
+                              for (var mig :
+                                  (Iterable<SqlMigration>)
+                                      () -> dialect.migrations(tableName).iterator()) {
+                                if (mig.getVersion() <= currentVersion) {
+                                  continue;
+                                }
+                                chain =
+                                    chain
+                                        .thenRun(
+                                            () ->
+                                                log.info(
+                                                    "Running migration {}: {}",
+                                                    mig.getVersion(),
+                                                    mig.getName()))
+                                        .thenCompose(__ -> executeUpdate(tx, mig.getSql()))
+                                        .thenCompose(__ -> updateVersion(tx, mig));
+                              }
+                              return chain;
                             })));
         log.info("Migrations complete");
         return;
       } catch (Exception e) {
-        log.error("Failed migration attempt {}. Retrying in 15s", ++attempts);
-        try {
-          Thread.sleep(15000);
-        } catch (InterruptedException ex) {
-          Thread.currentThread().interrupt();
-          throw new UncheckedException(ex);
+        if (++attempts < migrationRetries) {
+          log.error("Failed migration attempt {}. Retrying in 15s", attempts, e);
+          try {
+            //noinspection BusyWait
+            Thread.sleep(15000);
+          } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new UncheckedException(ex);
+          }
+        } else {
+          throw new IllegalStateException("Migrate database failed.", e);
         }
       }
-    } while (attempts < 5);
-    throw new IllegalStateException(
-        "Repeated attempts to migrate database failed. See earlier"
-            + " errors for more information.");
+    } while (true);
   }
 
   @Override
@@ -188,9 +199,9 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
               binder ->
                   binder
                       .bind(0, entry.getId())
-                      .bind(1, entry.getUniqueRequestId())
+                      .bind(1, entry.getUniqueRequestId(), String.class)
                       .bind(2, writer.toString())
-                      .bind(3, entry.getLastAttemptTime())
+                      .bind(3, entry.getLastAttemptTime(), Instant.class)
                       .bind(4, entry.getNextAttemptTime())
                       .bind(5, entry.getAttempts())
                       .bind(6, entry.isBlocked())
@@ -258,7 +269,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
               false,
               binder ->
                   binder
-                      .bind(0, entry.getLastAttemptTime())
+                      .bind(0, entry.getLastAttemptTime(), Instant.class)
                       .bind(1, entry.getNextAttemptTime())
                       .bind(2, entry.getAttempts())
                       .bind(3, entry.isBlocked())
@@ -460,6 +471,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     private Dialect dialect;
     private String tableName;
     private Boolean migrate;
+    private Integer migrationRetries;
     private InvocationSerializer serializer;
 
     protected SqlPersistorBuilder(SqlApi<CN, TX> sqlApi) {
@@ -513,6 +525,18 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     }
 
     /**
+     * @param retries The number of retries that should be made when attempting to migrate the
+     *     database when initialising. Has no effect if {@link #migrate(Boolean)} has been set to
+     *     {@code false}.
+     * @return this
+     */
+    @SuppressWarnings("unchecked")
+    public T migrationRetries(int retries) {
+      this.migrationRetries = retries;
+      return (T) this;
+    }
+
+    /**
      * @param serializer The serializer to use for {@link Invocation}s. See {@link
      *     InvocationSerializer} for more information. Defaults to {@link
      *     InvocationSerializer#createDefaultJsonSerializer()} with no permitted classes.
@@ -526,7 +550,13 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
 
     protected SqlPersistor<CN, TX> buildGeneric() {
       return new SqlPersistor<>(
-          writeLockTimeoutSeconds, dialect, tableName, migrate, serializer, sqlApi);
+          writeLockTimeoutSeconds,
+          dialect,
+          tableName,
+          migrate,
+          migrationRetries,
+          serializer,
+          sqlApi);
     }
   }
 }

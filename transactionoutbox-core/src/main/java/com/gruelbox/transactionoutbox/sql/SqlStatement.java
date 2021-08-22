@@ -10,6 +10,16 @@ public interface SqlStatement {
 
   SqlStatement bind(int index, Object value);
 
+  SqlStatement bindNull(int index, Class<?> clazz);
+
+  default <T> SqlStatement bind(int index, T obj, Class<T> clazz) {
+    if (obj == null) {
+      return bindNull(index, clazz);
+    } else {
+      return bind(index, obj);
+    }
+  }
+
   CompletableFuture<Integer> execute();
 
   <T> CompletableFuture<List<T>> executeQuery(

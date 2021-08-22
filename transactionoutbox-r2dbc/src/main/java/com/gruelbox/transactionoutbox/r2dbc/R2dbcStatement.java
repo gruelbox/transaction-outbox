@@ -36,17 +36,31 @@ class R2dbcStatement implements SqlStatement {
   @Override
   public R2dbcStatement bind(int i, Object arg) {
     log.trace("Binding {} -> {}", i, arg);
-    if (arg instanceof Instant) {
-      statement.bind(i, LocalDateTime.ofInstant((Instant) arg, ZoneOffset.UTC));
-    } else {
-      if (arg == null) {
-        // Lazy, but does what we need here
-        statement.bindNull(i, String.class);
-      } else {
-        statement.bind(i, arg);
-      }
-    }
+    statement.bind(i, mapObj(arg));
     return this;
+  }
+
+  @Override
+  public SqlStatement bindNull(int i, Class<?> clazz) {
+    log.trace("Binding {} -> null", i);
+    statement.bindNull(i, mapClass(clazz));
+    return this;
+  }
+
+  private Class<?> mapClass(Class<?> clazz) {
+    if (clazz.equals(Instant.class)) {
+      return LocalDateTime.class;
+    } else {
+      return clazz;
+    }
+  }
+
+  private Object mapObj(Object o) {
+    if (o instanceof Instant) {
+      return LocalDateTime.ofInstant((Instant) o, ZoneOffset.UTC);
+    } else {
+      return o;
+    }
   }
 
   @Override

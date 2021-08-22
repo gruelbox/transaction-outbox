@@ -15,7 +15,7 @@
   <description>R2DBC support for Transaction Outbox</description>
 
   <properties>
-    <r2dbc.version>0.8.2.RELEASE</r2dbc.version>
+    <r2dbc.version>0.8.5.RELEASE</r2dbc.version>
   </properties>
 
   <dependencies>
@@ -29,7 +29,7 @@
     <dependency>
       <groupId>io.projectreactor</groupId>
       <artifactId>reactor-core</artifactId>
-      <version>3.3.5.RELEASE</version>
+      <version>3.4.9</version>
     </dependency>
     <dependency>
       <groupId>io.r2dbc</groupId>
@@ -100,12 +100,6 @@
     </dependency>
     <dependency>
       <groupId>io.r2dbc</groupId>
-      <artifactId>r2dbc-h2</artifactId>
-      <version>${r2dbc.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.r2dbc</groupId>
       <artifactId>r2dbc-postgresql</artifactId>
       <version>${r2dbc.version}</version>
       <scope>test</scope>
@@ -117,9 +111,15 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>io.r2dbc</groupId>
+      <artifactId>r2dbc-h2</artifactId>
+      <version>0.8.4.RELEASE</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>dev.miku</groupId>
       <artifactId>r2dbc-mysql</artifactId>
-      <version>0.8.1.RELEASE</version>
+      <version>0.8.2.RELEASE</version>
       <scope>test</scope>
     </dependency>
     <dependency>

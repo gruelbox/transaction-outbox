@@ -48,15 +48,26 @@ final class PostgreSqlDialect extends Dialect {
         new SqlMigration(
             6,
             "Rename column blacklisted to blocked",
-            "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked"),
+            "ALTER TABLE " + tableName + " RENAME COLUMN blacklisted TO blocked"),
         new SqlMigration(
             7,
             "Add lastAttemptTime column to outbox",
-            "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6)"),
+            "ALTER TABLE " + tableName + " ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL"),
         new SqlMigration(
             8,
             "Make nextAttemptTime not null",
-            "ALTER TABLE " + tableName + " ALTER COLUMN nextAttemptTime SET NOT NULL"));
+            "ALTER TABLE " + tableName + " ALTER COLUMN nextAttemptTime SET NOT NULL"),
+        new SqlMigration(
+            9,
+            "Fix data types on blocked and processed columns",
+            String.format(
+                "UPDATE %s SET processed = FALSE WHERE processed IS NULL;\n"
+                    + "ALTER TABLE %s\n"
+                    + " ALTER COLUMN processed SET NOT NULL,\n"
+                    + " ALTER COLUMN blocked TYPE BOOLEAN \n"
+                    + "  USING CASE WHEN blocked = 'TRUE' or blocked = 'true' or blocked = '1' or blocked = 't' or blocked = 'y' or blocked = 'yes' or blocked = 'on' THEN TRUE ELSE FALSE END,\n"
+                    + " ALTER COLUMN blocked SET NOT NULL;",
+                tableName, tableName)));
   }
 
   @Override

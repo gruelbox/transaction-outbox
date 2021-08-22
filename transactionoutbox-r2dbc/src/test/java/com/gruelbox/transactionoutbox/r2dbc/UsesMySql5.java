@@ -26,6 +26,7 @@ public interface UsesMySql5 {
         .password(CONTAINER.getPassword())
         .port(CONTAINER.getFirstMappedPort())
         .database(CONTAINER.getDatabaseName())
+        .tlsVersion("TLSv1.2")
         .build();
   }
 }
