@@ -66,7 +66,7 @@ final class PostgreSqlDialect extends Dialect {
         + "  SELECT id FROM {{table}}"
         + "  WHERE nextAttemptTime < ? AND"
         + "        processed = true AND"
-        + "        blacklisted = false"
+        + "        blocked = false"
         + "  LIMIT ?)";
   }
 
