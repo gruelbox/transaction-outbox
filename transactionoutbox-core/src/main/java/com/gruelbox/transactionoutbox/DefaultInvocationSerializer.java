@@ -47,6 +47,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -447,54 +449,102 @@ public final class DefaultInvocationSerializer
     private static Date parse(String date, ParsePosition pos) throws ParseException {
       Exception fail;
       try {
-        int offset = pos.getIndex();
+        Parser parser = new Parser(date, pos.getIndex());
+        int year = parser.year();
+        int month = parser.month();
+        int day = parser.day();
+        int hour = 0;
+        int minutes = 0;
+        int seconds = 0;
+        int milliseconds = 0;
+        if (parser.hasTime()) {
+          hour = parser.hour();
+          minutes = parser.minutes();
+          if (parser.hasSeconds()) {
+            seconds = parser.seconds();
+            milliseconds = parser.milliseconds();
+          }
+        }
+        TimeZone timezone = parser.timeZone();
+        Calendar calendar = calendar(year, month, day, hour, minutes, seconds, milliseconds, timezone);
+        pos.setIndex(parser.offset);
+        return calendar.getTime();
+        // If we get a ParseException it'll already have the right message/offset.
+        // Other exception types can convert here.
+      } catch (IndexOutOfBoundsException | IllegalArgumentException e) {
+        fail = e;
+      }
+      String input = (date == null) ? null : ("'" + date + "'");
+      throw new ParseException(
+          "Failed to parse date [" + input + "]: " + fail.getMessage(), pos.getIndex());
+    }
 
-        // extract year
+    @AllArgsConstructor
+    private static final class Parser {
+      private final String date;
+      private int offset;
+
+      int year() {
         int year = parseInt(date, offset, offset += 4);
         if (checkOffset(date, offset, '-')) {
           offset += 1;
         }
+        return year;
+      }
 
-        // extract month
+      int month() {
         int month = parseInt(date, offset, offset += 2);
         if (checkOffset(date, offset, '-')) {
           offset += 1;
         }
+        return month;
+      }
 
-        // extract day
-        int day = parseInt(date, offset, offset += 2);
-        // default time value
-        int hour = 0;
-        int minutes = 0;
-        int seconds = 0;
-        int milliseconds =
-            0; // always use 0 otherwise returned date will include millis of current time
-        if (checkOffset(date, offset, 'T')) {
+      int day() {
+        return parseInt(date, offset, offset += 2);
+      }
 
-          // extract hours, minutes, seconds and milliseconds
-          hour = parseInt(date, offset += 1, offset += 2);
-          if (checkOffset(date, offset, ':')) {
-            offset += 1;
-          }
+      boolean hasTime() {
+        return checkOffset(date, offset, 'T');
+      }
 
-          minutes = parseInt(date, offset, offset += 2);
-          if (checkOffset(date, offset, ':')) {
-            offset += 1;
-          }
-          // second and milliseconds can be optional
-          if (date.length() > offset) {
-            char c = date.charAt(offset);
-            if (c != 'Z' && c != '+' && c != '-') {
-              seconds = parseInt(date, offset, offset += 2);
-              // milliseconds can be optional in the format
-              if (checkOffset(date, offset, '.')) {
-                milliseconds = parseInt(date, offset += 1, offset += 3);
-              }
-            }
-          }
+      boolean hasSeconds() {
+        if (date.length() <= offset) {
+          return false;
         }
+        char c = date.charAt(offset);
+        return c != 'Z' && c != '+' && c != '-';
+      }
 
-        // extract timezone
+      int hour() {
+        int hour = parseInt(date, offset += 1, offset += 2);
+        if (checkOffset(date, offset, ':')) {
+          offset += 1;
+        }
+        return hour;
+      }
+
+      int minutes() {
+        int minutes = parseInt(date, offset, offset += 2);
+        if (checkOffset(date, offset, ':')) {
+          offset += 1;
+        }
+        return minutes;
+      }
+
+      int seconds() {
+        return parseInt(date, offset, offset += 2);
+      }
+
+      int milliseconds() {
+        if (checkOffset(date, offset, '.')) {
+          return parseInt(date, offset += 1, offset += 3);
+        } else {
+          return 0;
+        }
+      }
+
+      TimeZone timeZone() {
         String timezoneId;
         if (date.length() <= offset) {
           throw new IllegalArgumentException("No time zone indicator");
@@ -515,27 +565,21 @@ public final class DefaultInvocationSerializer
         if (!timezone.getID().equals(timezoneId)) {
           throw new IndexOutOfBoundsException();
         }
-
-        Calendar calendar = new GregorianCalendar(timezone);
-        calendar.setLenient(false);
-        calendar.set(Calendar.YEAR, year);
-        calendar.set(Calendar.MONTH, month - 1);
-        calendar.set(Calendar.DAY_OF_MONTH, day);
-        calendar.set(Calendar.HOUR_OF_DAY, hour);
-        calendar.set(Calendar.MINUTE, minutes);
-        calendar.set(Calendar.SECOND, seconds);
-        calendar.set(Calendar.MILLISECOND, milliseconds);
-
-        pos.setIndex(offset);
-        return calendar.getTime();
-        // If we get a ParseException it'll already have the right message/offset.
-        // Other exception types can convert here.
-      } catch (IndexOutOfBoundsException | IllegalArgumentException e) {
-        fail = e;
+        return timezone;
       }
-      String input = (date == null) ? null : ("'" + date + "'");
-      throw new ParseException(
-          "Failed to parse date [" + input + "]: " + fail.getMessage(), pos.getIndex());
+    }
+
+    private static Calendar calendar(int year, int month, int day, int hour, int minutes, int seconds, int milliseconds, TimeZone timezone) {
+      Calendar calendar = new GregorianCalendar(timezone);
+      calendar.setLenient(false);
+      calendar.set(Calendar.YEAR, year);
+      calendar.set(Calendar.MONTH, month - 1);
+      calendar.set(Calendar.DAY_OF_MONTH, day);
+      calendar.set(Calendar.HOUR_OF_DAY, hour);
+      calendar.set(Calendar.MINUTE, minutes);
+      calendar.set(Calendar.SECOND, seconds);
+      calendar.set(Calendar.MILLISECOND, milliseconds);
+      return calendar;
     }
 
     /**

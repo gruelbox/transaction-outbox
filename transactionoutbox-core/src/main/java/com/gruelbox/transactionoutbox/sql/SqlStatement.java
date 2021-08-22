@@ -8,9 +8,9 @@ import java.util.function.Function;
 @Beta
 public interface SqlStatement {
 
-  SqlStatement bind(int index, Object value);
-
   SqlStatement bindNull(int index, Class<?> clazz);
+
+  SqlStatement bind(int index, Object value);
 
   default <T> SqlStatement bind(int index, T obj, Class<T> clazz) {
     if (obj == null) {
