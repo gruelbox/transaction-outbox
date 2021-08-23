@@ -46,12 +46,12 @@
 
   <modules>
     <module>transactionoutbox-core</module>
-    <module>transactionoutbox-spring</module>
-    <module>transactionoutbox-guice</module>
-    <module>transactionoutbox-jooq</module>
+<!--    <module>transactionoutbox-spring</module>-->
+<!--    <module>transactionoutbox-guice</module>-->
+<!--    <module>transactionoutbox-jooq</module>-->
     <module>transactionoutbox-r2dbc</module>
     <module>transactionoutbox-testing</module>
-    <module>transactionoutbox-acceptance</module>
+<!--    <module>transactionoutbox-acceptance</module>-->
   </modules>
 
   <dependencyManagement>
