@@ -19,10 +19,6 @@ jobs:
           server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
           settings-path: ${{ github.workspace }} # location for the settings.xml file
 
-      - name: Set up testcontainers reuse
-        run: |
-          echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
-
       - name: Build, publish to GPR and tag
         run: |
           if [ "$GITHUB_REPOSITORY" == "gruelbox/transaction-outbox" ]; then

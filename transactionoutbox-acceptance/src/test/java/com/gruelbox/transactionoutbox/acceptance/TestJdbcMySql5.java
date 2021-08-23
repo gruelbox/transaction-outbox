@@ -16,7 +16,6 @@ class TestJdbcMySql5 extends AbstractSimpleTransactionManagerAcceptanceTest {
   private static final JdbcDatabaseContainer container =
       new MySQLContainer<>("mysql:5")
           .withStartupTimeout(Duration.ofHours(1))
-          .withReuse(true)
           .withTmpFs(Map.of("/var/lib/mysql", "rw,noexec,nosuid,size=512m"));
 
   @Override
