@@ -134,6 +134,12 @@ class R2dbcStatement implements SqlStatement {
             if (Instant.class.equals(type)) {
               LocalDateTime value = row.get(index, LocalDateTime.class);
               return (V) (value == null ? null : value.toInstant(ZoneOffset.UTC));
+            } else if (Integer.class.equals(type)) {
+              var value = row.get(index, Number.class);
+              return (V) (value == null ? null : value.intValue());
+            } else if (Long.class.equals(type)) {
+              var value = row.get(index, Number.class);
+              return (V) (value == null ? null : value.longValue());
             } else {
               return row.get(index, type);
             }
