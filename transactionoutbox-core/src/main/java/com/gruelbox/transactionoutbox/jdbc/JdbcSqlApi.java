@@ -98,7 +98,9 @@ class JdbcSqlApi implements SqlApi<Connection, JdbcTransaction> {
   private <T> T executeWithStandaloneStatement(
       JdbcTransaction tx, String sql, int timeoutSeconds, Function<SqlStatement, T> binding) {
     try (PreparedStatement statement = tx.connection().prepareStatement(sql)) {
-      statement.setQueryTimeout(timeoutSeconds);
+      if (timeoutSeconds > 0) {
+        statement.setQueryTimeout(timeoutSeconds);
+      }
       return binding.apply(executeAndMap(statement));
     } catch (SQLException e) {
       throw new RuntimeException(e);
@@ -109,7 +111,9 @@ class JdbcSqlApi implements SqlApi<Connection, JdbcTransaction> {
       JdbcTransaction tx, String sql, int timeoutSeconds, Function<SqlStatement, T> binding) {
     PreparedStatement statement = tx.prepareBatchStatement(sql);
     try {
-      statement.setQueryTimeout(timeoutSeconds);
+      if (timeoutSeconds > 0) {
+        statement.setQueryTimeout(timeoutSeconds);
+      }
     } catch (SQLException e) {
       Utils.uncheckAndThrow(e);
     }
