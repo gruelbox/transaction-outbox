@@ -419,7 +419,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       var blocked = entry.getAttempts() >= blockAfterAttempts;
       if (blocked) {
         log.error(
-            "Blacklisting failing process after {} attempts: {}",
+            "Blocking failing process after {} attempts: {}",
             entry.getAttempts(),
             entry.description(),
             cause);
