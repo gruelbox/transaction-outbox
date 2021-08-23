@@ -71,6 +71,11 @@ public class PersistorWrapper<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
+  public CompletableFuture<Boolean> checkConnection(TX tx) {
+    return delegate.checkConnection(tx);
+  }
+
+  @Override
   public void onRegisterInitializationEvents(InitializationEventBus eventBus) {
     if (delegate instanceof InitializationEventSubscriber) {
       ((InitializationEventSubscriber) delegate).onRegisterInitializationEvents(eventBus);

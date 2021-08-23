@@ -61,4 +61,9 @@ public class StubPersistor implements Persistor {
   public CompletableFuture<Integer> clear(BaseTransaction transaction) {
     return completedFuture(0);
   }
+
+  @Override
+  public CompletableFuture<Boolean> checkConnection(BaseTransaction baseTransaction) {
+    return completedFuture(true);
+  }
 }

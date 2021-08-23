@@ -423,9 +423,6 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
         "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
             + dialect.getIntegerCastType()
             + ") AS version");
-    //    return executeUpdate(
-    //      tx,
-    //      "CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
   }
 
   private CompletableFuture<List<Integer>> fetchCurrentVersionAndLock(TX tx) {
@@ -446,6 +443,18 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     return sqlApi.statement(
         tx, dialect, sql, writeLockTimeoutSeconds, false, SqlStatement::execute);
   }
+
+  @Override
+  public CompletableFuture<Boolean> checkConnection(TX tx) {
+    return sqlApi.statement(
+      tx,
+      dialect,
+      "SELECT 1",
+      0,
+      false,
+      binder -> binder.executeQuery(1, row -> row.get(0, Integer.class))).thenApply(list -> !list.isEmpty() && list.get(0).equals(1));
+  }
+
 
   private String mapToNative(String sql) {
     return sqlApi.requiresNativeStatementMapping() ? dialect.mapStatementToNative(sql) : sql;

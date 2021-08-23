@@ -122,4 +122,12 @@ public interface Persistor<CN, TX extends BaseTransaction<?>> {
    */
   @Beta
   CompletableFuture<Integer> clear(TX tx);
+
+  /**
+   * Verifies that the database is responding.
+   *
+   * @param tx The current {@link BaseTransaction}.
+   * @return True
+   */
+  CompletableFuture<Boolean> checkConnection(TX tx);
 }

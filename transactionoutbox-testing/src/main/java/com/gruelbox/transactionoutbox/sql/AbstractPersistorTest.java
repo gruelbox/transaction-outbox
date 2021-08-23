@@ -69,6 +69,8 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
 
   @BeforeEach
   void beforeEach() throws InterruptedException, ExecutionException, TimeoutException {
+    CompletableFuture<Boolean> checkConnectionResult = txManager().transactionally(tx -> persistor().checkConnection(tx));
+    assertTrue(Utils.join(checkConnectionResult));
     persistor().migrate(txManager());
     log.info("Validating state");
     validateState();
