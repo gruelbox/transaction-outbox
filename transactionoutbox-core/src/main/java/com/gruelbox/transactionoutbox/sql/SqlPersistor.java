@@ -423,9 +423,9 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
         "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
             + dialect.getIntegerCastType()
             + ") AS version");
-//    return executeUpdate(
-//      tx,
-//      "CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
+    //    return executeUpdate(
+    //      tx,
+    //      "CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
   }
 
   private CompletableFuture<List<Integer>> fetchCurrentVersionAndLock(TX tx) {

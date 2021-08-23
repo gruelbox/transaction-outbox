@@ -101,7 +101,7 @@
     <dependency>
       <groupId>io.r2dbc</groupId>
       <artifactId>r2dbc-postgresql</artifactId>
-      <version>${r2dbc.version}</version>
+      <version>0.8.8.RELEASE</version>
       <scope>test</scope>
     </dependency>
     <dependency>

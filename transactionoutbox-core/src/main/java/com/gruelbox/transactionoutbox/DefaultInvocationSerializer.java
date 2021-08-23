@@ -47,7 +47,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
@@ -466,7 +465,8 @@ public final class DefaultInvocationSerializer
           }
         }
         TimeZone timezone = parser.timeZone();
-        Calendar calendar = calendar(year, month, day, hour, minutes, seconds, milliseconds, timezone);
+        Calendar calendar =
+            calendar(year, month, day, hour, minutes, seconds, milliseconds, timezone);
         pos.setIndex(parser.offset);
         return calendar.getTime();
         // If we get a ParseException it'll already have the right message/offset.
@@ -569,7 +569,15 @@ public final class DefaultInvocationSerializer
       }
     }
 
-    private static Calendar calendar(int year, int month, int day, int hour, int minutes, int seconds, int milliseconds, TimeZone timezone) {
+    private static Calendar calendar(
+        int year,
+        int month,
+        int day,
+        int hour,
+        int minutes,
+        int seconds,
+        int milliseconds,
+        TimeZone timezone) {
       Calendar calendar = new GregorianCalendar(timezone);
       calendar.setLenient(false);
       calendar.set(Calendar.YEAR, year);
