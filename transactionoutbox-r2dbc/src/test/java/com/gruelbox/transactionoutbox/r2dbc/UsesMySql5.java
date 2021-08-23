@@ -16,6 +16,7 @@ public interface UsesMySql5 {
   JdbcDatabaseContainer CONTAINER =
       new MySQLContainer<>("mysql:5")
           .withStartupTimeout(Duration.ofHours(1))
+          .withReuse(true)
           .withTmpFs(Map.of("/var/lib/mysql", "rw,noexec,nosuid,size=512m"));
 
   static MySqlConnectionConfiguration connectionConfiguration() {

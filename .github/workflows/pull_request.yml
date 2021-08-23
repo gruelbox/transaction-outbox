@@ -18,5 +18,9 @@ jobs:
         with:
           java-version: 11
 
+      - name: Set up testcontainers reuse
+        run: |
+          echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
+
       - name: Build with Maven
         run: mvn -B package -fae
