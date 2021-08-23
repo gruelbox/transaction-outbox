@@ -19,7 +19,7 @@ jobs:
           java-version: 11
 
       - name: Build with Maven and delombok
-        run: mvn -Pdelombok -B package
+        run: mvn -Pdelombok -B package -fae
 
       - uses: actions/upload-artifact@v2
         with:

@@ -29,7 +29,7 @@ jobs:
             git tag $revision
             git push origin $revision
           else
-            mvn -Pdelombok -B package
+            mvn -Pdelombok -B package -fae
           fi
         env:
           GITHUB_TOKEN: ${{ github.token }}
