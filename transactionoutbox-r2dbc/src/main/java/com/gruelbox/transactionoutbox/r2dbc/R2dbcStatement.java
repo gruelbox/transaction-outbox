@@ -113,31 +113,35 @@ class R2dbcStatement implements SqlStatement {
       return Mono.from(statement.execute())
           .map(r -> (io.r2dbc.spi.Result) r)
           .defaultIfEmpty(EMPTY_RESULT)
-          .flatMapMany(result -> result.map((r, m) -> r))
-          .map(
-              row ->
-                  dialect.mapResultFromNative(
-                      new SqlResultRow() {
-                        @SuppressWarnings("unchecked")
-                        @Override
-                        public <V> V get(int index, Class<V> type) {
-                          try {
-                            if (Instant.class.equals(type)) {
-                              LocalDateTime value = row.get(index, LocalDateTime.class);
-                              return (V) (value == null ? null : value.toInstant(ZoneOffset.UTC));
-                            } else {
-                              return row.get(index, type);
-                            }
-                          } catch (Exception e) {
-                            throw new IllegalArgumentException(
-                                "Failed to fetch field [" + index + "] in " + sql, e);
-                          }
-                        }
-                      }))
-          .map(rowMapper)
+          .flatMapMany(result -> result.map((r, m) -> mapSpiRow(rowMapper, r)))
           .collect(() -> new ArrayList<>(expectedRowCount), List::add);
     } catch (Exception e) {
       return Mono.error(e);
     }
+  }
+
+  private <U> U mapSpiRow(Function<SqlResultRow, U> rowMapper, io.r2dbc.spi.Row r) {
+    return rowMapper.apply(spiRowToSqlResultRow(r));
+  }
+
+  private SqlResultRow spiRowToSqlResultRow(io.r2dbc.spi.Row row) {
+    return dialect.mapResultFromNative(
+      new SqlResultRow() {
+        @SuppressWarnings("unchecked")
+        @Override
+        public <V> V get(int index, Class<V> type) {
+          try {
+            if (Instant.class.equals(type)) {
+              LocalDateTime value = row.get(index, LocalDateTime.class);
+              return (V) (value == null ? null : value.toInstant(ZoneOffset.UTC));
+            } else {
+              return row.get(index, type);
+            }
+          } catch (Exception e) {
+            throw new IllegalArgumentException(
+              "Failed to fetch field [" + index + "] in " + sql, e);
+          }
+        }
+      });
   }
 }
