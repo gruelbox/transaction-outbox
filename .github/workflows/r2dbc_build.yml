@@ -2,7 +2,7 @@ name: Continous Delivery
 
 on:
   push:
-    branches: [r2dbc]
+    branches: [r2dbc4]
 
 jobs:
   build:
