@@ -446,15 +446,16 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
 
   @Override
   public CompletableFuture<Boolean> checkConnection(TX tx) {
-    return sqlApi.statement(
-      tx,
-      dialect,
-      "SELECT 1",
-      0,
-      false,
-      binder -> binder.executeQuery(1, row -> row.get(0, Integer.class))).thenApply(list -> !list.isEmpty() && list.get(0).equals(1));
+    return sqlApi
+        .statement(
+            tx,
+            dialect,
+            "SELECT 1",
+            0,
+            false,
+            binder -> binder.executeQuery(1, row -> row.get(0, Integer.class)))
+        .thenApply(list -> !list.isEmpty() && list.get(0).equals(1));
   }
-
 
   private String mapToNative(String sql) {
     return sqlApi.requiresNativeStatementMapping() ? dialect.mapStatementToNative(sql) : sql;

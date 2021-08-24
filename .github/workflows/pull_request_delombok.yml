@@ -25,6 +25,12 @@ jobs:
       - name: Build with Maven and delombok
         run: mvn -Pdelombok -B package -fae
 
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+          files: /**/surefire-reports/**/*.xml
+
       - uses: actions/upload-artifact@v2
         with:
           name: javadocs-core

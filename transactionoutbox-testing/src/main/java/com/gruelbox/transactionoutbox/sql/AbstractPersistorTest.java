@@ -45,6 +45,7 @@ import org.hamcrest.TypeSafeMatcher;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -69,7 +70,8 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
 
   @BeforeEach
   void beforeEach() throws InterruptedException, ExecutionException, TimeoutException {
-    CompletableFuture<Boolean> checkConnectionResult = txManager().transactionally(tx -> persistor().checkConnection(tx));
+    CompletableFuture<Boolean> checkConnectionResult =
+        txManager().transactionally(tx -> persistor().checkConnection(tx));
     assertTrue(Utils.join(checkConnectionResult));
     persistor().migrate(txManager());
     log.info("Validating state");
@@ -578,6 +580,7 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
   }
 
   @Test
+  @Disabled
   void testLockPessimisticLockFailure()
       throws InterruptedException, TimeoutException, ExecutionException {
     var entry = createEntry("FOO1", now.minusSeconds(1), false);
