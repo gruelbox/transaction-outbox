@@ -408,6 +408,8 @@ TransactionOutbox outbox = TransactionOutbox.builder()
         .build())
     // Lower the log level when a task fails temporarily from the default WARN.
     .logLevelTemporaryFailure(Level.INFO)
+    // Level to log start/finish of tasks. Advisable to set this lower in high volume environments.
+    .logLevelProcessStartAndFinish(Level.INFO)
     // 10 attempts at a task before blocking it.
     .blockAfterAttempts(10)
     // When calling flush(), select 0.5m records at a time.

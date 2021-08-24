@@ -196,6 +196,7 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
     protected TransactionOutboxListener listener;
     protected Persistor<?, ?> persistor;
     protected Level logLevelTemporaryFailure;
+    protected Level logLevelProcessStartAndFinish;
     protected Boolean serializeMdc;
     protected Duration retentionThreshold;
     protected Boolean initializeImmediately;
@@ -309,6 +310,18 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
      */
     public TransactionOutboxBuilder logLevelTemporaryFailure(Level logLevelTemporaryFailure) {
       this.logLevelTemporaryFailure = logLevelTemporaryFailure;
+      return this;
+    }
+
+    /**
+     * @param logLevelProcessStartAndFinish The log level to use when logging start and finish on
+     *     tasks. Defaults to {@code INFO}, but can be helpful to reduce to {@code DEBUG} in high
+     *     volume environments.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder logLevelProcessStartAndFinish(
+        Level logLevelProcessStartAndFinish) {
+      this.logLevelProcessStartAndFinish = logLevelProcessStartAndFinish;
       return this;
     }
 

@@ -44,6 +44,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   @NotNull private final Submitter submitter;
   @NotNull private final Duration attemptFrequency;
   @NotNull private final Level logLevelTemporaryFailure;
+  @NotNull private final Level logLevelProcessStartAndFinish;
 
   @Min(1)
   private final int blockAfterAttempts;
@@ -70,6 +71,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       TransactionOutboxListener listener,
       Persistor<CN, TX> persistor,
       Level logLevelTemporaryFailure,
+      Level logLevelProcessStartAndFinish,
       Boolean serializeMdc,
       Duration retentionThreshold,
       Boolean initializeImmediately) {
@@ -84,6 +86,8 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     this.clockProvider = firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
     this.listener = firstNonNull(listener, () -> new TransactionOutboxListener() {});
     this.logLevelTemporaryFailure = firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
+    this.logLevelProcessStartAndFinish =
+        firstNonNull(logLevelProcessStartAndFinish, () -> Level.INFO);
     this.validator = new Validator(this.clockProvider);
     this.serializeMdc = serializeMdc == null || serializeMdc;
     this.retentionThreshold = retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold;
@@ -228,7 +232,12 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
             (success, e) -> {
               if (e == null) {
                 if (success) {
-                  log.info("Processed({}) {}", entry.getAttempts() + 1, entry.description());
+                  logAtLevel(
+                      log,
+                      logLevelProcessStartAndFinish,
+                      "Processed({}) {}",
+                      entry.getAttempts() + 1,
+                      entry.description());
                   onSuccess(entry);
                 } else {
                   log.debug("Skipped task {} - may be locked or already processed", entry.getId());
@@ -350,7 +359,12 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   private CompletableFuture<Void> invoke(TransactionOutboxEntry entry, TX transaction) {
     try {
-      log.info("Processing({}) {}", entry.getAttempts() + 1, entry.description());
+      logAtLevel(
+          log,
+          logLevelProcessStartAndFinish,
+          "Processing({}) {}",
+          entry.getAttempts() + 1,
+          entry.description());
       Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
       log.debug("Created instance {}", instance);
       Invocation invocation =
@@ -532,6 +546,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
           listener,
           persistor,
           logLevelTemporaryFailure,
+          logLevelProcessStartAndFinish,
           serializeMdc,
           retentionThreshold,
           initializeImmediately);

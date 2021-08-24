@@ -126,28 +126,28 @@ class R2dbcStatement implements SqlStatement {
 
   private SqlResultRow spiRowToSqlResultRow(io.r2dbc.spi.Row row) {
     return dialect.mapResultFromNative(
-      new SqlResultRow() {
-        @SuppressWarnings("unchecked")
-        @Override
-        public <V> V get(int index, Class<V> type) {
-          try {
-            if (Instant.class.equals(type)) {
-              LocalDateTime value = row.get(index, LocalDateTime.class);
-              return (V) (value == null ? null : value.toInstant(ZoneOffset.UTC));
-            } else if (Integer.class.equals(type)) {
-              var value = row.get(index, Number.class);
-              return (V) (value == null ? null : value.intValue());
-            } else if (Long.class.equals(type)) {
-              var value = row.get(index, Number.class);
-              return (V) (value == null ? null : value.longValue());
-            } else {
-              return row.get(index, type);
+        new SqlResultRow() {
+          @SuppressWarnings("unchecked")
+          @Override
+          public <V> V get(int index, Class<V> type) {
+            try {
+              if (Instant.class.equals(type)) {
+                LocalDateTime value = row.get(index, LocalDateTime.class);
+                return (V) (value == null ? null : value.toInstant(ZoneOffset.UTC));
+              } else if (Integer.class.equals(type)) {
+                var value = row.get(index, Number.class);
+                return (V) (value == null ? null : value.intValue());
+              } else if (Long.class.equals(type)) {
+                var value = row.get(index, Number.class);
+                return (V) (value == null ? null : value.longValue());
+              } else {
+                return row.get(index, type);
+              }
+            } catch (Exception e) {
+              throw new IllegalArgumentException(
+                  "Failed to fetch field [" + index + "] in " + sql, e);
             }
-          } catch (Exception e) {
-            throw new IllegalArgumentException(
-              "Failed to fetch field [" + index + "] in " + sql, e);
           }
-        }
-      });
+        });
   }
 }

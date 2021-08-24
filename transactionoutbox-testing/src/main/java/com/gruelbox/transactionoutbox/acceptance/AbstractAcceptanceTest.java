@@ -130,6 +130,7 @@ public abstract class AbstractAcceptanceTest<
     return TransactionOutbox.builder()
         .transactionManager(txManager)
         .logLevelTemporaryFailure(Level.DEBUG)
+        .logLevelProcessStartAndFinish(Level.DEBUG)
         .persistor(persistor);
   }
 

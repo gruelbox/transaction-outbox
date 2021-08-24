@@ -54,6 +54,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.slf4j.event.Level;
 
 @SuppressWarnings("deprecation")
 @Slf4j
@@ -82,6 +83,8 @@ abstract class AbstractAcceptanceTestV1 {
             .transactionManager(transactionManager)
             .instantiator(new LoggingInstantiator())
             .submitter(Submitter.withExecutor(unreliablePool))
+            .logLevelProcessStartAndFinish(Level.DEBUG)
+            .logLevelTemporaryFailure(Level.DEBUG)
             .listener(
                 new LatchListener(latch)
                     .andThen(
@@ -142,6 +145,8 @@ abstract class AbstractAcceptanceTestV1 {
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .retentionThreshold(Duration.ofDays(2))
             .clockProvider(clockProvider::get)
+            .logLevelProcessStartAndFinish(Level.DEBUG)
+            .logLevelTemporaryFailure(Level.DEBUG)
             .build();
 
     clearOutbox();
@@ -238,6 +243,8 @@ abstract class AbstractAcceptanceTestV1 {
               .transactionManager(transactionManager)
               .persistor(Persistor.forDialect(connectionDetails().dialect()))
               .listener(new LatchListener(latch))
+              .logLevelProcessStartAndFinish(Level.DEBUG)
+              .logLevelTemporaryFailure(Level.DEBUG)
               .build();
 
       clearOutbox();
@@ -315,6 +322,8 @@ abstract class AbstractAcceptanceTestV1 {
               .transactionManager(transactionManager)
               .listener(new LatchListener(latch))
               .persistor(Persistor.forDialect(connectionDetails().dialect()))
+              .logLevelProcessStartAndFinish(Level.DEBUG)
+              .logLevelTemporaryFailure(Level.DEBUG)
               .build();
 
       clearOutbox();
@@ -361,6 +370,8 @@ abstract class AbstractAcceptanceTestV1 {
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(new LatchListener(latch))
+            .logLevelProcessStartAndFinish(Level.DEBUG)
+            .logLevelTemporaryFailure(Level.DEBUG)
             .build();
 
     clearOutbox();
@@ -389,6 +400,8 @@ abstract class AbstractAcceptanceTestV1 {
             .attemptFrequency(Duration.ofMillis(500))
             .listener(orderedEntryListener)
             .blockAfterAttempts(2)
+            .logLevelProcessStartAndFinish(Level.DEBUG)
+            .logLevelTemporaryFailure(Level.DEBUG)
             .build();
 
     clearOutbox();
@@ -441,6 +454,8 @@ abstract class AbstractAcceptanceTestV1 {
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
             .blockAfterAttempts(2)
+            .logLevelProcessStartAndFinish(Level.DEBUG)
+            .logLevelTemporaryFailure(Level.DEBUG)
             .build();
 
     clearOutbox();
@@ -487,6 +502,8 @@ abstract class AbstractAcceptanceTestV1 {
                     latch.countDown();
                   }
                 })
+            .logLevelProcessStartAndFinish(Level.DEBUG)
+            .logLevelTemporaryFailure(Level.DEBUG)
             .build();
 
     withRunningFlusher(

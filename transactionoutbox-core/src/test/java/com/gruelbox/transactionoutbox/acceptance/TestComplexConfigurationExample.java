@@ -87,6 +87,7 @@ class TestComplexConfigurationExample {
                     .build())
             // Lower the log level when a task fails temporarily from the default WARN.
             .logLevelTemporaryFailure(Level.INFO)
+            .logLevelProcessStartAndFinish(Level.INFO)
             // 10 attempts at a task before it is blocked (and would require intervention)
             .blockAfterAttempts(10)
             // When calling flush(), select 0.5m records at a time.
