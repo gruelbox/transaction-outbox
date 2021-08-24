@@ -497,7 +497,6 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
 
     var gotLockLatch = new CountDownLatch(1);
     var releaseLatch = new CountDownLatch(1);
-    AtomicReference<List<TransactionOutboxEntry>> locked = new AtomicReference<>();
 
     // Use a background thread to run the locking so it works for JDBC
     ExecutorService executorService = Executors.newFixedThreadPool(2);
@@ -511,11 +510,11 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
                           tx ->
                               persistor()
                                   .selectBatch(tx, 2, now)
-                                  .thenAccept(
+                                  .thenApply(
                                       batch -> {
                                         assertThat(batch, hasSize(2));
                                         log.info("Transaction thread obtained locks");
-                                        locked.set(batch);
+                                        return batch;
                                       })
                                   .thenCompose(
                                       batch ->
@@ -534,9 +533,9 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
                                               },
                                               executorService))
                                   .thenCompose(
-                                      __ ->
+                                      batch ->
                                           CompletableFuture.allOf(
-                                              locked.get().stream()
+                                              batch.stream()
                                                   .map(entry -> persistor().delete(tx, entry))
                                                   .toArray(CompletableFuture[]::new))))
                       .join());
@@ -559,7 +558,8 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
                                 batch.stream()
                                     .map(entry -> persistor().delete(tx, entry))
                                     .toArray(CompletableFuture[]::new));
-                          }));
+                          }))
+          .join();
 
       // Kill the other thread
       log.info("Shutting down");
