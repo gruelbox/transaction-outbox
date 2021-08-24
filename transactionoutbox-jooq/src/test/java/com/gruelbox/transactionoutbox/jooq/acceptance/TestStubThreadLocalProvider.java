@@ -18,6 +18,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.slf4j.event.Level;
 
 @Slf4j
 class TestStubThreadLocalProvider {
@@ -34,6 +35,8 @@ class TestStubThreadLocalProvider {
             .persistor(StubPersistor.builder().build())
             .submitter(Submitter.withExecutor(Runnable::run))
             .instantiator(Instantiator.using(clazz -> (Runnable) latch::countDown))
+            .logLevelTemporaryFailure(Level.DEBUG)
+            .logLevelProcessStartAndFinish(Level.DEBUG)
             .build();
 
     transactionManager.inTransaction(

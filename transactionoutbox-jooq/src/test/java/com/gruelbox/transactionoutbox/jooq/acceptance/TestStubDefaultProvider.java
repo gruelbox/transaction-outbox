@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
 import org.junit.jupiter.api.Test;
+import org.slf4j.event.Level;
 
 @Slf4j
 class TestStubDefaultProvider {
@@ -35,6 +36,8 @@ class TestStubDefaultProvider {
             .transactionManager(transactionManager)
             .persistor(StubPersistor.builder().build())
             .submitter(Submitter.withExecutor(Runnable::run))
+            .logLevelTemporaryFailure(Level.DEBUG)
+            .logLevelProcessStartAndFinish(Level.DEBUG)
             .instantiator(
                 Instantiator.using(
                     clazz ->
@@ -70,6 +73,8 @@ class TestStubDefaultProvider {
             .transactionManager(transactionManager)
             .persistor(StubPersistor.builder().build())
             .submitter(Submitter.withExecutor(Runnable::run))
+            .logLevelTemporaryFailure(Level.DEBUG)
+            .logLevelProcessStartAndFinish(Level.DEBUG)
             .instantiator(
                 Instantiator.using(
                     clazz ->
