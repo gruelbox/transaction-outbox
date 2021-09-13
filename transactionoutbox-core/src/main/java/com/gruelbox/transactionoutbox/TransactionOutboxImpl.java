@@ -155,8 +155,13 @@ class TransactionOutboxImpl implements TransactionOutbox {
       totalRecordsDeleted += recordsDeleted;
     } while (recordsDeleted > 0);
     if (totalRecordsDeleted > 0) {
-      long s = retentionThreshold.toSeconds();
-      String duration = String.format("%dd:%02dh:%02dm", s / 3600, (s % 3600) / 60, (s % 60));
+      String duration =
+          String.format(
+              "%dd:%02dh:%02dm:%02ds",
+              retentionThreshold.toDaysPart(),
+              retentionThreshold.toHoursPart(),
+              retentionThreshold.toMinutesPart(),
+              retentionThreshold.toSecondsPart());
       log.info(
           "Expired idempotency protection on {} requests completed more than {} ago",
           totalRecordsDeleted,
