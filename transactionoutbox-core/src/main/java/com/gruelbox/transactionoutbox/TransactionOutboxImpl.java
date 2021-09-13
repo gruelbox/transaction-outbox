@@ -315,17 +315,17 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
         .thenApply(
             total -> {
               if (total > 0) {
-                long s = retentionThreshold.toSeconds();
-                long days = s / 86400;
-                long remaining = s % 86400;
-                long hours = remaining / 3600;
-                remaining = remaining % 3600;
-                long minutes = remaining / 60;
-                long seconds = remaining % 60;
+                String duration =
+                        String.format(
+                                "%dd:%02dh:%02dm:%02ds",
+                                retentionThreshold.toDaysPart(),
+                                retentionThreshold.toHoursPart(),
+                                retentionThreshold.toMinutesPart(),
+                                retentionThreshold.toSecondsPart());
                 log.info(
-                    "Expired idempotency protection on {} requests completed more than {} ago",
-                    total,
-                    String.format("%dd %02dh %02dm %02ds", days, hours, minutes, seconds));
+                        "Expired idempotency protection on {} requests completed more than {} ago",
+                        total,
+                        duration);
                 return true;
               } else {
                 log.debug("No records found to delete as of {}", now);
