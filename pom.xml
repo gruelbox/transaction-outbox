@@ -34,7 +34,7 @@
     <skip.format>false</skip.format>
 
     <!-- Dependency versions -->
-    <logback.version>1.2.5</logback.version>
+    <logback.version>1.2.6</logback.version>
     <revision>5.1.99999-SNAPSHOT</revision>
     <junit.jupiter.version>5.7.2</junit.jupiter.version>
     <testcontainers.version>1.16.0</testcontainers.version>
