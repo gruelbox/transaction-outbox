@@ -8,9 +8,13 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import net.sf.cglib.proxy.Callback;
-import net.sf.cglib.proxy.Enhancer;
-import net.sf.cglib.proxy.MethodInterceptor;
+import net.bytebuddy.ByteBuddy;
+import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
+import net.bytebuddy.implementation.MethodDelegation;
+import net.bytebuddy.implementation.bind.annotation.AllArguments;
+import net.bytebuddy.implementation.bind.annotation.Origin;
+import net.bytebuddy.implementation.bind.annotation.RuntimeType;
+import net.bytebuddy.matcher.ElementMatchers;
 import org.objenesis.Objenesis;
 import org.objenesis.ObjenesisStd;
 import org.objenesis.instantiator.ObjectInstantiator;
@@ -72,6 +76,20 @@ class Utils {
     throw new UncheckedException(e);
   }
 
+  public static class ProxyDelegator<T> {
+
+    private final BiFunction<Method, Object[], T> processor;
+
+    public ProxyDelegator(BiFunction<Method, Object[], T> processor) {
+      this.processor = processor;
+    }
+
+    @RuntimeType
+    public Object intercept(@Origin Method m, @AllArguments Object... args) {
+      return processor.apply(m, args);
+    }
+  }
+
   @SuppressWarnings({"unchecked", "cast"})
   static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], T> processor) {
     if (clazz.isInterface()) {
@@ -81,28 +99,21 @@ class Utils {
               clazz.getClassLoader(),
               new Class[] {clazz},
               (proxy, method, args) -> processor.apply(method, args));
-    } else if (hasDefaultConstructor(clazz)) {
-      // CGLIB on its own can create an instance
-      return (T)
-          Enhancer.create(
-              clazz,
-              (MethodInterceptor)
-                  (o, method, objects, methodProxy) -> processor.apply(method, objects));
     } else {
-      // Slowest - we need to use Objenesis and CGLIB together
-      MethodInterceptor methodInterceptor =
-          (o, method, objects, methodProxy) -> processor.apply(method, objects);
-      Enhancer enhancer = new Enhancer();
-      enhancer.setSuperclass(clazz);
-      enhancer.setCallbackTypes(new Class<?>[] {MethodInterceptor.class});
-      enhancer.setInterceptDuringConstruction(true);
-      Class<T> proxyClass = enhancer.createClass();
-      // TODO could cache the ObjectInstantiators - see ObjenesisSupport in spring-aop
-      ObjectInstantiator<T> oi = objenesis.getInstantiatorOf(proxyClass);
-      T proxy = oi.newInstance();
-      ((net.sf.cglib.proxy.Factory) proxy).setCallbacks(new Callback[] {methodInterceptor});
-      enhancer.setInterceptDuringConstruction(false);
-      return proxy;
+      Class<? extends T> proxy =
+          new ByteBuddy()
+              .subclass(clazz)
+              .method(ElementMatchers.isDeclaredBy(clazz))
+              .intercept(MethodDelegation.to(new ProxyDelegator<>(processor)))
+              .make()
+              .load(clazz.getClassLoader(), ClassLoadingStrategy.Default.INJECTION)
+              .getLoaded();
+      if (hasDefaultConstructor(clazz)) {
+        return uncheckedly(() -> proxy.getDeclaredConstructor().newInstance());
+      } else {
+        ObjectInstantiator<? extends T> instantiator = objenesis.getInstantiatorOf(proxy);
+        return instantiator.newInstance();
+      }
     }
   }
 

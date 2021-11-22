@@ -55,9 +55,9 @@
         <version>1.7.32</version>
       </dependency>
       <dependency>
-        <groupId>cglib</groupId>
-        <artifactId>cglib</artifactId>
-        <version>3.3.0</version>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy</artifactId>
+        <version>1.12.1</version>
       </dependency>
       <dependency>
         <groupId>org.objenesis</groupId>

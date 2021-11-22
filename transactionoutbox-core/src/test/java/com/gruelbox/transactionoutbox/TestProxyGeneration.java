@@ -22,9 +22,9 @@ class TestProxyGeneration {
     assertTrue(called.get());
   }
 
-  /** CGLIB */
+  /** ByteBuddy */
   @Test
-  void testCGLIB() {
+  void testByteBuddy() {
     AtomicBoolean called = new AtomicBoolean();
     Child proxy =
         Utils.createProxy(
