@@ -1,30 +1,15 @@
 package com.gruelbox.transactionoutbox;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
-import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
-import net.bytebuddy.implementation.MethodDelegation;
-import net.bytebuddy.implementation.bind.annotation.AllArguments;
-import net.bytebuddy.implementation.bind.annotation.Origin;
-import net.bytebuddy.implementation.bind.annotation.RuntimeType;
-import net.bytebuddy.matcher.ElementMatchers;
-import org.objenesis.Objenesis;
-import org.objenesis.ObjenesisStd;
-import org.objenesis.instantiator.ObjectInstantiator;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
 @Slf4j
 class Utils {
-
-  private static final Objenesis objenesis = new ObjenesisStd();
 
   @SuppressWarnings({"SameParameterValue", "WeakerAccess", "UnusedReturnValue"})
   static boolean safelyRun(String gerund, ThrowingRunnable runnable) {
@@ -76,49 +61,8 @@ class Utils {
     throw new UncheckedException(e);
   }
 
-  public static class ProxyDelegator<T> {
-
-    private final BiFunction<Method, Object[], T> processor;
-
-    public ProxyDelegator(BiFunction<Method, Object[], T> processor) {
-      this.processor = processor;
-    }
-
-    @RuntimeType
-    public Object intercept(@Origin Method m, @AllArguments Object... args) {
-      return processor.apply(m, args);
-    }
-  }
-
-  @SuppressWarnings({"unchecked", "cast"})
-  static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], T> processor) {
-    if (clazz.isInterface()) {
-      // Fastest - we can just proxy an interface directly
-      return (T)
-          Proxy.newProxyInstance(
-              clazz.getClassLoader(),
-              new Class[] {clazz},
-              (proxy, method, args) -> processor.apply(method, args));
-    } else {
-      Class<? extends T> proxy =
-          new ByteBuddy()
-              .subclass(clazz)
-              .method(ElementMatchers.isDeclaredBy(clazz))
-              .intercept(MethodDelegation.to(new ProxyDelegator<>(processor)))
-              .make()
-              .load(clazz.getClassLoader(), ClassLoadingStrategy.Default.INJECTION)
-              .getLoaded();
-      if (hasDefaultConstructor(clazz)) {
-        return uncheckedly(() -> proxy.getDeclaredConstructor().newInstance());
-      } else {
-        ObjectInstantiator<? extends T> instantiator = objenesis.getInstantiatorOf(proxy);
-        return instantiator.newInstance();
-      }
-    }
-  }
-
-  static <T> T createLoggingProxy(Class<T> clazz) {
-    return createProxy(
+  static <T> T createLoggingProxy(ProxyFactory proxyFactory, Class<T> clazz) {
+    return proxyFactory.createProxy(
         clazz,
         (method, args) -> {
           log.info(
@@ -158,15 +102,6 @@ class Utils {
       default:
         logger.warn(message, args);
         break;
-    }
-  }
-
-  private static boolean hasDefaultConstructor(Class<?> clazz) {
-    try {
-      clazz.getConstructor();
-      return true;
-    } catch (NoSuchMethodException e) {
-      return false;
     }
   }
 }

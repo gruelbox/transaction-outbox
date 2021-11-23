@@ -47,6 +47,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
   private final Validator validator;
   @NotNull private final Duration retentionThreshold;
   private final AtomicBoolean initialized = new AtomicBoolean();
+  private final ProxyFactory proxyFactory = new ProxyFactory();
 
   private TransactionOutboxImpl(
       TransactionManager transactionManager,
@@ -217,7 +218,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
-    return Utils.createProxy(
+    return proxyFactory.createProxy(
         clazz,
         (method, args) ->
             uncheckedly(

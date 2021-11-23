@@ -14,7 +14,7 @@ class TestMySql8 extends AbstractAcceptanceTest {
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      new MySQLContainer<>("mysql:8").withStartupTimeout(Duration.ofHours(1));
+      new MySQLContainer<>("mysql:8.0.27").withStartupTimeout(Duration.ofMinutes(5));
 
   @Override
   protected ConnectionDetails connectionDetails() {

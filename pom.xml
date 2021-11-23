@@ -58,6 +58,7 @@
         <groupId>net.bytebuddy</groupId>
         <artifactId>byte-buddy</artifactId>
         <version>1.12.1</version>
+        <optional>true</optional>
       </dependency>
       <dependency>
         <groupId>org.objenesis</groupId>
