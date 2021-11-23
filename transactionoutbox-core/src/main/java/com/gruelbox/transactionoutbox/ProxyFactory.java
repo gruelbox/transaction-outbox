@@ -4,6 +4,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.function.BiFunction;
+import lombok.extern.slf4j.Slf4j;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.TypeCache;
 import net.bytebuddy.TypeCache.Sort;
@@ -15,10 +16,11 @@ import org.objenesis.Objenesis;
 import org.objenesis.ObjenesisStd;
 import org.objenesis.instantiator.ObjectInstantiator;
 
+@Slf4j
 public class ProxyFactory {
 
-  private static final Objenesis objenesis = new ObjenesisStd();
-  private static final TypeCache<Class<?>> byteBuddyCache = new TypeCache<>(Sort.WEAK);
+  private final Objenesis objenesis = setupObjenesis();
+  private final TypeCache<Class<?>> byteBuddyCache = setupByteBuddyCache();
 
   private static boolean hasDefaultConstructor(Class<?> clazz) {
     try {
@@ -26,6 +28,24 @@ public class ProxyFactory {
       return true;
     } catch (NoSuchMethodException e) {
       return false;
+    }
+  }
+
+  private TypeCache<Class<?>> setupByteBuddyCache() {
+    try {
+      return new TypeCache<>(Sort.WEAK);
+    } catch (NoClassDefFoundError error) {
+      log.info("ByteBuddy is not on the classpath, so only interfaces can be used with transaction-outbox");
+      return null;
+    }
+  }
+
+  private ObjenesisStd setupObjenesis() {
+    try {
+      return new ObjenesisStd();
+    } catch (NoClassDefFoundError error) {
+      log.info("Objenesis is not on the classpath, so only interfaces or classes with default constructors can be used with transaction-outbox");
+      return null;
     }
   }
 
@@ -50,6 +70,9 @@ public class ProxyFactory {
     if (hasDefaultConstructor(clazz)) {
       instance = Utils.uncheckedly(() -> proxy.getDeclaredConstructor().newInstance());
     } else {
+      if (objenesis == null) {
+        throw new MissingOptionalDependencyException("org.objenesis", "objenesis");
+      }
       ObjectInstantiator<? extends T> instantiator = objenesis.getInstantiatorOf(proxy);
       instance = instantiator.newInstance();
     }
@@ -65,22 +88,21 @@ public class ProxyFactory {
 
   @SuppressWarnings({"unchecked", "cast"})
   private <T> Class<? extends T> buildByteBuddyProxyClass(Class<T> clazz) {
-    try {
-      return (Class<? extends T>)
-          byteBuddyCache.findOrInsert(
-              clazz.getClassLoader(),
-              clazz,
-              () ->
-                  new ByteBuddy()
-                      .subclass(clazz)
-                      .defineField("handler", InvocationHandler.class, Visibility.PUBLIC)
-                      .method(ElementMatchers.isDeclaredBy(clazz))
-                      .intercept(InvocationHandlerAdapter.toField("handler"))
-                      .make()
-                      .load(clazz.getClassLoader(), ClassLoadingStrategy.Default.INJECTION)
-                      .getLoaded());
-    } catch (NoClassDefFoundError error) {
+    if (byteBuddyCache == null) {
       throw new MissingOptionalDependencyException("net.bytebuddy", "byte-buddy");
     }
+    return (Class<? extends T>)
+        byteBuddyCache.findOrInsert(
+            clazz.getClassLoader(),
+            clazz,
+            () ->
+                new ByteBuddy()
+                    .subclass(clazz)
+                    .defineField("handler", InvocationHandler.class, Visibility.PUBLIC)
+                    .method(ElementMatchers.isDeclaredBy(clazz))
+                    .intercept(InvocationHandlerAdapter.toField("handler"))
+                    .make()
+                    .load(clazz.getClassLoader(), ClassLoadingStrategy.Default.INJECTION)
+                    .getLoaded());
   }
 }
