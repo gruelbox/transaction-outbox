@@ -40,7 +40,7 @@
     <testcontainers.version>1.16.2</testcontainers.version>
     <hamcrest.version>2.2</hamcrest.version>
     <mockito.version>1.10.19</mockito.version>
-    <hikari.version>5.0.0</hikari.version>
+    <hikari.version>5.0.1</hikari.version>
     <h2.version>1.4.200</h2.version>
   </properties>
 
