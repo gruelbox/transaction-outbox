@@ -19,6 +19,7 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -199,6 +200,13 @@ class TestDefaultInvocationSerializer {
       Object[] values = {1};
       check(
           new Invocation(CLASS_NAME, METHOD_NAME, primitives, values, Map.of("A", "1", "B", "2")));
+    }
+
+    @Test
+    void testUUID() {
+      Class<?>[] primitives = {UUID.class};
+      Object[] values = {UUID.randomUUID()};
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
     }
 
     void check(Invocation invocation) {

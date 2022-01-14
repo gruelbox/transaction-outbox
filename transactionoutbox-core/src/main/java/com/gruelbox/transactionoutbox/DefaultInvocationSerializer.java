@@ -47,6 +47,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +61,7 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>Primitive types such as {@code int} or {@code double} or the boxed equivalents
  *   <li>{@link String}
  *   <li>{@link java.util.Date}
+ *   <li>{@link java.util.UUID}
  *   <li>The {@code java.time} classes:
  *       <ul>
  *         <li>{@link java.time.DayOfWeek}
@@ -140,42 +142,45 @@ public final class DefaultInvocationSerializer
       addClassPair(boolean.class, "boolean");
       addClassPair(char.class, "char");
 
-      addClassPair(Byte.class, "Byte");
-      addClassPair(Short.class, "Short");
-      addClassPair(Integer.class, "Integer");
-      addClassPair(Long.class, "Long");
-      addClassPair(Float.class, "Float");
-      addClassPair(Float.class, "Float");
-      addClassPair(Float.class, "Float");
-      addClassPair(Double.class, "Double");
-      addClassPair(Boolean.class, "Boolean");
-      addClassPair(Character.class, "Character");
+      addClass(Byte.class);
+      addClass(Short.class);
+      addClass(Integer.class);
+      addClass(Long.class);
+      addClass(Float.class);
+      addClass(Double.class);
+      addClass(Boolean.class);
+      addClass(Character.class);
 
-      addClassPair(BigDecimal.class, "BigDecimal");
-      addClassPair(String.class, "String");
-      addClassPair(Date.class, "Date");
+      addClass(BigDecimal.class);
+      addClass(String.class);
+      addClass(Date.class);
+      addClass(UUID.class);
 
-      addClassPair(DayOfWeek.class, "DayOfWeek");
-      addClassPair(Duration.class, "Duration");
-      addClassPair(Instant.class, "Instant");
-      addClassPair(LocalDate.class, "LocalDate");
-      addClassPair(LocalDateTime.class, "LocalDateTime");
-      addClassPair(Month.class, "Month");
-      addClassPair(MonthDay.class, "MonthDay");
-      addClassPair(Period.class, "Period");
-      addClassPair(Year.class, "Year");
-      addClassPair(YearMonth.class, "YearMonth");
-      addClassPair(ZoneOffset.class, "ZoneOffset");
-      addClassPair(DayOfWeek.class, "DayOfWeek");
-      addClassPair(ChronoUnit.class, "ChronoUnit");
+      addClass(DayOfWeek.class);
+      addClass(Duration.class);
+      addClass(Instant.class);
+      addClass(LocalDate.class);
+      addClass(LocalDateTime.class);
+      addClass(Month.class);
+      addClass(MonthDay.class);
+      addClass(Period.class);
+      addClass(Year.class);
+      addClass(YearMonth.class);
+      addClass(ZoneOffset.class);
+      addClass(DayOfWeek.class);
+      addClass(ChronoUnit.class);
 
       addClassPair(BaseTransaction.class, "Transaction");
       //noinspection deprecation
-      addClassPair(Transaction.class, "Transaction");
+      addClass(Transaction.class);
       addClassPair(JdbcTransaction.class, "Transaction");
       addClassPair(TransactionContextPlaceholder.class, "TransactionContext");
 
       serializableClasses.forEach(clazz -> addClassPair(clazz, clazz.getName()));
+    }
+
+    private void addClass(Class<?> clazz) {
+      addClassPair(clazz, clazz.getSimpleName());
     }
 
     private void addClassPair(Class<?> clazz, String name) {
