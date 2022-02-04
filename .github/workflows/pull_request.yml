@@ -14,7 +14,8 @@ jobs:
         jdk: [11,15,17]
       fail-fast: false
     steps:
-
+      - uses: docker-practice/actions-setup-docker@master
+        if: ${{ matrix.os == 'macos-latest' }}
       - uses: actions/checkout@v2
 
       - name: Set up JDK ${{ matrix.jdk }}
