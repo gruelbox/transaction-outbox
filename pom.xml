@@ -208,22 +208,6 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.0.0-M5</version>
       </plugin>
-<!--      <plugin>-->
-<!--        <groupId>com.coveo</groupId>-->
-<!--        <artifactId>fmt-maven-plugin</artifactId>-->
-<!--        <version>2.13</version>-->
-<!--        <configuration>-->
-<!--          <filesNamePattern>.*\.java</filesNamePattern>-->
-<!--          <skip>${skip.format}</skip>-->
-<!--        </configuration>-->
-<!--        <executions>-->
-<!--          <execution>-->
-<!--            <goals>-->
-<!--              <goal>format</goal>-->
-<!--            </goals>-->
-<!--          </execution>-->
-<!--        </executions>-->
-<!--      </plugin>-->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>flatten-maven-plugin</artifactId>
@@ -252,6 +236,32 @@
   </build>
 
   <profiles>
+    <profile>
+      <id>active-on-jdk-11</id>
+      <activation>
+        <jdk>11</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.coveo</groupId>
+            <artifactId>fmt-maven-plugin</artifactId>
+            <version>2.13</version>
+            <configuration>
+              <filesNamePattern>.*\.java</filesNamePattern>
+              <skip>${skip.format}</skip>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>format</goal>
+                </goals>
+              </execution>
+            </executions>
+        </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>release</id>
       <properties>
