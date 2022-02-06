@@ -34,10 +34,10 @@
     <skip.format>false</skip.format>
 
     <!-- Dependency versions -->
-    <logback.version>1.2.7</logback.version>
+    <logback.version>1.2.10</logback.version>
     <revision>1.3.99999-SNAPSHOT</revision>
-    <junit.jupiter.version>5.8.1</junit.jupiter.version>
-    <testcontainers.version>1.16.2</testcontainers.version>
+    <junit.jupiter.version>5.8.2</junit.jupiter.version>
+    <testcontainers.version>1.16.3</testcontainers.version>
   </properties>
 
   <modules>
@@ -52,7 +52,7 @@
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>1.7.32</version>
+        <version>1.7.35</version>
       </dependency>
       <dependency>
         <groupId>net.bytebuddy</groupId>
@@ -74,7 +74,7 @@
       <dependency>
         <groupId>org.hibernate.validator</groupId>
         <artifactId>hibernate-validator</artifactId>
-        <version>6.2.0.Final</version>
+        <version>6.2.1.Final</version>
       </dependency>
       <dependency>
         <groupId>javax.el</groupId>
@@ -145,7 +145,7 @@
       <dependency>
         <groupId>com.zaxxer</groupId>
         <artifactId>HikariCP</artifactId>
-        <version>5.0.0</version>
+        <version>5.0.1</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -181,7 +181,7 @@
       <dependency>
         <groupId>mysql</groupId>
         <artifactId>mysql-connector-java</artifactId>
-        <version>8.0.27</version>
+        <version>8.0.28</version>
         <scope>test</scope>
       </dependency>
     </dependencies>
@@ -192,7 +192,7 @@
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.8.1</version>
+        <version>3.9.0</version>
         <configuration>
           <source>${maven.compiler.source}</source>
           <target>${maven.compiler.target}</target>
@@ -201,7 +201,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-        <version>3.2.0</version>
+        <version>3.2.2</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
