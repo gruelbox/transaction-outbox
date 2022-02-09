@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
     steps:
       - uses: docker-practice/actions-setup-docker@master
-        if: ${{ matrix.os == 'macos-latest' }}
+        if: ${{ matrix.os == 'macos-latest' || matrix.os == 'windows-latest'}}
       - uses: actions/checkout@v2
 
       - name: Set up JDK ${{ matrix.jdk }}
