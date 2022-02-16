@@ -122,7 +122,11 @@ public class TransactionOutboxEntry {
                   "%s.%s(%s) [%s]%s",
                   invocation.getClassName(),
                   invocation.getMethodName(),
-                  Arrays.stream(invocation.getArgs()).map(this::stringify).collect(joining(", ")),
+                  invocation.getArgs() == null
+                      ? null
+                      : Arrays.stream(invocation.getArgs())
+                          .map(this::stringify)
+                          .collect(joining(", ")),
                   id,
                   uniqueRequestId == null ? "" : " uid=[" + uniqueRequestId + "]");
           this.description = description;

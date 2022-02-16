@@ -51,7 +51,7 @@ public class StubParameterContextTransactionManager<C>
 
   private <T, E extends Exception> T withTransaction(ThrowingTransactionalSupplier<T, E> work)
       throws E {
-    Connection mockConnection = Utils.createLoggingProxy(Connection.class);
+    Connection mockConnection = Utils.createLoggingProxy(new ProxyFactory(), Connection.class);
     C context = contextFactory.get();
     try (SimpleTransaction transaction = new SimpleTransaction(mockConnection, context)) {
       contextMap.put(context, transaction);
