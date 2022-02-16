@@ -52,22 +52,24 @@
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>1.7.35</version>
+        <version>1.7.36</version>
       </dependency>
       <dependency>
-        <groupId>cglib</groupId>
-        <artifactId>cglib</artifactId>
-        <version>3.3.0</version>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy</artifactId>
+        <version>1.12.1</version>
+        <optional>true</optional>
       </dependency>
       <dependency>
         <groupId>org.objenesis</groupId>
         <artifactId>objenesis</artifactId>
         <version>3.2</version>
+        <optional>true</optional>
       </dependency>
       <dependency>
         <groupId>com.google.code.gson</groupId>
         <artifactId>gson</artifactId>
-        <version>2.8.9</version>
+        <version>2.9.0</version>
       </dependency>
       <dependency>
         <groupId>org.hibernate.validator</groupId>
@@ -173,7 +175,7 @@
       <dependency>
         <groupId>org.postgresql</groupId>
         <artifactId>postgresql</artifactId>
-        <version>42.3.1</version>
+        <version>42.3.2</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -190,7 +192,7 @@
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.9.0</version>
+        <version>3.10.0</version>
         <configuration>
           <source>${maven.compiler.source}</source>
           <target>${maven.compiler.target}</target>
@@ -205,22 +207,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.0.0-M5</version>
-      </plugin>
-      <plugin>
-        <groupId>com.coveo</groupId>
-        <artifactId>fmt-maven-plugin</artifactId>
-        <version>2.13</version>
-        <configuration>
-          <filesNamePattern>.*\.java</filesNamePattern>
-          <skip>${skip.format}</skip>
-        </configuration>
-        <executions>
-          <execution>
-            <goals>
-              <goal>format</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -250,6 +236,32 @@
   </build>
 
   <profiles>
+    <profile>
+      <id>active-on-jdk-11</id>
+      <activation>
+        <jdk>11</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.coveo</groupId>
+            <artifactId>fmt-maven-plugin</artifactId>
+            <version>2.13</version>
+            <configuration>
+              <filesNamePattern>.*\.java</filesNamePattern>
+              <skip>${skip.format}</skip>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>format</goal>
+                </goals>
+              </execution>
+            </executions>
+        </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>release</id>
       <properties>
@@ -358,7 +370,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-javadoc-plugin</artifactId>
-            <version>3.3.1</version>
+            <version>3.3.2</version>
             <configuration>
               <failOnError>true</failOnError>
               <quiet>true</quiet>

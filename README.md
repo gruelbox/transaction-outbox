@@ -110,6 +110,7 @@ If you find yourself wondering _why bother with the queues now_? You're quite ri
 - Currently, **MySQL**, **PostgreSQL** or **H2** databases (pull requests to support Oracle, SQL Server or any other traditional RDMBS would be trivial. Beyond that, a SQL database is not strictly necessary for the pattern to work, merely a data store with the concept of a transaction spanning multiple mutation operations).
 - Database access via **JDBC** (In principle, JDBC should not be required - alternatives such as R2DBC are under investigation - but the API is currently tied to it)
 - Native transactions (not JTA or similar).
+- (Optional) Proxying non-interfaces requires [ByteBuddy](https://bytebuddy.net/#/) and for proxying classes without default constructors [Objenesis](http://objenesis.org/) to be added as a dependency
 
 ### Stable releases
 The latest stable release is available from Maven Central. Stable releases are [sort-of semantically versioned](https://semver.org/). That is, they follow semver in every respect other than that the version numbers are not monotically increasing. The project uses continuous delivery and selects individual stable releases to promote to Central, so Central releases will always be spaced apart numerically. The important thing, though, is that dependencies should be safe to upgrade as long as the major version number has not increased. 
@@ -120,14 +121,14 @@ The latest stable release is available from Maven Central. Stable releases are [
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
-  <version>4.1.230</version>
+  <version>4.2.268</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-core:4.1.230'
+implementation 'com.gruelbox:transactionoutbox-core:4.2.268'
 ```
 
 ### Development snapshots

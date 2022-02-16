@@ -33,6 +33,7 @@ import java.time.Period;
 import java.time.Year;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Calendar;
 import java.util.Date;
@@ -92,6 +93,14 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
                     serializableTypes == null ? Set.of() : serializableTypes,
                     version == null ? 2 : version))
             .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
+            .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeTypeAdapter())
+            .registerTypeAdapter(Instant.class, new InstantTypeAdapter())
+            .registerTypeAdapter(Duration.class, new DurationTypeAdapter())
+            .registerTypeAdapter(LocalDate.class, new LocalDateTypeAdapter())
+            .registerTypeAdapter(MonthDay.class, new MonthDayTypeAdapter())
+            .registerTypeAdapter(Period.class, new PeriodTypeAdapter())
+            .registerTypeAdapter(Year.class, new YearTypeAdapter())
+            .registerTypeAdapter(YearMonth.class, new YearMonthAdapter())
             .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
             .create();
   }
@@ -326,6 +335,112 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
             "Cannot serialize class - not found: " + clazz.getName());
       }
       return name;
+    }
+  }
+
+  static final class LocalDateTimeTypeAdapter extends TypeAdapter<LocalDateTime> {
+
+    @Override
+    public void write(JsonWriter out, LocalDateTime value) throws IOException {
+      out.value(value.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+    }
+
+    @Override
+    public LocalDateTime read(JsonReader in) throws IOException {
+      return LocalDateTime.parse(in.nextString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+    }
+  }
+
+  static final class InstantTypeAdapter extends TypeAdapter<Instant> {
+
+    @Override
+    public void write(JsonWriter out, Instant value) throws IOException {
+      out.value(DateTimeFormatter.ISO_INSTANT.format(value));
+    }
+
+    @Override
+    public Instant read(JsonReader in) throws IOException {
+      return DateTimeFormatter.ISO_INSTANT.parse(in.nextString(), Instant::from);
+    }
+  }
+
+  static final class DurationTypeAdapter extends TypeAdapter<Duration> {
+
+    @Override
+    public void write(JsonWriter out, Duration value) throws IOException {
+      out.value(value.get(ChronoUnit.SECONDS));
+    }
+
+    @Override
+    public Duration read(JsonReader in) throws IOException {
+      return Duration.of(in.nextLong(), ChronoUnit.SECONDS);
+    }
+  }
+
+  static final class LocalDateTypeAdapter extends TypeAdapter<LocalDate> {
+
+    @Override
+    public void write(JsonWriter out, LocalDate value) throws IOException {
+      out.value(DateTimeFormatter.ISO_LOCAL_DATE.format(value));
+    }
+
+    @Override
+    public LocalDate read(JsonReader in) throws IOException {
+      return DateTimeFormatter.ISO_LOCAL_DATE.parse(in.nextString(), LocalDate::from);
+    }
+  }
+
+  static final class MonthDayTypeAdapter extends TypeAdapter<MonthDay> {
+
+    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d/M");
+
+    @Override
+    public void write(JsonWriter out, MonthDay value) throws IOException {
+      out.value(value.format(formatter));
+    }
+
+    @Override
+    public MonthDay read(JsonReader in) throws IOException {
+      return MonthDay.parse(in.nextString(), formatter);
+    }
+  }
+
+  static final class PeriodTypeAdapter extends TypeAdapter<Period> {
+
+    @Override
+    public void write(JsonWriter out, Period value) throws IOException {
+      out.value(value.toString());
+    }
+
+    @Override
+    public Period read(JsonReader in) throws IOException {
+      return Period.parse(in.nextString());
+    }
+  }
+
+  static final class YearTypeAdapter extends TypeAdapter<Year> {
+
+    @Override
+    public void write(JsonWriter out, Year value) throws IOException {
+      out.value(value.getValue());
+    }
+
+    @Override
+    public Year read(JsonReader in) throws IOException {
+      return Year.of(in.nextInt());
+    }
+  }
+
+  static final class YearMonthAdapter extends TypeAdapter<YearMonth> {
+
+    @Override
+    public void write(JsonWriter out, YearMonth value) throws IOException {
+      out.value(value.toString());
+    }
+
+    @Override
+    public YearMonth read(JsonReader in) throws IOException {
+      return YearMonth.parse(in.nextString());
     }
   }
 

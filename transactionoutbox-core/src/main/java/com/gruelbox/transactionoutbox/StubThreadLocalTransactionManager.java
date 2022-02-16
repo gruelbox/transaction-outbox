@@ -29,7 +29,7 @@ public class StubThreadLocalTransactionManager
 
   private <T, E extends Exception> T withTransaction(ThrowingTransactionalSupplier<T, E> work)
       throws E {
-    Connection mockConnection = Utils.createLoggingProxy(Connection.class);
+    Connection mockConnection = Utils.createLoggingProxy(new ProxyFactory(), Connection.class);
     try (SimpleTransaction transaction =
         pushTransaction(new SimpleTransaction(mockConnection, null))) {
       return work.doWork(transaction);
