@@ -1,30 +1,24 @@
 package com.gruelbox.transactionoutbox;
 
-import static java.util.concurrent.CompletableFuture.completedFuture;
-import static java.util.concurrent.CompletableFuture.failedFuture;
-import static java.util.stream.Collectors.joining;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.lang.StackWalker.StackFrame;
 import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.function.BiFunction;
 import java.util.function.Supplier;
-import lombok.SneakyThrows;
-import lombok.extern.slf4j.Slf4j;
-import net.sf.cglib.proxy.Callback;
-import net.sf.cglib.proxy.Enhancer;
-import net.sf.cglib.proxy.MethodInterceptor;
-import org.objenesis.Objenesis;
-import org.objenesis.ObjenesisStd;
-import org.objenesis.instantiator.ObjectInstantiator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
+import java.util.stream.Collectors;
+
+import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.concurrent.CompletableFuture.failedFuture;
+import static java.util.stream.Collectors.joining;
 
 /**
  * Utility methods used by transaction outbox. These are very firmly {@link NotApi}. Don't use them
@@ -33,8 +27,6 @@ import org.slf4j.event.Level;
 @Slf4j
 @NotApi
 public class Utils {
-
-  private static final Objenesis objenesis = new ObjenesisStd();
 
   private Utils() {}
 
@@ -114,60 +106,20 @@ public class Utils {
     }
   }
 
-  @SuppressWarnings({"unchecked", "cast"})
-  public static <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], Object> processor) {
-    BiFunction<Method, Object[], Object> wrapped =
-        (method, args) -> {
-          switch (method.getName()) {
-            case "toString":
-              return "Proxy[" + clazz.getName() + "]";
-            case "hashCode":
-              return processor.hashCode();
-            case "equals":
-              return false;
-            default:
-              return processor.apply(method, args);
-          }
-        };
-    if (clazz.isInterface()) {
-      // Fastest - we can just proxy an interface directly
-      return (T)
-          Proxy.newProxyInstance(
-              clazz.getClassLoader(),
-              new Class[] {clazz},
-              (proxy, method, args) -> wrapped.apply(method, args));
-    } else if (hasDefaultConstructor(clazz)) {
-      // CGLIB on its own can create an instance
-      return (T)
-          Enhancer.create(
-              clazz,
-              (MethodInterceptor)
-                  (o, method, objects, methodProxy) -> wrapped.apply(method, objects));
-    } else {
-      // Slowest - we need to use Objenesis and CGLIB together
-      MethodInterceptor methodInterceptor =
-          (o, method, objects, methodProxy) -> wrapped.apply(method, objects);
-      Enhancer enhancer = new Enhancer();
-      enhancer.setSuperclass(clazz);
-      enhancer.setCallbackTypes(new Class<?>[] {MethodInterceptor.class});
-      enhancer.setInterceptDuringConstruction(true);
-      Class<T> proxyClass = enhancer.createClass();
-      // TODO could cache the ObjectInstantiators - see ObjenesisSupport in spring-aop
-      ObjectInstantiator<T> oi = objenesis.getInstantiatorOf(proxyClass);
-      T proxy = oi.newInstance();
-      ((net.sf.cglib.proxy.Factory) proxy).setCallbacks(new Callback[] {methodInterceptor});
-      enhancer.setInterceptDuringConstruction(false);
-      return proxy;
-    }
-  }
-
-  public static <T> T createLoggingProxy(Class<T> clazz) {
-    return createProxy(
-        clazz,
-        (method, args) -> {
-          logMethodCall("Called mock {}.{}({})", clazz, method, args);
-          return null;
-        });
+  public static <T> T createLoggingProxy(ProxyFactory proxyFactory, Class<T> clazz) {
+    return proxyFactory.createProxy(
+            clazz,
+            (method, args) -> {
+              log.info(
+                      "Called mock " + clazz.getSimpleName() + ".{}({})",
+                      method.getName(),
+                      args == null
+                              ? ""
+                              : Arrays.stream(args)
+                              .map(it -> it == null ? "null" : it.toString())
+                              .collect(Collectors.joining(", ")));
+              return null;
+            });
   }
 
   public static void logMethodCall(String format, Class<?> clazz, Method method, Object[] args) {
@@ -250,15 +202,6 @@ public class Utils {
       runnable.run();
     } catch (Exception e) {
       throw sneakyThrow(e);
-    }
-  }
-
-  private static boolean hasDefaultConstructor(Class<?> clazz) {
-    try {
-      clazz.getConstructor();
-      return true;
-    } catch (NoSuchMethodException e) {
-      return false;
     }
   }
 }

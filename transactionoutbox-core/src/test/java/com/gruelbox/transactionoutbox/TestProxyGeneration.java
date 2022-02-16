@@ -1,18 +1,27 @@
 package com.gruelbox.transactionoutbox;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 class TestProxyGeneration {
+
+  private ProxyFactory proxyFactory;
+
+  @BeforeEach
+  void setUp() {
+    proxyFactory = new ProxyFactory();
+  }
 
   /** Reflection */
   @Test
   void testReflection() {
     AtomicBoolean called = new AtomicBoolean();
     Interface proxy =
-        Utils.createProxy(
+        proxyFactory.createProxy(
             Interface.class,
             (method, args) -> {
               called.set(true);
@@ -22,12 +31,12 @@ class TestProxyGeneration {
     assertTrue(called.get());
   }
 
-  /** CGLIB */
+  /** ByteBuddy */
   @Test
-  void testCGLIB() {
+  void testByteBuddy() {
     AtomicBoolean called = new AtomicBoolean();
     Child proxy =
-        Utils.createProxy(
+        proxyFactory.createProxy(
             Child.class,
             (method, args) -> {
               called.set(true);
@@ -42,7 +51,7 @@ class TestProxyGeneration {
   void testObjensis() {
     AtomicBoolean called = new AtomicBoolean();
     Parent proxy =
-        Utils.createProxy(
+        proxyFactory.createProxy(
             Parent.class,
             (method, args) -> {
               called.set(true);

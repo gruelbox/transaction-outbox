@@ -1,30 +1,18 @@
 package com.gruelbox.transactionoutbox;
 
-import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
-
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.time.DayOfWeek;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.Month;
-import java.time.MonthDay;
-import java.time.Period;
-import java.time.Year;
-import java.time.YearMonth;
-import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.engine.discovery.predicates.IsTestMethod;
 import org.junit.platform.commons.util.ReflectionUtils;
+
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.time.*;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+
+import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
 @SuppressWarnings("RedundantCast")
 @Slf4j
@@ -59,7 +47,7 @@ class TestDefaultInvocationSerializer {
 
   private static class Inner {
 
-    private DefaultInvocationSerializer serializer;
+    private final DefaultInvocationSerializer serializer;
 
     Inner(Integer version) {
       this.serializer =
@@ -160,6 +148,7 @@ class TestDefaultInvocationSerializer {
         Instant.class,
         LocalDate.class,
         LocalDateTime.class,
+        LocalDateTime.class,
         MonthDay.class,
         Period.class,
         Year.class,
@@ -170,6 +159,7 @@ class TestDefaultInvocationSerializer {
         Instant.now(),
         LocalDate.now(),
         LocalDateTime.now(),
+        null,
         MonthDay.of(1, 1),
         Period.ofMonths(1),
         Year.now(),

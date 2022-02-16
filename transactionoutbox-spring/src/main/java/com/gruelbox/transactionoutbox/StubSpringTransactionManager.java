@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
 import com.gruelbox.transactionoutbox.jdbc.StubThreadLocalJdbcTransactionManager;
+
 import java.sql.Connection;
 
 /** Stub implementation of {@link SpringTransactionManager}, for use in tests. */
@@ -17,7 +18,7 @@ public class StubSpringTransactionManager
       implements SpringTransaction {
 
     StubSpringTransaction() {
-      super(Utils.createLoggingProxy(Connection.class), null);
+      super(Utils.createLoggingProxy(new ProxyFactory(), Connection.class), null);
     }
   }
 }

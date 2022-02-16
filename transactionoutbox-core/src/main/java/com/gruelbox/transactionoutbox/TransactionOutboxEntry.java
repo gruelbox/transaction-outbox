@@ -1,17 +1,18 @@
 package com.gruelbox.transactionoutbox;
 
-import static java.util.stream.Collectors.joining;
-
-import java.time.Instant;
-import java.util.Arrays;
-import javax.validation.constraints.Future;
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.PositiveOrZero;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+
+import javax.validation.constraints.Future;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.PositiveOrZero;
+import java.time.Instant;
+import java.util.Arrays;
+
+import static java.util.stream.Collectors.joining;
 
 /** Internal representation of a {@code TransactionOutbox} task. */
 @SuperBuilder(toBuilder = true)
@@ -120,7 +121,7 @@ public final class TransactionOutboxEntry {
                   invocation.getClassName(),
                   invocation.getMethodName(),
                   invocation.getArgs() == null
-                      ? ""
+                      ? null
                       : Arrays.stream(invocation.getArgs())
                           .map(this::stringify)
                           .collect(joining(", ")),

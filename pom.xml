@@ -39,7 +39,7 @@
     <junit.jupiter.version>5.8.2</junit.jupiter.version>
     <testcontainers.version>1.16.3</testcontainers.version>
     <hamcrest.version>2.2</hamcrest.version>
-    <mockito.version>1.10.19</mockito.version>
+    <mockito.version>5.3.1</mockito.version>
     <hikari.version>5.0.1</hikari.version>
     <h2.version>1.4.200</h2.version>
   </properties>
@@ -62,14 +62,16 @@
         <version>1.7.36</version>
       </dependency>
       <dependency>
-        <groupId>cglib</groupId>
-        <artifactId>cglib</artifactId>
-        <version>3.3.0</version>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy</artifactId>
+        <version>1.12.1</version>
+        <optional>true</optional>
       </dependency>
       <dependency>
         <groupId>org.objenesis</groupId>
         <artifactId>objenesis</artifactId>
         <version>3.2</version>
+        <optional>true</optional>
       </dependency>
       <dependency>
         <groupId>com.google.code.gson</groupId>
@@ -119,7 +121,7 @@
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
-        <artifactId>mockito-all</artifactId>
+        <artifactId>mockito-core</artifactId>
         <version>${mockito.version}</version>
         <scope>test</scope>
       </dependency>
@@ -220,22 +222,6 @@
         <version>3.0.0-M5</version>
       </plugin>
       <plugin>
-        <groupId>com.coveo</groupId>
-        <artifactId>fmt-maven-plugin</artifactId>
-        <version>2.13</version>
-        <configuration>
-          <filesNamePattern>.*\.java</filesNamePattern>
-          <skip>${skip.format}</skip>
-        </configuration>
-        <executions>
-          <execution>
-            <goals>
-              <goal>format</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>flatten-maven-plugin</artifactId>
         <version>1.2.7</version>
@@ -263,6 +249,32 @@
   </build>
 
   <profiles>
+    <profile>
+      <id>active-on-jdk-11</id>
+      <activation>
+        <jdk>11</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.coveo</groupId>
+            <artifactId>fmt-maven-plugin</artifactId>
+            <version>2.13</version>
+            <configuration>
+              <filesNamePattern>.*\.java</filesNamePattern>
+              <skip>${skip.format}</skip>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>format</goal>
+                </goals>
+              </execution>
+            </executions>
+        </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>release</id>
       <properties>

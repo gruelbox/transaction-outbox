@@ -1,16 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
-import com.google.gson.TypeAdapter;
+import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
@@ -19,6 +9,10 @@ import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
 import com.gruelbox.transactionoutbox.spi.InitializationEventSubscriber;
 import com.gruelbox.transactionoutbox.spi.SerializableTypeRequired;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
@@ -27,30 +21,10 @@ import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.ParsePosition;
-import java.time.DayOfWeek;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.Month;
-import java.time.MonthDay;
-import java.time.Period;
-import java.time.Year;
-import java.time.YearMonth;
-import java.time.ZoneOffset;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimeZone;
-import java.util.UUID;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.extern.slf4j.Slf4j;
+import java.util.*;
 
 /**
  * A locked-down serializer which supports a limited list of primitives and simple JDK value types.
@@ -99,6 +73,14 @@ public final class DefaultInvocationSerializer
         new GsonBuilder()
             .registerTypeAdapter(Invocation.class, gsonSerializer)
             .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
+            .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeTypeAdapter())
+            .registerTypeAdapter(Instant.class, new InstantTypeAdapter())
+            .registerTypeAdapter(Duration.class, new DurationTypeAdapter())
+            .registerTypeAdapter(LocalDate.class, new LocalDateTypeAdapter())
+            .registerTypeAdapter(MonthDay.class, new MonthDayTypeAdapter())
+            .registerTypeAdapter(Period.class, new PeriodTypeAdapter())
+            .registerTypeAdapter(Year.class, new YearTypeAdapter())
+            .registerTypeAdapter(YearMonth.class, new YearMonthAdapter())
             .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
             .create();
   }
@@ -128,8 +110,8 @@ public final class DefaultInvocationSerializer
       implements JsonSerializer<Invocation>, JsonDeserializer<Invocation> {
 
     private final int version;
-    private Map<Class<?>, String> classToName = new HashMap<>();
-    private Map<String, Class<?>> nameToClass = new HashMap<>();
+    private final Map<Class<?>, String> classToName = new HashMap<>();
+    private final Map<String, Class<?>> nameToClass = new HashMap<>();
 
     InvocationJsonSerializer(Set<Class<?>> serializableClasses, int version) {
       this.version = version;
@@ -233,7 +215,7 @@ public final class DefaultInvocationSerializer
     public JsonElement serialize(Invocation src, Type typeOfSrc, JsonSerializationContext context) {
       if (version == 1) {
         log.warn("Serializing as deprecated version {}", version);
-        return serializeV1(src, typeOfSrc, context);
+        return serializeV1(src, context);
       }
       JsonObject obj = new JsonObject();
       obj.addProperty("c", src.getClassName());
@@ -263,7 +245,7 @@ public final class DefaultInvocationSerializer
       return obj;
     }
 
-    JsonElement serializeV1(Invocation src, Type typeOfSrc, JsonSerializationContext context) {
+    JsonElement serializeV1(Invocation src, JsonSerializationContext context) {
       JsonObject obj = new JsonObject();
       obj.addProperty("c", src.getClassName());
       obj.addProperty("m", src.getMethodName());
@@ -343,6 +325,112 @@ public final class DefaultInvocationSerializer
             "Cannot serialize class - not found: " + clazz.getName());
       }
       return name;
+    }
+  }
+
+  static final class LocalDateTimeTypeAdapter extends TypeAdapter<LocalDateTime> {
+
+    @Override
+    public void write(JsonWriter out, LocalDateTime value) throws IOException {
+      out.value(value.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+    }
+
+    @Override
+    public LocalDateTime read(JsonReader in) throws IOException {
+      return LocalDateTime.parse(in.nextString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+    }
+  }
+
+  static final class InstantTypeAdapter extends TypeAdapter<Instant> {
+
+    @Override
+    public void write(JsonWriter out, Instant value) throws IOException {
+      out.value(DateTimeFormatter.ISO_INSTANT.format(value));
+    }
+
+    @Override
+    public Instant read(JsonReader in) throws IOException {
+      return DateTimeFormatter.ISO_INSTANT.parse(in.nextString(), Instant::from);
+    }
+  }
+
+  static final class DurationTypeAdapter extends TypeAdapter<Duration> {
+
+    @Override
+    public void write(JsonWriter out, Duration value) throws IOException {
+      out.value(value.get(ChronoUnit.SECONDS));
+    }
+
+    @Override
+    public Duration read(JsonReader in) throws IOException {
+      return Duration.of(in.nextLong(), ChronoUnit.SECONDS);
+    }
+  }
+
+  static final class LocalDateTypeAdapter extends TypeAdapter<LocalDate> {
+
+    @Override
+    public void write(JsonWriter out, LocalDate value) throws IOException {
+      out.value(DateTimeFormatter.ISO_LOCAL_DATE.format(value));
+    }
+
+    @Override
+    public LocalDate read(JsonReader in) throws IOException {
+      return DateTimeFormatter.ISO_LOCAL_DATE.parse(in.nextString(), LocalDate::from);
+    }
+  }
+
+  static final class MonthDayTypeAdapter extends TypeAdapter<MonthDay> {
+
+    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d/M");
+
+    @Override
+    public void write(JsonWriter out, MonthDay value) throws IOException {
+      out.value(value.format(formatter));
+    }
+
+    @Override
+    public MonthDay read(JsonReader in) throws IOException {
+      return MonthDay.parse(in.nextString(), formatter);
+    }
+  }
+
+  static final class PeriodTypeAdapter extends TypeAdapter<Period> {
+
+    @Override
+    public void write(JsonWriter out, Period value) throws IOException {
+      out.value(value.toString());
+    }
+
+    @Override
+    public Period read(JsonReader in) throws IOException {
+      return Period.parse(in.nextString());
+    }
+  }
+
+  static final class YearTypeAdapter extends TypeAdapter<Year> {
+
+    @Override
+    public void write(JsonWriter out, Year value) throws IOException {
+      out.value(value.getValue());
+    }
+
+    @Override
+    public Year read(JsonReader in) throws IOException {
+      return Year.of(in.nextInt());
+    }
+  }
+
+  static final class YearMonthAdapter extends TypeAdapter<YearMonth> {
+
+    @Override
+    public void write(JsonWriter out, YearMonth value) throws IOException {
+      out.value(value.toString());
+    }
+
+    @Override
+    public YearMonth read(JsonReader in) throws IOException {
+      return YearMonth.parse(in.nextString());
     }
   }
 

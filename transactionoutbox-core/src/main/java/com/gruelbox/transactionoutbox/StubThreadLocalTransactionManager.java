@@ -3,8 +3,9 @@ package com.gruelbox.transactionoutbox;
 import com.gruelbox.transactionoutbox.jdbc.AbstractThreadLocalJdbcTransactionManager;
 import com.gruelbox.transactionoutbox.jdbc.SimpleTransaction;
 import com.gruelbox.transactionoutbox.jdbc.StubSimpleTransactionManager;
-import java.sql.Connection;
 import lombok.extern.slf4j.Slf4j;
+
+import java.sql.Connection;
 
 /**
  * A stub transaction manager that assumes no underlying database and thread local transaction
@@ -55,7 +56,7 @@ public class StubThreadLocalTransactionManager
 
   private <T, E extends Exception> T withTransaction(ThrowingTransactionalSupplier<T, E> work)
       throws E {
-    Connection mockConnection = Utils.createLoggingProxy(Connection.class);
+    Connection mockConnection = Utils.createLoggingProxy(new ProxyFactory(), Connection.class);
     try (SimpleTransaction<Void> tx = new SimpleTransaction<>(mockConnection, null)) {
       JdbcShimTransaction shim = new JdbcShimTransaction(tx);
       pushTransaction(shim);

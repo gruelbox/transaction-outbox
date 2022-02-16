@@ -1,16 +1,18 @@
 package com.gruelbox.transactionoutbox;
 
-import static com.gruelbox.transactionoutbox.Utils.firstNonNull;
-import static com.gruelbox.transactionoutbox.Utils.logAtLevel;
-import static com.gruelbox.transactionoutbox.Utils.sneakyThrow;
-import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
-import static java.time.temporal.ChronoUnit.MILLIS;
-import static java.time.temporal.ChronoUnit.MINUTES;
-import static java.util.concurrent.CompletableFuture.completedFuture;
-import static java.util.concurrent.CompletableFuture.failedFuture;
-
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
+import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.validator.constraints.Length;
+import org.hibernate.validator.internal.engine.DefaultClockProvider;
+import org.slf4j.MDC;
+import org.slf4j.event.Level;
+
+import javax.validation.ClockProvider;
+import javax.validation.Valid;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -22,16 +24,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
-import javax.validation.ClockProvider;
-import javax.validation.Valid;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
-import lombok.ToString;
-import lombok.extern.slf4j.Slf4j;
-import org.hibernate.validator.constraints.Length;
-import org.hibernate.validator.internal.engine.DefaultClockProvider;
-import org.slf4j.MDC;
-import org.slf4j.event.Level;
+
+import static com.gruelbox.transactionoutbox.Utils.*;
+import static java.time.temporal.ChronoUnit.MILLIS;
+import static java.time.temporal.ChronoUnit.MINUTES;
+import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.concurrent.CompletableFuture.failedFuture;
 
 @Slf4j
 class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements TransactionOutbox {
@@ -58,6 +56,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   private final Validator validator;
   @NotNull private final Duration retentionThreshold;
   private final AtomicBoolean initialized = new AtomicBoolean();
+  private final ProxyFactory proxyFactory = new ProxyFactory();
   private final Method unblockMethod;
 
   TransactionOutboxImpl(
@@ -122,22 +121,21 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
-    return Utils.createProxy(
-        clazz,
-        (method, args) ->
-            uncheckedly(
-                () -> {
-                  TransactionalInvocation extracted =
-                      transactionManager.extractTransaction(method, args);
-                  var entry = newEntry(uniqueRequestId, extracted);
-                  TX tx = (TX) extracted.getTransaction();
-                  if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
-                    return submitAsFuture(tx, entry);
-                  } else {
-                    submitBlocking(tx, entry);
-                    return null;
-                  }
-                }));
+    return proxyFactory.createProxy(
+            clazz,
+            (method, args) -> uncheckedly(
+              () -> {
+                TransactionalInvocation extracted =
+                        transactionManager.extractTransaction(method, args);
+                var entry = newEntry(uniqueRequestId, extracted);
+                TX tx = (TX) extracted.getTransaction();
+                if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
+                  return (T) submitAsFuture(tx, entry);
+                } else {
+                  submitBlocking(tx, entry);
+                  return null;
+                }
+              }));
   }
 
   @Override
@@ -533,7 +531,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       super();
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public TransactionOutbox build() {
       return new TransactionOutboxImpl(
           transactionManager,
