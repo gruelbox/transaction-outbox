@@ -13,12 +13,13 @@ import lombok.Getter;
 @Getter
 @Beta
 public enum Dialect {
-  MY_SQL_5(false, Constants.DEFAULT_DELETE_EXPIRED_STMT),
-  MY_SQL_8(true, Constants.DEFAULT_DELETE_EXPIRED_STMT),
+  MY_SQL_5(false, false, Constants.DEFAULT_DELETE_EXPIRED_STMT),
+  MY_SQL_8(true, true, Constants.DEFAULT_DELETE_EXPIRED_STMT),
   POSTGRESQL_9(
       true,
+      true,
       "DELETE FROM {{table}} WHERE ctid IN (SELECT ctid FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?)"),
-  H2(false, Constants.DEFAULT_DELETE_EXPIRED_STMT);
+  H2(false, true, Constants.DEFAULT_DELETE_EXPIRED_STMT);
 
   /**
    * @return True if hot row support ({@code SKIP LOCKED}) is available, increasing performance when
@@ -27,6 +28,8 @@ public enum Dialect {
    */
   @SuppressWarnings("JavaDoc")
   private final boolean supportsSkipLock;
+
+  private final boolean supportsWindowFunctions;
 
   /** @return Format string for the SQL required to delete expired retained records. */
   @SuppressWarnings("JavaDoc")

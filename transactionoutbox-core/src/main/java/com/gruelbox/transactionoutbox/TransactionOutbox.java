@@ -88,6 +88,8 @@ public interface TransactionOutbox {
   @SuppressWarnings("UnusedReturnValue")
   boolean flush();
 
+  boolean flushOrdered();
+
   /**
    * Unblocks a blocked entry and resets the attempt count so that it will be retried again.
    * Requires an active transaction and a transaction manager that supports thread local context.
@@ -138,6 +140,7 @@ public interface TransactionOutbox {
     protected Boolean serializeMdc;
     protected Duration retentionThreshold;
     protected Boolean initializeImmediately;
+    protected Boolean submitImmediately;
 
     protected TransactionOutboxBuilder() {}
 
@@ -285,6 +288,16 @@ public interface TransactionOutbox {
     }
 
     /**
+     * @param submitImmediately If true, a task will be submitted immediately after scheduling.
+     * Defaults to true.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder submitImmediately(boolean submitImmediately) {
+      this.submitImmediately = submitImmediately;
+      return this;
+    }
+
+    /**
      * Creates and initialises the {@link TransactionOutbox}.
      *
      * @return The outbox implementation.
@@ -309,6 +322,10 @@ public interface TransactionOutbox {
      * @return Builder.
      */
     ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId);
+
+    default ParameterizedScheduleBuilder groupId(String groupId) {
+      return this;
+    }
 
     /**
      * Equivalent to {@link TransactionOutbox#schedule(Class)}, but applying additional parameters

@@ -46,6 +46,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
   private final boolean serializeMdc;
   private final Validator validator;
   @NotNull private final Duration retentionThreshold;
+  @NotNull private final boolean submitImmediately;
   private final AtomicBoolean initialized = new AtomicBoolean();
   private final ProxyFactory proxyFactory = new ProxyFactory();
 
@@ -62,7 +63,8 @@ class TransactionOutboxImpl implements TransactionOutbox {
       Level logLevelTemporaryFailure,
       Boolean serializeMdc,
       Duration retentionThreshold,
-      Boolean initializeImmediately) {
+      Boolean initializeImmediately,
+      Boolean submitImmediately) {
     this.transactionManager = transactionManager;
     this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
     this.persistor = persistor;
@@ -76,6 +78,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
     this.validator = new Validator(this.clockProvider);
     this.serializeMdc = serializeMdc == null || serializeMdc;
     this.retentionThreshold = retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold;
+    this.submitImmediately = submitImmediately == null || submitImmediately;
     this.validator.validate(this);
     if (initializeImmediately == null || initializeImmediately) {
       initialize();
@@ -100,7 +103,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
 
   @Override
   public <T> T schedule(Class<T> clazz) {
-    return schedule(clazz, null);
+    return schedule(clazz, null, null);
   }
 
   @Override
@@ -111,23 +114,34 @@ class TransactionOutboxImpl implements TransactionOutbox {
   @SuppressWarnings("UnusedReturnValue")
   @Override
   public boolean flush() {
+    return flush(false);
+  }
+
+  @Override
+  public boolean flushOrdered() {
+    return flush(true);
+  }
+
+  private boolean flush(boolean isOrdered) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
     Instant now = clockProvider.getClock().instant();
-    List<TransactionOutboxEntry> batch = flush(now);
+    List<TransactionOutboxEntry> batch = flush(now, isOrdered);
     expireIdempotencyProtection(now);
     return !batch.isEmpty();
   }
 
-  private List<TransactionOutboxEntry> flush(Instant now) {
+  private List<TransactionOutboxEntry> flush(Instant now, boolean isOrdered) {
     log.debug("Flushing stale tasks");
     var batch =
         transactionManager.inTransactionReturns(
             transaction -> {
               List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
-              uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize, now))
-                  .forEach(
+              uncheckedly(() -> isOrdered ?
+                      persistor.selectBatchOrdered(transaction, flushBatchSize, now) :
+                      persistor.selectBatch(transaction, flushBatchSize, now)
+                  ).forEach(
                       entry -> {
                         log.debug("Reprocessing {}", entry.description());
                         try {
@@ -214,7 +228,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
     }
   }
 
-  private <T> T schedule(Class<T> clazz, String uniqueRequestId) {
+  private <T> T schedule(Class<T> clazz, String uniqueRequestId, String groupId) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
@@ -230,16 +244,19 @@ class TransactionOutboxImpl implements TransactionOutbox {
                           extracted.getMethodName(),
                           extracted.getParameters(),
                           extracted.getArgs(),
-                          uniqueRequestId);
+                          uniqueRequestId,
+                          groupId);
                   validator.validate(entry);
                   persistor.save(extracted.getTransaction(), entry);
-                  extracted
-                      .getTransaction()
-                      .addPostCommitHook(
-                          () -> {
-                            listener.scheduled(entry);
-                            submitNow(entry);
-                          });
+                  if (submitImmediately) {
+                    extracted
+                        .getTransaction()
+                        .addPostCommitHook(
+                            () -> {
+                              listener.scheduled(entry);
+                              submitNow(entry);
+                            });
+                  }
                   log.debug(
                       "Scheduled {} for running after transaction commit", entry.description());
                   return null;
@@ -298,7 +315,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
   }
 
   private TransactionOutboxEntry newEntry(
-      Class<?> clazz, String methodName, Class<?>[] params, Object[] args, String uniqueRequestId) {
+      Class<?> clazz, String methodName, Class<?>[] params, Object[] args, String uniqueRequestId, String groupId) {
     return TransactionOutboxEntry.builder()
         .id(UUID.randomUUID().toString())
         .invocation(
@@ -311,6 +328,8 @@ class TransactionOutboxImpl implements TransactionOutbox {
         .lastAttemptTime(null)
         .nextAttemptTime(after(attemptFrequency))
         .uniqueRequestId(uniqueRequestId)
+        .createTime(clockProvider.getClock().instant())
+        .groupId(groupId)
         .build();
   }
 
@@ -388,7 +407,8 @@ class TransactionOutboxImpl implements TransactionOutbox {
           logLevelTemporaryFailure,
           serializeMdc,
           retentionThreshold,
-          initializeImmediately);
+          initializeImmediately,
+          submitImmediately);
     }
   }
 
@@ -397,6 +417,9 @@ class TransactionOutboxImpl implements TransactionOutbox {
     @Length(max = 250)
     private String uniqueRequestId;
 
+    @Length(max = 250)
+    private String groupId;
+
     @Override
     public ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId) {
       this.uniqueRequestId = uniqueRequestId;
@@ -404,9 +427,15 @@ class TransactionOutboxImpl implements TransactionOutbox {
     }
 
     @Override
+    public ParameterizedScheduleBuilder groupId(final String groupId) {
+      this.groupId = groupId;
+      return this;
+    }
+
+    @Override
     public <T> T schedule(Class<T> clazz) {
       validator.validate(this);
-      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId);
+      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, groupId);
     }
   }
 }

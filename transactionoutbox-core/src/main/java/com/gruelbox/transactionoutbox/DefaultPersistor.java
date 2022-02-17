@@ -37,7 +37,8 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultPersistor implements Persistor {
 
   private static final String ALL_FIELDS =
-      "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
+      "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version, "
+          + "createTime, groupId";
 
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
@@ -93,7 +94,7 @@ public class DefaultPersistor implements Persistor {
   public void save(Transaction tx, TransactionOutboxEntry entry)
       throws SQLException, AlreadyScheduledException {
     var insertSql =
-        "INSERT INTO " + tableName + " (" + ALL_FIELDS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO " + tableName + " (" + ALL_FIELDS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
     if (entry.getUniqueRequestId() == null) {
@@ -133,6 +134,9 @@ public class DefaultPersistor implements Persistor {
     stmt.setBoolean(7, entry.isBlocked());
     stmt.setBoolean(8, entry.isProcessed());
     stmt.setInt(9, entry.getVersion());
+    stmt.setTimestamp(
+        10, entry.getCreateTime() == null ? null : Timestamp.from(entry.getCreateTime()));
+    stmt.setString(11, entry.getGroupId());
   }
 
   @Override
@@ -241,8 +245,47 @@ public class DefaultPersistor implements Persistor {
                     + ALL_FIELDS
                     + " FROM "
                     + tableName
-                    + " WHERE nextAttemptTime < ? AND blocked = false AND processed = false LIMIT ?"
+                    + " WHERE nextAttemptTime < ? AND blocked = false AND processed = false and groupid is null LIMIT ?"
                     + forUpdate)) {
+      stmt.setTimestamp(1, Timestamp.from(now));
+      stmt.setInt(2, batchSize);
+      return gatherResults(batchSize, stmt);
+    }
+  }
+
+  @Override
+  public List<TransactionOutboxEntry> selectBatchOrdered(
+      final Transaction tx, final int batchSize, final Instant now) throws Exception {
+    String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
+    try (PreparedStatement stmt =
+        tx.connection()
+            .prepareStatement(
+                dialect.isSupportsWindowFunctions()
+                    ? "WITH t AS"
+                        + " ("
+                        + "   SELECT rank() over (PARTITION BY groupid ORDER BY createtime) AS rn, " + ALL_FIELDS
+                        + "   FROM " + tableName
+                        + "   WHERE processed = false"
+                        + " ) "
+                        + " SELECT " + ALL_FIELDS
+                        + " FROM t "
+                        + " WHERE rn = 1 AND nextAttemptTime < ? AND blocked = false AND groupid IS NOT null LIMIT ?"
+                        + forUpdate
+                    :
+                      "SELECT "
+                        + ALL_FIELDS
+                        + " FROM"
+                        + " ("
+                        + "   SELECT groupid AS group_id, MIN(createtime) AS min_create_time"
+                        + "   FROM " + tableName
+                        + "   WHERE processed = false"
+                        + "   GROUP BY group_id"
+                        + " ) AS t"
+                        + " JOIN " + tableName + " t1"
+                        + " ON t1.groupid = t.group_id AND t1.createtime = t.min_create_time"
+                        + " WHERE nextAttemptTime < ? AND blocked = false AND groupid IS NOT null LIMIT ?"
+                        + forUpdate
+            )) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
       return gatherResults(batchSize, stmt);
@@ -289,6 +332,11 @@ public class DefaultPersistor implements Persistor {
               .blocked(rs.getBoolean("blocked"))
               .processed(rs.getBoolean("processed"))
               .version(rs.getInt("version"))
+              .createTime(
+                  rs.getTimestamp("createTime") == null
+                      ? null
+                      : rs.getTimestamp("createTime").toInstant())
+              .groupId(rs.getString("groupId"))
               .build();
       log.debug("Found {}", entry);
       return entry;

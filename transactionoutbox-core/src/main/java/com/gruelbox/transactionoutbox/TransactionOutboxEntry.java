@@ -109,6 +109,10 @@ public class TransactionOutboxEntry {
   @Setter
   private int version;
 
+  @Getter private Instant createTime;
+
+  @Getter private String groupId;
+
   @EqualsAndHashCode.Exclude @ToString.Exclude private volatile boolean initialized;
   @EqualsAndHashCode.Exclude @ToString.Exclude private String description;
 

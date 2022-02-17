@@ -72,7 +72,18 @@ class DefaultMigrationManager {
               8,
               "Update length of invocation column on outbox for MySQL dialects only.",
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation MEDIUMTEXT",
-              Map.of(Dialect.POSTGRESQL_9, "", Dialect.H2, "")));
+              Map.of(Dialect.POSTGRESQL_9, "", Dialect.H2, "")),
+          new Migration(
+              9,
+              "Add createTime column to outbox",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN createTime TIMESTAMP(6) NULL AFTER invocation",
+              Map.of(
+                  Dialect.POSTGRESQL_9,
+                  "ALTER TABLE TXNO_OUTBOX ADD COLUMN createTime TIMESTAMP(6)")),
+          new Migration(
+              10,
+              "Add groupId column to outbox",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN groupId VARCHAR(250)"));
 
   static void migrate(TransactionManager transactionManager, @NotNull Dialect dialect) {
     transactionManager.inTransaction(
