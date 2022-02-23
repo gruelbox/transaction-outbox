@@ -7,16 +7,19 @@ on:
 jobs:
   build:
     if: "!contains(github.event.head_commit.message, 'skip ci')"
-    runs-on: ubuntu-latest
-
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        jdk: [11,15,17]
+      fail-fast: false
     steps:
-
       - uses: actions/checkout@v2
 
-      - name: Set up JDK 11
+      - name: Set up JDK ${{ matrix.jdk }}
         uses: actions/setup-java@v1
         with:
-          java-version: 11
+          java-version: ${{ matrix.jdk }}
 
       - name: Build with Maven
         run: mvn -B package
