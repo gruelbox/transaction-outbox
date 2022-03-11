@@ -35,17 +35,8 @@ public class JacksonInvocationSerializer implements InvocationSerializer {
       ObjectMapper mapper, DefaultInvocationSerializer defaultInvocationSerializer) {
     this.mapper = mapper.copy();
     this.defaultInvocationSerializer = defaultInvocationSerializer;
-    SimpleModule module = new SimpleModule();
-    TypeResolverBuilder<?> typeResolver =
-        new ObjectMapper.DefaultTypeResolverBuilder(
-            NON_FINAL,
-            BasicPolymorphicTypeValidator.builder().allowIfBaseType(Object.class).build());
-    typeResolver = typeResolver.init(JsonTypeInfo.Id.CLASS, null);
-    typeResolver = typeResolver.inclusion(JsonTypeInfo.As.WRAPPER_OBJECT);
-    this.mapper.setDefaultTyping(typeResolver);
-    module.addSerializer(Invocation.class, new CustomInvocationSerializer());
-    module.addDeserializer(Invocation.class, new CustomInvocationDeserializer(this.mapper));
-    this.mapper.registerModule(module);
+    this.mapper.setDefaultTyping(TransactionOutboxJacksonModule.typeResolver());
+    this.mapper.registerModule(new TransactionOutboxJacksonModule());
   }
 
   @Override

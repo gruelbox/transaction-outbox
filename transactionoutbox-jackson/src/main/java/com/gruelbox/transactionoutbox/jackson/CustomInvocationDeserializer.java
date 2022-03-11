@@ -1,7 +1,6 @@
 package com.gruelbox.transactionoutbox.jackson;
 
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -9,11 +8,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.gruelbox.transactionoutbox.Invocation;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ClassUtils;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.regex.Pattern;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.ClassUtils;
 
 @Slf4j
 public class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
@@ -30,9 +30,8 @@ public class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
     super(vc);
   }
 
-  public CustomInvocationDeserializer(ObjectMapper mapper) {
+  CustomInvocationDeserializer() {
     this(Invocation.class);
-    this.mapper = mapper;
   }
 
   @Override
@@ -42,7 +41,7 @@ public class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
     String methodName = node.get("methodName").textValue();
     ArrayNode paramTypes = ((ArrayNode) node.get("parameterTypes"));
     JsonNode arguments = node.get("args");
-    JsonNode processedArguments = replaceImmutableCollections(arguments);
+    JsonNode processedArguments = replaceImmutableCollections(arguments, p);
     Class<?>[] types = new Class<?>[paramTypes.size()];
 
     for (int i = 0; i < paramTypes.size(); i++) {
@@ -52,18 +51,18 @@ public class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
         throw new RuntimeException(e);
       }
     }
-    Object[] args = mapper.treeToValue(processedArguments, Object[].class);
-
-    Map<String, String> mdc = mapper.convertValue(node.get("mdc"), new TypeReference<>() {});
+    Object[] args = p.getCodec().treeToValue(processedArguments, Object[].class);
+    Map<String, String> mdc = p.getCodec().readValue(p.getCodec().treeAsTokens(node.get("mdc")), new TypeReference<>() {});
 
     return new Invocation(className, methodName, types, args, mdc);
   }
 
-  private JsonNode replaceImmutableCollections(JsonNode arguments) throws JsonProcessingException {
+  private JsonNode replaceImmutableCollections(JsonNode arguments, JsonParser p) throws IOException {
     String args = arguments.toString();
     args = setPattern.matcher(args).replaceAll("{\"java.util.HashSet\":");
     args = mapPattern.matcher(args).replaceAll("{\"java.util.HashMap\":");
     args = listPattern.matcher(args).replaceAll("{\"java.util.ArrayList\":");
-    return this.mapper.readTree(args);
+    JsonParser parser = p.getCodec().getFactory().createParser(args);
+    return p.getCodec().readTree(parser);
   }
 }
