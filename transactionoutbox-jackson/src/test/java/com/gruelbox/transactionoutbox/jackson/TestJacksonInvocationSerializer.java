@@ -1,7 +1,6 @@
 package com.gruelbox.transactionoutbox.jackson;
 
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,7 +14,6 @@ import java.io.StringWriter;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -47,8 +45,8 @@ class TestJacksonInvocationSerializer {
 
   void check(Invocation invocation) {
     Invocation deserialized = serdeser(invocation);
-    Assertions.assertEquals(deserialized, serdeser(invocation));
-    Assertions.assertEquals(invocation, deserialized);
+    assertEquals(deserialized, serdeser(invocation));
+    assertEquals(invocation, deserialized);
   }
 
   Invocation serdeser(Invocation invocation) {
@@ -151,13 +149,18 @@ class TestJacksonInvocationSerializer {
 
   @Test
   void deserializes_old_representation_correctly() {
-    var MAPPER = mock(ObjectMapper.class);
-    var internalMapper = mock(ObjectMapper.class);
-    given(MAPPER.copy()).willReturn(internalMapper);
     StringReader reader =
         new StringReader(
-            "{\"c\":\"com.gojiholdings.common.domain.datetime.GojiDateTimeFormatter\",\"m\":\"parseDate\",\"p\":[\"String\"],\"a\":[{\"t\":\"String\",\"v\":\"2021-05-11\"}],\"x\":{\"X-GOJI-REQUEST-ID\":\"someRequestId\"}}");
-    underTest.deserializeInvocation(reader);
+            "{\"c\":\"com.gruelbox.transactionoutbox.jackson.Service\",\"m\":\"parseDate\",\"p\":[\"String\"],\"a\":[{\"t\":\"String\",\"v\":\"2021-05-11\"}],\"x\":{\"REQUEST-ID\":\"someRequestId\"}}");
+    Invocation invocation = underTest.deserializeInvocation(reader);
+    assertEquals(
+        new Invocation(
+            "com.gruelbox.transactionoutbox.jackson.Service",
+            "parseDate",
+            new Class<?>[] {String.class},
+            new Object[] {"2021-05-11"},
+            Map.of("REQUEST-ID", "someRequestId")),
+        invocation);
   }
 
   @Test
