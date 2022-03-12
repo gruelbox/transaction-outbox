@@ -33,7 +33,8 @@ public class TransactionOutboxJacksonModule extends Module {
 
     SimpleDeserializers deserializers = new SimpleDeserializers();
     deserializers.addDeserializer(Invocation.class, new CustomInvocationDeserializer());
-    deserializers.addDeserializer(TransactionOutboxEntry.class, new TransactionOutboxDeserializer());
+    deserializers.addDeserializer(
+        TransactionOutboxEntry.class, new TransactionOutboxDeserializer());
     setupContext.addDeserializers(deserializers);
   }
 
@@ -41,7 +42,7 @@ public class TransactionOutboxJacksonModule extends Module {
     return new ObjectMapper.DefaultTypeResolverBuilder(
             NON_FINAL,
             BasicPolymorphicTypeValidator.builder().allowIfBaseType(Object.class).build())
-            .init(JsonTypeInfo.Id.CLASS, null)
-            .inclusion(JsonTypeInfo.As.WRAPPER_OBJECT);
+        .init(JsonTypeInfo.Id.CLASS, null)
+        .inclusion(JsonTypeInfo.As.WRAPPER_OBJECT);
   }
 }

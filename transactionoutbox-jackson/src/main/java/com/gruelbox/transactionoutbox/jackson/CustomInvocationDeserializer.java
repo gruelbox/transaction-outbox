@@ -8,12 +8,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.gruelbox.transactionoutbox.Invocation;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.ClassUtils;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ClassUtils;
 
 @Slf4j
 public class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
@@ -52,12 +51,15 @@ public class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
       }
     }
     Object[] args = p.getCodec().treeToValue(processedArguments, Object[].class);
-    Map<String, String> mdc = p.getCodec().readValue(p.getCodec().treeAsTokens(node.get("mdc")), new TypeReference<>() {});
+    Map<String, String> mdc =
+        p.getCodec()
+            .readValue(p.getCodec().treeAsTokens(node.get("mdc")), new TypeReference<>() {});
 
     return new Invocation(className, methodName, types, args, mdc);
   }
 
-  private JsonNode replaceImmutableCollections(JsonNode arguments, JsonParser p) throws IOException {
+  private JsonNode replaceImmutableCollections(JsonNode arguments, JsonParser p)
+      throws IOException {
     String args = arguments.toString();
     args = setPattern.matcher(args).replaceAll("{\"java.util.HashSet\":");
     args = mapPattern.matcher(args).replaceAll("{\"java.util.HashMap\":");

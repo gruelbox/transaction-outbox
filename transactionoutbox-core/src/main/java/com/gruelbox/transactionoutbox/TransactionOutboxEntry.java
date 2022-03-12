@@ -13,7 +13,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import lombok.extern.jackson.Jacksonized;
 
 /**
  * Internal representation of a {@link TransactionOutbox} task. Generally only directly of interest

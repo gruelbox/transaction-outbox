@@ -1,12 +1,7 @@
 package com.gruelbox.transactionoutbox.jackson;
 
-import static com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
-import com.fasterxml.jackson.databind.jsontype.TypeResolverBuilder;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
 import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.InvocationSerializer;
