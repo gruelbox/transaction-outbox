@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 
-class TransactionOutboxDeserializer extends JsonDeserializer<TransactionOutboxEntry> {
+class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOutboxEntry> {
 
   @Override
   public TransactionOutboxEntry deserialize(JsonParser p, DeserializationContext c)

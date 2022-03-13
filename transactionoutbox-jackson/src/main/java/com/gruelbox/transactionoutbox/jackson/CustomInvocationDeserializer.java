@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.gruelbox.transactionoutbox.Invocation;
@@ -15,9 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ClassUtils;
 
 @Slf4j
-public class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
+class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
 
-  private ObjectMapper mapper;
   private static final Pattern setPattern =
       Pattern.compile("\\{\\w*\"(java.util.ImmutableCollections\\$Set[\\dN]+)\"\\w*:");
   private static final Pattern mapPattern =

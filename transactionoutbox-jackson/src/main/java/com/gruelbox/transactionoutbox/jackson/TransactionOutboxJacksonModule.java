@@ -10,9 +10,11 @@ import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.TypeResolverBuilder;
 import com.fasterxml.jackson.databind.module.SimpleDeserializers;
 import com.fasterxml.jackson.databind.module.SimpleSerializers;
+import com.gruelbox.transactionoutbox.Beta;
 import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 
+@Beta
 public class TransactionOutboxJacksonModule extends Module {
 
   @Override
@@ -34,7 +36,7 @@ public class TransactionOutboxJacksonModule extends Module {
     SimpleDeserializers deserializers = new SimpleDeserializers();
     deserializers.addDeserializer(Invocation.class, new CustomInvocationDeserializer());
     deserializers.addDeserializer(
-        TransactionOutboxEntry.class, new TransactionOutboxDeserializer());
+        TransactionOutboxEntry.class, new TransactionOutboxEntryDeserializer());
     setupContext.addDeserializers(deserializers);
   }
 
