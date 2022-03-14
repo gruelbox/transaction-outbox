@@ -27,7 +27,8 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
 1. [Advanced](#advanced)
    1. [The nested outbox pattern](#the-nested-outbox-pattern)
    1. [Idempotency protection](#idempotency-protection)
-   2. [Flexible serialization](#flexible-serialization)
+   1. [Flexible serialization](#flexible-serialization-beta)
+   1. [Clustering](#clustering)
 1. [Configuration reference](#configuration-reference)
 1. [Stubbing in tests](#stubbing-in-tests)
 
@@ -263,7 +264,9 @@ backgroundThread.interrupt();
 backgroundThread.join();
 ```
 
-Don't worry about it running on multiple instances simultaneously. It's designed to handle concurrent use (particularly on databases that support `SKIP LOCKED`, such as Postgres and MySQL 8+), and indeed multi-processing it can be a benefit; spreading high workloads across instances without any need for more complex high-availability configuration (that said, if you want to distribute work across a cluster at point of submission, this is also supported).
+`flush()` is designed to handle concurrent use on databases that support `SKIP LOCKED`, such as Postgres and MySQL 8+. Feel free to run this as often as you like (within reason, e.g. once a minute) on every instance of your application.  This can have the benefit of spreading work across multiple instances when the work backlog is extremely high, but is not as effective as a proper [clustering](#clustering) approach.
+
+However, multiple concurrent calls to `flush()` can cause lock timeout errors on databases without `SKIP LOCKED` support, such as MySQL 5.7.  This is harmless, but will cause a lot of log noise, so you may prefer to run on a single instance at a time to avoid this.
 
 ## Managing the "dead letter queue"
 
@@ -341,7 +344,7 @@ outbox.with()
 
 Where `context-clientid` is a globally-unique identifier derived from the incoming request. Such ids are usually available from queue middleware as message ids, or if not you can require as part of the incoming API (possibly with a tenant prefix to ensure global uniqueness across tenants).
 
-### Flexible serialization
+### Flexible serialization (beta)
 
 Most people will use the default persistor, `DefaultPersistor`, to persist tasks to a relational database. This uses `DefaultInvocationSerializer` by default, which in turn uses [GSON](https://github.com/google/gson) to serialize as JSON.  `DefaultInvocationSerializer` is extremely limited by design, with a small list of allowed classes in method arguments. 
 You can extend the list of support types by calling `serializableTypes` in its builder, but it will always be restricted to this global list. This is by design, to avoid building a [deserialization of untrusted data](https://owasp.org/www-community/vulnerabilities/Deserialization_of_untrusted_data) vulnerability into the library.
@@ -353,6 +356,58 @@ outbox.schedule(Service.class).processList(List.of(1, "2", 3L));
 However, if you completely trust your serialized data (for example, your developers don't have write access to your production database, and the access credentials are well guarded) then you may prefer to have 100% flexibility, with no need to declare the types used and the ability to use any combination of run-time and compile-time types.
 
 See [transaction-outbox-jackson](transactionoutbox-jackson/README.md), which uses a specially-configured Jackson `ObjectMapper` to achieve this.
+
+### Clustering
+
+The default mechanism for _running_ tasks (either immediately, or when they are picked up by background processing) is via a `java.concurrent.Executor`, which effectively does the following:
+```
+executor.execute(() -> outbox.processNow(transactionOutboxEntry));
+```
+This offloads processing to a background thread _on the application instance_ on which the task was picked up. Under high load, this can mean thousands of tasks being picked up from the database queue and submitted at the same time on the same application instance, even if there are 20 instances of the application, effectively limiting the total rate of processing to what a single instance can handle.
+
+If you want to instead push the work for processing by _any_ of your application instances, thus spreading the work around a cluster, there are multiple approaches, just some of which are listed below:
+
+* An HTTP endpoint on a load-balanced DNS with service discovery (such as a container orchestrator e.g. Kubernetes or Nomad)
+* A shared queue (AWS SQS, ActiveMQ, ZeroMQ)
+* A lower-level clustering/messaging toolkit such as [JGroups](http://www.jgroups.org/).
+
+All of these can be implemented as follows:
+
+When defining the `TransactionOutbox`, replace `ExecutorSubmitter` with something which serializes a `TransactionOutboxEntry` and ships it to the remote queue/address. Here's what configuration might look for a `RestApiExecutor` which ships the request to a load-balanced endpoint hosted on Nomad/Consul:
+```
+TransactionOutbox outbox = TransactionOutbox.builder()
+  .submitter(RestApiExecutor.builder()
+    .endpoint("POST", "https://invoicing.service.consul:8080/outbox/process")
+    .serializer(somethingWhichCanSerializeTransactionOutboxEntries)
+    .build()
+```
+Then listen on your communication mechanism for incoming serialized `TransactionOutboxEntry`s, and push them to a normal local `ExecutorSubmitter`.  Here's what a JAX-RS example might look like:
+```
+@POST
+@Path("/outbox/process")
+void processOutboxEntry(String entry) {
+  TransactionOutboxEntry entry = somethingWhichCanSerializeTransactionOutboxEntries.deserialize(entry);
+  Submitter submitter = ExecutorSubmitter.builder().executor(localExecutor).logLevelWorkQueueSaturation(Level.INFO).build();
+  submitter.submit(entry, outbox.get()::processNow);
+}
+```
+This whole approach is complicated a little by the inherent difficulty in serializing and deserializing a `TransactionOutboxEntry`, which is extremely polymorphic in nature. A reference approach is provided by [transaction-outbox-jackson](transactionoutbox-jackson/README.md), which provides the features necessary to make a Jackson `ObjectMapper` able to handle the work.  With that on the classpath you can use an `ObjectMapper` as follows:
+```
+// Add support for TransactionOutboxEntry to your normal application ObjectMapper
+yourNormalSharedObjectMapper.registerModule(new TransactionOutboxJacksonModule());
+
+// (Optional) support deep polymorphic requests - for this we need to copy the object
+// mapper so it doesn't break the way the rest of your application works
+ObjectMapper objectMapper = yourNormalSharedObjectMapper.copy();
+objectMapper.setDefaultTyping(TransactionOutboxJacksonModule.typeResolver());
+
+// Serialize
+String message = objectMapper.writeValueAsString(entry);
+
+// Deserialize
+TransactionOutboxEntry entry = objectMapper.readValue(message, TransactionOutboxEntry.class);
+```
+Armed with the above, happy clustering!
 
 ## Configuration reference
 
@@ -392,7 +447,7 @@ TransactionOutbox outbox = TransactionOutbox.builder()
     // Change the log level used when work cannot be submitted to a saturated queue to INFO level (the default
     // is WARN, which you should probably consider a production incident). You can also change the Executor used
     // for submitting work to a shared thread pool used by the rest of your application. Fully-custom Submitter
-    // implementations are also easy to implement.
+    // implementations are also easy to implement, for example to cluster work.
     .submitter(ExecutorSubmitter.builder()
         .executor(ForkJoinPool.commonPool())
         .logLevelWorkQueueSaturation(Level.INFO)
