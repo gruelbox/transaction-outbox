@@ -36,7 +36,8 @@ public class ProxyFactory {
     try {
       return new TypeCache<>(Sort.WEAK);
     } catch (NoClassDefFoundError error) {
-      log.info("ByteBuddy is not on the classpath, so only interfaces can be used with transaction-outbox");
+      log.info(
+          "ByteBuddy is not on the classpath, so only interfaces can be used with transaction-outbox");
       return null;
     }
   }
@@ -45,7 +46,8 @@ public class ProxyFactory {
     try {
       return new ObjenesisStd();
     } catch (NoClassDefFoundError error) {
-      log.info("Objenesis is not on the classpath, so only interfaces or classes with default constructors can be used with transaction-outbox");
+      log.info(
+          "Objenesis is not on the classpath, so only interfaces or classes with default constructors can be used with transaction-outbox");
       return null;
     }
   }

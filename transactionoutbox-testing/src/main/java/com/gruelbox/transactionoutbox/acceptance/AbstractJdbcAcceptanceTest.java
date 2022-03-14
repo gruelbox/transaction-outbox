@@ -7,13 +7,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.gruelbox.transactionoutbox.AlreadyScheduledException;
-import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.Submitter;
-import com.gruelbox.transactionoutbox.ThrowingRunnable;
-import com.gruelbox.transactionoutbox.TransactionOutbox;
-import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransaction;
 import com.gruelbox.transactionoutbox.jdbc.JdbcTransactionManager;
@@ -49,6 +43,10 @@ public abstract class AbstractJdbcAcceptanceTest<
 
   protected boolean supportsThreadLocalContext() {
     return true;
+  }
+
+  protected InvocationSerializer serializer() {
+    return InvocationSerializer.createDefaultJsonSerializer();
   }
 
   @Override
@@ -92,7 +90,7 @@ public abstract class AbstractJdbcAcceptanceTest<
   @SuppressWarnings({"unchecked", "rawtypes"})
   @Override
   protected final Persistor<Connection, TX> createPersistor() {
-    return (Persistor) JdbcPersistor.builder().dialect(dialect()).migrationRetries(0).build();
+    return (Persistor) JdbcPersistor.builder().dialect(dialect()).serializer(serializer()).migrationRetries(0).build();
   }
 
   @Test
