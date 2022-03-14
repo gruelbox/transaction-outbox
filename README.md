@@ -373,13 +373,60 @@ If you want to instead push the work for processing by _any_ of your application
 
 All of these can be implemented as follows:
 
-When defining the `TransactionOutbox`, replace `ExecutorSubmitter` with something which serializes a `TransactionOutboxEntry` and ships it to the remote queue/address. Here's what configuration might look for a `RestApiExecutor` which ships the request to a load-balanced endpoint hosted on Nomad/Consul:
+When defining the `TransactionOutbox`, replace `ExecutorSubmitter` with something which serializes a `TransactionOutboxEntry` and ships it to the remote queue/address. Here's what configuration might look for a `RestApiSubmitter` which ships the request to a load-balanced endpoint hosted on Nomad/Consul:
 ```
-TransactionOutbox outbox = TransactionOutbox.builder()
-  .submitter(RestApiExecutor.builder()
-    .endpoint("POST", "https://invoicing.service.consul:8080/outbox/process")
-    .serializer(somethingWhichCanSerializeTransactionOutboxEntries)
-    .build()
+TransactionOutbox outbox = TransactionOutbox.builder().submitter(restApiSubmitter)
+```
+It is strongly advised that you use a local executor in-line, to ensure that if there are communications issues with your endpoint or queue, it doesn't fail the calling thread.  Here is an example using [Feign](https://github.com/OpenFeign/feign):
+```
+@Slf4j
+class RestApiSubmitter implements Submitter {
+
+  private final FeignResource feignResource;
+  private final ExecutorService localExecutor;
+  private final Provider<TransactionOutbox> outbox;
+
+  @Inject
+  RestApiExecutor(String endpointUrl, ExecutorService localExecutor, ObjectMapper objectMapper, Provider<TransactionOutbox> outbox) {
+    this.feignResource = Feign.builder()
+      .decoder(new JacksonDecoder(objectMapper))
+      .target(GitHub.class, "https://api.github.com");;
+    this.localExecutor = localExecutor;
+    this.outbox = outbox;
+  }
+
+  @Override
+  public void submit(TransactionOutboxEntry entry, Consumer<TransactionOutboxEntry> leIgnore) {
+    try {
+      localExecutor.execute(() -> processRemotely(entry));
+      log.info("Queued {} to be sent for remote processing", entry.description());
+    } catch (RejectedExecutionException e) {
+      log.info("Will queue {} for processing when local executor is available", entry.description());
+    } catch (Exception e) {
+      log.warn("Failed to queue {} for execution at {}. It will be re-attempted later.", entry.description(), url, e);
+    }
+  }
+
+  private void processRemotely(TransactionOutboxEntry entry) {
+    try {
+      feignResource.process(entry);
+      log.info("Submitted {} for remote processing at {}", entry.description(), url);
+    } catch (Exception e) {
+      log.warn(
+        "Failed to submit {} for remote processing at {}. It will be re-attempted later.",
+        entry.description(),
+        url,
+        e
+      );
+    }
+  }
+  
+  public interface FeignResource {
+    @RequestLine("POST /outbox/process")
+    void process(TransactionOutboxEntry entry);
+  }
+  
+}
 ```
 Then listen on your communication mechanism for incoming serialized `TransactionOutboxEntry`s, and push them to a normal local `ExecutorSubmitter`.  Here's what a JAX-RS example might look like:
 ```
