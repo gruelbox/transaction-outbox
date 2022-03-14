@@ -44,7 +44,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
-
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -123,8 +122,8 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       implements JsonSerializer<Invocation>, JsonDeserializer<Invocation> {
 
     private final int version;
-    private Map<Class<?>, String> classToName = new HashMap<>();
-    private Map<String, Class<?>> nameToClass = new HashMap<>();
+    private final Map<Class<?>, String> classToName = new HashMap<>();
+    private final Map<String, Class<?>> nameToClass = new HashMap<>();
 
     InvocationJsonSerializer(Set<Class<?>> serializableClasses, int version) {
       this.version = version;
