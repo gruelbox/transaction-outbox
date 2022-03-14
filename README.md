@@ -27,6 +27,7 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
 1. [Advanced](#advanced)
    1. [The nested outbox pattern](#the-nested-outbox-pattern)
    1. [Idempotency protection](#idempotency-protection)
+   2. [Flexible serialization](#flexible-serialization)
 1. [Configuration reference](#configuration-reference)
 1. [Stubbing in tests](#stubbing-in-tests)
 
@@ -339,6 +340,19 @@ outbox.with()
 ```
 
 Where `context-clientid` is a globally-unique identifier derived from the incoming request. Such ids are usually available from queue middleware as message ids, or if not you can require as part of the incoming API (possibly with a tenant prefix to ensure global uniqueness across tenants).
+
+### Flexible serialization
+
+Most people will use the default persistor, `DefaultPersistor`, to persist tasks to a relational database. This uses `DefaultInvocationSerializer` by default, which in turn uses [GSON](https://github.com/google/gson) to serialize as JSON.  `DefaultInvocationSerializer` is extremely limited by design, with a small list of allowed classes in method arguments. 
+You can extend the list of support types by calling `serializableTypes` in its builder, but it will always be restricted to this global list. This is by design, to avoid building a [deserialization of untrusted data](https://owasp.org/www-community/vulnerabilities/Deserialization_of_untrusted_data) vulnerability into the library.
+
+Furthermore, there is no support for the case where run-time and compile-time types differ, such as in polymorphic collections. The following will always fail with `DefaultInvocationSerializer`:
+```
+outbox.schedule(Service.class).processList(List.of(1, "2", 3L));
+```
+However, if you completely trust your serialized data (for example, your developers don't have write access to your production database, and the access credentials are well guarded) then you may prefer to have 100% flexibility, with no need to declare the types used and the ability to use any combination of run-time and compile-time types.
+
+See [transaction-outbox-jackson](transactionoutbox-jackson/README.md), which uses a specially-configured Jackson `ObjectMapper` to achieve this.
 
 ## Configuration reference
 
