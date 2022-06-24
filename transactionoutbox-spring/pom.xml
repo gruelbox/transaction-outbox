@@ -16,7 +16,7 @@
   </description>
 
   <properties>
-    <spring.boot.version>2.6.6</spring.boot.version>
+    <spring.boot.version>2.7.1</spring.boot.version>
     <spring.version>5.3.16</spring.version>
   </properties>
 
