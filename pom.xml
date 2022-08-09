@@ -64,7 +64,7 @@
       <dependency>
         <groupId>org.objenesis</groupId>
         <artifactId>objenesis</artifactId>
-        <version>3.2</version>
+        <version>3.3</version>
         <optional>true</optional>
       </dependency>
       <dependency>
@@ -176,7 +176,7 @@
       <dependency>
         <groupId>org.postgresql</groupId>
         <artifactId>postgresql</artifactId>
-        <version>42.4.0</version>
+        <version>42.4.1</version>
         <scope>test</scope>
       </dependency>
       <dependency>
