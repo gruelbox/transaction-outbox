@@ -35,7 +35,7 @@ public interface Submitter {
     return withExecutor(
         new ThreadPoolExecutor(
             1,
-            Math.min(1, ForkJoinPool.commonPool().getParallelism()),
+            Math.max(1, ForkJoinPool.commonPool().getParallelism()),
             0L,
             TimeUnit.MILLISECONDS,
             new ArrayBlockingQueue<Runnable>(16384)));
