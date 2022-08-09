@@ -75,7 +75,7 @@
       <dependency>
         <groupId>org.hibernate.validator</groupId>
         <artifactId>hibernate-validator</artifactId>
-        <version>6.2.3.Final</version>
+        <version>6.2.4.Final</version>
       </dependency>
       <dependency>
         <groupId>javax.el</groupId>
@@ -176,7 +176,7 @@
       <dependency>
         <groupId>org.postgresql</groupId>
         <artifactId>postgresql</artifactId>
-        <version>42.4.0</version>
+        <version>42.4.1</version>
         <scope>test</scope>
       </dependency>
       <dependency>
