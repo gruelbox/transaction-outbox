@@ -6,46 +6,37 @@ import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.time.temporal.ChronoUnit.MINUTES;
 
 import java.lang.reflect.InvocationTargetException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.validation.ClockProvider;
-import javax.validation.Valid;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
+import java.util.function.Supplier;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.validator.constraints.Length;
-import org.hibernate.validator.internal.engine.DefaultClockProvider;
 import org.slf4j.MDC;
 import org.slf4j.event.Level;
 
 @Slf4j
-class TransactionOutboxImpl implements TransactionOutbox {
+class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   private static final int DEFAULT_FLUSH_BATCH_SIZE = 4096;
 
-  @NotNull private final TransactionManager transactionManager;
-  @Valid @NotNull private final Persistor persistor;
-  @Valid @NotNull private final Instantiator instantiator;
-  @NotNull private final Submitter submitter;
-  @NotNull private final Duration attemptFrequency;
-  @NotNull private final Level logLevelTemporaryFailure;
-
-  @Min(1)
+  private final TransactionManager transactionManager;
+  private final Persistor persistor;
+  private final Instantiator instantiator;
+  private final Submitter submitter;
+  private final Duration attemptFrequency;
+  private final Level logLevelTemporaryFailure;
   private final int blockAfterAttempts;
-
-  @Min(1)
   private final int flushBatchSize;
-
-  @NotNull private final ClockProvider clockProvider;
-  @NotNull private final TransactionOutboxListener listener;
+  private final Supplier<Clock> clockProvider;
+  private final TransactionOutboxListener listener;
   private final boolean serializeMdc;
   private final Validator validator;
-  @NotNull private final Duration retentionThreshold;
+  private final Duration retentionThreshold;
   private final AtomicBoolean initialized = new AtomicBoolean();
   private final ProxyFactory proxyFactory = new ProxyFactory();
 
@@ -56,7 +47,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
       Duration attemptFrequency,
       int blockAfterAttempts,
       int flushBatchSize,
-      ClockProvider clockProvider,
+      Supplier<Clock> clockProvider,
       TransactionOutboxListener listener,
       Persistor persistor,
       Level logLevelTemporaryFailure,
@@ -70,7 +61,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
     this.attemptFrequency = Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
     this.blockAfterAttempts = blockAfterAttempts < 1 ? 5 : blockAfterAttempts;
     this.flushBatchSize = flushBatchSize < 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
-    this.clockProvider = Utils.firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
+    this.clockProvider = clockProvider == null ? Clock::systemDefaultZone : clockProvider;
     this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {});
     this.logLevelTemporaryFailure = Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
     this.validator = new Validator(this.clockProvider);
@@ -80,6 +71,21 @@ class TransactionOutboxImpl implements TransactionOutbox {
     if (initializeImmediately == null || initializeImmediately) {
       initialize();
     }
+  }
+
+  @Override
+  public void validate(Validator validator) {
+    validator.notNull("transactionManager", transactionManager);
+    validator.valid("persistor", persistor);
+    validator.valid("instantiator", instantiator);
+    validator.valid("submitter", submitter);
+    validator.notNull("attemptFrequency", attemptFrequency);
+    validator.notNull("logLevelTemporaryFailure", logLevelTemporaryFailure);
+    validator.min("blockAfterAttempts", blockAfterAttempts, 1);
+    validator.min("flushBatchSize", flushBatchSize, 1);
+    validator.notNull("clockProvider", clockProvider);
+    validator.notNull("listener", listener);
+    validator.notNull("retentionThreshold", retentionThreshold);
   }
 
   static TransactionOutboxBuilder builder() {
@@ -114,7 +120,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
-    Instant now = clockProvider.getClock().instant();
+    Instant now = clockProvider.get().instant();
     List<TransactionOutboxEntry> batch = flush(now);
     expireIdempotencyProtection(now);
     return !batch.isEmpty();
@@ -269,7 +275,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
                   log.debug(
                       "Deferring deletion of {} by {}", entry.description(), retentionThreshold);
                   entry.setProcessed(true);
-                  entry.setLastAttemptTime(Instant.now(clockProvider.getClock()));
+                  entry.setLastAttemptTime(Instant.now(clockProvider.get()));
                   entry.setNextAttemptTime(after(retentionThreshold));
                   persistor.update(transaction, entry);
                 }
@@ -317,7 +323,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
   private void pushBack(Transaction transaction, TransactionOutboxEntry entry)
       throws OptimisticLockException {
     try {
-      entry.setLastAttemptTime(clockProvider.getClock().instant());
+      entry.setLastAttemptTime(clockProvider.get().instant());
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
       persistor.update(transaction, entry);
@@ -329,7 +335,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
   }
 
   private Instant after(Duration duration) {
-    return clockProvider.getClock().instant().plus(duration).truncatedTo(MILLIS);
+    return clockProvider.get().instant().plus(duration).truncatedTo(MILLIS);
   }
 
   private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
@@ -337,7 +343,7 @@ class TransactionOutboxImpl implements TransactionOutbox {
       entry.setAttempts(entry.getAttempts() + 1);
       var blocked = entry.getAttempts() >= blockAfterAttempts;
       entry.setBlocked(blocked);
-      entry.setLastAttemptTime(Instant.now(clockProvider.getClock()));
+      entry.setLastAttemptTime(Instant.now(clockProvider.get()));
       entry.setNextAttemptTime(after(attemptFrequency));
       validator.validate(entry);
       transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));
@@ -394,7 +400,6 @@ class TransactionOutboxImpl implements TransactionOutbox {
 
   private class ParameterizedScheduleBuilderImpl implements ParameterizedScheduleBuilder {
 
-    @Length(max = 250)
     private String uniqueRequestId;
 
     @Override
@@ -405,7 +410,9 @@ class TransactionOutboxImpl implements TransactionOutbox {
 
     @Override
     public <T> T schedule(Class<T> clazz) {
-      validator.validate(this);
+      if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
+        throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
+      }
       return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId);
     }
   }

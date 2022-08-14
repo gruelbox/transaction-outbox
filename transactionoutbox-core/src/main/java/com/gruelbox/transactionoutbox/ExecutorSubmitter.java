@@ -4,7 +4,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
-import javax.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.event.Level;
@@ -38,7 +37,7 @@ import org.slf4j.event.Level;
  */
 @Slf4j
 @Builder
-public class ExecutorSubmitter implements Submitter {
+public class ExecutorSubmitter implements Submitter, Validatable {
 
   /** @param executor The executor to use. */
   @SuppressWarnings("JavaDoc")
@@ -50,7 +49,6 @@ public class ExecutorSubmitter implements Submitter {
    *     default {@code DEBUG} level.
    */
   @SuppressWarnings("JavaDoc")
-  @NotNull
   @Builder.Default
   private final Level logLevelWorkQueueSaturation = Level.DEBUG;
 
@@ -71,5 +69,11 @@ public class ExecutorSubmitter implements Submitter {
           entry.description(),
           e);
     }
+  }
+
+  @Override
+  public void validate(Validator validator) {
+    validator.notNull("executor", executor);
+    validator.notNull("logLevelWorkQueueSaturation", logLevelWorkQueueSaturation);
   }
 }
