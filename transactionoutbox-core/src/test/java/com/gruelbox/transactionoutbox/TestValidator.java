@@ -7,7 +7,6 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
-import javax.validation.ValidationException;
 import org.junit.jupiter.api.Test;
 
 class TestValidator {
@@ -30,7 +29,7 @@ class TestValidator {
             .invocation(COMPLEX_INVOCATION)
             .nextAttemptTime(now.minusMillis(1))
             .build();
-    assertThrows(ValidationException.class, () -> validator.validate(entry));
+    assertThrows(IllegalArgumentException.class, () -> validator.validate(entry));
   }
 
   @Test
@@ -41,7 +40,7 @@ class TestValidator {
             .invocation(COMPLEX_INVOCATION)
             .nextAttemptTime(now)
             .build();
-    assertThrows(ValidationException.class, () -> validator.validate(entry));
+    assertThrows(IllegalArgumentException.class, () -> validator.validate(entry));
   }
 
   @Test

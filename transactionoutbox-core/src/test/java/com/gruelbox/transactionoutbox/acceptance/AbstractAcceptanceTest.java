@@ -32,8 +32,10 @@ import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
+import org.hamcrest.MatcherAssert;
 import org.junit.Assume;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -237,7 +239,7 @@ abstract class AbstractAcceptanceTest {
                 .schedule(ClassProcessor.class)
                 .process("6"));
 
-    assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
+    MatcherAssert.assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
   }
 
   /**
@@ -423,7 +425,7 @@ abstract class AbstractAcceptanceTest {
           var dialect = connectionDetails().dialect();
           Assume.assumeThat(
               dialect,
-              new Matcher<>() {
+              new BaseMatcher<>() {
                 @Override
                 public void describeTo(Description description) {}
 
@@ -431,12 +433,6 @@ abstract class AbstractAcceptanceTest {
                 public boolean matches(Object o) {
                   return Dialect.MY_SQL_8.equals(o) || Dialect.MY_SQL_5.equals(o);
                 }
-
-                @Override
-                public void describeMismatch(Object o, Description description) {}
-
-                @Override
-                public void _dont_implement_Matcher___instead_extend_BaseMatcher_() {}
               });
           assertThrows(
               Exception.class,
@@ -584,9 +580,9 @@ abstract class AbstractAcceptanceTest {
           assertTrue("Latch not opened in time", latch.await(30, TimeUnit.SECONDS));
         });
 
-    assertThat(
+    MatcherAssert.assertThat(
         "Should never get duplicates running to full completion", duplicates.keySet(), empty());
-    assertThat(
+    MatcherAssert.assertThat(
         "Only got: " + results.keySet(),
         results.keySet(),
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));

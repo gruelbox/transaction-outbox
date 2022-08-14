@@ -4,12 +4,10 @@ import static java.util.stream.Collectors.joining;
 
 import java.time.Instant;
 import java.util.Arrays;
-import javax.validation.constraints.Future;
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.PositiveOrZero;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
@@ -21,14 +19,13 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder(toBuilder = true)
 @EqualsAndHashCode
 @ToString
-public class TransactionOutboxEntry {
+public class TransactionOutboxEntry implements Validatable {
 
   /**
    * @param id The id of the record. Usually a UUID.
    * @return The id of the record. Usually a UUID.
    */
   @SuppressWarnings("JavaDoc")
-  @NotNull
   @Getter
   private final String id;
 
@@ -45,7 +42,6 @@ public class TransactionOutboxEntry {
    * @return The method invocation to perform.
    */
   @SuppressWarnings("JavaDoc")
-  @NotNull
   @Getter
   @Setter(AccessLevel.PACKAGE)
   private Invocation invocation;
@@ -64,7 +60,6 @@ public class TransactionOutboxEntry {
    * @return The timestamp after which the task is available for re-attempting.
    */
   @SuppressWarnings("JavaDoc")
-  @Future
   @Getter
   @Setter
   private Instant nextAttemptTime;
@@ -74,7 +69,6 @@ public class TransactionOutboxEntry {
    * @return The number of unsuccessful attempts so far made to run the task.
    */
   @SuppressWarnings("JavaDoc")
-  @PositiveOrZero
   @Getter
   @Setter
   private int attempts;
@@ -104,7 +98,6 @@ public class TransactionOutboxEntry {
    * @return The optimistic locking version. Monotonically increasing with each update.
    */
   @SuppressWarnings("JavaDoc")
-  @PositiveOrZero
   @Getter
   @Setter
   private int version;
@@ -149,5 +142,15 @@ public class TransactionOutboxEntry {
       return "\"" + o + "\"";
     }
     return o.toString();
+  }
+
+  @Override
+  public void validate(Validator validator) {
+    validator.notNull("id", id);
+    validator.nullOrNotBlank("uniqueRequestId", uniqueRequestId);
+    validator.notNull("invocation", invocation);
+    validator.inFuture("nextAttemptTime", nextAttemptTime);
+    validator.positiveOrZero("attempts", attempts);
+    validator.positiveOrZero("version", version);
   }
 }
