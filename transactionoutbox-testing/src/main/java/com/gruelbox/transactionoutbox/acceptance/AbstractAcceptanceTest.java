@@ -50,6 +50,7 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.event.Level;
 
 /**
@@ -90,6 +91,10 @@ public abstract class AbstractAcceptanceTest<
   protected abstract CompletableFuture<?> incrementRecordCount(Object txOrContext);
 
   protected abstract CompletableFuture<Long> countRecords(TX tx);
+
+  protected boolean includeLongRunningTests() {
+    return true;
+  }
 
   private static Persistor<?, ?> staticPersistor;
   private static BaseTransactionManager<?, ?> staticTxManager;
@@ -288,7 +293,7 @@ public abstract class AbstractAcceptanceTest<
   }
 
   @Test
-  final void testAsyncBlackAndWhitelistViaContext() throws Exception {
+  final void testAsyncBlockAndUnblockViaContext() throws Exception {
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blockLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blockLatch);
@@ -435,6 +440,7 @@ public abstract class AbstractAcceptanceTest<
 
   /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
   @Test
+  @EnabledIf("includeLongRunningTests")
   final void testAsyncHighVolumeUnreliable() throws Exception {
     int count = 50;
 
@@ -489,6 +495,7 @@ public abstract class AbstractAcceptanceTest<
 
   /** Ensures that we correctly handle expiry of large numbers of */
   @Test
+  @EnabledIf("includeLongRunningTests")
   final void testAsyncLargeExpiryBatches() {
     int count = 29;
     CountDownLatch latch = new CountDownLatch(count);

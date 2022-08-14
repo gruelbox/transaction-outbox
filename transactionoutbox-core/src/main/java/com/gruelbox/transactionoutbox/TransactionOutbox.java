@@ -6,8 +6,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.function.Function;
-import javax.validation.ClockProvider;
+import java.util.function.Supplier;
 import lombok.ToString;
 import org.slf4j.MDC;
 import org.slf4j.event.Level;
@@ -192,7 +191,7 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
     protected Duration attemptFrequency;
     protected int blockAfterAttempts;
     protected int flushBatchSize;
-    protected ClockProvider clockProvider;
+    protected Supplier<Clock> clockProvider;
     protected TransactionOutboxListener listener;
     protected Persistor<?, ?> persistor;
     protected Level logLevelTemporaryFailure;
@@ -274,7 +273,7 @@ public interface TransactionOutbox extends SchedulerProxyFactory {
      *     Defaults to the system clock.
      * @return Builder.
      */
-    public TransactionOutboxBuilder clockProvider(ClockProvider clockProvider) {
+    public TransactionOutboxBuilder clockProvider(Supplier<Clock> clockProvider) {
       this.clockProvider = clockProvider;
       return this;
     }

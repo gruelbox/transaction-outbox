@@ -3,15 +3,7 @@ package com.gruelbox.transactionoutbox.sql;
 import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.failedFuture;
 
-import com.gruelbox.transactionoutbox.Beta;
-import com.gruelbox.transactionoutbox.Invocation;
-import com.gruelbox.transactionoutbox.InvocationSerializer;
-import com.gruelbox.transactionoutbox.LockException;
-import com.gruelbox.transactionoutbox.OptimisticLockException;
-import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.UncheckedException;
-import com.gruelbox.transactionoutbox.Utils;
+import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
@@ -36,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @Beta
 @Slf4j
 public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
-    implements Persistor<CN, TX>, InitializationEventSubscriber {
+    implements Persistor<CN, TX>, InitializationEventSubscriber, Validatable {
 
   private static final String ALL_FIELDS =
       "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
@@ -115,6 +107,12 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                 + " SET attempts = 0, blocked = false, version = version + 1 "
                 + "WHERE blocked = true AND processed = false AND id = ?");
     this.clearSql = dialect.mapStatementToNative("TRUNCATE TABLE " + this.tableName);
+  }
+
+  @Override
+  public void validate(Validator validator) {
+    validator.notNull("dialect", dialect);
+    validator.notNull("tableName", tableName);
   }
 
   @Override

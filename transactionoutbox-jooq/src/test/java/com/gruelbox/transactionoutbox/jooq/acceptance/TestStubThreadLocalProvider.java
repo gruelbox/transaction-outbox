@@ -23,7 +23,7 @@ import org.slf4j.event.Level;
 @Slf4j
 class TestStubThreadLocalProvider {
 
-  private ThreadLocalJooqTransactionManager transactionManager =
+  private final ThreadLocalJooqTransactionManager transactionManager =
       new StubThreadLocalJooqTransactionManager();
 
   @Test

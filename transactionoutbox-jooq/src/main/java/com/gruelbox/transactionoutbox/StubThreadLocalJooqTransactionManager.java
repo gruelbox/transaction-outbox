@@ -7,6 +7,6 @@ public class StubThreadLocalJooqTransactionManager
     extends StubThreadLocalJdbcTransactionManager<JooqTransaction>
     implements ThreadLocalJooqTransactionManager {
   public StubThreadLocalJooqTransactionManager() {
-    super(() -> new JooqTransaction(Utils.createLoggingProxy(Connection.class), null));
+    super(() -> new JooqTransaction(Utils.createLoggingProxy(new ProxyFactory(), Connection.class), null));
   }
 }

@@ -4,17 +4,12 @@ import com.gruelbox.transactionoutbox.spi.BaseTransaction;
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.validator.constraints.Length;
-import org.hibernate.validator.internal.engine.DefaultClockProvider;
 import org.slf4j.MDC;
 import org.slf4j.event.Level;
 
-import javax.validation.ClockProvider;
-import javax.validation.Valid;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -24,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static com.gruelbox.transactionoutbox.Utils.*;
 import static java.time.temporal.ChronoUnit.MILLIS;
@@ -32,29 +28,24 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.failedFuture;
 
 @Slf4j
-class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements TransactionOutbox {
+class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements TransactionOutbox, Validatable {
 
   private static final int DEFAULT_FLUSH_BATCH_SIZE = 4096;
 
-  @Valid @NotNull private final BaseTransactionManager<CN, TX> transactionManager;
-  @Valid @NotNull private final Persistor<CN, TX> persistor;
-  @Valid @NotNull private final Instantiator instantiator;
-  @NotNull private final Submitter submitter;
-  @NotNull private final Duration attemptFrequency;
-  @NotNull private final Level logLevelTemporaryFailure;
-  @NotNull private final Level logLevelProcessStartAndFinish;
-
-  @Min(1)
+  private final BaseTransactionManager<CN, TX> transactionManager;
+  private final Persistor<CN, TX> persistor;
+  private final Instantiator instantiator;
+  private final Submitter submitter;
+  private final Duration attemptFrequency;
+  private final Level logLevelTemporaryFailure;
+  private final Level logLevelProcessStartAndFinish;
   private final int blockAfterAttempts;
-
-  @Min(1)
   private final int flushBatchSize;
-
-  @NotNull private final ClockProvider clockProvider;
-  @NotNull private final TransactionOutboxListener listener;
+  private final Supplier<Clock> clockProvider;
+  private final TransactionOutboxListener listener;
   private final boolean serializeMdc;
   private final Validator validator;
-  @NotNull private final Duration retentionThreshold;
+  private final Duration retentionThreshold;
   private final AtomicBoolean initialized = new AtomicBoolean();
   private final ProxyFactory proxyFactory = new ProxyFactory();
   private final Method unblockMethod;
@@ -66,7 +57,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
       Duration attemptFrequency,
       int blockAfterAttempts,
       int flushBatchSize,
-      ClockProvider clockProvider,
+      Supplier<Clock> clockProvider,
       TransactionOutboxListener listener,
       Persistor<CN, TX> persistor,
       Level logLevelTemporaryFailure,
@@ -82,7 +73,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     this.attemptFrequency = firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
     this.blockAfterAttempts = blockAfterAttempts < 1 ? 5 : blockAfterAttempts;
     this.flushBatchSize = flushBatchSize < 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
-    this.clockProvider = firstNonNull(clockProvider, () -> DefaultClockProvider.INSTANCE);
+    this.clockProvider = clockProvider == null ? Clock::systemDefaultZone : clockProvider;
     this.listener = firstNonNull(listener, () -> new TransactionOutboxListener() {});
     this.logLevelTemporaryFailure = firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
     this.logLevelProcessStartAndFinish =
@@ -96,6 +87,21 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     if (initializeImmediately == null || initializeImmediately) {
       initialize();
     }
+  }
+
+  @Override
+  public void validate(Validator validator) {
+    validator.notNull("transactionManager", transactionManager);
+    validator.valid("persistor", persistor);
+    validator.valid("instantiator", instantiator);
+    validator.valid("submitter", submitter);
+    validator.notNull("attemptFrequency", attemptFrequency);
+    validator.notNull("logLevelTemporaryFailure", logLevelTemporaryFailure);
+    validator.min("blockAfterAttempts", blockAfterAttempts, 1);
+    validator.min("flushBatchSize", flushBatchSize, 1);
+    validator.notNull("clockProvider", clockProvider);
+    validator.notNull("listener", listener);
+    validator.notNull("retentionThreshold", retentionThreshold);
   }
 
   @Override
@@ -150,7 +156,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   @Override
   public CompletableFuture<Boolean> flushAsync() {
-    Instant now = clockProvider.getClock().instant();
+    Instant now = clockProvider.get().instant();
     return flushAsync(now)
         .thenApply(batch -> !batch.isEmpty())
         .thenCompose(
@@ -198,15 +204,15 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
-    log.info("Whitelisting entry {}", entryId);
+    log.info("Unblocking entry {}", entryId);
     return persistor
         .unblock((TX) tx, entryId)
         .thenApply(
             success -> {
               if (success) {
-                log.info("Whitelisting of entry {} succeeded", entryId);
+                log.info("Unblocking of entry {} succeeded", entryId);
               } else {
-                log.info("Whitelisting of entry {} failed", entryId);
+                log.info("Unblocking of entry {} failed", entryId);
               }
               return success;
             });
@@ -267,7 +273,7 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
                                 entry.description(),
                                 retentionThreshold);
                             entry.setProcessed(true);
-                            entry.setLastAttemptTime(Instant.now(clockProvider.getClock()));
+                            entry.setLastAttemptTime(Instant.now(clockProvider.get()));
                             entry.setNextAttemptTime(after(retentionThreshold));
                             return persistor.update(tx, entry).thenApply(_2 -> true);
                           }
@@ -414,14 +420,14 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
   }
 
   private CompletableFuture<Void> pushBack(TX transaction, TransactionOutboxEntry entry) {
-    entry.setLastAttemptTime(clockProvider.getClock().instant());
+    entry.setLastAttemptTime(clockProvider.get().instant());
     entry.setNextAttemptTime(after(attemptFrequency));
     validator.validate(entry);
     return persistor.update(transaction, entry);
   }
 
   private Instant after(Duration duration) {
-    return clockProvider.getClock().instant().plus(duration).truncatedTo(MILLIS);
+    return clockProvider.get().instant().plus(duration).truncatedTo(MILLIS);
   }
 
   private CompletableFuture<Void> updateAttemptCount(
@@ -553,7 +559,6 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   private class ParameterizedScheduleBuilderImpl implements ParameterizedScheduleBuilder {
 
-    @Length(max = 250)
     private String uniqueRequestId;
 
     @Override
@@ -564,7 +569,9 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
     @Override
     public <T> T schedule(Class<T> clazz) {
-      validator.validate(this);
+      if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
+        throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
+      }
       return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId);
     }
   }

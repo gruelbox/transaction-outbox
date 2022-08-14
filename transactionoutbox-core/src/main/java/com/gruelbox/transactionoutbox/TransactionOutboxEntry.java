@@ -6,9 +6,6 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
-import javax.validation.constraints.Future;
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.PositiveOrZero;
 import java.time.Instant;
 import java.util.Arrays;
 
@@ -18,14 +15,13 @@ import static java.util.stream.Collectors.joining;
 @SuperBuilder(toBuilder = true)
 @EqualsAndHashCode
 @ToString
-public final class TransactionOutboxEntry {
+public final class TransactionOutboxEntry implements Validatable {
 
   /**
    * @param id The id of the record. Usually a UUID.
    * @return The id of the record. Usually a UUID.
    */
   @SuppressWarnings("JavaDoc")
-  @NotNull
   @Getter
   private final String id;
 
@@ -43,7 +39,6 @@ public final class TransactionOutboxEntry {
    * @return The method invocation to perform.
    */
   @SuppressWarnings("JavaDoc")
-  @NotNull
   @Getter
   @Setter
   private Invocation invocation;
@@ -62,7 +57,6 @@ public final class TransactionOutboxEntry {
    * @return The timestamp after which the task is available for re-attempting.
    */
   @SuppressWarnings("JavaDoc")
-  @Future
   @Getter
   @Setter
   private Instant nextAttemptTime;
@@ -72,7 +66,6 @@ public final class TransactionOutboxEntry {
    * @return The number of unsuccessful attempts so far made to run the task.
    */
   @SuppressWarnings("JavaDoc")
-  @PositiveOrZero
   @Getter
   @Setter
   private int attempts;
@@ -102,7 +95,6 @@ public final class TransactionOutboxEntry {
    * @return The optimistic locking version. Monotonically increasing with each update.
    */
   @SuppressWarnings("JavaDoc")
-  @PositiveOrZero
   @Getter
   @Setter
   private int version;
@@ -147,5 +139,15 @@ public final class TransactionOutboxEntry {
       return "\"" + o + "\"";
     }
     return o.toString();
+  }
+
+  @Override
+  public void validate(Validator validator) {
+    validator.notNull("id", id);
+    validator.nullOrNotBlank("uniqueRequestId", uniqueRequestId);
+    validator.notNull("invocation", invocation);
+    validator.inFuture("nextAttemptTime", nextAttemptTime);
+    validator.positiveOrZero("attempts", attempts);
+    validator.positiveOrZero("version", version);
   }
 }

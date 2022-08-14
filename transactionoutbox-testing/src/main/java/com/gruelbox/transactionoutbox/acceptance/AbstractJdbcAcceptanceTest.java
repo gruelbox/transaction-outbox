@@ -397,7 +397,7 @@ public abstract class AbstractJdbcAcceptanceTest<
    * unblocked.
    */
   @Test
-  final void testBlockingBlackAndWhitelistThreadLocal() throws Exception {
+  final void testBlockingBlockAndUnblockThreadLocal() throws Exception {
     Assumptions.assumeTrue(supportsThreadLocalContext());
 
     CountDownLatch successLatch = new CountDownLatch(1);
@@ -432,7 +432,7 @@ public abstract class AbstractJdbcAcceptanceTest<
    * unblocked.
    */
   @Test
-  final void testBlockingBlackAndWhitelistDirectTx() throws Exception {
+  final void testBlockingBlockAndUnblockDirectTx() throws Exception {
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blockLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blockLatch);

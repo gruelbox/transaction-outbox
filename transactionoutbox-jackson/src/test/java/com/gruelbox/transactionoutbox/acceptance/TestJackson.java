@@ -22,6 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestJackson extends AbstractSimpleTransactionManagerAcceptanceTest {
   @Override
+  protected boolean includeLongRunningTests() {
+    return false;
+  }
+
+  @Override
   protected JdbcConnectionDetails connectionDetails() {
     return JdbcConnectionDetails.builder()
             .dialect(Dialects.H2)
