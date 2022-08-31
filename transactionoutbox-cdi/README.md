@@ -65,13 +65,13 @@ Create your `TransactionOutbox` as a bean:
 @Produces
 public TransactionManager cdiTransactionManager(DataSource datasource, TransactionSynchronizationRegistry tsr) throws SQLException
 {
-   return new CdiTransactionManager(datasource, tsr);
+   return CdiTransactionManager.create(datasource, tsr);
 }
 
 @Produces
-public TransactionOutbox transactionOutbox(TransactionManager transactionManager, CdiInstanciator instanciator)
+public TransactionOutbox transactionOutbox(TransactionManager transactionManager)
 {
-   return TransactionOutbox.builder().instantiator(instanciator).blockAfterAttempts(1).transactionManager(transactionManager).persistor(Persistor.forDialect(Dialect.H2)).build();
+   return TransactionOutbox.builder().instantiator(CdiInstantiator.create()).transactionManager(transactionManager).persistor(Persistor.forDialect(Dialect.H2)).build();
 }
 ```
 

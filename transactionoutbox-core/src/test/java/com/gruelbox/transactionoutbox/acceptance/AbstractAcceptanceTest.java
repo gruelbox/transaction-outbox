@@ -34,7 +34,6 @@ import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
-import org.hamcrest.Matcher;
 import org.hamcrest.MatcherAssert;
 import org.junit.Assume;
 import org.junit.jupiter.api.Assertions;
