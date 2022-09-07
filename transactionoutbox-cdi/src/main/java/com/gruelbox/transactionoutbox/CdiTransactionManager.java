@@ -2,12 +2,15 @@ package com.gruelbox.transactionoutbox;
 
 import static com.gruelbox.transactionoutbox.Utils.uncheck;
 
+import io.agroal.api.AgroalDataSource;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
 import javax.sql.DataSource;
 import javax.transaction.Status;
 import javax.transaction.Synchronization;
@@ -16,22 +19,19 @@ import javax.transaction.Transactional;
 import javax.transaction.Transactional.TxType;
 
 /** Transaction manager which uses cdi and jta. */
+@ApplicationScoped
 public class CdiTransactionManager implements ThreadLocalContextTransactionManager {
 
-  private CdiTransaction transactionInstance;
+  private final CdiTransaction transactionInstance = new CdiTransaction();
 
-  private TransactionSynchronizationRegistry tsr;
+  private final DataSource datasource;
 
-  private CdiTransactionManager() {}
+  private final TransactionSynchronizationRegistry tsr;
 
-  public static CdiTransactionManager create(
-      DataSource datasource, TransactionSynchronizationRegistry tsr) throws SQLException {
-    return new CdiTransactionManager(datasource, tsr);
-  }
-
-  private CdiTransactionManager(DataSource datasource, TransactionSynchronizationRegistry tsr)
+  @Inject
+  public CdiTransactionManager(AgroalDataSource datasource, TransactionSynchronizationRegistry tsr)
       throws SQLException {
-    transactionInstance = new CdiTransaction(datasource);
+    this.datasource = datasource;
     this.tsr = tsr;
   }
 
@@ -66,13 +66,6 @@ public class CdiTransactionManager implements ThreadLocalContextTransactionManag
 
   private final class CdiTransaction implements Transaction {
 
-    private DataSource datasource;
-
-    public CdiTransaction(DataSource datasource) throws SQLException {
-      this.datasource = datasource;
-    }
-
-    @Override
     public final Connection connection() {
       try {
         return datasource.getConnection();
