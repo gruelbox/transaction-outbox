@@ -13,7 +13,6 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import javax.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -34,7 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @SuperBuilder
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-public class DefaultPersistor implements Persistor {
+public class DefaultPersistor implements Persistor, Validatable {
 
   private static final String ALL_FIELDS =
       "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
@@ -47,18 +46,15 @@ public class DefaultPersistor implements Persistor {
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  @NotNull
   private final int writeLockTimeoutSeconds = 2;
 
   /** @param dialect The database dialect to use. Required. */
   @SuppressWarnings("JavaDoc")
-  @NotNull
   private final Dialect dialect;
 
   /** @param tableName The database table name. The default is {@code TXNO_OUTBOX}. */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  @NotNull
   private final String tableName = "TXNO_OUTBOX";
 
   /**
@@ -69,7 +65,6 @@ public class DefaultPersistor implements Persistor {
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  @NotNull
   private final boolean migrate = true;
 
   /**
@@ -81,6 +76,12 @@ public class DefaultPersistor implements Persistor {
   @Builder.Default
   private final InvocationSerializer serializer =
       InvocationSerializer.createDefaultJsonSerializer();
+
+  @Override
+  public void validate(Validator validator) {
+    validator.notNull("dialect", dialect);
+    validator.notNull("tableName", tableName);
+  }
 
   @Override
   public void migrate(TransactionManager transactionManager) {
