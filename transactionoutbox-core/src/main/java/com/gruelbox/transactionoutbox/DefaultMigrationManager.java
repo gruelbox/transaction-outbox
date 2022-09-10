@@ -7,7 +7,6 @@ import java.sql.Statement;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import javax.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -74,7 +73,7 @@ class DefaultMigrationManager {
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation MEDIUMTEXT",
               Map.of(Dialect.POSTGRESQL_9, "", Dialect.H2, "")));
 
-  static void migrate(TransactionManager transactionManager, @NotNull Dialect dialect) {
+  static void migrate(TransactionManager transactionManager, Dialect dialect) {
     transactionManager.inTransaction(
         transaction -> {
           try {
@@ -89,7 +88,7 @@ class DefaultMigrationManager {
   }
 
   @SneakyThrows
-  private static void runSql(Connection connection, Migration migration, @NotNull Dialect dialect) {
+  private static void runSql(Connection connection, Migration migration, Dialect dialect) {
     log.info("Running migration: {}", migration.name);
     try (Statement s = connection.createStatement()) {
       s.execute(migration.sqlFor(dialect));
