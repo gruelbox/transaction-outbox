@@ -41,7 +41,7 @@
     <hamcrest.version>2.2</hamcrest.version>
     <mockito.version>5.3.1</mockito.version>
     <hikari.version>5.0.1</hikari.version>
-    <h2.version>1.4.200</h2.version>
+    <h2.version>2.1.214</h2.version>
   </properties>
 
   <modules>

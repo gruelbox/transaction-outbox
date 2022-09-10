@@ -38,7 +38,7 @@ class TestUtils {
     assertTrue(
         dsl.select()
             .from(TEST_TABLE)
-            .where(DSL.field("VALUE").eq(value))
+            .where(DSL.field("VAL").eq(value))
             .fetchOptional()
             .isPresent());
   }
@@ -47,7 +47,7 @@ class TestUtils {
     assertFalse(
         dsl.select()
             .from(TEST_TABLE)
-            .where(DSL.field("VALUE").eq(value))
+            .where(DSL.field("VAL").eq(value))
             .fetchOptional()
             .isPresent());
   }

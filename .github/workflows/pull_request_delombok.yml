@@ -3,7 +3,6 @@ name: Pull request (delombok)
 on:
   pull_request:
     branches: [ master ]
-    branches-ignore: [ r2dbc4 ]
 
 jobs:
   build:

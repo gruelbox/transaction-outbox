@@ -20,7 +20,7 @@ public abstract class AbstractSqlAcceptanceTest<
 
   protected final void prepareDataStore() {
     txManager
-        .transactionally(tx -> runSql(tx, "CREATE TABLE IF NOT EXISTS TESTDATA(value INT)"))
+        .transactionally(tx -> runSql(tx, "CREATE TABLE IF NOT EXISTS TESTDATA(VAL INT)"))
         .thenRun(() -> log.info("Table created"))
         .join();
   }
