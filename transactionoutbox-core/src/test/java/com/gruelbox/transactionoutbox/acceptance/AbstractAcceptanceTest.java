@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,14 +35,12 @@ import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
-import org.hamcrest.Matcher;
 import org.hamcrest.MatcherAssert;
 import org.junit.Assume;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.apache.commons.lang.math.RandomUtils;
 
 @Slf4j
 abstract class AbstractAcceptanceTest {
@@ -51,6 +50,8 @@ abstract class AbstractAcceptanceTest {
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
   protected abstract ConnectionDetails connectionDetails();
+
+  private static final Random random = new Random();
 
   /**
    * Uses a simple direct transaction manager and connection manager and attempts to fire an
@@ -690,7 +691,7 @@ abstract class AbstractAcceptanceTest {
         return (InterfaceProcessor)
             (foo, bar) -> {
               LOGGER.info("Processing ({}, {})", foo, bar);
-              if (RandomUtils.nextInt(10) == 5) {
+              if (random.nextInt(10) == 5) {
                 throw new RuntimeException("Temporary failure of InterfaceProcessor");
               }
               LOGGER.info("Processed ({}, {})", foo, bar);
