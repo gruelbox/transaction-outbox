@@ -16,6 +16,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,14 +33,14 @@ import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
-import org.hamcrest.Matcher;
+import org.hamcrest.MatcherAssert;
 import org.junit.Assume;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.apache.commons.lang.math.RandomUtils;
 
 @Slf4j
 abstract class AbstractAcceptanceTest {
@@ -49,6 +50,8 @@ abstract class AbstractAcceptanceTest {
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
   protected abstract ConnectionDetails connectionDetails();
+
+  private static final Random random = new Random();
 
   /**
    * Uses a simple direct transaction manager and connection manager and attempts to fire an
@@ -237,7 +240,7 @@ abstract class AbstractAcceptanceTest {
                 .schedule(ClassProcessor.class)
                 .process("6"));
 
-    assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
+    MatcherAssert.assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
   }
 
   /**
@@ -423,7 +426,7 @@ abstract class AbstractAcceptanceTest {
           var dialect = connectionDetails().dialect();
           Assume.assumeThat(
               dialect,
-              new Matcher<>() {
+              new BaseMatcher<>() {
                 @Override
                 public void describeTo(Description description) {}
 
@@ -431,12 +434,6 @@ abstract class AbstractAcceptanceTest {
                 public boolean matches(Object o) {
                   return Dialect.MY_SQL_8.equals(o) || Dialect.MY_SQL_5.equals(o);
                 }
-
-                @Override
-                public void describeMismatch(Object o, Description description) {}
-
-                @Override
-                public void _dont_implement_Matcher___instead_extend_BaseMatcher_() {}
               });
           assertThrows(
               Exception.class,
@@ -584,9 +581,9 @@ abstract class AbstractAcceptanceTest {
           assertTrue("Latch not opened in time", latch.await(30, TimeUnit.SECONDS));
         });
 
-    assertThat(
+    MatcherAssert.assertThat(
         "Should never get duplicates running to full completion", duplicates.keySet(), empty());
-    assertThat(
+    MatcherAssert.assertThat(
         "Only got: " + results.keySet(),
         results.keySet(),
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
@@ -694,7 +691,7 @@ abstract class AbstractAcceptanceTest {
         return (InterfaceProcessor)
             (foo, bar) -> {
               LOGGER.info("Processing ({}, {})", foo, bar);
-              if (RandomUtils.nextInt(10) == 5) {
+              if (random.nextInt(10) == 5) {
                 throw new RuntimeException("Temporary failure of InterfaceProcessor");
               }
               LOGGER.info("Processed ({}, {})", foo, bar);
