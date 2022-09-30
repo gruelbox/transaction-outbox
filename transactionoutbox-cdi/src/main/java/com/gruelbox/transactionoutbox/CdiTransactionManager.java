@@ -2,7 +2,6 @@ package com.gruelbox.transactionoutbox;
 
 import static com.gruelbox.transactionoutbox.Utils.uncheck;
 
-import io.agroal.api.AgroalDataSource;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -29,7 +28,7 @@ public class CdiTransactionManager implements ThreadLocalContextTransactionManag
   private final TransactionSynchronizationRegistry tsr;
 
   @Inject
-  public CdiTransactionManager(AgroalDataSource datasource, TransactionSynchronizationRegistry tsr)
+  public CdiTransactionManager(DataSource datasource, TransactionSynchronizationRegistry tsr)
       throws SQLException {
     this.datasource = datasource;
     this.tsr = tsr;
