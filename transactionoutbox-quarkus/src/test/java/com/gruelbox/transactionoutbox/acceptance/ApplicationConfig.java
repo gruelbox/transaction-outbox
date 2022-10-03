@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.CdiInstantiator;
-import com.gruelbox.transactionoutbox.CdiTransactionManager;
+import com.gruelbox.transactionoutbox.QuarkusTransactionManager;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
@@ -25,7 +25,7 @@ public class ApplicationConfig extends Application {
 
   @Produces
   public TransactionOutbox transactionOutbox(
-      CdiTransactionManager transactionManager, RemoteCallService testProxy) {
+      QuarkusTransactionManager transactionManager, RemoteCallService testProxy) {
     return TransactionOutbox.builder()
         .instantiator(CdiInstantiator.create())
         .blockAfterAttempts(1)

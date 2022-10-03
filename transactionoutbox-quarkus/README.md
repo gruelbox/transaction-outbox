@@ -1,7 +1,7 @@
-# transaction-outbox-cdi
+# transactionoutbox-quarkus
 
 
-Extension for [transaction-outbox-core](../README.md) which integrates CDI's DI and/or transaction management.
+Extension for [transaction-outbox-core](../README.md) which integrates CDI's DI and Quarkus transaction management.
 
 Tested with Quarkus implementation (Arc/Agroal)
 
@@ -16,7 +16,7 @@ The latest stable release is available from Maven Central.
 ```xml
 <dependency>
   <groupId>com.gruelbox</groupId>
-  <artifactId>transactionoutbox-cdi</artifactId>
+  <artifactId>transactionoutbox-quarkus</artifactId>
   <version>4.3.281</version>
 </dependency>
 ```
@@ -24,7 +24,7 @@ The latest stable release is available from Maven Central.
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-cdi:4.3.281'
+implementation 'com.gruelbox:transactionoutbox-quarkus:4.3.281'
 ```
 
 ### Development snapshots
@@ -62,14 +62,9 @@ The above example uses environment variables, allowing you to keep the credentia
 Create your `TransactionOutbox` as a bean:
 
 ```java
-@Produces
-public TransactionManager cdiTransactionManager(DataSource datasource, TransactionSynchronizationRegistry tsr) throws SQLException
-{
-   return CdiTransactionManager.create(datasource, tsr);
-}
 
 @Produces
-public TransactionOutbox transactionOutbox(TransactionManager transactionManager)
+public TransactionOutbox transactionOutbox(QuarkusTransactionManager transactionManager)
 {
    return TransactionOutbox.builder().instantiator(CdiInstantiator.create()).transactionManager(transactionManager).persistor(Persistor.forDialect(Dialect.H2)).build();
 }

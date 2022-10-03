@@ -11,7 +11,7 @@
 
 	<name>Transaction Outbox CDI</name>
 	<packaging>jar</packaging>
-	<artifactId>transactionoutbox-cdi</artifactId>
+	<artifactId>transactionoutbox-quarkus</artifactId>
 	<description>A safe implementation of the transactional outbox pattern for Java (CDI extension library)
   </description>
 
