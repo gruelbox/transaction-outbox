@@ -50,6 +50,7 @@
     <module>transactionoutbox-spring</module>
     <module>transactionoutbox-guice</module>
     <module>transactionoutbox-jooq</module>
+    <module>transactionoutbox-quarkus</module>
     <module>transactionoutbox-r2dbc</module>
     <module>transactionoutbox-testing</module>
     <module>transactionoutbox-acceptance</module>
