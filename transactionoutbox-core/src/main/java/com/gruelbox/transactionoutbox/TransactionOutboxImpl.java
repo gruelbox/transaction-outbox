@@ -25,19 +25,33 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private static final int DEFAULT_FLUSH_BATCH_SIZE = 4096;
 
   private final TransactionManager transactionManager;
+
   private final Persistor persistor;
+
   private final Instantiator instantiator;
+
   private final Submitter submitter;
+
   private final Duration attemptFrequency;
+
   private final Level logLevelTemporaryFailure;
+
   private final int blockAfterAttempts;
+
   private final int flushBatchSize;
+
   private final Supplier<Clock> clockProvider;
+
   private final TransactionOutboxListener listener;
+
   private final boolean serializeMdc;
+
   private final Validator validator;
+
   private final Duration retentionThreshold;
+
   private final AtomicBoolean initialized = new AtomicBoolean();
+
   private final ProxyFactory proxyFactory = new ProxyFactory();
 
   private TransactionOutboxImpl(
@@ -415,5 +429,67 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       }
       return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId);
     }
+  }
+
+  @Override
+  public int unblockAll() {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
+    if (!(transactionManager instanceof ThreadLocalContextTransactionManager)) {
+      throw new UnsupportedOperationException(
+          "This method requires a ThreadLocalContextTransactionManager");
+    }
+    log.info("Unblocking entries for retry.");
+    try {
+      return ((ThreadLocalContextTransactionManager) transactionManager)
+          .requireTransactionReturns(tx -> persistor.unblockAll(tx));
+    } catch (Exception e) {
+      throw (RuntimeException) Utils.uncheckAndThrow(e);
+    }
+  }
+
+  @Override
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  public int unblockAll(Object transactionContext) {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
+    if (!(transactionManager instanceof ParameterContextTransactionManager)) {
+      throw new UnsupportedOperationException(
+          "This method requires a ParameterContextTransactionManager");
+    }
+    log.info("Unblocking entries for retry");
+    try {
+      if (transactionContext instanceof Transaction) {
+        return persistor.unblockAll((Transaction) transactionContext);
+      }
+      Transaction transaction =
+          ((ParameterContextTransactionManager) transactionManager)
+              .transactionFromContext(transactionContext);
+      return persistor.unblockAll(transaction);
+    } catch (Exception e) {
+      throw (RuntimeException) Utils.uncheckAndThrow(e);
+    }
+  }
+
+  @Override
+  public List<TransactionOutboxEntry> getBlockedEntries(int page, int batchSize) {
+    return transactionManager.inTransactionReturns(
+        transaction -> {
+          List<TransactionOutboxEntry> result = new ArrayList<>(batchSize);
+          uncheckedly(() -> persistor.selectBlocked(transaction, page, batchSize))
+              .forEach(
+                  entry -> {
+                    log.debug("Reprocessing {}", entry.description());
+                    try {
+                      pushBack(transaction, entry);
+                      result.add(entry);
+                    } catch (OptimisticLockException e) {
+                      log.debug("Beaten to optimistic lock on {}", entry.description());
+                    }
+                  });
+          return result;
+        });
   }
 }

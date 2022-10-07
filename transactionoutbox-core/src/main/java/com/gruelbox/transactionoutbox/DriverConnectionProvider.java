@@ -55,7 +55,7 @@ final class DriverConnectionProvider implements ConnectionProvider, Validatable 
   public void validate(Validator validator) {
     validator.notBlank("driverClassName", driverClassName);
     validator.notBlank("url", url);
-    validator.notBlank("user",user);
+    validator.notBlank("user", user);
     validator.notBlank("password", password);
   }
 }

@@ -302,4 +302,35 @@ public class DefaultPersistor implements Persistor, Validatable {
       stmt.execute("DELETE FROM " + tableName);
     }
   }
+
+  @Override
+  public int unblockAll(Transaction tx) throws Exception {
+    PreparedStatement stmt =
+        tx.prepareBatchStatement(
+            "UPDATE "
+                + tableName
+                + " SET attempts = 0, blocked = false "
+                + "WHERE blocked = true AND processed = false");
+    stmt.setQueryTimeout(writeLockTimeoutSeconds);
+    return stmt.executeUpdate();
+  }
+
+  @Override
+  public List<TransactionOutboxEntry> selectBlocked(Transaction tx, int page, int batchSize)
+      throws Exception {
+    String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
+    try (PreparedStatement stmt =
+        tx.connection()
+            .prepareStatement(
+                "SELECT "
+                    + ALL_FIELDS
+                    + " FROM "
+                    + tableName
+                    + " WHERE blocked = true AND processed = false ORDER BY lastAttemptTime DESC LIMIT ? OFFSET ?"
+                    + forUpdate)) {
+      stmt.setInt(1, batchSize);
+      stmt.setInt(2, page * batchSize);
+      return gatherResults(batchSize, stmt);
+    }
+  }
 }
