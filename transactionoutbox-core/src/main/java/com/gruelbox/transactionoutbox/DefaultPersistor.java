@@ -35,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class DefaultPersistor implements Persistor, Validatable {
 
-  private static final String ALL_FIELDS =
+  protected static final String ALL_FIELDS =
       "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
 
   /**
@@ -46,16 +46,16 @@ public class DefaultPersistor implements Persistor, Validatable {
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  private final int writeLockTimeoutSeconds = 2;
+  protected final int writeLockTimeoutSeconds = 2;
 
   /** @param dialect The database dialect to use. Required. */
   @SuppressWarnings("JavaDoc")
-  private final Dialect dialect;
+  protected final Dialect dialect;
 
   /** @param tableName The database table name. The default is {@code TXNO_OUTBOX}. */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  private final String tableName = "TXNO_OUTBOX";
+  protected final String tableName = "TXNO_OUTBOX";
 
   /**
    * @param migrate Set to false to disable automatic database migrations. This may be preferred if
@@ -65,7 +65,7 @@ public class DefaultPersistor implements Persistor, Validatable {
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  private final boolean migrate = true;
+  protected final boolean migrate = true;
 
   /**
    * @param serializer The serializer to use for {@link Invocation}s. See {@link
@@ -74,7 +74,7 @@ public class DefaultPersistor implements Persistor, Validatable {
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  private final InvocationSerializer serializer =
+  protected final InvocationSerializer serializer =
       InvocationSerializer.createDefaultJsonSerializer();
 
   @Override
@@ -223,8 +223,14 @@ public class DefaultPersistor implements Persistor, Validatable {
         tx.prepareBatchStatement(
             "UPDATE "
                 + tableName
-                + " SET attempts = 0, blocked = false "
-                + "WHERE blocked = true AND processed = false AND id = ?");
+                + " SET attempts = 0, blocked = "
+                + dialect.booleanValue(false)
+                + " "
+                + "WHERE blocked = "
+                + dialect.booleanValue(true)
+                + " AND processed = "
+                + dialect.booleanValue(false)
+                + " AND id = ?");
     stmt.setString(1, entryId);
     stmt.setQueryTimeout(writeLockTimeoutSeconds);
     return stmt.executeUpdate() != 0;
@@ -242,7 +248,11 @@ public class DefaultPersistor implements Persistor, Validatable {
                     + ALL_FIELDS
                     + " FROM "
                     + tableName
-                    + " WHERE nextAttemptTime < ? AND blocked = false AND processed = false LIMIT ?"
+                    + " WHERE nextAttemptTime < ? AND blocked = "
+                    + dialect.booleanValue(false)
+                    + " AND processed = "
+                    + dialect.booleanValue(false)
+                    + dialect.getLimitCriteria()
                     + forUpdate)) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
