@@ -103,7 +103,7 @@ public interface Persistor {
    * Selects up to a specified maximum number of blocked records with pagination.
    *
    * @param tx The current {@link Transaction}.
-   * @param int page the page to get
+   * @param page the page to get
    * @param batchSize The number of records to select.
    * @return The records.
    * @throws Exception Any exception.
