@@ -45,7 +45,7 @@ public enum Dialect {
 
     static final String DEFAULT_LIMIT_CRITERIA = " LIMIT ?";
 
-    static final String ORACLE_LIMIT_CRITERIA = " AND ROWNUM < ?";
+    static final String ORACLE_LIMIT_CRITERIA = " AND ROWNUM <= ?";
   }
 
   public String booleanValue(boolean criteriaValue) {

@@ -48,7 +48,7 @@ class DefaultMigrationManager {
               "ALTER TABLE TXNO_OUTBOX ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE",
               Map.of(
                   Dialect.ORACLE,
-                  "ALTER TABLE TXNO_OUTBOX ADD uniqueRequestId VARCHAR2(100) NULL UNIQUE")),
+                  "ALTER TABLE TXNO_OUTBOX ADD uniqueRequestId VARCHAR(100) NULL UNIQUE")),
           new Migration(
               3,
               "Add processed flag",
