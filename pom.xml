@@ -46,7 +46,7 @@
     <module>transactionoutbox-spring</module>
     <module>transactionoutbox-guice</module>
     <module>transactionoutbox-jooq</module>
-    <module>transactionoutbox-cdi</module>
+    <module>transactionoutbox-quarkus</module>
   </modules>
 
   <dependencyManagement>

@@ -9,10 +9,10 @@
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
-	<name>Transaction Outbox CDI</name>
+	<name>Transaction Outbox Quarkus</name>
 	<packaging>jar</packaging>
 	<artifactId>transactionoutbox-quarkus</artifactId>
-	<description>A safe implementation of the transactional outbox pattern for Java (CDI extension library)
+	<description>A safe implementation of the transactional outbox pattern for Java (Quarkus extension library)
   </description>
 
 	<properties>
