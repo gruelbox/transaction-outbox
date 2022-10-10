@@ -7,7 +7,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-class TestDefaultPersistorOracle extends AbstractDefaultPersistorTest {
+class TestDefaultPersistorOracle18 extends AbstractDefaultPersistorTest {
 
   @Container
   @SuppressWarnings("rawtypes")

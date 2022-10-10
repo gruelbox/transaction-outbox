@@ -9,7 +9,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SuppressWarnings("WeakerAccess")
 @Testcontainers
-class TestOracle extends AbstractAcceptanceTest {
+class TestOracle18 extends AbstractAcceptanceTest {
 
   @Container
   @SuppressWarnings("rawtypes")
