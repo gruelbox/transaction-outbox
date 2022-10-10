@@ -1,9 +1,9 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.CdiInstantiator;
-import com.gruelbox.transactionoutbox.QuarkusTransactionManager;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
+import com.gruelbox.transactionoutbox.QuarkusTransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
