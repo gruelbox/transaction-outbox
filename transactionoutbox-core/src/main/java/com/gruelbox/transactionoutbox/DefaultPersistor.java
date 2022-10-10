@@ -318,7 +318,6 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Override
   public List<TransactionOutboxEntry> selectBlocked(Transaction tx, int page, int batchSize)
       throws Exception {
-    String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
@@ -326,8 +325,7 @@ public class DefaultPersistor implements Persistor, Validatable {
                     + ALL_FIELDS
                     + " FROM "
                     + tableName
-                    + " WHERE blocked = true AND processed = false ORDER BY lastAttemptTime DESC LIMIT ? OFFSET ?"
-                    + forUpdate)) {
+                    + " WHERE blocked = true AND processed = false ORDER BY lastAttemptTime DESC LIMIT ? OFFSET ?")) {
       stmt.setInt(1, batchSize);
       stmt.setInt(2, page * batchSize);
       return gatherResults(batchSize, stmt);
