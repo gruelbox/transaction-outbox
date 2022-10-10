@@ -232,6 +232,10 @@ See [transaction-outbox-guice](transactionoutbox-guice/README.md), which integra
 
 See [transaction-outbox-jooq](transactionoutbox-jooq/README.md), which integrates jOOQ transaction management with `TransactionOutbox`.
 
+### Oracle
+
+Oracle database compatibility requires to configure Oracle jdbc driver using following VM argument : -Doracle.jdbc.javaNetNio=false
+
 ## Set up the background worker
 
 At the moment, if any work fails first time, it won't be retried. All we need to add is a background thread that repeatedly calls [`TransactionOutbox.flush()`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html) to pick up and reprocess stale work.
