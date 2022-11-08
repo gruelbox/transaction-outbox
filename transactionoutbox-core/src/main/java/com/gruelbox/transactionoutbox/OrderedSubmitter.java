@@ -4,9 +4,7 @@ import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.event.Level;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Executor;
-import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
 
 /**
@@ -38,13 +36,18 @@ import java.util.function.Consumer;
  */
 @Slf4j
 @Builder
-public class ExecutorSubmitter implements Submitter, Validatable {
+public class OrderedSubmitter implements Submitter, Validatable {
 
     /**
      * @param executor The executor to use.
      */
     @SuppressWarnings("JavaDoc")
     private final Executor executor;
+
+    /**
+     * TODO add javadoc
+     */
+    private final ConcurrentHashMap<String, CompletableFuture<Void>> queuedOrderedTasks = new ConcurrentHashMap<>();
 
     /**
      * @param logLevelWorkQueueSaturation The log level to use when work submission hits the executor
@@ -58,8 +61,21 @@ public class ExecutorSubmitter implements Submitter, Validatable {
     @Override
     public void submit(TransactionOutboxEntry entry, Consumer<TransactionOutboxEntry> localExecutor) {
         try {
-            executor.execute(() -> localExecutor.accept(entry));
-            log.info("Submitted {} for immediate processing", entry.description());
+            if (entry.getGroupId() == null) {
+                executor.execute(() -> localExecutor.accept(entry));
+                log.info("Submitted {} for immediate processing", entry.description());
+                return;
+            }
+
+            queuedOrderedTasks.compute(entry.getGroupId(), (groupId, future) -> {
+                CompletableFuture<Void> newFuture = future == null
+                        ? CompletableFuture.runAsync(() -> localExecutor.accept(entry), executor)
+                        : future.thenRunAsync(() -> localExecutor.accept(entry), executor);
+                newFuture.thenRun(() -> cleanUpQueue(entry.getGroupId()));
+                return newFuture;
+            });
+            log.info("Submitted {} for ordered processing", entry.description());
+
         } catch (RejectedExecutionException e) {
             Utils.logAtLevel(
                     log,
@@ -72,6 +88,10 @@ public class ExecutorSubmitter implements Submitter, Validatable {
                     entry.description(),
                     e);
         }
+    }
+
+    private void cleanUpQueue(String groupId) {
+        queuedOrderedTasks.entrySet().removeIf(entry -> entry.getKey().equals(groupId) && entry.getValue().isDone());
     }
 
     @Override

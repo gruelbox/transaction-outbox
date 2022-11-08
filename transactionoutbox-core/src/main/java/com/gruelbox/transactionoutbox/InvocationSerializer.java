@@ -16,29 +16,29 @@ import java.io.Writer;
  */
 public interface InvocationSerializer {
 
-  /**
-   * Creates a locked-down serializer which supports a limited list of primitives and simple JDK
-   * value types. Shortcut to {@link DefaultInvocationSerializer}.
-   *
-   * @return The serializer.
-   */
-  static InvocationSerializer createDefaultJsonSerializer() {
-    return DefaultInvocationSerializer.builder().build();
-  }
+    /**
+     * Creates a locked-down serializer which supports a limited list of primitives and simple JDK
+     * value types. Shortcut to {@link DefaultInvocationSerializer}.
+     *
+     * @return The serializer.
+     */
+    static InvocationSerializer createDefaultJsonSerializer() {
+        return DefaultInvocationSerializer.builder().build();
+    }
 
-  /**
-   * Serializes an invocation to the supplied writer.
-   *
-   * @param invocation The invocation.
-   * @param writer The writer.
-   */
-  void serializeInvocation(Invocation invocation, Writer writer);
+    /**
+     * Serializes an invocation to the supplied writer.
+     *
+     * @param invocation The invocation.
+     * @param writer     The writer.
+     */
+    void serializeInvocation(Invocation invocation, Writer writer);
 
-  /**
-   * Deserializes an invocation from the supplied reader.
-   *
-   * @param reader The reader.
-   * @return The deserialized invocation.
-   */
-  Invocation deserializeInvocation(Reader reader);
+    /**
+     * Deserializes an invocation from the supplied reader.
+     *
+     * @param reader The reader.
+     * @return The deserialized invocation.
+     */
+    Invocation deserializeInvocation(Reader reader);
 }

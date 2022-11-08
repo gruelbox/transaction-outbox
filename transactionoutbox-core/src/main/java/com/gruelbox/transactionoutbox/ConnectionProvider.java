@@ -10,11 +10,11 @@ import java.sql.Connection;
 @SuppressWarnings("WeakerAccess")
 public interface ConnectionProvider {
 
-  /**
-   * Requests a new connection, or an available connection from a pool. The caller is responsible
-   * for calling {@link Connection#close()}.
-   *
-   * @return The connection.
-   */
-  Connection obtainConnection();
+    /**
+     * Requests a new connection, or an available connection from a pool. The caller is responsible
+     * for calling {@link Connection#close()}.
+     *
+     * @return The connection.
+     */
+    Connection obtainConnection();
 }

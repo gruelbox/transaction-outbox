@@ -6,4 +6,6 @@ import org.springframework.context.annotation.Import;
 @Beta
 @Configuration
 @Import({SpringTransactionManager.class, SpringInstantiator.class})
-public class SpringTransactionOutboxConfiguration {}
+public class SpringTransactionOutboxConfiguration {
+
+}

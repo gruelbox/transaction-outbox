@@ -1,8 +1,9 @@
 package com.gruelbox.transactionoutbox;
 
-import java.sql.Connection;
-import javax.sql.DataSource;
 import lombok.Builder;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
 
 /**
  * A {@link ConnectionProvider} which requests connections from a {@link DataSource}. This is
@@ -17,10 +18,10 @@ import lombok.Builder;
 @Builder
 final class DataSourceConnectionProvider implements ConnectionProvider {
 
-  private final DataSource dataSource;
+    private final DataSource dataSource;
 
-  @Override
-  public Connection obtainConnection() {
-    return Utils.uncheckedly(dataSource::getConnection);
-  }
+    @Override
+    public Connection obtainConnection() {
+        return Utils.uncheckedly(dataSource::getConnection);
+    }
 }

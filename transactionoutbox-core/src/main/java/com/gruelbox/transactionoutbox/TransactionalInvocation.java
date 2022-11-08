@@ -7,9 +7,10 @@ import lombok.Value;
  */
 @Value
 public class TransactionalInvocation {
-  Class<?> clazz;
-  String methodName;
-  Class<?>[] parameters;
-  Object[] args;
-  Transaction transaction;
+
+    Class<?> clazz;
+    String methodName;
+    Class<?>[] parameters;
+    Object[] args;
+    Transaction transaction;
 }
