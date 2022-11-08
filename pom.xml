@@ -5,20 +5,27 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.gruelbox</groupId>
+  <groupId>com.synaos</groupId>
   <artifactId>transactionoutbox-parent</artifactId>
   <packaging>pom</packaging>
   <version>${revision}</version>
 
   <name>Transaction Outbox Parent</name>
-  <description>A safe implementation of the transactional outbox pattern for Java.</description>
-  <inceptionYear>2020</inceptionYear>
-  <url>https://github.com/gruelbox/transaction-outbox</url>
+  <description>A safe implementation of the transactional outbox pattern with ordering for Java based on gruelbox.</description>
+  <inceptionYear>2022</inceptionYear>
+  <url>https://github.com/synaos/transaction-outbox</url>
 
   <organization>
-    <name>Graham Crockford</name>
-    <url>https://gruelbox.com</url>
+    <name>Synaos</name>
+    <url>https://synaos.com</url>
   </organization>
+
+  <repositories>
+    <repository>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
+    </repository>
+  </repositories>
 
   <properties>
     <!-- Core -->
