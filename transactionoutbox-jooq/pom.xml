@@ -23,7 +23,7 @@
 
         <!-- Runtime -->
         <dependency>
-            <groupId>com.gruelbox</groupId>
+            <groupId>com.synaos</groupId>
             <artifactId>transactionoutbox-core</artifactId>
             <version>${project.version}</version>
         </dependency>

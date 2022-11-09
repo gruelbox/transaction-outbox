@@ -21,13 +21,6 @@
         <url>https://synaos.com</url>
     </organization>
 
-    <repositories>
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
-        </repository>
-    </repositories>
-
     <properties>
         <!-- Core -->
         <maven.compiler.source>11</maven.compiler.source>

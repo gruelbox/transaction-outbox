@@ -23,7 +23,7 @@
 
         <!-- Runtime -->
         <dependency>
-            <groupId>com.gruelbox</groupId>
+            <groupId>com.synaos</groupId>
             <artifactId>transactionoutbox-core</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -45,11 +45,6 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-resteasy</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-arc</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
