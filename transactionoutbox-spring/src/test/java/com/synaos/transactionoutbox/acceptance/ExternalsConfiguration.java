@@ -6,4 +6,5 @@ import org.springframework.context.annotation.Import;
 
 @Configuration
 @Import({SpringTransactionOutboxConfiguration.class})
-class ExternalsConfiguration {}
+class ExternalsConfiguration {
+}

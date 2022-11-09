@@ -12,32 +12,32 @@ import org.jooq.DSLContext;
 @Slf4j
 @Beta
 final class DefaultJooqTransactionManager
-    implements ParameterContextTransactionManager<Configuration> {
+        implements ParameterContextTransactionManager<Configuration> {
 
-  private final DSLContext dsl;
+    private final DSLContext dsl;
 
-  DefaultJooqTransactionManager(DSLContext dsl) {
-    this.dsl = dsl;
-  }
-
-  @Override
-  public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E> work) {
-    return dsl.transactionResult(cfg -> work.doWork(transactionFromContext(cfg)));
-  }
-
-  @Override
-  public Transaction transactionFromContext(Configuration context) {
-    Object txn = context.data(JooqTransactionListener.TXN_KEY);
-    if (txn == null) {
-      throw new IllegalStateException(
-          JooqTransactionListener.class.getSimpleName() + " is not attached to the DSL");
+    DefaultJooqTransactionManager(DSLContext dsl) {
+        this.dsl = dsl;
     }
-    return (Transaction) txn;
-  }
 
-  @Override
-  public Class<Configuration> contextType() {
-    return Configuration.class;
-  }
+    @Override
+    public <T, E extends Exception> T inTransactionReturnsThrows(
+            ThrowingTransactionalSupplier<T, E> work) {
+        return dsl.transactionResult(cfg -> work.doWork(transactionFromContext(cfg)));
+    }
+
+    @Override
+    public Transaction transactionFromContext(Configuration context) {
+        Object txn = context.data(JooqTransactionListener.TXN_KEY);
+        if (txn == null) {
+            throw new IllegalStateException(
+                    JooqTransactionListener.class.getSimpleName() + " is not attached to the DSL");
+        }
+        return (Transaction) txn;
+    }
+
+    @Override
+    public Class<Configuration> contextType() {
+        return Configuration.class;
+    }
 }

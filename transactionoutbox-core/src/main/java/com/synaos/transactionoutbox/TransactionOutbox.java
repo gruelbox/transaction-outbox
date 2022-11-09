@@ -60,10 +60,11 @@ public interface TransactionOutbox {
     <T> T schedule(Class<T> clazz, String groupId);
 
     /**
-     *  Entry point for submitting new transaction outbox tasks without groupId
+     * Entry point for submitting new transaction outbox tasks without groupId
+     *
      * @param clazz The class to proxy.
+     * @param <T>   The type to proxy.
      * @return The proxy of {@code T}.
-     * @param <T> The type to proxy.
      */
     <T> T schedule(Class<T> clazz);
 

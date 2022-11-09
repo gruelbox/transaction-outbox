@@ -6,7 +6,8 @@
 
 Extension for [transaction-outbox-core](../README.md) which integrates Spring's DI and/or transaction management.
 
-I don't actually use Spring in production, so this is more presented as an example at the moment. Doubtless I've missed a lot of nuances about the flexibility of Spring. Pull requests very welcome.
+I don't actually use Spring in production, so this is more presented as an example at the moment. Doubtless I've missed
+a lot of nuances about the flexibility of Spring. Pull requests very welcome.
 
 ## Installation
 
@@ -32,7 +33,10 @@ implementation 'com.gruelbox:transactionoutbox-spring:4.3.281'
 
 ### Development snapshots
 
-Maven Central is updated regularly. Alternatively, if you want to stay at the bleeding edge, you can use continuously-delivered releases from [Github Package Repository](https://github.com/gruelbox/transaction-outbox/packages). These can be used from production builds since they will never be deleted.
+Maven Central is updated regularly. Alternatively, if you want to stay at the bleeding edge, you can use
+continuously-delivered releases
+from [Github Package Repository](https://github.com/gruelbox/transaction-outbox/packages). These can be used from
+production builds since they will never be deleted.
 
 #### Maven
 
@@ -46,7 +50,9 @@ Maven Central is updated regularly. Alternatively, if you want to stay at the bl
 </repositories>
 ```
 
-You will need to authenticate with Github to use Github Package Repository. Create a personal access token in [your GitHub settings](https://github.com/settings/tokens). It only needs **read:package** permissions. Then add something like the following in your Maven `settings.xml`:
+You will need to authenticate with Github to use Github Package Repository. Create a personal access token
+in [your GitHub settings](https://github.com/settings/tokens). It only needs **read:package** permissions. Then add
+something like the following in your Maven `settings.xml`:
 
 ```xml
 <servers>
@@ -58,7 +64,8 @@ You will need to authenticate with Github to use Github Package Repository. Crea
 </servers>
 ```
 
-The above example uses environment variables, allowing you to keep the credentials out of source control, but you can hard-code them if you know what you're doing.
+The above example uses environment variables, allowing you to keep the credentials out of source control, but you can
+hard-code them if you know what you're doing.
 
 ## Configuration
 
@@ -77,7 +84,8 @@ public TransactionOutbox transactionOutbox(SpringTransactionManager springTransa
 
 ```
 
-You can mix-and-match `SpringInstantiator` ans `SpringTransactionManager` with other implementations in hybrid frameworks.
+You can mix-and-match `SpringInstantiator` ans `SpringTransactionManager` with other implementations in hybrid
+frameworks.
 
 ## Usage
 
@@ -95,4 +103,5 @@ void publishCustomerCreatedEvent(long id) {
 }
 ```
 
-Notice that with a DI framework like Spring in play, you can **self-invoke** on `getClass()` - invoke a method on the same class that's scheduling it.
+Notice that with a DI framework like Spring in play, you can **self-invoke** on `getClass()` - invoke a method on the
+same class that's scheduling it.

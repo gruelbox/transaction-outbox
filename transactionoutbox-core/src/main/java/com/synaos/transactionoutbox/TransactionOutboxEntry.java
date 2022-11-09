@@ -169,7 +169,7 @@ public class TransactionOutboxEntry implements Validatable, Comparable<Transacti
 
     @Override
     public int compareTo(TransactionOutboxEntry otherEntry) {
-        if (otherEntry == null){
+        if (otherEntry == null) {
             throw new IllegalArgumentException("TransactionOutBoxEntry to compare can't be null");
         }
         return createdAt.compareTo(otherEntry.getCreatedAt());

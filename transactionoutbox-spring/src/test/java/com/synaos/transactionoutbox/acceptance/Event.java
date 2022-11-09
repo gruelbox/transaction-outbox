@@ -1,46 +1,48 @@
 package com.synaos.transactionoutbox.acceptance;
 
-import java.time.LocalDateTime;
 import javax.persistence.Entity;
 import javax.persistence.Id;
+import java.time.LocalDateTime;
 
 @Entity
 class Event {
 
-  @Id private Long id;
+    @Id
+    private Long id;
 
-  private String description;
-  private LocalDateTime created;
+    private String description;
+    private LocalDateTime created;
 
-  protected Event() {}
+    protected Event() {
+    }
 
-  Event(long id, String description, LocalDateTime created) {
-    this.id = id;
-    this.description = description;
-    this.created = created;
-  }
+    Event(long id, String description, LocalDateTime created) {
+        this.id = id;
+        this.description = description;
+        this.created = created;
+    }
 
-  Long getId() {
-    return id;
-  }
+    Long getId() {
+        return id;
+    }
 
-  void setId(Long id) {
-    this.id = id;
-  }
+    void setId(Long id) {
+        this.id = id;
+    }
 
-  String getDescription() {
-    return description;
-  }
+    String getDescription() {
+        return description;
+    }
 
-  void setDescription(String description) {
-    this.description = description;
-  }
+    void setDescription(String description) {
+        this.description = description;
+    }
 
-  LocalDateTime getCreated() {
-    return created;
-  }
+    LocalDateTime getCreated() {
+        return created;
+    }
 
-  void setCreated(LocalDateTime created) {
-    this.created = created;
-  }
+    void setCreated(LocalDateTime created) {
+        this.created = created;
+    }
 }

@@ -6,32 +6,34 @@ import javax.persistence.Id;
 @Entity
 class Customer {
 
-  @Id private Long id;
-  private String firstName;
-  private String lastName;
+    @Id
+    private Long id;
+    private String firstName;
+    private String lastName;
 
-  protected Customer() {}
+    protected Customer() {
+    }
 
-  Customer(Long id, String firstName, String lastName) {
-    this.id = id;
-    this.firstName = firstName;
-    this.lastName = lastName;
-  }
+    Customer(Long id, String firstName, String lastName) {
+        this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
 
-  @Override
-  public String toString() {
-    return String.format("Customer[id=%d, firstName='%s', lastName='%s']", id, firstName, lastName);
-  }
+    @Override
+    public String toString() {
+        return String.format("Customer[id=%d, firstName='%s', lastName='%s']", id, firstName, lastName);
+    }
 
-  Long getId() {
-    return id;
-  }
+    Long getId() {
+        return id;
+    }
 
-  String getFirstName() {
-    return firstName;
-  }
+    String getFirstName() {
+        return firstName;
+    }
 
-  String getLastName() {
-    return lastName;
-  }
+    String getLastName() {
+        return lastName;
+    }
 }

@@ -5,12 +5,12 @@ import com.synaos.transactionoutbox.Beta;
 import com.synaos.transactionoutbox.DefaultInvocationSerializer;
 import com.synaos.transactionoutbox.Invocation;
 import com.synaos.transactionoutbox.InvocationSerializer;
+import lombok.Builder;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
-
-import lombok.Builder;
 
 /**
  * A general-purpose {@link InvocationSerializer} which can handle pretty much anything that you
@@ -24,58 +24,58 @@ import lombok.Builder;
  */
 @Beta
 public final class JacksonInvocationSerializer implements InvocationSerializer {
-  private final ObjectMapper mapper;
-  private final InvocationSerializer defaultInvocationSerializer;
+    private final ObjectMapper mapper;
+    private final InvocationSerializer defaultInvocationSerializer;
 
-  @Builder
-  private JacksonInvocationSerializer(
-      ObjectMapper mapper, DefaultInvocationSerializer defaultInvocationSerializer) {
-    this.mapper = mapper.copy();
-    this.defaultInvocationSerializer = defaultInvocationSerializer;
-    this.mapper.setDefaultTyping(TransactionOutboxJacksonModule.typeResolver());
-    this.mapper.registerModule(new TransactionOutboxJacksonModule());
-  }
-
-  @Override
-  public void serializeInvocation(Invocation invocation, Writer writer) {
-    try {
-      mapper.writeValue(writer, invocation);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    @Builder
+    private JacksonInvocationSerializer(
+            ObjectMapper mapper, DefaultInvocationSerializer defaultInvocationSerializer) {
+        this.mapper = mapper.copy();
+        this.defaultInvocationSerializer = defaultInvocationSerializer;
+        this.mapper.setDefaultTyping(TransactionOutboxJacksonModule.typeResolver());
+        this.mapper.registerModule(new TransactionOutboxJacksonModule());
     }
-  }
 
-  @Override
-  public Invocation deserializeInvocation(Reader reader) {
-    try {
-      // read ahead to check if old style
-      BufferedReader br = new BufferedReader(reader);
-      if (checkForOldSerialization(br)) {
-        if (defaultInvocationSerializer == null) {
-          throw new UnsupportedOperationException(
-              "Can't deserialize GSON-format tasks without a "
-                  + DefaultInvocationSerializer.class.getSimpleName()
-                  + ". Supply one when building "
-                  + getClass().getSimpleName());
+    @Override
+    public void serializeInvocation(Invocation invocation, Writer writer) {
+        try {
+            mapper.writeValue(writer, invocation);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
-        return defaultInvocationSerializer.deserializeInvocation(br);
-      }
-      return mapper.readValue(br, Invocation.class);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
-  }
 
-  private boolean checkForOldSerialization(BufferedReader reader) throws IOException {
-    reader.mark(1);
-    char[] chars = new char[6];
-    int charsRead = reader.read(chars, 0, 6);
-
-    String result = "";
-    if (charsRead != -1) {
-      result = new String(chars, 0, charsRead);
+    @Override
+    public Invocation deserializeInvocation(Reader reader) {
+        try {
+            // read ahead to check if old style
+            BufferedReader br = new BufferedReader(reader);
+            if (checkForOldSerialization(br)) {
+                if (defaultInvocationSerializer == null) {
+                    throw new UnsupportedOperationException(
+                            "Can't deserialize GSON-format tasks without a "
+                                    + DefaultInvocationSerializer.class.getSimpleName()
+                                    + ". Supply one when building "
+                                    + getClass().getSimpleName());
+                }
+                return defaultInvocationSerializer.deserializeInvocation(br);
+            }
+            return mapper.readValue(br, Invocation.class);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
-    reader.reset();
-    return result.startsWith("{\"c\":");
-  }
+
+    private boolean checkForOldSerialization(BufferedReader reader) throws IOException {
+        reader.mark(1);
+        char[] chars = new char[6];
+        int charsRead = reader.read(chars, 0, 6);
+
+        String result = "";
+        if (charsRead != -1) {
+            result = new String(chars, 0, charsRead);
+        }
+        reader.reset();
+        return result.startsWith("{\"c\":");
+    }
 }

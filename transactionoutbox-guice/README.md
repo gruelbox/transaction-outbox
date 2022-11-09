@@ -34,7 +34,8 @@ See [transactionoutbox-core](../README.md) for more information.
 
 ### Configuration
 
-To get a `TransactionOutbox` for use throughout your application, add a `Singleton` binding for your chosen transaction manager and then wire in `GuiceInstantiator` as follows:
+To get a `TransactionOutbox` for use throughout your application, add a `Singleton` binding for your chosen transaction
+manager and then wire in `GuiceInstantiator` as follows:
 
 ```java
 @Provides
@@ -61,7 +62,9 @@ void doSomething() {
 
 ## Remote injection
 
-Alternatively, you may prefer to hide the use of `TransactionOutbox` and create injectable "remote" implementations of specific services. This is a stylistic choice, and is more a Guice thing than a `TransactionOutbox` thing, but is presented here for illustration.
+Alternatively, you may prefer to hide the use of `TransactionOutbox` and create injectable "remote" implementations of
+specific services. This is a stylistic choice, and is more a Guice thing than a `TransactionOutbox` thing, but is
+presented here for illustration.
 
 ### Configuration
 
@@ -74,7 +77,8 @@ Create a suitable binding annotation to specify that you want to inject the remo
 public @interface Remote {}
 ```
 
-Bind `TransactionOutbox` as per the example above, and add two more bindings to expose the "real" and "remote" versions of the service:
+Bind `TransactionOutbox` as per the example above, and add two more bindings to expose the "real" and "remote" versions
+of the service:
 
 ```java
 @Provides
@@ -92,7 +96,8 @@ MyService local() {
 
 ### Usage
 
-Now you can inject the remote implementation and use it to schedule work. The following is exactly equivalent to the usage example above, just using an injected remote:
+Now you can inject the remote implementation and use it to schedule work. The following is exactly equivalent to the
+usage example above, just using an injected remote:
 
 ```java
 @Inject

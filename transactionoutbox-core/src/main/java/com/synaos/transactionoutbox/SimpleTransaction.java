@@ -12,8 +12,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.synaos.transactionoutbox.Utils.safelyClose;
-
 @Slf4j
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 class SimpleTransaction implements Transaction, AutoCloseable {

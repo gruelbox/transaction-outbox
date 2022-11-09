@@ -11,28 +11,28 @@ import org.jooq.DSLContext;
  */
 @Slf4j
 final class ThreadLocalJooqTransactionManager
-    extends AbstractThreadLocalTransactionManager<SimpleTransaction>
-    implements JooqTransactionManager {
+        extends AbstractThreadLocalTransactionManager<SimpleTransaction>
+        implements JooqTransactionManager {
 
-  private final DSLContext parentDsl;
+    private final DSLContext parentDsl;
 
-  ThreadLocalJooqTransactionManager(DSLContext parentDsl) {
-    this.parentDsl = parentDsl;
-  }
+    ThreadLocalJooqTransactionManager(DSLContext parentDsl) {
+        this.parentDsl = parentDsl;
+    }
 
-  @Override
-  public <T, E extends Exception> T inTransactionReturnsThrows(
-      ThrowingTransactionalSupplier<T, E> work) {
-    DSLContext dsl =
-        peekTransaction()
-            .map(SimpleTransaction::context)
-            .map(Configuration.class::cast)
-            .map(Configuration::dsl)
-            .orElse(parentDsl);
-    return dsl.transactionResult(
-        config ->
-            config
-                .dsl()
-                .connectionResult(connection -> work.doWork(peekTransaction().orElseThrow())));
-  }
+    @Override
+    public <T, E extends Exception> T inTransactionReturnsThrows(
+            ThrowingTransactionalSupplier<T, E> work) {
+        DSLContext dsl =
+                peekTransaction()
+                        .map(SimpleTransaction::context)
+                        .map(Configuration.class::cast)
+                        .map(Configuration::dsl)
+                        .orElse(parentDsl);
+        return dsl.transactionResult(
+                config ->
+                        config
+                                .dsl()
+                                .connectionResult(connection -> work.doWork(peekTransaction().orElseThrow())));
+    }
 }

@@ -6,9 +6,12 @@
 
 Extension for [transaction-outbox-core](../README.md) which integrates with jOOQ for transaction management.
 
-Like Transaction Outbox, jOOQ is intended to play nicely with any other transaction management approach, but provides its own as an option. If you are already using jOOQ's `TransactionProvider` via `DSLContext.transaction(...)` throughout your application, you can continue to do so with this extension.
+Like Transaction Outbox, jOOQ is intended to play nicely with any other transaction management approach, but provides
+its own as an option. If you are already using jOOQ's `TransactionProvider` via `DSLContext.transaction(...)` throughout
+your application, you can continue to do so with this extension.
 
-jOOQ gives you the option to either use thread-local transaction management or explicitly pass a contextual `DSLContext` or `Configuration` down your stack. You can do the same thing with `TransactionOutbox`.
+jOOQ gives you the option to either use thread-local transaction management or explicitly pass a contextual `DSLContext`
+or `Configuration` down your stack. You can do the same thing with `TransactionOutbox`.
 
 ## Installation
 
@@ -48,7 +51,8 @@ jooqConfig.setSQLDialect(SQLDialect.H2);
 jooqConfig.setTransactionProvider(new ThreadLocalTransactionProvider(connectionProvider, true));
 ```
 
-Now connect `JooqTransactionListener`, which is the bridge between jOOQ and `TransactionOutbox`, and create the `DSLContext`:
+Now connect `JooqTransactionListener`, which is the bridge between jOOQ and `TransactionOutbox`, and create
+the `DSLContext`:
 
 ```java
 var listener = JooqTransactionManager.createListener();
@@ -81,7 +85,8 @@ dsl.transaction(() -> {
 
 ## Using explicit transaction context
 
-If you prefer not to use thread-local transactions, you are already taking on the burden of passing jOOQ `Configuration`s or `DSLContext`s down your stack. This is supported with `TransactionOutbox`, but requires a little explanation.
+If you prefer not to use thread-local transactions, you are already taking on the burden of passing jOOQ `Configuration`
+s or `DSLContext`s down your stack. This is supported with `TransactionOutbox`, but requires a little explanation.
 
 ### Configuration
 
@@ -107,7 +112,8 @@ The call pattern in the thread-local context example above will now not work:
 outbox.schedule(MyClass.class).publishCustomerCreatedEvent(1L);
 ```
 
-`TransactionOutbox` needs the currently active transaction context to write the database record. To do so, you need to change the scheduled method itself to receive a `Configuration`:
+`TransactionOutbox` needs the currently active transaction context to write the database record. To do so, you need to
+change the scheduled method itself to receive a `Configuration`:
 
 ```java
 void publishCustomerCreatedEvent(long id, Configuration cfg2) {
@@ -126,9 +132,16 @@ dsl.transaction(cfg1 -> {
 });
 ```
 
-In the example above, `cfg1` is the transaction context in which the request is written to the database, and `cfg2` is the context in which it is executed, which will be a different transaction at some later time. `cfg1` is stripped from the request before writing it to the database and replaced with `cfg2` at run time.
+In the example above, `cfg1` is the transaction context in which the request is written to the database, and `cfg2` is
+the context in which it is executed, which will be a different transaction at some later time. `cfg1` is stripped from
+the request before writing it to the database and replaced with `cfg2` at run time.
 
-The reason for passing the `Configuration` in the scheduled method call itself (rather than the `schedule()` method call) is twofold:
+The reason for passing the `Configuration` in the scheduled method call itself (rather than the `schedule()` method
+call) is twofold:
 
-1.  It is very common for tasks to need access to the transaction context _at the time they are run_ in order to participate in that transaction. That way, if any part of the outbox task is rolled back, any work we do inside it is also rolled back.
-2.  If the method were not scheduled by `TransactionOutbox`, but instead called directly, it would need the `Configuration` passed to it anyway. By working this way we ensure that the API for calling directly or scheduled is the same, and therefore the two implementations are interchangeable.
+1. It is very common for tasks to need access to the transaction context _at the time they are run_ in order to
+   participate in that transaction. That way, if any part of the outbox task is rolled back, any work we do inside it is
+   also rolled back.
+2. If the method were not scheduled by `TransactionOutbox`, but instead called directly, it would need
+   the `Configuration` passed to it anyway. By working this way we ensure that the API for calling directly or scheduled
+   is the same, and therefore the two implementations are interchangeable.

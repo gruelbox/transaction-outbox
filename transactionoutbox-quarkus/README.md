@@ -1,6 +1,5 @@
 # transactionoutbox-quarkus
 
-
 Extension for [transaction-outbox-core](../README.md) which integrates CDI's DI and Quarkus transaction management.
 
 Tested with Quarkus implementation (Arc/Agroal)
@@ -29,7 +28,10 @@ implementation 'com.gruelbox:transactionoutbox-quarkus:4.3.281'
 
 ### Development snapshots
 
-Maven Central is updated regularly. Alternatively, if you want to stay at the bleeding edge, you can use continuously-delivered releases from [Github Package Repository](https://github.com/gruelbox/transaction-outbox/packages). These can be used from production builds since they will never be deleted.
+Maven Central is updated regularly. Alternatively, if you want to stay at the bleeding edge, you can use
+continuously-delivered releases
+from [Github Package Repository](https://github.com/gruelbox/transaction-outbox/packages). These can be used from
+production builds since they will never be deleted.
 
 #### Maven
 
@@ -43,7 +45,9 @@ Maven Central is updated regularly. Alternatively, if you want to stay at the bl
 </repositories>
 ```
 
-You will need to authenticate with Github to use Github Package Repository. Create a personal access token in [your GitHub settings](https://github.com/settings/tokens). It only needs **read:package** permissions. Then add something like the following in your Maven `settings.xml`:
+You will need to authenticate with Github to use Github Package Repository. Create a personal access token
+in [your GitHub settings](https://github.com/settings/tokens). It only needs **read:package** permissions. Then add
+something like the following in your Maven `settings.xml`:
 
 ```xml
 <servers>
@@ -55,7 +59,8 @@ You will need to authenticate with Github to use Github Package Repository. Crea
 </servers>
 ```
 
-The above example uses environment variables, allowing you to keep the credentials out of source control, but you can hard-code them if you know what you're doing.
+The above example uses environment variables, allowing you to keep the credentials out of source control, but you can
+hard-code them if you know what you're doing.
 
 ## Configuration
 

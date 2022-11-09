@@ -2,7 +2,7 @@ name: Publish to Central
 
 on:
   release:
-    types: [created]
+    types: [ created ]
 
 jobs:
   build:
@@ -72,7 +72,7 @@ jobs:
           body: Updates the versions in the README files following the release
           branch: update-readme-version
           base: master
-          
+
       - name: Delete tag branch
         run: git push --delete origin temp-${GITHUB_REF:10}
 
