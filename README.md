@@ -477,6 +477,8 @@ TransactionOutbox outbox = TransactionOutbox.builder()
         .dialect(Dialect.POSTGRESQL_9)
         // Override the table name (defaults to "TXNO_OUTBOX")
         .tableName("transactionOutbox")
+        // Override the column name (defaults to "id")
+        .columnName("id")
         // Shorten the time we will wait for write locks (defaults to 2)
         .writeLockTimeoutSeconds(1)
         // Disable automatic creation and migration of the outbox table, forcing the application to manage
