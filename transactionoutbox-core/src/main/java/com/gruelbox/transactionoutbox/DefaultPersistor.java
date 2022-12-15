@@ -3,13 +3,7 @@ package com.gruelbox.transactionoutbox;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.SQLIntegrityConstraintViolationException;
-import java.sql.SQLTimeoutException;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +51,11 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Builder.Default
   private final String tableName = "TXNO_OUTBOX";
 
+    /** @param columnName The table column name. The default is {@code id}. */
+    @SuppressWarnings("JavaDoc")
+    @Builder.Default
+    private final String columnName = "id";
+
   /**
    * @param migrate Set to false to disable automatic database migrations. This may be preferred if
    *     the default migration behaviour interferes with your existing toolset, and you prefer to
@@ -81,6 +80,7 @@ public class DefaultPersistor implements Persistor, Validatable {
   public void validate(Validator validator) {
     validator.notNull("dialect", dialect);
     validator.notNull("tableName", tableName);
+      validator.notNull("columnName", columnName);
   }
 
   @Override
@@ -253,13 +253,24 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Override
   public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now)
       throws Exception {
-    try (PreparedStatement stmt =
-        tx.connection()
-            .prepareStatement(dialect.getDeleteExpired().replace("{{table}}", tableName))) {
+    try (PreparedStatement stmt = getPreparedStatement(tx)) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
       return stmt.executeUpdate();
     }
+  }
+
+  private PreparedStatement getPreparedStatement(Transaction tx) throws SQLException {
+    if (dialect == Dialect.POSTGRESQL_9) {
+      return tx.connection()
+              .prepareStatement(dialect.getDeleteExpired()
+                      .replace("{{table}}", tableName)
+                      .replace("{{column}}", columnName));
+    }
+
+    return tx.connection()
+            .prepareStatement(dialect.getDeleteExpired()
+                    .replace("{{table}}", tableName));
   }
 
   private List<TransactionOutboxEntry> gatherResults(int batchSize, PreparedStatement stmt)
