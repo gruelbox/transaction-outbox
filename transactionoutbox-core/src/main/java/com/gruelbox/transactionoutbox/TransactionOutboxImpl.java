@@ -476,20 +476,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   @Override
   public List<TransactionOutboxEntry> getBlockedEntries(int page, int batchSize) {
     return transactionManager.inTransactionReturns(
-        transaction -> {
-          List<TransactionOutboxEntry> result = new ArrayList<>(batchSize);
-          uncheckedly(() -> persistor.selectBlocked(transaction, page, batchSize))
-              .forEach(
-                  entry -> {
-                    log.debug("Reprocessing {}", entry.description());
-                    try {
-                      pushBack(transaction, entry);
-                      result.add(entry);
-                    } catch (OptimisticLockException e) {
-                      log.debug("Beaten to optimistic lock on {}", entry.description());
-                    }
-                  });
-          return result;
-        });
+        transaction ->
+            uncheckedly(() -> persistor.selectBlocked(transaction, page, batchSize)));
   }
 }
