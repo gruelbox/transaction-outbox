@@ -74,7 +74,7 @@ abstract class AbstractAcceptanceTest {
    * Uses a simple direct transaction manager and connection manager and attempts to fire an
    * interface using a custom instantiator.
    */
-  // @Test
+  @Test
   final void simpleConnectionProviderCustomInstantiatorInterfaceClass()
       throws InterruptedException {
 
@@ -132,7 +132,7 @@ abstract class AbstractAcceptanceTest {
     assertTrue(gotScheduled.get());
   }
 
-  // @Test
+  @Test
   final void noAutomaticInitialization() {
 
     TransactionManager transactionManager = simpleTxnManager();
@@ -159,7 +159,7 @@ abstract class AbstractAcceptanceTest {
                 () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee")));
   }
 
-  // @Test
+  @Test
   void duplicateRequests() {
 
     TransactionManager transactionManager = simpleTxnManager();
@@ -264,7 +264,7 @@ abstract class AbstractAcceptanceTest {
    * Uses a simple data source transaction manager and attempts to fire a concrete class via
    * reflection.
    */
-  // @Test
+  @Test
   final void dataSourceConnectionProviderReflectionInstantiatorConcreteClass()
       throws InterruptedException {
     try (HikariDataSource ds = pooledDataSource()) {
@@ -294,7 +294,7 @@ abstract class AbstractAcceptanceTest {
    * Implements a custom transaction manager. Any required changes to this test are a sign that we
    * need to bump the major revision.
    */
-  // @Test
+  @Test
   final void customTransactionManager()
       throws ClassNotFoundException, SQLException, InterruptedException {
 
@@ -386,7 +386,7 @@ abstract class AbstractAcceptanceTest {
    * Runs a piece of work which will fail several times before working successfully. Ensures that
    * the work runs eventually.
    */
-  // @Test
+  @Test
   final void retryBehaviour() throws Exception {
     TransactionManager transactionManager = simpleTxnManager();
     CountDownLatch latch = new CountDownLatch(1);
@@ -412,7 +412,7 @@ abstract class AbstractAcceptanceTest {
         });
   }
 
-  // @Test
+  @Test
   final void onSchedulingFailure_BubbleExceptionsUp() throws Exception {
     TransactionManager transactionManager = simpleTxnManager();
     CountDownLatch latch = new CountDownLatch(1);
@@ -465,7 +465,7 @@ abstract class AbstractAcceptanceTest {
         });
   }
 
-  // @Test
+  @Test
   final void lastAttemptTime_updatesEveryTime() throws Exception {
     TransactionManager transactionManager = simpleTxnManager();
     CountDownLatch successLatch = new CountDownLatch(1);
@@ -519,7 +519,7 @@ abstract class AbstractAcceptanceTest {
    * Runs a piece of work which will fail enough times to enter a blocked state but will then pass
    * when re-tried after it is unblocked.
    */
-  // @Test
+  @Test
   final void blockAndThenUnblockForRetry() throws Exception {
     TransactionManager transactionManager = simpleTxnManager();
     CountDownLatch successLatch = new CountDownLatch(1);
@@ -623,7 +623,7 @@ abstract class AbstractAcceptanceTest {
   }
 
   /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
-  // @Test
+  @Test
   final void highVolumeUnreliable() throws Exception {
     int count = 10;
 
