@@ -35,8 +35,8 @@ import lombok.extern.slf4j.Slf4j;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class DefaultPersistor implements Persistor, Validatable {
 
-  protected static final String ALL_FIELDS =
-      "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
+  private static final String ALL_FIELDS =
+          "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
 
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
@@ -74,8 +74,8 @@ public class DefaultPersistor implements Persistor, Validatable {
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  protected final InvocationSerializer serializer =
-      InvocationSerializer.createDefaultJsonSerializer();
+  private final InvocationSerializer serializer =
+          InvocationSerializer.createDefaultJsonSerializer();
 
   @Override
   public void validate(Validator validator) {
@@ -262,7 +262,7 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   @Override
   public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now)
-      throws Exception {
+          throws Exception {
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(dialect.getDeleteExpired().replace("{{table}}", tableName))) {
