@@ -3,7 +3,13 @@ package com.gruelbox.transactionoutbox;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
-import java.sql.*;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.SQLIntegrityConstraintViolationException;
+import java.sql.SQLTimeoutException;
+import java.sql.Statement;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultPersistor implements Persistor, Validatable {
 
   private static final String ALL_FIELDS =
-      "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
+          "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
 
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
@@ -51,11 +57,6 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Builder.Default
   private final String tableName = "TXNO_OUTBOX";
 
-    /** @param columnName The table column name. The default is {@code id}. */
-    @SuppressWarnings("JavaDoc")
-    @Builder.Default
-    private final String columnName = "id";
-
   /**
    * @param migrate Set to false to disable automatic database migrations. This may be preferred if
    *     the default migration behaviour interferes with your existing toolset, and you prefer to
@@ -74,13 +75,12 @@ public class DefaultPersistor implements Persistor, Validatable {
   @SuppressWarnings("JavaDoc")
   @Builder.Default
   private final InvocationSerializer serializer =
-      InvocationSerializer.createDefaultJsonSerializer();
+          InvocationSerializer.createDefaultJsonSerializer();
 
   @Override
   public void validate(Validator validator) {
     validator.notNull("dialect", dialect);
     validator.notNull("tableName", tableName);
-      validator.notNull("columnName", columnName);
   }
 
   @Override
@@ -252,25 +252,14 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   @Override
   public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now)
-      throws Exception {
-    try (PreparedStatement stmt = getPreparedStatement(tx)) {
+          throws Exception {
+    try (PreparedStatement stmt =
+        tx.connection()
+            .prepareStatement(dialect.getDeleteExpired().replace("{{table}}", tableName))) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
       return stmt.executeUpdate();
     }
-  }
-
-  private PreparedStatement getPreparedStatement(Transaction tx) throws SQLException {
-    if (dialect == Dialect.POSTGRESQL_9) {
-      return tx.connection()
-              .prepareStatement(dialect.getDeleteExpired()
-                      .replace("{{table}}", tableName)
-                      .replace("{{column}}", columnName));
-    }
-
-    return tx.connection()
-            .prepareStatement(dialect.getDeleteExpired()
-                    .replace("{{table}}", tableName));
   }
 
   private List<TransactionOutboxEntry> gatherResults(int batchSize, PreparedStatement stmt)
