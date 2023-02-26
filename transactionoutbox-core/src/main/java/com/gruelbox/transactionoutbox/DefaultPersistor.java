@@ -46,16 +46,16 @@ public class DefaultPersistor implements Persistor, Validatable {
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  protected final int writeLockTimeoutSeconds = 2;
+  private final int writeLockTimeoutSeconds = 2;
 
   /** @param dialect The database dialect to use. Required. */
   @SuppressWarnings("JavaDoc")
-  protected final Dialect dialect;
+  private final Dialect dialect;
 
   /** @param tableName The database table name. The default is {@code TXNO_OUTBOX}. */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  protected final String tableName = "TXNO_OUTBOX";
+  private final String tableName = "TXNO_OUTBOX";
 
   /**
    * @param migrate Set to false to disable automatic database migrations. This may be preferred if
@@ -65,7 +65,7 @@ public class DefaultPersistor implements Persistor, Validatable {
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  protected final boolean migrate = true;
+  private final boolean migrate = true;
 
   /**
    * @param serializer The serializer to use for {@link Invocation}s. See {@link
