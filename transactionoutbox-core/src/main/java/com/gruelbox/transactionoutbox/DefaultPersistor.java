@@ -223,8 +223,14 @@ public class DefaultPersistor implements Persistor, Validatable {
         tx.prepareBatchStatement(
             "UPDATE "
                 + tableName
-                + " SET attempts = 0, blocked = false "
-                + "WHERE blocked = true AND processed = false AND id = ?");
+                + " SET attempts = 0, blocked = "
+                + dialect.booleanValue(false)
+                + " "
+                + "WHERE blocked = "
+                + dialect.booleanValue(true)
+                + " AND processed = "
+                + dialect.booleanValue(false)
+                + " AND id = ?");
     stmt.setString(1, entryId);
     stmt.setQueryTimeout(writeLockTimeoutSeconds);
     return stmt.executeUpdate() != 0;
@@ -242,7 +248,11 @@ public class DefaultPersistor implements Persistor, Validatable {
                     + ALL_FIELDS
                     + " FROM "
                     + tableName
-                    + " WHERE nextAttemptTime < ? AND blocked = false AND processed = false LIMIT ?"
+                    + " WHERE nextAttemptTime < ? AND blocked = "
+                    + dialect.booleanValue(false)
+                    + " AND processed = "
+                    + dialect.booleanValue(false)
+                    + dialect.getLimitCriteria()
                     + forUpdate)) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
