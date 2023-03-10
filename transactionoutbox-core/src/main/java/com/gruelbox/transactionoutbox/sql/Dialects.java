@@ -16,4 +16,7 @@ public final class Dialects {
 
   /** Supports PostgreSQL 9, 10, 11 and 12. */
   public static final Dialect POSTGRESQL_9 = new PostgreSqlDialect(true);
+
+  /** Supports Oracle */
+  public static final Dialect ORACLE = new OracleDialect();
 }

@@ -47,7 +47,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   private final String deleteSql;
   private final String updateSql;
   private final String lockSql;
-  private final String blockSql;
+  private final String unblockSql;
   private final String clearSql;
 
   private SqlPersistor(
@@ -82,7 +82,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                 + "FROM "
                 + this.tableName
                 + " WHERE nextAttemptTime < ?"
-                + " AND blocked = false AND processed = false LIMIT ?"
+                + " AND blocked = " + dialect.booleanValue(false) + " AND processed = " + dialect.booleanValue(false) + dialect.getLimitCriteria()
                 + (dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : ""));
     this.deleteExpiredSql =
         mapToNative(dialect.getDeleteExpired().replace("{{table}}", this.tableName));
@@ -100,12 +100,12 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
                 + this.tableName
                 + " WHERE id = ? AND version = ? FOR UPDATE"
                 + (dialect.isSupportsSkipLock() ? " SKIP LOCKED" : ""));
-    this.blockSql =
+    this.unblockSql =
         mapToNative(
             "UPDATE "
                 + this.tableName
-                + " SET attempts = 0, blocked = false, version = version + 1 "
-                + "WHERE blocked = true AND processed = false AND id = ?");
+                + " SET attempts = 0, blocked = " + dialect.booleanValue(false) + ", version = version + 1 "
+                + "WHERE blocked = "+ dialect.booleanValue(true) +" AND processed = " + dialect.booleanValue(false) + " AND id = ?");
     this.clearSql = dialect.mapStatementToNative("TRUNCATE TABLE " + this.tableName);
   }
 
@@ -126,43 +126,40 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
       try {
         Utils.join(tm.transactionally(this::createVersionTableIfNotExists));
         log.info("Checking for new migrations...");
-        Utils.join(
-            tm.transactionally(
-                tx ->
-                    fetchCurrentVersionAndLock(tx)
-                        .thenApply(
-                            versionResult -> {
-                              if (versionResult.size() != 1) {
-                                throw new IllegalStateException(
-                                    "Unexpected number of version records: "
-                                        + versionResult.size());
-                              }
-                              int currentVersion = versionResult.get(0);
-                              log.info("Current schema version is {}", currentVersion);
-                              return currentVersion;
-                            })
-                        .thenCompose(
-                            currentVersion -> {
-                              CompletableFuture<?> chain = CompletableFuture.completedFuture(null);
-                              for (var mig :
-                                  (Iterable<SqlMigration>)
-                                      () -> dialect.migrations(tableName).iterator()) {
-                                if (mig.getVersion() <= currentVersion) {
-                                  continue;
-                                }
-                                chain =
-                                    chain
-                                        .thenRun(
-                                            () ->
-                                                log.info(
-                                                    "Running migration {}: {}",
-                                                    mig.getVersion(),
-                                                    mig.getName()))
-                                        .thenCompose(__ -> executeUpdate(tx, mig.getSql()))
-                                        .thenCompose(__ -> updateVersion(tx, mig));
-                              }
-                              return chain;
-                            })));
+
+        boolean foundUpgrades;
+        do {
+          foundUpgrades = Utils.join(tm.transactionally(tx ->
+            fetchCurrentVersionAndLock(tx)
+              .thenApply(
+                versionResult -> {
+                  if (versionResult.size() != 1) {
+                    throw new IllegalStateException(
+                            "Unexpected number of version records: "
+                                    + versionResult.size());
+                  }
+                  int currentVersion = versionResult.get(0);
+                  log.debug("Current schema version is {}", currentVersion);
+                  return currentVersion;
+                })
+                .thenApply(currentVersion -> dialect.migrations(tableName).filter(it -> it.getVersion() > currentVersion).findFirst().orElse(null))
+                .thenCompose(mig -> {
+                  if (mig == null) {
+                    return CompletableFuture.completedFuture(false);
+                  }
+                  return CompletableFuture.completedFuture(null)
+                    .thenRun(
+                            () ->
+                                    log.info(
+                                            "Running migration {}: {}",
+                                            mig.getVersion(),
+                                            mig.getName()))
+                    .thenCompose(__ -> executeUpdate(tx, mig.getSql()))
+                    .thenCompose(__ -> updateVersion(tx, mig))
+                    .thenApply(i -> true);
+                })
+          ));
+        } while (foundUpgrades);
         log.info("Migrations complete");
         return;
       } catch (Exception e) {
@@ -349,7 +346,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
           .statement(
               tx,
               dialect,
-              blockSql,
+              unblockSql,
               writeLockTimeoutSeconds,
               false,
               binder -> binder.bind(0, entryId).execute())
@@ -416,11 +413,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   private CompletableFuture<Integer> createVersionTableIfNotExists(TX tx) {
-    return executeUpdate(
-        tx,
-        "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
-            + dialect.getIntegerCastType()
-            + ") AS version");
+    return dialect.createVersionTableIfNotExists(sql -> executeUpdate(tx, sql));
   }
 
   private CompletableFuture<List<Integer>> fetchCurrentVersionAndLock(TX tx) {
@@ -448,7 +441,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
         .statement(
             tx,
             dialect,
-            "SELECT 1",
+            dialect.getConnectionCheck(),
             0,
             false,
             binder -> binder.executeQuery(1, row -> row.get(0, Integer.class)))
