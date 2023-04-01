@@ -33,7 +33,7 @@
     <test.dir>src/test/java</test.dir>
     <skip.format>false</skip.format>
 
-    <!-- Dependency versions -->
+    <!-- Dependency versions. -->
     <logback.version>1.4.5</logback.version>
     <revision>1.3.99999-SNAPSHOT</revision>
     <junit.jupiter.version>5.9.1</junit.jupiter.version>
