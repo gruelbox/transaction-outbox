@@ -16,7 +16,7 @@
   </description>
 
 	<properties>
-		<quarkus.version>2.16.5.Final</quarkus.version>
+		<quarkus.version>2.16.6.Final</quarkus.version>
 	</properties>
 
 	<dependencies>
