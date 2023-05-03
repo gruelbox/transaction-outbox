@@ -5,6 +5,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.function.Supplier;
+
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -84,18 +86,12 @@ public final class Invocation {
     this.mdc = mdc;
   }
 
-  Object invoke(Object instance, TransactionOutboxListener listener)
-      throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-    Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
-    method.setAccessible(true);
-    if (log.isDebugEnabled()) {
-      log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
-    }
+  <T> T withinMDC(InvocationCall<T> call) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     if (mdc != null && MDC.getMDCAdapter() != null) {
       var oldMdc = MDC.getCopyOfContextMap();
       MDC.setContextMap(mdc);
       try {
-        return listener.wrapInvocation(() -> method.invoke(instance, args));
+        return call.call();
       } finally {
         if (oldMdc == null) {
           MDC.clear();
@@ -104,7 +100,30 @@ public final class Invocation {
         }
       }
     } else {
-      return listener.wrapInvocation(() -> method.invoke(instance, args));
+      return call.call();
     }
+  }
+
+  <T> T withinMdcUnchecked(Supplier<T> supplier) {
+    try {
+      return withinMDC(supplier::get);
+    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  Object invoke(Object instance, TransactionOutboxListener listener)
+      throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+    Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
+    method.setAccessible(true);
+    if (log.isDebugEnabled()) {
+      log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
+    }
+    return listener.wrapInvocation(() -> method.invoke(instance, args));
+  }
+
+  @FunctionalInterface
+  interface InvocationCall<T> {
+    T call() throws NoSuchMethodException, IllegalAccessException, InvocationTargetException;
   }
 }

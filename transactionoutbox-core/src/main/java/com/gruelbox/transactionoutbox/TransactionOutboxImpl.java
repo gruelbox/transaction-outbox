@@ -264,20 +264,20 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
               } else {
                 return invoke(entry, tx)
                     .thenCompose(
-                        _1 -> {
+                        _1 -> entry.getInvocation().withinMdcUnchecked(() -> {
                           if (entry.getUniqueRequestId() == null) {
                             return persistor.delete(tx, entry).thenApply(_2 -> true);
                           } else {
                             log.debug(
-                                "Deferring deletion of {} by {}",
-                                entry.description(),
-                                retentionThreshold);
+                                    "Deferring deletion of {} by {}",
+                                    entry.description(),
+                                    retentionThreshold);
                             entry.setProcessed(true);
                             entry.setLastAttemptTime(Instant.now(clockProvider.get()));
                             entry.setNextAttemptTime(after(retentionThreshold));
                             return persistor.update(tx, entry).thenApply(_2 -> true);
                           }
-                        });
+                        }));
               }
             });
   }
@@ -363,23 +363,25 @@ class TransactionOutboxImpl<CN, TX extends BaseTransaction<CN>> implements Trans
 
   private CompletableFuture<Void> invoke(TransactionOutboxEntry entry, TX transaction) {
     try {
-      logAtLevel(
-          log,
-          logLevelProcessStartAndFinish,
-          "Processing({}) {}",
-          entry.getAttempts() + 1,
-          entry.description());
-      Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
-      log.debug("Created instance {}", instance);
-      Invocation invocation =
-          transactionManager.injectTransaction(entry.getInvocation(), transaction);
-      Object result = invocation.invoke(instance, listener);
-      log.debug("Successfully invoked, returned {}", result);
-      if (result instanceof CompletableFuture<?>) {
-        return ((CompletableFuture<?>) result).thenApply(__ -> null);
-      } else {
-        return completedFuture(null);
-      }
+      return entry.getInvocation().withinMDC(() -> {
+        logAtLevel(
+                log,
+                logLevelProcessStartAndFinish,
+                "Processing({}) {}",
+                entry.getAttempts() + 1,
+                entry.description());
+        Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
+        log.debug("Created instance {}", instance);
+        Invocation invocation =
+                transactionManager.injectTransaction(entry.getInvocation(), transaction);
+        Object result = invocation.invoke(instance, listener);
+        log.debug("Successfully invoked, returned {}", result);
+        if (result instanceof CompletableFuture<?>) {
+          return ((CompletableFuture<?>) result).thenApply(__ -> null);
+        } else {
+          return completedFuture(null);
+        }
+      });
     } catch (InvocationTargetException e) {
       return failedFuture(e.getCause());
     } catch (Exception e) {
