@@ -152,7 +152,8 @@ class TestDefaultInvocationSerializer {
         MonthDay.class,
         Period.class,
         Year.class,
-        YearMonth.class
+        YearMonth.class,
+        ZonedDateTime.class
       };
       Object[] values = {
         Duration.ofDays(1),
@@ -163,7 +164,8 @@ class TestDefaultInvocationSerializer {
         MonthDay.of(1, 1),
         Period.ofMonths(1),
         Year.now(),
-        YearMonth.now()
+        YearMonth.now(),
+        ZonedDateTime.now()
       };
       check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
     }

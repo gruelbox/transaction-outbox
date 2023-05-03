@@ -43,6 +43,7 @@ import java.util.*;
  *         <li>{@link java.time.Instant}
  *         <li>{@link java.time.LocalDate}
  *         <li>{@link java.time.LocalDateTime}
+ *         <li>{@link java.time.ZonedDateTime}
  *         <li>{@link java.time.Month}
  *         <li>{@link java.time.MonthDay}
  *         <li>{@link java.time.Period}
@@ -74,6 +75,7 @@ public final class DefaultInvocationSerializer
             .registerTypeAdapter(Invocation.class, gsonSerializer)
             .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
             .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeTypeAdapter())
+            .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeTypeAdapter())
             .registerTypeAdapter(Instant.class, new InstantTypeAdapter())
             .registerTypeAdapter(Duration.class, new DurationTypeAdapter())
             .registerTypeAdapter(LocalDate.class, new LocalDateTypeAdapter())
@@ -143,6 +145,7 @@ public final class DefaultInvocationSerializer
       addClass(Instant.class);
       addClass(LocalDate.class);
       addClass(LocalDateTime.class);
+      addClass(ZonedDateTime.class);
       addClass(Month.class);
       addClass(MonthDay.class);
       addClass(Period.class);
@@ -325,6 +328,19 @@ public final class DefaultInvocationSerializer
             "Cannot serialize class - not found: " + clazz.getName());
       }
       return name;
+    }
+  }
+
+  static final class ZonedDateTimeTypeAdapter extends TypeAdapter<ZonedDateTime> {
+
+    @Override
+    public void write(final JsonWriter out, final ZonedDateTime value) throws IOException {
+      out.value(value.format(DateTimeFormatter.ISO_ZONED_DATE_TIME));
+    }
+
+    @Override
+    public ZonedDateTime read(final JsonReader in) throws IOException {
+      return ZonedDateTime.parse(in.nextString(), DateTimeFormatter.ISO_ZONED_DATE_TIME);
     }
   }
 
