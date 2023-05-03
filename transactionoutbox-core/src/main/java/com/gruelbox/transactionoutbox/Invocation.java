@@ -84,18 +84,12 @@ public class Invocation {
     this.mdc = mdc;
   }
 
-  void invoke(Object instance, TransactionOutboxListener listener)
-      throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-    Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
-    method.setAccessible(true);
-    if (log.isDebugEnabled()) {
-      log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
-    }
+  void withinMDC(Runnable runnable) {
     if (mdc != null && MDC.getMDCAdapter() != null) {
       var oldMdc = MDC.getCopyOfContextMap();
       MDC.setContextMap(mdc);
       try {
-        listener.wrapInvocation(() -> method.invoke(instance, args));
+        runnable.run();
       } finally {
         if (oldMdc == null) {
           MDC.clear();
@@ -104,7 +98,19 @@ public class Invocation {
         }
       }
     } else {
-      listener.wrapInvocation(() -> method.invoke(instance, args));
+      runnable.run();
     }
+  }
+
+
+
+  void invoke(Object instance, TransactionOutboxListener listener)
+      throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+    Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
+    method.setAccessible(true);
+    if (log.isDebugEnabled()) {
+      log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
+    }
+    listener.wrapInvocation(() -> method.invoke(instance, args));
   }
 }
