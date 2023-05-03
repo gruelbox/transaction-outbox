@@ -259,11 +259,14 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   @Override
   @SuppressWarnings("WeakerAccess")
   public void processNow(TransactionOutboxEntry entry) {
-    entry.getInvocation().withinMDC(() -> {
-      try {
-        initialize();
-        var success =
-                transactionManager.inTransactionReturnsThrows(
+    entry
+        .getInvocation()
+        .withinMDC(
+            () -> {
+              try {
+                initialize();
+                var success =
+                    transactionManager.inTransactionReturnsThrows(
                         transaction -> {
                           if (!persistor.lock(transaction, entry)) {
                             return false;
@@ -274,7 +277,9 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                             persistor.delete(transaction, entry);
                           } else {
                             log.debug(
-                                    "Deferring deletion of {} by {}", entry.description(), retentionThreshold);
+                                "Deferring deletion of {} by {}",
+                                entry.description(),
+                                retentionThreshold);
                             entry.setProcessed(true);
                             entry.setLastAttemptTime(Instant.now(clockProvider.get()));
                             entry.setNextAttemptTime(after(retentionThreshold));
@@ -282,18 +287,18 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                           }
                           return true;
                         });
-        if (success) {
-          log.info("Processed {}", entry.description());
-          listener.success(entry);
-        } else {
-          log.debug("Skipped task {} - may be locked or already processed", entry.getId());
-        }
-      } catch (InvocationTargetException e) {
-        updateAttemptCount(entry, e.getCause());
-      } catch (Exception e) {
-        updateAttemptCount(entry, e);
-      }
-    });
+                if (success) {
+                  log.info("Processed {}", entry.description());
+                  listener.success(entry);
+                } else {
+                  log.debug("Skipped task {} - may be locked or already processed", entry.getId());
+                }
+              } catch (InvocationTargetException e) {
+                updateAttemptCount(entry, e.getCause());
+              } catch (Exception e) {
+                updateAttemptCount(entry, e);
+              }
+            });
   }
 
   private void invoke(TransactionOutboxEntry entry, Transaction transaction)
