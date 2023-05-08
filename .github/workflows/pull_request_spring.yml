@@ -1,4 +1,4 @@
-name: Pull request (spring)
+name: Pull request
 
 on:
   pull_request:
