@@ -270,6 +270,13 @@
 			<properties>
 				<gpg.executable>gpg2</gpg.executable>
 			</properties>
+			<modules>
+				<module>transactionoutbox-core</module>
+				<module>transactionoutbox-jackson</module>
+				<module>transactionoutbox-guice</module>
+				<module>transactionoutbox-jooq</module>
+				<module>transactionoutbox-quarkus</module>
+			</modules>
 			<build>
 				<plugins>
 					<plugin>
