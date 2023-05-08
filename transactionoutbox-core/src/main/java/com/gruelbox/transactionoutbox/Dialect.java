@@ -17,7 +17,7 @@ public enum Dialect {
   MY_SQL_8(true, Constants.DEFAULT_DELETE_EXPIRED_STMT, Constants.DEFAULT_LIMIT_CRITERIA), //
   POSTGRESQL_9(
       true,
-      "DELETE FROM {{table}} WHERE ctid IN (SELECT ctid FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?)",
+      "DELETE FROM {{table}} WHERE id IN (SELECT id FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?)",
       Constants.DEFAULT_LIMIT_CRITERIA), //
   H2(false, Constants.DEFAULT_DELETE_EXPIRED_STMT, Constants.DEFAULT_LIMIT_CRITERIA), //
   ORACLE(
