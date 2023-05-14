@@ -227,7 +227,8 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   @Override
   public boolean unblock(Transaction tx, String entryId) throws Exception {
-    try (PreparedStatement stmt =
+    @SuppressWarnings("resource")
+    PreparedStatement stmt =
         tx.prepareBatchStatement(
             "UPDATE "
                 + tableName
@@ -238,11 +239,10 @@ public class DefaultPersistor implements Persistor, Validatable {
                 + dialect.booleanValue(true)
                 + " AND processed = "
                 + dialect.booleanValue(false)
-                + " AND id = ?")) {
-      stmt.setString(1, entryId);
-      stmt.setQueryTimeout(writeLockTimeoutSeconds);
-      return stmt.executeUpdate() != 0;
-    }
+                + " AND id = ?");
+    stmt.setString(1, entryId);
+    stmt.setQueryTimeout(writeLockTimeoutSeconds);
+    return stmt.executeUpdate() != 0;
   }
 
   @Override
