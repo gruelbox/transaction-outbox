@@ -33,7 +33,9 @@ public enum Dialect {
   @SuppressWarnings("JavaDoc")
   private final boolean supportsSkipLock;
 
-  /** @return Format string for the SQL required to delete expired retained records. */
+  /**
+   * @return Format string for the SQL required to delete expired retained records.
+   */
   @SuppressWarnings("JavaDoc")
   private final String deleteExpired;
 

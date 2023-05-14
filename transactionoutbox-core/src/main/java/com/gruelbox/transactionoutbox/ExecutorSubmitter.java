@@ -39,7 +39,9 @@ import org.slf4j.event.Level;
 @Builder
 public class ExecutorSubmitter implements Submitter, Validatable {
 
-  /** @param executor The executor to use. */
+  /**
+   * @param executor The executor to use.
+   */
   @SuppressWarnings("JavaDoc")
   private final Executor executor;
 

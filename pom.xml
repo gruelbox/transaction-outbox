@@ -33,15 +33,15 @@
 		<test.dir>src/test/java</test.dir>
 		<skip.format>false</skip.format>
 
-    <!-- Dependency versions -->
-    <logback.version>1.4.7</logback.version>
-    <revision>1.3.99999-SNAPSHOT</revision>
-    <junit.jupiter.version>5.9.3</junit.jupiter.version>
-    <testcontainers.version>1.18.1</testcontainers.version>
-    <maven.source.plugin.version>3.2.1</maven.source.plugin.version>
-    <nexus.staging.plugin.version>1.6.13</nexus.staging.plugin.version>
-    <maven.gpg.plugin.version>3.1.0</maven.gpg.plugin.version>
-  </properties>
+		<!-- Dependency versions -->
+		<logback.version>1.4.7</logback.version>
+		<revision>1.3.99999-SNAPSHOT</revision>
+		<junit.jupiter.version>5.9.3</junit.jupiter.version>
+		<testcontainers.version>1.18.1</testcontainers.version>
+		<maven.source.plugin.version>3.2.1</maven.source.plugin.version>
+		<nexus.staging.plugin.version>1.6.13</nexus.staging.plugin.version>
+		<maven.gpg.plugin.version>3.1.0</maven.gpg.plugin.version>
+  	</properties>
 
 	<modules>
 		<module>transactionoutbox-core</module>
@@ -76,12 +76,12 @@
         <version>2.10.1</version>
       </dependency>
 
-			<dependency>
-				<groupId>org.projectlombok</groupId>
-				<artifactId>lombok</artifactId>
-				<version>1.18.24</version>
-				<scope>provided</scope>
-			</dependency>
+      <dependency>
+		<groupId>org.projectlombok</groupId>
+		<artifactId>lombok</artifactId>
+		<version>1.18.24</version>
+		<scope>provided</scope>
+      </dependency>
 
       <dependency>
         <groupId>org.junit.jupiter</groupId>
@@ -236,42 +236,38 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>com.spotify.fmt</groupId>
+				<artifactId>fmt-maven-plugin</artifactId>
+				<version>2.20</version>
+				<configuration>
+					<verbose>true</verbose>
+					<filesNamePattern>.*\.java</filesNamePattern>
+					<skip>false</skip>
+					<skipSortingImports>false</skipSortingImports>
+					<style>google</style>
+				</configuration>
+				<executions>
+					<execution>
+						<phase>validate</phase>
+						<goals>
+							<goal>format</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 
 	<profiles>
 		<profile>
 			<id>spring</id>
+			<activation>
+				<jdk>[17,)</jdk>
+			</activation>
 			<modules>
 				<module>transactionoutbox-spring</module>
 			</modules>
-		</profile>
-		<profile>
-			<id>active-on-jdk-11</id>
-			<activation>
-				<jdk>[11,16)</jdk>
-			</activation>
-
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>com.coveo</groupId>
-						<artifactId>fmt-maven-plugin</artifactId>
-						<version>2.13</version>
-						<configuration>
-							<filesNamePattern>.*\.java</filesNamePattern>
-							<skip>${skip.format}</skip>
-						</configuration>
-						<executions>
-							<execution>
-								<goals>
-									<goal>format</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
 		</profile>
 		<profile>
 			<id>release</id>

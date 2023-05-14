@@ -6,7 +6,9 @@ import java.sql.PreparedStatement;
 /** Access and manipulation of a currently-active transaction. */
 public interface Transaction {
 
-  /** @return The connection for the transaction. */
+  /**
+   * @return The connection for the transaction.
+   */
   Connection connection();
 
   /**
