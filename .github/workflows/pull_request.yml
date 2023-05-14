@@ -22,4 +22,4 @@ jobs:
           java-version: ${{ matrix.jdk }}
 
       - name: Build with Maven
-        run: mvn -B package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        run: mvn -Pconcise -B package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
