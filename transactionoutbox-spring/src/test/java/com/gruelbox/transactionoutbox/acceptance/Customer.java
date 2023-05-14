@@ -1,37 +1,18 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 class Customer {
-
   @Id private Long id;
-  private String firstName;
-  private String lastName;
-
-  protected Customer() {}
-
-  Customer(Long id, String firstName, String lastName) {
-    this.id = id;
-    this.firstName = firstName;
-    this.lastName = lastName;
-  }
-
-  @Override
-  public String toString() {
-    return String.format("Customer[id=%d, firstName='%s', lastName='%s']", id, firstName, lastName);
-  }
-
-  Long getId() {
-    return id;
-  }
-
-  String getFirstName() {
-    return firstName;
-  }
-
-  String getLastName() {
-    return lastName;
-  }
+  @Column private String firstName;
+  @Column private String lastName;
 }

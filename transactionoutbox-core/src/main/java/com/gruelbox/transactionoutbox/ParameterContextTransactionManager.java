@@ -33,7 +33,9 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
    */
   Transaction transactionFromContext(T context);
 
-  /** @return The type expected by {@link #transactionFromContext(Object)}. */
+  /**
+   * @return The type expected by {@link #transactionFromContext(Object)}.
+   */
   Class<T> contextType();
 
   /**

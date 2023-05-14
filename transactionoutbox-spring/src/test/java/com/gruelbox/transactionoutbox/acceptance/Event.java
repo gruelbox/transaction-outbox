@@ -1,46 +1,20 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
-import java.time.LocalDateTime;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import java.time.LocalDateTime;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 class Event {
-
   @Id private Long id;
-
-  private String description;
-  private LocalDateTime created;
-
-  protected Event() {}
-
-  Event(long id, String description, LocalDateTime created) {
-    this.id = id;
-    this.description = description;
-    this.created = created;
-  }
-
-  Long getId() {
-    return id;
-  }
-
-  void setId(Long id) {
-    this.id = id;
-  }
-
-  String getDescription() {
-    return description;
-  }
-
-  void setDescription(String description) {
-    this.description = description;
-  }
-
-  LocalDateTime getCreated() {
-    return created;
-  }
-
-  void setCreated(LocalDateTime created) {
-    this.created = created;
-  }
+  @Column private String description;
+  @Column private LocalDateTime created;
 }
