@@ -57,7 +57,7 @@ jobs:
           commit-message: "Update versions in READMEs [skip ci]"
           title: Update versions in READMEs
           body: Updates the versions in the README files following the release
-          branch: update-readme-version/${GITHUB_REF##*/}
+          branch: update-readme-version
           base: master
           author: GitHub <noreply@github.com>
 
