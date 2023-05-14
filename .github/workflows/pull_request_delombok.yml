@@ -18,8 +18,18 @@ jobs:
         with:
           java-version: 17
 
+      - name: Set up testcontainers reuse
+        run: |
+          echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
+
       - name: Build with Maven and delombok
-        run: mvn -Pconcise,delombok -B package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        run: mvn -Pconcise,delombok -B package -fae -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+          files: ./**/target/surefire-reports/**/*.xml
 
       - uses: actions/upload-artifact@v2
         with:

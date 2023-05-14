@@ -1,7 +1,10 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.BaseTransaction;
+import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import lombok.ToString;
@@ -14,13 +17,13 @@ import org.slf4j.event.Level;
  * pattern for Java. See <a href="https://github.com/gruelbox/transaction-outbox">README</a> for
  * usage instructions.
  */
-public interface TransactionOutbox {
+public interface TransactionOutbox extends SchedulerProxyFactory {
 
   /**
    * @return A builder for creating a new instance of {@link TransactionOutbox}.
    */
   static TransactionOutboxBuilder builder() {
-    return TransactionOutboxImpl.builder();
+    return new TransactionOutboxImpl.Builder();
   }
 
   /**
@@ -36,7 +39,7 @@ public interface TransactionOutbox {
    * <p>Returns a proxy of {@code T} which, when called, will instantly return and schedule a call
    * of the <em>real</em> method to occur after the current transaction is committed (as such a
    * transaction needs to be active and accessible from the transaction manager supplied to {@link
-   * TransactionOutboxBuilder#transactionManager(TransactionManager)}),
+   * TransactionOutboxBuilder#transactionManager(BaseTransactionManager)}).
    *
    * <p>Usage:
    *
@@ -54,8 +57,9 @@ public interface TransactionOutbox {
    *
    * @param clazz The class to proxy.
    * @param <T> The type to proxy.
-   * @return The proxy of {@code T}.
+   * @return The proxy of {@code X}.
    */
+  @Override
   <T> T schedule(Class<T> clazz);
 
   /**
@@ -79,55 +83,111 @@ public interface TransactionOutbox {
    * queue with a blocking policy, this method could block for a long time, depending on how long
    * the scheduled work takes and how large {@link TransactionOutboxBuilder#flushBatchSize(int)} is.
    *
-   * <p>Calls {@link TransactionManager#inTransactionReturns(TransactionalSupplier)} to start a new
-   * transaction for the fetch.
+   * <p>Calls {@link BaseTransactionManager#transactionally(Function)} to start a new transaction
+   * for the fetch.
    *
    * <p>Additionally, expires any records completed prior to the {@link
    * TransactionOutboxBuilder#retentionThreshold(Duration)}.
    *
    * @return true if any work was flushed.
    */
-  @SuppressWarnings("UnusedReturnValue")
   boolean flush();
 
   /**
-   * Unblocks a blocked entry and resets the attempt count so that it will be retried again.
-   * Requires an active transaction and a transaction manager that supports thread local context.
+   * Identifies any stale tasks queued using {@link #schedule(Class)} (those which were queued more
+   * than {@code attemptFrequency} ago and have been tried less than {@code blockAfterAttempts}
+   * times) and attempts to resubmit them.
+   *
+   * <p>As long as the {@link Submitter} is non-blocking (e.g. uses a bounded queue with a {@link
+   * java.util.concurrent.RejectedExecutionHandler} which throws such as {@link
+   * java.util.concurrent.ThreadPoolExecutor.AbortPolicy}), this method will return quickly.
+   * However, if the {@link Submitter}uses a bounded queue with a blocking policy, this method could
+   * block for a long time, depending on how long the scheduled work takes and how large {@code
+   * flushBatchSize} is.
+   *
+   * <p>Calls {@link BaseTransactionManager#transactionally(Function)} to start a new transaction
+   * for the fetch.
+   *
+   * <p>Additionally, expires any records completed prior to the {@link
+   * TransactionOutboxBuilder#retentionThreshold(Duration)}.
+   *
+   * @return true if any work was flushed.
+   */
+  CompletableFuture<Boolean> flushAsync();
+
+  /**
+   * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
+   * transaction and a transaction manager that supports thread local context.
    *
    * @param entryId The entry id.
-   * @return True if the request to unblock the entry was successful. May return false if another
-   *     thread unblocked the entry first.
+   * @return True if the unblocking request was successful. May return false if another thread
+   *     unblocked the entry first.
    */
   boolean unblock(String entryId);
 
   /**
-   * Clears a failed entry of its failed state and resets the attempt count so that it will be
-   * retried again. Requires an active transaction and a transaction manager that supports supplied
-   * context.
+   * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
+   * transaction to be supplied.
    *
    * @param entryId The entry id.
-   * @param transactionContext The transaction context ({@link TransactionManager} implementation
-   *     specific).
-   * @return True if the request to unblock the entry was successful. May return false if another
-   *     thread unblocked the entry first.
+   * @param transaction The transaction ({@link BaseTransactionManager} implementation specific).
+   * @return True if the unblocking request was successful. May return false if another thread
+   *     unblocked the entry first.
    */
-  @SuppressWarnings("unused")
-  boolean unblock(String entryId, Object transactionContext);
+  boolean unblock(String entryId, BaseTransaction<?> transaction);
 
   /**
-   * Processes an entry immediately in the current thread. Intended for use in custom
-   * implementations of {@link Submitter} and should not generally otherwise be called.
+   * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
+   * transaction and a transaction manager that supports thread local context. Will run
+   * asynchronously if the underlying database API supports it.
+   *
+   * @param entryId The entry id.
+   * @return True if the unblocking request was successful. May return false if another thread
+   *     unblocked the entry first.
+   */
+  CompletableFuture<Boolean> unblockAsync(String entryId);
+  /**
+   * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
+   * transaction to be supplied.
+   *
+   * <p>Will run asynchronously if the underlying database API supports it.
+   *
+   * @param entryId The entry id.
+   * @param transaction The transaction ({@link BaseTransactionManager} implementation specific).
+   * @return True if the unblocking request was successful. May return false if another thread
+   *     unblocked the entry first.
+   */
+  CompletableFuture<Boolean> unblockAsync(String entryId, BaseTransaction<?> transaction);
+
+  /**
+   * Marks a blocked entry back to not blocked and resets the attempt count. Requires an active
+   * transaction to be supplied via the implementation-specific context.
+   *
+   * <p>Will run asynchronously if the underlying database API supports it.
+   *
+   * @param entryId The entry id.
+   * @param transactionContext The transaction context ({@link BaseTransactionManager}
+   *     implementation specific).
+   * @return True if the unblocking request was successful. May return false if another thread
+   *     unblocked the entry first.
+   */
+  CompletableFuture<Boolean> unblockAsync(String entryId, Object transactionContext);
+
+  /**
+   * Processes an entry immediately. Intended for use in custom implementations of {@link Submitter}
+   * and should not generally otherwise be called.
    *
    * @param entry The entry.
+   * @return Void result.
    */
-  @SuppressWarnings("WeakerAccess")
-  void processNow(TransactionOutboxEntry entry);
+  @Beta
+  CompletableFuture<Void> processNow(TransactionOutboxEntry entry);
 
   /** Builder for {@link TransactionOutbox}. */
   @ToString
   abstract class TransactionOutboxBuilder {
 
-    protected TransactionManager transactionManager;
+    protected BaseTransactionManager<?, ?> transactionManager;
     protected Instantiator instantiator;
     protected Submitter submitter;
     protected Duration attemptFrequency;
@@ -135,13 +195,14 @@ public interface TransactionOutbox {
     protected int flushBatchSize;
     protected Supplier<Clock> clockProvider;
     protected TransactionOutboxListener listener;
-    protected Persistor persistor;
+    protected Persistor<?, ?> persistor;
     protected Level logLevelTemporaryFailure;
+    protected Level logLevelProcessStartAndFinish;
     protected Boolean serializeMdc;
     protected Duration retentionThreshold;
     protected Boolean initializeImmediately;
 
-    protected TransactionOutboxBuilder() {}
+    TransactionOutboxBuilder() {}
 
     /**
      * @param transactionManager Provides {@link TransactionOutbox} with the ability to start,
@@ -149,7 +210,8 @@ public interface TransactionOutbox {
      *     outside.
      * @return Builder.
      */
-    public TransactionOutboxBuilder transactionManager(TransactionManager transactionManager) {
+    public TransactionOutboxBuilder transactionManager(
+        BaseTransactionManager<?, ?> transactionManager) {
       this.transactionManager = transactionManager;
       return this;
     }
@@ -189,8 +251,7 @@ public interface TransactionOutbox {
     }
 
     /**
-     * @param blockAfterAttempts how many attempts a task should be retried before it is permanently
-     *     blocked. Defaults to 5.
+     * @param blockAfterAttempts After now many attempts a task should be blocked. Defaults to 5.
      * @return Builder.
      */
     public TransactionOutboxBuilder blockAfterAttempts(int blockAfterAttempts) {
@@ -232,12 +293,12 @@ public interface TransactionOutbox {
     /**
      * @param persistor The method {@link TransactionOutbox} uses to interact with the database.
      *     This encapsulates all {@link TransactionOutbox} interaction with the database outside
-     *     transaction management (which is handled by the {@link TransactionManager}). Defaults to
-     *     a multi-platform SQL implementation that should not need to be changed in most cases. If
-     *     re-implementing this interface, read the documentation on {@link Persistor} carefully.
+     *     transaction management (which is handled by the {@link BaseTransactionManager}). Defaults
+     *     to a multi-platform SQL implementation that should not need to be changed in most cases.
+     *     If re-implementing this interface, read the documentation on {@link Persistor} carefully.
      * @return Builder.
      */
-    public TransactionOutboxBuilder persistor(Persistor persistor) {
+    public TransactionOutboxBuilder persistor(Persistor<?, ?> persistor) {
       this.persistor = persistor;
       return this;
     }
@@ -250,6 +311,18 @@ public interface TransactionOutbox {
      */
     public TransactionOutboxBuilder logLevelTemporaryFailure(Level logLevelTemporaryFailure) {
       this.logLevelTemporaryFailure = logLevelTemporaryFailure;
+      return this;
+    }
+
+    /**
+     * @param logLevelProcessStartAndFinish The log level to use when logging start and finish on
+     *     tasks. Defaults to {@code INFO}, but can be helpful to reduce to {@code DEBUG} in high
+     *     volume environments.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder logLevelProcessStartAndFinish(
+        Level logLevelProcessStartAndFinish) {
+      this.logLevelProcessStartAndFinish = logLevelProcessStartAndFinish;
       return this;
     }
 
@@ -294,7 +367,7 @@ public interface TransactionOutbox {
     public abstract TransactionOutbox build();
   }
 
-  interface ParameterizedScheduleBuilder {
+  interface ParameterizedScheduleBuilder extends SchedulerProxyFactory {
 
     /**
      * Specifies a unique id for the request. This defaults to {@code null}, but if non-null, will
@@ -327,6 +400,7 @@ public interface TransactionOutbox {
      * @param <T> The type to proxy.
      * @return The proxy of {@code T}.
      */
+    @Override
     <T> T schedule(Class<T> clazz);
   }
 }

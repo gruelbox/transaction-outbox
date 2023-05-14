@@ -1,21 +1,17 @@
 package com.gruelbox.transactionoutbox;
 
+import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
+
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Stream;
+import java.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.DynamicNode;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestFactory;
-import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.engine.discovery.predicates.IsTestMethod;
+import org.junit.platform.commons.util.ReflectionUtils;
 
 @SuppressWarnings("RedundantCast")
 @Slf4j
@@ -24,17 +20,33 @@ class TestDefaultInvocationSerializer {
   private static final String CLASS_NAME = "foo";
   private static final String METHOD_NAME = "bar";
 
-  @TestFactory
-  Stream<DynamicNode> versions() {
-    return TestingUtils.parameterizedClassTester(
-        "serializedVersion={0}",
-        Inner.class,
-        Stream.of(Arguments.of(1), Arguments.of(2), Arguments.of(new Object[] {null})));
+  @Test
+  void version1() {
+    Inner inner = new Inner(1);
+    ReflectionUtils.findMethods(Inner.class, new IsTestMethod()).stream()
+        .peek(method -> log.info("Running test {}", method.getName()))
+        .forEach(method -> uncheckedly(() -> method.invoke(inner)));
   }
 
-  static class Inner {
+  @Test
+  void version2() {
+    Inner inner = new Inner(2);
+    ReflectionUtils.findMethods(Inner.class, new IsTestMethod()).stream()
+        .peek(method -> log.info("Running test {}", method.getName()))
+        .forEach(method -> uncheckedly(() -> method.invoke(inner)));
+  }
 
-    private DefaultInvocationSerializer serializer;
+  @Test
+  void version3() {
+    Inner inner = new Inner(null);
+    ReflectionUtils.findMethods(Inner.class, new IsTestMethod()).stream()
+        .peek(method -> log.info("Running test {}", method.getName()))
+        .forEach(method -> uncheckedly(() -> method.invoke(inner)));
+  }
+
+  private static class Inner {
+
+    private final DefaultInvocationSerializer serializer;
 
     Inner(Integer version) {
       this.serializer =

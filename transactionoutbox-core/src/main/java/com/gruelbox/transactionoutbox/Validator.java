@@ -4,7 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.function.Supplier;
 
-class Validator {
+public class Validator {
 
   private final String path;
   private final Supplier<Clock> clockProvider;

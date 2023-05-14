@@ -18,10 +18,11 @@ class TestGuiceInstantiator {
     MatcherAssert.assertThat(instance, Matchers.isA(Parent.class));
   }
 
-  static final class Child {}
+  private static final class Child {}
 
-  static final class Parent {
+  private static final class Parent {
 
+    @SuppressWarnings("FieldCanBeLocal")
     private final Child child;
 
     @Inject

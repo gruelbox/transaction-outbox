@@ -1,0 +1,54 @@
+name: Continous Delivery
+
+on:
+  push:
+    branches: [ r2dbc4-rebase ]
+
+jobs:
+  build:
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v1
+        with:
+          java-version: 17
+          server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
+          settings-path: ${{ github.workspace }} # location for the settings.xml file
+
+      - name: Set up testcontainers reuse
+        run: |
+          echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
+
+      - name: Build fork
+        if: ${{ github.event.pull_request.head.repo.fork }}
+        run: mvn -Pconcise -B package -fae -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Build, publish to GPR and tag
+        if: ${{ !github.event.pull_request.head.repo.fork }}
+        run: |
+          revision="6.0.$GITHUB_RUN_NUMBER"
+          echo "Building $revision at $GITHUB_SHA"
+          mvn -Pconcise,delombok -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision="$revision" -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - uses: gruelbox/git-auto-commit-action@v4
+        if: ${{ !github.event.pull_request.head.repo.fork }}
+        with:
+          commit_message: Apply formatting
+          file_pattern: '*.java *.xml'
+
+      - name: Tag
+        if: ${{ !github.event.pull_request.head.repo.fork }}
+        run: |
+          echo "Tagging $revision"
+          git tag $revision
+          git push origin $revision
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

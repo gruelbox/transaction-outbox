@@ -3,9 +3,11 @@ package com.gruelbox.transactionoutbox.jackson;
 import java.util.Map;
 import java.util.Set;
 import lombok.*;
+import lombok.extern.jackson.Jacksonized;
 
 @Getter
 @Setter
+@Jacksonized
 @NoArgsConstructor
 @EqualsAndHashCode
 @ToString

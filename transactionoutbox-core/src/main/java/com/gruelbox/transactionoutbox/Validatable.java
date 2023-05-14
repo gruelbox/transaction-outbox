@@ -1,5 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-interface Validatable {
+public interface Validatable {
   void validate(Validator validator);
 }

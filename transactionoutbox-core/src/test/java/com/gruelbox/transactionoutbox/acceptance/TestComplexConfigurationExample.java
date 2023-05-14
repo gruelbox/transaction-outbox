@@ -1,14 +1,14 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
-import com.gruelbox.transactionoutbox.DefaultPersistor;
-import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.ExecutorSubmitter;
 import com.gruelbox.transactionoutbox.Instantiator;
-import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.jdbc.JdbcPersistor;
+import com.gruelbox.transactionoutbox.jdbc.SimpleTransactionManager;
+import com.gruelbox.transactionoutbox.sql.Dialects;
 import java.sql.Connection;
 import java.time.Duration;
 import java.util.Currency;
@@ -36,7 +36,8 @@ class TestComplexConfigurationExample {
     ServiceLocator myServiceLocator = Mockito.mock(ServiceLocator.class);
     EventPublisher eventPublisher = Mockito.mock(EventPublisher.class);
 
-    TransactionManager transactionManager = TransactionManager.fromDataSource(dataSource);
+    SimpleTransactionManager transactionManager =
+        SimpleTransactionManager.fromDataSource(dataSource);
 
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -52,10 +53,10 @@ class TestComplexConfigurationExample {
             .transactionManager(transactionManager)
             // Modify how requests are persisted to the database.
             .persistor(
-                DefaultPersistor.builder()
+                JdbcPersistor.builder()
                     // Selecting the right SQL dialect ensures that features such as SKIP LOCKED are
                     // used correctly.
-                    .dialect(Dialect.POSTGRESQL_9)
+                    .dialect(Dialects.POSTGRESQL_9)
                     // Override the table name (defaults to "TXNO_OUTBOX")
                     .tableName("transactionOutbox")
                     // Shorten the time we will wait for write locks (defaults to 2)
@@ -86,6 +87,7 @@ class TestComplexConfigurationExample {
                     .build())
             // Lower the log level when a task fails temporarily from the default WARN.
             .logLevelTemporaryFailure(Level.INFO)
+            .logLevelProcessStartAndFinish(Level.INFO)
             // 10 attempts at a task before it is blocked (and would require intervention)
             .blockAfterAttempts(10)
             // When calling flush(), select 0.5m records at a time.
@@ -99,11 +101,9 @@ class TestComplexConfigurationExample {
             // request ids across invocations.
             .serializeMdc(true)
             // We can intercept task successes, single failures and blocked tasks. The most common
-            // use is
-            // to catch blocked tasks.
-            // and raise alerts for these to be investigated. A Slack interactive message is
-            // particularly effective here
-            // since it can be wired up to call unblock() automatically.
+            // use is to catch blocked tasks and raise alerts for these to be investigated. A
+            // Slack interactive message is particularly effective here since it can be wired up to
+            // call unblock() automatically.
             .listener(
                 new TransactionOutboxListener() {
 

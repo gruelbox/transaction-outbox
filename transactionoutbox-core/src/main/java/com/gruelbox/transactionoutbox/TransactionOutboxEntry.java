@@ -4,21 +4,17 @@ import static java.util.stream.Collectors.joining;
 
 import java.time.Instant;
 import java.util.Arrays;
-import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
-/**
- * Internal representation of a {@link TransactionOutbox} task. Generally only directly of interest
- * to implementers of SPIs such as {@link Persistor} or {@link Submitter}.
- */
+/** Internal representation of a {@code TransactionOutbox} task. */
 @SuperBuilder(toBuilder = true)
 @EqualsAndHashCode
 @ToString
-public class TransactionOutboxEntry implements Validatable {
+public final class TransactionOutboxEntry implements Validatable {
 
   /**
    * @param id The id of the record. Usually a UUID.
@@ -30,7 +26,8 @@ public class TransactionOutboxEntry implements Validatable {
 
   /**
    * @param uniqueRequestId A unique, client-supplied key for the entry. If supplied, it must be
-   *     globally unique
+   *     globally unique.
+   * @return A unique, client-supplied key for the entry. If supplied, it must be globally unique.
    */
   @SuppressWarnings("JavaDoc")
   @Getter
@@ -42,7 +39,7 @@ public class TransactionOutboxEntry implements Validatable {
    */
   @SuppressWarnings("JavaDoc")
   @Getter
-  @Setter(AccessLevel.PACKAGE)
+  @Setter
   private Invocation invocation;
 
   /**
@@ -101,8 +98,8 @@ public class TransactionOutboxEntry implements Validatable {
   @Setter
   private int version;
 
-  @EqualsAndHashCode.Exclude @ToString.Exclude private volatile boolean initialized;
-  @EqualsAndHashCode.Exclude @ToString.Exclude private String description;
+  @EqualsAndHashCode.Exclude @ToString.Exclude private transient volatile boolean initialized;
+  @EqualsAndHashCode.Exclude @ToString.Exclude private transient String description;
 
   /**
    * @return A textual description of the task.

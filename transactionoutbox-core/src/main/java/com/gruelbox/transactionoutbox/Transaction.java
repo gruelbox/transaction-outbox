@@ -1,40 +1,25 @@
 package com.gruelbox.transactionoutbox;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
+import com.gruelbox.transactionoutbox.jdbc.JdbcTransaction;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
-/** Access and manipulation of a currently-active transaction. */
-public interface Transaction {
+/**
+ * Represents a transaction in JDBC-land.
+ *
+ * @deprecated Use {@link com.gruelbox.transactionoutbox.jdbc.JdbcTransaction} for equivalent
+ *     functionality.
+ */
+@Deprecated
+public interface Transaction extends JdbcTransaction {
 
-  /**
-   * @return The connection for the transaction.
-   */
-  Connection connection();
-
-  /**
-   * @param <T> The context type. Coerced on read.
-   * @return A {@link TransactionManager}-specific object representing the context of this
-   *     transaction. Intended for use with {@link TransactionManager} implementations that support
-   *     explicitly-passed transaction context injection into method arguments.
-   */
-  default <T> T context() {
-    return null;
+  @Override
+  default void addPostCommitHook(Runnable hook) {
+    throw new UnsupportedOperationException("This method needs to be implemented");
   }
 
-  /**
-   * Creates a prepared statement which will be cached and re-used within a transaction. Any batch
-   * on these statements is executed before the transaction is committed, and automatically closed.
-   *
-   * @param sql The SQL statement
-   * @return The statement.
-   */
-  PreparedStatement prepareBatchStatement(String sql);
-
-  /**
-   * Will be called to perform work immediately after the current transaction is committed. This
-   * should occur in the same thread and will generally not be long-lasting.
-   *
-   * @param runnable The code to run post-commit.
-   */
-  void addPostCommitHook(Runnable runnable);
+  @Override
+  default void addPostCommitHook(Supplier<CompletableFuture<Void>> hook) {
+    addPostCommitHook(() -> Utils.join(hook.get()));
+  }
 }
