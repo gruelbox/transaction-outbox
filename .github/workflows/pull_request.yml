@@ -1,4 +1,4 @@
-name: Pull request legacy JDKs
+name: Pull request
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        jdk: [11,]
+        jdk: [11,20]
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
