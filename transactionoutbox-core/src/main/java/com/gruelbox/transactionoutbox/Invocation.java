@@ -22,7 +22,9 @@ import org.slf4j.MDC;
 @Slf4j
 public final class Invocation {
 
-  /** @return The class name (as provided/expected by an {@link Instantiator}). */
+  /**
+   * @return The class name (as provided/expected by an {@link Instantiator}).
+   */
   @SuppressWarnings("JavaDoc")
   @SerializedName("c")
   String className;
@@ -42,12 +44,16 @@ public final class Invocation {
   @SerializedName("p")
   Class<?>[] parameterTypes;
 
-  /** @return The arguments to call. Must match {@link #parameterTypes}. */
+  /**
+   * @return The arguments to call. Must match {@link #parameterTypes}.
+   */
   @SuppressWarnings("JavaDoc")
   @SerializedName("a")
   Object[] args;
 
-  /** @return Thread-local context to recreate when running the task. */
+  /**
+   * @return Thread-local context to recreate when running the task.
+   */
   @SuppressWarnings("JavaDoc")
   @SerializedName("x")
   Map<String, String> mdc;

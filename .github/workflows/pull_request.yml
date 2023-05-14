@@ -1,4 +1,4 @@
-name: Pull request legacy JDKs
+name: Pull request
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        jdk: [11,15]
+        jdk: [11,17,20]
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -26,7 +26,7 @@ jobs:
           echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
 
       - name: Build with Maven
-        run: mvn -B package -fae
+        run: mvn -Pconcise -B package -fae -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
 
       - name: Publish Unit Test Results
         uses: EnricoMi/publish-unit-test-result-action@v1
