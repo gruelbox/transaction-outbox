@@ -52,7 +52,7 @@ public class ProxyFactory {
   }
 
   @SuppressWarnings({"unchecked", "cast"})
-  <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], T> processor) {
+  public <T> T createProxy(Class<T> clazz, BiFunction<Method, Object[], T> processor) {
     if (clazz.isInterface()) {
       // Fastest - we can just proxy an interface directly
       return (T)

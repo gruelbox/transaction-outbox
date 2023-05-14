@@ -30,13 +30,13 @@ public interface TransactionOutboxListener {
    * @throws IllegalArgumentException If thrown by the method invocation.
    * @throws InvocationTargetException If thrown by the method invocation.
    */
-  default void wrapInvocation(Invocator invocator)
+  default Object wrapInvocation(Invocator invocator)
       throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-    invocator.run();
+    return invocator.run();
   }
 
   interface Invocator {
-    void run() throws IllegalAccessException, IllegalArgumentException, InvocationTargetException;
+    Object run() throws IllegalAccessException, IllegalArgumentException, InvocationTargetException;
   }
 
   /**
@@ -100,9 +100,9 @@ public interface TransactionOutboxListener {
       }
 
       @Override
-      public void wrapInvocation(Invocator invocator)
+      public Object wrapInvocation(Invocator invocator)
           throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-        self.wrapInvocation(() -> other.wrapInvocation(invocator));
+        return self.wrapInvocation(() -> other.wrapInvocation(invocator));
       }
 
       @Override

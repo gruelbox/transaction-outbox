@@ -8,11 +8,12 @@
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox/badge)](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox)
 
-A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. `TransactionOutbox` has a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks. Every aspect is highly configurable or overridable. It features out-of-the-box support for **Spring DI**, **Spring Txn**, **Guice**, **MySQL 5 & 8**, **PostgreSQL 9-12**, **Oracle 18 & 21** and **H2**.
+A [flexible](#key-benefits) implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java, providing a reliable means of [ensuring eventual consistency](#why-do-i-need-it) and [idempotency](#idempotency-protection) in Microservices architectures based on transactional databases.
 
 ## Contents
 
 1. [Why do I need it?](#why-do-i-need-it)
+1. [Key benefits](#key-benefits)
 1. [Installation](#installation)
    1. [Requirements](#requirements)
    1. [Stable releases](#stable-releases)
@@ -31,6 +32,8 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
    1. [Clustering](#clustering)
 1. [Configuration reference](#configuration-reference)
 1. [Stubbing in tests](#stubbing-in-tests)
+1. [Working with the SPI](#working-with-the-spi)
+1. [Community](#community)
 
 ## Why do I need it?
 
@@ -92,8 +95,8 @@ public void createWidget(@PathParam("id") SaleId saleId, Sale sale) {
 
 Here's what happens:
 
-- When you create an instance of [`TransactionOutbox`](https://www.javadoc.io/static/com.gruelbox/transactionoutbox-core/0.1.57/com/gruelbox/transactionoutbox/TransactionOutbox.html) (see [Basic Configuration](#basic-configuration)), it will, by default, automatically create two database tables, `TXNO_OUTBOX` and `TXNO_VERSION`, and then keep these synchronized with schema changes as new versions are released. _Note: this is the default behaviour on a SQL database, but is completely overridable if you are using a different type of data store or don't want a third party library managing your database schema. See [Configuration reference](#configuration-reference)_. 
-- [`TransactionOutbox`](https://www.javadoc.io/static/com.gruelbox/transactionoutbox-core/0.1.57/com/gruelbox/transactionoutbox/TransactionOutbox.html) creates a proxy of `MessageQueue`. Any method calls on the proxy are serialized and written to the `TXNO_OUTBOX` table (by default) _in the same transaction_ as the `SaleRepository` call. The call returns immediately rather than actually invoking the real method.
+- When you create an instance of [`TransactionOutbox`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html) (see [Basic Configuration](#basic-configuration)), it will, by default, automatically create two database tables, `TXNO_OUTBOX` and `TXNO_VERSION`, and then keep these synchronized with schema changes as new versions are released. _Note: this is the default behaviour on a SQL database, but is completely overridable if you are using a different type of data store or don't want a third party library managing your database schema. See [Configuration reference](#configuration-reference)_. 
+- [`TransactionOutbox`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html) creates a proxy of `MessageQueue`. Any method calls on the proxy are serialized and written to the `TXNO_OUTBOX` table (by default) _in the same transaction_ as the `SaleRepository` call. The call returns immediately rather than actually invoking the real method.
 - If the transaction rolls back, so do the serialized requests.
 - Immediately after the transaction is successfully committed, another thread will attempt to make the _real_ call to `MessageQueue` asynchronously.
 - If that call fails, or the application dies before the call is attempted, a [background "mop-up" thread](#set-up-the-background-worker) will re-attempt the call a configurable number of times, with configurable time between each, before [blocking](#managing-the-dead-letter-queue) the request and firing and event for it to be investigated (similar to a [dead letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue)).
@@ -105,12 +108,35 @@ If you find yourself wondering _why bother with the queues now_? You're quite ri
 
 > Note that for the above example to work, `StockReductionEvent` and `IncomeEvent` need to be included for serialization. See [Configuration reference](#configuration-reference).
 
+## Key benefits
+
+Core library:
+
+- In heavy production use and tested at volume
+- A clean, extensible API
+- Very few dependencies
+- Highly configurable and extensible
+- Non-blocking core suited to reactive applications
+- Supports any data manipulation API (JDBC, R2DBC, ADBA...)
+- Supports any transactional data store (SQL or noSQL)
+- Supports any transaction management framework
+- Supports any dependency injection or service locator framework
+
+In-built support for:
+
+- Data APIs: **JDBC** (blocking - fully suppported) and **R2DBC** (non-blocking - currently in beta)
+- SQL dialects: **MySQL 5 & 8**, **PostgreSQL 9-12** and **H2**
+- Transaction management: **Spring Txn** and **jOOQ**
+- Dependency injection: **Spring DI** and **Guice**.
+
+Other integrations are easy to create. Please ask if you need help.
+
 ## Installation
 
 ### Requirements
 - At least **Java 11**. Downgrading to requiring Java 8 is [under consideration](https://github.com/gruelbox/transaction-outbox/issues/29).
-- Currently, **MySQL**, **PostgreSQL**, **Oracle** or **H2** databases (pull requests to support SQL Server or any other traditional RDMBS would be trivial. Beyond that, a SQL database is not strictly necessary for the pattern to work, merely a data store with the concept of a transaction spanning multiple mutation operations).
-- Database access via **JDBC** (In principle, JDBC should not be required - alternatives such as R2DBC are under investigation - but the API is currently tied to it)
+- Currently, **MySQL**, **PostgreSQL**, **Oracle** or **H2** databases (pull requests to support Oracle, SQL Server or any other traditional RDMBS would be trivial. Beyond that, a SQL database is not strictly necessary for the pattern to work, merely a data store with the concept of a transaction spanning multiple mutation operations).
+- Database access via **JDBC** or **R2DBC** (additional APIs could be implemented by pull request).
 - Native transactions (not JTA or similar).
 - (Optional) Proxying non-interfaces requires [ByteBuddy](https://bytebuddy.net/#/) and for proxying classes without default constructors [Objenesis](http://objenesis.org/) to be added as a dependency
 
@@ -180,7 +206,7 @@ repositories {
 
 ## Basic Configuration
 
-An application needs a single, shared instance of [`TransactionOutbox`](https://www.javadoc.io/static/com.gruelbox/transactionoutbox-core/0.1.57/com/gruelbox/transactionoutbox/TransactionOutbox.html), which is configured using a builder on construction. This takes some time to get right, particularly if you already have a transaction management solution in your application.
+An application needs a single, shared instance of [`TransactionOutbox`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html), which is configured using a builder on construction. This takes some time to get right, particularly if you already have a transaction management solution in your application.
 
 ### No existing transaction manager or dependency injection
 
@@ -188,13 +214,13 @@ If you have no existing transaction management, connection pooling or dependency
 
 ```java
 // Use an in-memory H2 database
-TransactionManager transactionManager = TransactionManager.fromConnectionDetails(
+SimpleTransactionManager = SimpleTransactionManager.fromConnectionDetails(
     "org.h2.Driver", "jdbc:h2:mem:test;MV_STORE=TRUE", "test", "test"));
 
 // Create the outbox
 TransactionOutbox outbox = TransactionOutbox.builder()
   .transactionManager(transactionManager)
-  .persistor(Persistor.forDialect(Dialect.H2))
+  .persistor(Persistor.forDialect(Dialects.H2))
   .build();
 
 // Start a transaction
@@ -206,10 +232,10 @@ transactionManager.inTransaction(tx -> {
 });
 ```
 
-Alternatively, you could create the [`TransactionManager`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionManager.html) from a [`DataSource`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionManager.html), allowing you to use a connection pooling `DataSource` such as Hikari:
+Alternatively, you could use a `DataSource`, allowing you to use a connection pooling `DataSource` such as HikariCP:
 
 ```java
-TransactionManager transactionManager = TransactionManager.fromDataSource(dataSource);
+SimpleTransactionManager transactionManager = SimpleTransactionManager.fromDataSource(dataSource);
 ```
 
 In this default configuration, `MyClass` must have a default constructor so the "real" implementation can be constructed at the point the method is actually invoked (which might be on another day on another instance of the application). However, you can avoid this requirement by providing an [`Instantiator`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/Instantiator.html) on every instance of your application that knows how to create the objects:
@@ -465,8 +491,6 @@ Armed with the above, happy clustering!
 This example shows a number of other configuration options in action:
 
 ```java
-TransactionManager transactionManager = TransactionManager.fromDataSource(dataSource);
-
 TransactionOutbox outbox = TransactionOutbox.builder()
     // The most complex part to set up for most will be synchronizing with your existing transaction
     // management. Pre-rolled implementations are available for jOOQ and Spring (see above for more information)
@@ -478,7 +502,7 @@ TransactionOutbox outbox = TransactionOutbox.builder()
     // DefaultPersistor, or create a completely new Persistor implementation.
     .persistor(DefaultPersistor.builder()
         // Selecting the right SQL dialect ensures that features such as SKIP LOCKED are used correctly.
-        .dialect(Dialect.POSTGRESQL_9)
+        .dialect(Dialects.POSTGRESQL_9)
         // Override the table name (defaults to "TXNO_OUTBOX")
         .tableName("transactionOutbox")
         // Shorten the time we will wait for write locks (defaults to 2)
@@ -505,6 +529,8 @@ TransactionOutbox outbox = TransactionOutbox.builder()
         .build())
     // Lower the log level when a task fails temporarily from the default WARN.
     .logLevelTemporaryFailure(Level.INFO)
+    // Level to log start/finish of tasks. Advisable to set this lower in high volume environments.
+    .logLevelProcessStartAndFinish(Level.INFO)
     // 10 attempts at a task before blocking it.
     .blockAfterAttempts(10)
     // When calling flush(), select 0.5m records at a time.
@@ -553,24 +579,26 @@ try {
 
 `TransactionOutbox` should not be directly stubbed (e.g. using Mockito); the contract is too complex to stub out.
 
-Instead, [stubs](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/StubThreadLocalTransactionManager.html) [exist](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/StubPersistor.html) for the various arguments to the builder, allowing you to build a `TransactionOutbox` with minimal external dependencies which can be called and verified in tests.
+Instead, stubs exist for the various arguments to the builder, allowing you to build a `TransactionOutbox` with minimal external dependencies which can be called and verified in tests.
 
 ```java
 // GIVEN
 
-SomeService mockService = Mockito.mock(SomeService.class);
+SomeService mockService = mock(SomeService.class);
 
-// Also see StubParameterContextTransactionManager
-TransactionManager transactionManager = new StubThreadLocalTransactionManager();
+// Examples of stub transaction managers
+SimpleTransactionManager transactionManager1 = new StubStubSimpleTransactionManager(() -> new SimpleTransaction<>(mock(Connection.class, null)));
+DefaultJooqTransactionManager transactionManager2 = new StubDefaultJooqTransactionManager();
+SpringTransactionManager transactionManager3 = new StubSpringTransactionManager();
 
 TransactionOutbox outbox = TransactionOutbox.builder()
+    .transactionManager(transactionManager1)
     .instantiator(Instantiator.using(clazz -> mockService)) // Return our mock
     .persistor(StubPersistor.builder().build()) // Doesn't save anything
     .submitter(Submitter.withExecutor(MoreExecutors.directExecutor())) // Execute all work in-line
     .clockProvider(() ->
         Clock.fixed(LocalDateTime.of(2020, 3, 1, 12, 0)
             .toInstant(ZoneOffset.UTC), ZoneOffset.UTC)) // Fix the clock (not necessary here)
-    .transactionManager(transactionManager)
     .build();
 
 // WHEN
@@ -582,3 +610,16 @@ Mockito.verify(mockService).doAThing(1);
 ```
 
 Depending on the type of test, you may wish to use a real `Persistor` such as `DefaultPersistor` (if there's a real database available) or a real, multi-threaded `Submitter`. That's up to you.
+
+## Working with the SPI
+
+As noted above, it is straightforward to create integrations with additional database platforms and transaction managers. Since every company seems to have its own home-grown way of managing transactions, this turns out to be a very common thing to need to do.
+
+Documentation for this is on the way, but in the meantime please feel free to ask if you need help.
+
+
+## Community
+
+Key contributors:
+
+<a href="https://www.goji.investments"><img src="https://www.goji.investments/wp-content/themes/goji/assets/images/logo.svg" width="80"/></a>

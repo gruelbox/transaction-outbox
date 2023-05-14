@@ -21,7 +21,7 @@ public class DaoImpl {
     }
     String insertQuery = "insert into toto values (?);";
     try (Connection connexion = defaultDataSource.getConnection();
-        PreparedStatement statement = connexion.prepareStatement(insertQuery); ) {
+        PreparedStatement statement = connexion.prepareStatement(insertQuery)) {
       statement.setString(1, something);
       return statement.executeUpdate();
     } catch (SQLException e) {
@@ -32,7 +32,7 @@ public class DaoImpl {
   public List<String> getFromDatabase() {
     List<String> values = new ArrayList<>();
     try (Connection connexion = defaultDataSource.getConnection();
-        Statement statement = connexion.createStatement(); ) {
+        Statement statement = connexion.createStatement()) {
       ResultSet resultSet = statement.executeQuery("select * from toto;");
       while (resultSet.next()) {
         values.add(resultSet.getString(1));
@@ -45,7 +45,7 @@ public class DaoImpl {
 
   public int purge() {
     try (Connection connexion = defaultDataSource.getConnection();
-        Statement statement = connexion.createStatement(); ) {
+        Statement statement = connexion.createStatement()) {
       return statement.executeUpdate("delete from toto;");
     } catch (SQLException e) {
       throw new RuntimeException(e);

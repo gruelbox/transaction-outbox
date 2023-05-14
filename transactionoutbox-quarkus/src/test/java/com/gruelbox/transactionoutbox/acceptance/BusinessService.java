@@ -7,7 +7,7 @@ import javax.transaction.Transactional;
 
 @ApplicationScoped
 public class BusinessService {
-  private DaoImpl dao;
+  private final DaoImpl dao;
 
   @Inject private TransactionOutbox outbox;
 

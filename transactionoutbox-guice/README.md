@@ -39,7 +39,7 @@ To get a `TransactionOutbox` for use throughout your application, add a `Singlet
 ```java
 @Provides
 @Singleton
-TransactionOutbox transactionOutbox(Injector injector, TransactionManager transactionManager) {
+TransactionOutbox transactionOutbox(Injector injector, SimpleTransactionManager transactionManager) {
   return TransactionOutbox.builder()
     .transactionManager(transactionManager)
     .persistor(Persistor.forDialect(Dialect.MY_SQL_8))
