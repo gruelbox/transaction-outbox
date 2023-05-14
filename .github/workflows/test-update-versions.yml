@@ -1,4 +1,4 @@
-name: Publish to Central
+name: Test update versions
 
 on: workflow_dispatch
 
