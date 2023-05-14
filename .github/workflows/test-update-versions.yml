@@ -28,7 +28,7 @@ jobs:
           sed -i "s_\(implementation 'com.gruelbox:transactionoutbox-quarkus:\)[^']*_\1${revision}_g" transactionoutbox-quarkus/README.md
 
       - name: Create version update pull request
-        uses: gruelbox/create-pull-request@v5
+        uses: gruelbox/create-pull-request
         with:
           commit-message: "Update versions in READMEs [skip ci]"
           title: Update versions in READMEs
