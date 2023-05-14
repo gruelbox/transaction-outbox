@@ -19,7 +19,7 @@ jobs:
           java-version: 17
 
       - name: Build with Maven and delombok
-        run: mvn -Pdelombok -B package
+        run: mvn -Pdelombok -B package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
 
       - uses: actions/upload-artifact@v2
         with:
