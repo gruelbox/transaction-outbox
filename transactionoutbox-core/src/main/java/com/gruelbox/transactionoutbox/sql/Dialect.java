@@ -107,8 +107,8 @@ public abstract class Dialect {
     return row;
   }
 
-  public CompletableFuture<Integer> createVersionTableIfNotExists(
-      Function<String, CompletableFuture<Integer>> statementInvoker) {
+  public CompletableFuture<Long> createVersionTableIfNotExists(
+      Function<String, CompletableFuture<Long>> statementInvoker) {
     return statementInvoker.apply(
         "CREATE TABLE IF NOT EXISTS TXNO_VERSION AS SELECT CAST(0 AS "
             + getIntegerCastType()

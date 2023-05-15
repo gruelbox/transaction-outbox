@@ -20,7 +20,6 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeoutException;
@@ -148,8 +147,8 @@ class JdbcSqlApi implements SqlApi<Connection, JdbcTransaction> {
       }
 
       @Override
-      public CompletableFuture<Integer> execute() {
-        return toBlockingFuture((Callable<Integer>) statement::executeUpdate);
+      public CompletableFuture<Long> execute() {
+        return toBlockingFuture(() -> (long) statement.executeUpdate());
       }
 
       @Override

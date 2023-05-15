@@ -273,12 +273,12 @@ public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> 
                     persistor().save(tx, entry4)))
         .join();
 
-    Integer records =
+    Long records =
         txManager()
             .transactionally(
                 tx -> persistor().deleteProcessedAndExpired(tx, 10, now.plusSeconds(4)))
             .join();
-    assertThat(records, equalTo(2));
+    assertThat(records, equalTo(2L));
 
     entry2.setProcessed(false);
     entry3.setProcessed(false);

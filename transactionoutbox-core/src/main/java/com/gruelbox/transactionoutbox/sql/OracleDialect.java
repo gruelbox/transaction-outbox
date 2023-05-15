@@ -113,8 +113,8 @@ final class OracleDialect extends Dialect {
   }
 
   @Override
-  public CompletableFuture<Integer> createVersionTableIfNotExists(
-      Function<String, CompletableFuture<Integer>> statementInvoker) {
+  public CompletableFuture<Long> createVersionTableIfNotExists(
+      Function<String, CompletableFuture<Long>> statementInvoker) {
     return statementInvoker
         .apply("CREATE TABLE TXNO_VERSION AS SELECT CAST(0 AS NUMBER) as version FROM DUAL")
         .exceptionally(
@@ -123,7 +123,7 @@ final class OracleDialect extends Dialect {
                 t = t.getCause();
               }
               if (t instanceof SQLException && t.getMessage().contains("955")) {
-                return 0;
+                return 0L;
               }
               if (t instanceof RuntimeException) {
                 throw (RuntimeException) t;

@@ -20,7 +20,7 @@ public interface SqlStatement {
     }
   }
 
-  CompletableFuture<Integer> execute();
+  CompletableFuture<Long> execute();
 
   <T> CompletableFuture<List<T>> executeQuery(
       int expectedRowCount, Function<SqlResultRow, T> rowMapper);

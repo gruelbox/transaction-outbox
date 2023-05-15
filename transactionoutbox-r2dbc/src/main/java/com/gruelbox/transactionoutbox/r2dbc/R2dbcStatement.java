@@ -64,7 +64,7 @@ class R2dbcStatement implements SqlStatement {
   }
 
   @Override
-  public CompletableFuture<Integer> execute() {
+  public CompletableFuture<Long> execute() {
     return setQueryTimeout(timeoutSeconds).then(executeInternal()).toFuture();
   }
 
@@ -76,7 +76,7 @@ class R2dbcStatement implements SqlStatement {
         .toFuture();
   }
 
-  private Mono<Integer> setQueryTimeout(int timeoutSeconds) {
+  private Mono<Long> setQueryTimeout(int timeoutSeconds) {
     try {
       if (timeoutSeconds <= 0) {
         return Mono.empty();
@@ -97,11 +97,11 @@ class R2dbcStatement implements SqlStatement {
     }
   }
 
-  private Mono<Integer> executeInternal() {
+  private Mono<Long> executeInternal() {
     try {
       return Mono.from(statement.execute())
           .flatMap(result -> Mono.from(result.getRowsUpdated()))
-          .defaultIfEmpty(0);
+          .defaultIfEmpty(0L);
     } catch (Exception e) {
       return Mono.error(e);
     }

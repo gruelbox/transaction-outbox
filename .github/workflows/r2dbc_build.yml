@@ -29,7 +29,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Build, publish to GPR and tag
+      - name: Build and publish to Github Artifact Repository
         if: ${{ !github.event.pull_request.head.repo.fork }}
         run: |
           revision="6.0.$GITHUB_RUN_NUMBER"
@@ -39,6 +39,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - uses: gruelbox/git-auto-commit-action@master
+        name: Commit formatting changes
         if: ${{ !github.event.pull_request.head.repo.fork }}
         with:
           commit_message: Apply formatting

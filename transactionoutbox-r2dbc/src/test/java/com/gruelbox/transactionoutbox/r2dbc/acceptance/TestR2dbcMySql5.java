@@ -5,7 +5,7 @@ import static com.gruelbox.transactionoutbox.r2dbc.UsesMySql5.connectionConfigur
 import com.gruelbox.transactionoutbox.r2dbc.UsesMySql5;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import com.gruelbox.transactionoutbox.sql.Dialects;
-import dev.miku.r2dbc.mysql.MySqlConnectionFactory;
+import io.asyncer.r2dbc.mysql.MySqlConnectionFactory;
 import io.r2dbc.spi.ConnectionFactory;
 
 class TestR2dbcMySql5 extends AbstractR2dbcAcceptanceTest implements UsesMySql5 {

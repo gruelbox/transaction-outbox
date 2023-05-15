@@ -411,7 +411,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public CompletableFuture<Integer> deleteProcessedAndExpired(TX tx, int batchSize, Instant now) {
+  public CompletableFuture<Long> deleteProcessedAndExpired(TX tx, int batchSize, Instant now) {
     try {
       return sqlApi.statement(
           tx,
@@ -426,11 +426,11 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public CompletableFuture<Integer> clear(TX tx) {
+  public CompletableFuture<Long> clear(TX tx) {
     return sqlApi.statement(tx, dialect, clearSql, 0, false, SqlStatement::execute);
   }
 
-  private CompletableFuture<Integer> createVersionTableIfNotExists(TX tx) {
+  private CompletableFuture<Long> createVersionTableIfNotExists(TX tx) {
     return dialect.createVersionTableIfNotExists(sql -> executeUpdate(tx, sql));
   }
 
@@ -444,11 +444,11 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
         binder -> binder.executeQuery(1, row -> row.get(0, Integer.class)));
   }
 
-  private CompletableFuture<Integer> updateVersion(TX tx, SqlMigration mig) {
+  private CompletableFuture<Long> updateVersion(TX tx, SqlMigration mig) {
     return executeUpdate(tx, "UPDATE TXNO_VERSION SET version = " + mig.getVersion());
   }
 
-  private CompletableFuture<Integer> executeUpdate(TX tx, String sql) {
+  private CompletableFuture<Long> executeUpdate(TX tx, String sql) {
     return sqlApi.statement(
         tx, dialect, sql, writeLockTimeoutSeconds, false, SqlStatement::execute);
   }

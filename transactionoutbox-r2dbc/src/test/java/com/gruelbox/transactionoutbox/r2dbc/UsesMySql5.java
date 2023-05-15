@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.r2dbc;
 
-import dev.miku.r2dbc.mysql.MySqlConnectionConfiguration;
+import io.asyncer.r2dbc.mysql.MySqlConnectionConfiguration;
 import java.time.Duration;
 import java.util.Map;
 import org.testcontainers.containers.JdbcDatabaseContainer;

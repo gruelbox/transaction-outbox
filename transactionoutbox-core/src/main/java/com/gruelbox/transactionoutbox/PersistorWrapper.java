@@ -61,12 +61,12 @@ public class PersistorWrapper<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public CompletableFuture<Integer> deleteProcessedAndExpired(TX tx, int batchSize, Instant now) {
+  public CompletableFuture<Long> deleteProcessedAndExpired(TX tx, int batchSize, Instant now) {
     return delegate.deleteProcessedAndExpired(tx, batchSize, now);
   }
 
   @Override
-  public CompletableFuture<Integer> clear(TX tx) {
+  public CompletableFuture<Long> clear(TX tx) {
     return delegate.clear(tx);
   }
 

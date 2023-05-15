@@ -10,14 +10,9 @@ import com.gruelbox.transactionoutbox.spi.InitializationEventBus;
 import com.gruelbox.transactionoutbox.spi.InitializationEventPublisher;
 import com.gruelbox.transactionoutbox.spi.SerializableTypeRequired;
 import com.gruelbox.transactionoutbox.spi.TransactionManagerSupport;
-import io.r2dbc.spi.Batch;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.ConnectionFactory;
 import io.r2dbc.spi.ConnectionFactoryMetadata;
-import io.r2dbc.spi.ConnectionMetadata;
-import io.r2dbc.spi.IsolationLevel;
-import io.r2dbc.spi.Statement;
-import io.r2dbc.spi.ValidationDepth;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Optional;
@@ -31,9 +26,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
+import lombok.experimental.Delegate;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+import reactor.util.annotation.NonNull;
 
 /**
  * A transaction manager which uses the raw R2DBC {@link Connection} SPI as its context. This is
@@ -183,6 +180,7 @@ public class R2dbcRawTransactionManager
         new ConcurrentHashMap<>();
 
     @Override
+    @NonNull
     public Publisher<? extends Connection> create() {
       return Mono.from(delegate.create())
           .map(WrappedConnection::new)
@@ -195,15 +193,18 @@ public class R2dbcRawTransactionManager
     }
 
     @Override
+    @NonNull
     public ConnectionFactoryMetadata getMetadata() {
       return delegate.getMetadata();
     }
 
     private static final AtomicLong nextId = new AtomicLong(1);
 
-    private class WrappedConnection implements Connection {
+    private class WrappedConnection implements Connection, WrappedConnectionExtensionMethods {
 
+      @Delegate(excludes = {WrappedConnectionExtensionMethods.class})
       private final Connection conn;
+
       private final long id = nextId.getAndIncrement();
 
       WrappedConnection(Connection conn) {
@@ -211,11 +212,7 @@ public class R2dbcRawTransactionManager
       }
 
       @Override
-      public Publisher<Void> beginTransaction() {
-        return conn.beginTransaction();
-      }
-
-      @Override
+      @NonNull
       public Publisher<Void> close() {
         return Mono.from(conn.close())
             .then(
@@ -227,75 +224,22 @@ public class R2dbcRawTransactionManager
       }
 
       @Override
+      @NonNull
       public Publisher<Void> commitTransaction() {
         return Mono.from(conn.commitTransaction())
             .then(fromCompletionStage(() -> contextMap.get(this).processHooks()));
       }
 
       @Override
-      public Batch createBatch() {
-        return conn.createBatch();
-      }
-
-      @Override
-      public Publisher<Void> createSavepoint(String name) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public Statement createStatement(String sql) {
-        return conn.createStatement(sql);
-      }
-
-      @Override
-      public boolean isAutoCommit() {
-        return conn.isAutoCommit();
-      }
-
-      @Override
-      public ConnectionMetadata getMetadata() {
-        return conn.getMetadata();
-      }
-
-      @Override
-      public IsolationLevel getTransactionIsolationLevel() {
-        return conn.getTransactionIsolationLevel();
-      }
-
-      @Override
-      public Publisher<Void> releaseSavepoint(String name) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public Publisher<Void> rollbackTransaction() {
-        return conn.rollbackTransaction();
-      }
-
-      @Override
-      public Publisher<Void> rollbackTransactionToSavepoint(String name) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public Publisher<Void> setAutoCommit(boolean autoCommit) {
-        return conn.setAutoCommit(autoCommit);
-      }
-
-      @Override
-      public Publisher<Void> setTransactionIsolationLevel(IsolationLevel isolationLevel) {
-        return conn.setTransactionIsolationLevel(isolationLevel);
-      }
-
-      @Override
-      public Publisher<Boolean> validate(ValidationDepth depth) {
-        return conn.validate(depth);
-      }
-
-      @Override
       public String toString() {
         return "WrappedConnection[" + id + "]";
       }
+    }
+
+    private interface WrappedConnectionExtensionMethods {
+      Publisher<Void> close();
+
+      Publisher<Void> commitTransaction();
     }
   }
 }

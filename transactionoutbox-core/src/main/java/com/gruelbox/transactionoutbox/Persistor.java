@@ -111,7 +111,7 @@ public interface Persistor<CN, TX extends BaseTransaction<?>> {
    * @param now The time to use when selecting records.
    * @return The number of records affected.
    */
-  CompletableFuture<Integer> deleteProcessedAndExpired(TX tx, int batchSize, Instant now);
+  CompletableFuture<Long> deleteProcessedAndExpired(TX tx, int batchSize, Instant now);
 
   /**
    * Clears all scheduled tasks. Does not need to be high-performance or support high volume; only
@@ -121,7 +121,7 @@ public interface Persistor<CN, TX extends BaseTransaction<?>> {
    * @return The number of records affected.
    */
   @Beta
-  CompletableFuture<Integer> clear(TX tx);
+  CompletableFuture<Long> clear(TX tx);
 
   /**
    * Verifies that the database is responding.

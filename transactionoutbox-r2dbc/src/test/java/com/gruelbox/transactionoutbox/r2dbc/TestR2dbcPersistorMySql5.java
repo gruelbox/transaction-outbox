@@ -8,7 +8,7 @@ import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.Connectio
 import com.gruelbox.transactionoutbox.spi.BaseTransactionManager;
 import com.gruelbox.transactionoutbox.sql.AbstractPersistorTest;
 import com.gruelbox.transactionoutbox.sql.Dialect;
-import dev.miku.r2dbc.mysql.MySqlConnectionFactory;
+import io.asyncer.r2dbc.mysql.MySqlConnectionFactory;
 import io.r2dbc.spi.Connection;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeAll;

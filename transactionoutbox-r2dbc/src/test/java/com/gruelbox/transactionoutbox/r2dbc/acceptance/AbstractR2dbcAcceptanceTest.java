@@ -63,7 +63,8 @@ abstract class AbstractR2dbcAcceptanceTest
             .maxIdleTime(Duration.ofSeconds(10))
             .maxSize(20)
             .build();
-    ConnectionPool pool = autoClose(new ConnectionPool(configuration));
+    ConnectionPool pool = new ConnectionPool(configuration);
+    autoClose(() -> pool.close().block());
     ConnectionFactoryWrapper connectionFactory =
         R2dbcRawTransactionManager.wrapConnectionFactory(pool);
     return new R2dbcRawTransactionManager(connectionFactory).enableStackLogging();
