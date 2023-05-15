@@ -38,7 +38,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - uses: gruelbox/git-auto-commit-action@v4
+      - uses: gruelbox/git-auto-commit-action@master
         if: ${{ !github.event.pull_request.head.repo.fork }}
         with:
           commit_message: Apply formatting
