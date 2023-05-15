@@ -18,7 +18,7 @@ public abstract class AbstractSqlAcceptanceTest<
   @SuppressWarnings("SameParameterValue")
   protected abstract CompletableFuture<Long> readLongValue(TX tx, String sql);
 
-  protected final void prepareDataStore() {
+  protected void prepareDataStore() {
     txManager
         .transactionally(tx -> runSql(tx, "CREATE TABLE IF NOT EXISTS TESTDATA(VAL INT)"))
         .thenRun(() -> log.info("Table created"))
