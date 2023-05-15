@@ -1,7 +1,12 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.sql.Dialects;
+
+import java.sql.SQLException;
 import java.time.Duration;
+import java.util.concurrent.CompletionException;
+
+import lombok.extern.slf4j.Slf4j;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -9,6 +14,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SuppressWarnings("WeakerAccess")
 @Testcontainers
+@Slf4j
 class TestJdbcOracle18 extends AbstractSimpleTransactionManagerAcceptanceTest {
 
   @Container
@@ -25,5 +31,26 @@ class TestJdbcOracle18 extends AbstractSimpleTransactionManagerAcceptanceTest {
         .user(container.getUsername())
         .password(container.getPassword())
         .build();
+  }
+
+  @Override
+  protected final void prepareDataStore() {
+    txManager
+      .transactionally(tx -> runSql(tx, "CREATE TABLE TESTDATA(VAL INT)"))
+      .exceptionally(
+        t -> {
+          if (t instanceof CompletionException) {
+            t = t.getCause();
+          }
+          if (t instanceof SQLException && t.getMessage().contains("955")) {
+            return null;
+          }
+          if (t instanceof RuntimeException) {
+            throw (RuntimeException) t;
+          }
+          throw new CompletionException(t);
+        })
+      .thenRun(() -> log.info("Table created"))
+      .join();
   }
 }
