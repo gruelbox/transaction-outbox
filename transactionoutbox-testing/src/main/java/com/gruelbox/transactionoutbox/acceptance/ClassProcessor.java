@@ -6,6 +6,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("unused")
 public class ClassProcessor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BlockingClassProcessor.class);

@@ -18,13 +18,14 @@ class TestJdbcPersistorPostgres10
     extends AbstractPersistorTest<Connection, SimpleTransaction<Void>> {
 
   @Container
-  @SuppressWarnings("rawtypes")
+  @SuppressWarnings({"rawtypes", "resource"})
   private static final JdbcDatabaseContainer container =
       (JdbcDatabaseContainer)
           new PostgreSQLContainer("postgres:10").withStartupTimeout(Duration.ofHours(1));
 
-  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialects.POSTGRESQL_9).build();
-  private SimpleTransactionManager txManager =
+  private final JdbcPersistor persistor =
+      JdbcPersistor.builder().dialect(Dialects.POSTGRESQL_9).build();
+  private final SimpleTransactionManager txManager =
       SimpleTransactionManager.fromConnectionDetails(
           "org.postgresql.Driver",
           container.getJdbcUrl(),

@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 @Slf4j
 class TestStubSpringTransactionManager {
 
-  private SpringTransactionManager transactionManager = new StubSpringTransactionManager();
+  private final SpringTransactionManager transactionManager = new StubSpringTransactionManager();
 
   @Test
   void testStubSpringTransactionManager() throws InterruptedException {

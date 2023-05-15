@@ -41,6 +41,7 @@ class TestStubThreadLocalProvider {
 
     transactionManager.inTransaction(
         () -> {
+          @SuppressWarnings("resource")
           JooqTransaction jooqTransaction = transactionManager.requireTransactionReturns(tx -> tx);
           assertThat(jooqTransaction.connection(), isA(Connection.class));
 

@@ -58,7 +58,7 @@ import org.junit.jupiter.api.Test;
 @Slf4j
 public abstract class AbstractPersistorTest<CN, TX extends BaseTransaction<CN>> {
 
-  private Instant now = now().truncatedTo(SECONDS);
+  private final Instant now = now().truncatedTo(SECONDS);
 
   protected abstract Dialect dialect();
 

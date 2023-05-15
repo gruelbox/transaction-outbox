@@ -38,7 +38,7 @@ class TestR2dbcPersistorPostgres12 extends AbstractPersistorTest<Connection, R2d
     return POSTGRESQL_9;
   }
 
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings({"unchecked", "rawtypes"})
   @Override
   protected Persistor<Connection, R2dbcRawTransaction> persistor() {
     return (Persistor) persistor;

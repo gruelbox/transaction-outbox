@@ -33,7 +33,7 @@ public final class R2dbcRawTransaction implements R2dbcTransaction {
     postCommitHooks.add(runnable);
   }
 
-  final CompletableFuture<Void> processHooks() {
+  CompletableFuture<Void> processHooks() {
     log.debug("{} hooks to process", postCommitHooks.size());
     CompletableFuture[] futures =
         postCommitHooks.stream()

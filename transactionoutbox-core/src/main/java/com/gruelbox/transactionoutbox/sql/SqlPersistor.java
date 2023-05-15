@@ -61,7 +61,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
     this.writeLockTimeoutSeconds = writeLockTimeoutSeconds == null ? 2 : writeLockTimeoutSeconds;
     this.dialect = Objects.requireNonNull(dialect);
     this.tableName = tableName == null ? "TXNO_OUTBOX" : tableName;
-    this.migrate = migrate == null ? true : migrate;
+    this.migrate = migrate == null || migrate;
     this.migrationRetries = migrationRetries == null ? 5 : migrationRetries;
     this.serializer =
         Utils.firstNonNull(serializer, InvocationSerializer::createDefaultJsonSerializer);
@@ -239,7 +239,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public final CompletableFuture<Void> delete(TX tx, TransactionOutboxEntry entry) {
+  public CompletableFuture<Void> delete(TX tx, TransactionOutboxEntry entry) {
     try {
       return sqlApi
           .statement(
@@ -272,7 +272,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public final CompletableFuture<Void> update(TX tx, TransactionOutboxEntry entry) {
+  public CompletableFuture<Void> update(TX tx, TransactionOutboxEntry entry) {
     try {
       return sqlApi
           .statement(
@@ -320,7 +320,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public final CompletableFuture<Boolean> lock(TX tx, TransactionOutboxEntry entry) {
+  public CompletableFuture<Boolean> lock(TX tx, TransactionOutboxEntry entry) {
     try {
       return sqlApi
           .statement(
@@ -359,7 +359,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public final CompletableFuture<Boolean> unblock(TX tx, String entryId) {
+  public CompletableFuture<Boolean> unblock(TX tx, String entryId) {
     try {
       return sqlApi
           .statement(
@@ -376,7 +376,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public final CompletableFuture<List<TransactionOutboxEntry>> selectBatch(
+  public CompletableFuture<List<TransactionOutboxEntry>> selectBatch(
       TX tx, int batchSize, Instant now) {
     try {
       return sqlApi.statement(
@@ -411,8 +411,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public final CompletableFuture<Integer> deleteProcessedAndExpired(
-      TX tx, int batchSize, Instant now) {
+  public CompletableFuture<Integer> deleteProcessedAndExpired(TX tx, int batchSize, Instant now) {
     try {
       return sqlApi.statement(
           tx,
@@ -427,7 +426,7 @@ public final class SqlPersistor<CN, TX extends BaseTransaction<CN>>
   }
 
   @Override
-  public final CompletableFuture<Integer> clear(TX tx) {
+  public CompletableFuture<Integer> clear(TX tx) {
     return sqlApi.statement(tx, dialect, clearSql, 0, false, SqlStatement::execute);
   }
 

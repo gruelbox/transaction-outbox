@@ -1,12 +1,12 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.CdiInstantiator;
-import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.QuarkusTransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.sql.Dialects;
 import java.util.HashSet;
 import java.util.Set;
 import javax.enterprise.inject.Produces;
@@ -16,7 +16,7 @@ public class ApplicationConfig extends Application {
 
   @Override
   public Set<Class<?>> getClasses() {
-    final Set<Class<?>> classes = new HashSet<Class<?>>();
+    final Set<Class<?>> classes = new HashSet<>();
 
     classes.add(BusinessService.class);
 
@@ -37,7 +37,7 @@ public class ApplicationConfig extends Application {
               }
             })
         .transactionManager(transactionManager)
-        .persistor(Persistor.forDialect(Dialect.H2))
+        .persistor(Persistor.forDialect(Dialects.H2))
         .build();
   }
 

@@ -1,13 +1,12 @@
 package com.gruelbox.transactionoutbox.acceptance.v1;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import com.gruelbox.transactionoutbox.AlreadyScheduledException;
 import com.gruelbox.transactionoutbox.NoTransactionActiveException;
@@ -111,7 +110,7 @@ abstract class AbstractAcceptanceTestV1 {
           outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee");
           try {
             // Should not be fired until after commit
-            assertFalse(latch.await(2, TimeUnit.SECONDS));
+            Assertions.assertFalse(latch.await(2, TimeUnit.SECONDS));
           } catch (InterruptedException e) {
             fail("Interrupted");
           }
@@ -413,8 +412,9 @@ abstract class AbstractAcceptanceTestV1 {
               () -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee"));
           assertTrue(blockLatch.await(10, TimeUnit.SECONDS));
           assertTrue(
-              transactionManager.inTransactionReturns(
-                  tx -> outbox.unblock(orderedEntryListener.getBlocked().getId())));
+              (boolean)
+                  transactionManager.inTransactionReturns(
+                      tx -> outbox.unblock(orderedEntryListener.getBlocked().getId())));
           assertTrue(successLatch.await(10, TimeUnit.SECONDS));
           var orderedEntryEvents = orderedEntryListener.getOrderedEntries();
           log.info("The entry life cycle is: {}", orderedEntryEvents);
@@ -467,8 +467,9 @@ abstract class AbstractAcceptanceTestV1 {
               () -> outbox.schedule(BlockingInterfaceProcessor.class).process(3, "Whee"));
           assertTrue(blockLatch.await(3, TimeUnit.SECONDS));
           assertTrue(
-              transactionManager.inTransactionReturns(
-                  tx -> outbox.unblock(latchListener.getBlocked().getId())));
+              (boolean)
+                  transactionManager.inTransactionReturns(
+                      tx -> outbox.unblock(latchListener.getBlocked().getId())));
           assertTrue(successLatch.await(3, TimeUnit.SECONDS));
         });
   }
@@ -521,7 +522,7 @@ abstract class AbstractAcceptanceTestV1 {
                                   .process(i * 10 + j, "Whee");
                             }
                           }));
-          assertTrue("Latch not opened in time", latch.await(30, TimeUnit.SECONDS));
+          assertTrue((boolean) latch.await(30, TimeUnit.SECONDS), "Latch not opened in time");
         });
 
     assertThat(

@@ -92,6 +92,7 @@ public abstract class AbstractAcceptanceTest<
 
   protected abstract CompletableFuture<Long> countRecords(TX tx);
 
+  @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   protected boolean includeLongRunningTests() {
     return true;
   }

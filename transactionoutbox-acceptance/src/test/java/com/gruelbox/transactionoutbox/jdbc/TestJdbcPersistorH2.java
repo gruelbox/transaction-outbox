@@ -12,8 +12,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 class TestJdbcPersistorH2 extends AbstractPersistorTest<Connection, SimpleTransaction<Void>> {
 
-  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialects.H2).build();
-  private SimpleTransactionManager txManager =
+  private final JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialects.H2).build();
+  private final SimpleTransactionManager txManager =
       SimpleTransactionManager.fromConnectionDetails(
           "org.h2.Driver",
           "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=2000;LOB_TIMEOUT=2000;MV_STORE=TRUE",

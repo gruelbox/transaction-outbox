@@ -19,7 +19,7 @@ import org.slf4j.MDC;
 @SuppressWarnings("WeakerAccess")
 @Value
 @Slf4j
-public final class Invocation {
+public class Invocation {
 
   /**
    * @return The class name (as provided/expected by an {@link Instantiator}).

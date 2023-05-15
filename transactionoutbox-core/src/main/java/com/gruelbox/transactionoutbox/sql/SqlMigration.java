@@ -9,7 +9,7 @@ import lombok.Value;
  */
 @Value
 @Beta
-public final class SqlMigration {
+public class SqlMigration {
   int version;
   String name;
   String sql;

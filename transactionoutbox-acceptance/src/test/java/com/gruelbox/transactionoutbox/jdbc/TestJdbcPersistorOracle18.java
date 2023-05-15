@@ -13,7 +13,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 class TestJdbcPersistorOracle18 extends AbstractPersistorTest<Connection, SimpleTransaction<Void>> {
 
-  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialects.ORACLE).build();
+  private final JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialects.ORACLE).build();
 
   @Container
   @SuppressWarnings("rawtypes")

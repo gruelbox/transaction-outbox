@@ -25,7 +25,7 @@ import org.slf4j.event.Level;
 @Slf4j
 class TestStubDefaultProvider {
 
-  private DefaultJooqTransactionManager transactionManager =
+  private final DefaultJooqTransactionManager transactionManager =
       new StubDefaultJooqTransactionManager();
 
   @Test

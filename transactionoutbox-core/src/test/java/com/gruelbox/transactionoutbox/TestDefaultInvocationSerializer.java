@@ -209,7 +209,7 @@ class TestDefaultInvocationSerializer {
     Invocation serdeser(Invocation invocation) {
       var writer = new StringWriter();
       serializer.serializeInvocation(invocation, writer);
-      log.info("Serialised as: {}", writer.toString());
+      log.info("Serialised as: {}", writer);
       return serializer.deserializeInvocation(new StringReader(writer.toString()));
     }
   }

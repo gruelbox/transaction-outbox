@@ -2,12 +2,14 @@ package com.gruelbox.transactionoutbox.jackson;
 
 import java.util.Map;
 import java.util.Set;
-import lombok.*;
-import lombok.extern.jackson.Jacksonized;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 @Getter
 @Setter
-@Jacksonized
 @NoArgsConstructor
 @EqualsAndHashCode
 @ToString

@@ -7,6 +7,7 @@ public final class NoTransactionActiveException extends RuntimeException {
     super();
   }
 
+  @SuppressWarnings("unused")
   public NoTransactionActiveException(Throwable cause) {
     super(cause);
   }

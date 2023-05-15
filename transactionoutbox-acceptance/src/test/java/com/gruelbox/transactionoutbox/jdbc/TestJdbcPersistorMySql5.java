@@ -17,12 +17,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class TestJdbcPersistorMySql5 extends AbstractPersistorTest<Connection, SimpleTransaction<Void>> {
 
   @Container
-  @SuppressWarnings("rawtypes")
+  @SuppressWarnings({"rawtypes", "resource"})
   private static final JdbcDatabaseContainer container =
       new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1));
 
-  private JdbcPersistor persistor = JdbcPersistor.builder().dialect(Dialects.MY_SQL_5).build();
-  private SimpleTransactionManager txManager =
+  private final JdbcPersistor persistor =
+      JdbcPersistor.builder().dialect(Dialects.MY_SQL_5).build();
+  private final SimpleTransactionManager txManager =
       SimpleTransactionManager.fromConnectionDetails(
           "com.mysql.cj.jdbc.Driver",
           container.getJdbcUrl(),

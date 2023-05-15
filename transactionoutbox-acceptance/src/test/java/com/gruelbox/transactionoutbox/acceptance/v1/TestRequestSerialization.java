@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.acceptance.v1;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
 import com.gruelbox.transactionoutbox.DefaultPersistor;
@@ -16,6 +16,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("deprecation")
 public class TestRequestSerialization {
 
   /**
