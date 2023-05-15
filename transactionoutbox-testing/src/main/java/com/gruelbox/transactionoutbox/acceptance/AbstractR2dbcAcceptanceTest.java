@@ -1,11 +1,10 @@
-package com.gruelbox.transactionoutbox.r2dbc.acceptance;
+package com.gruelbox.transactionoutbox.acceptance;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
 
 import com.gruelbox.transactionoutbox.Persistor;
 import com.gruelbox.transactionoutbox.SchedulerProxyFactory;
-import com.gruelbox.transactionoutbox.acceptance.AbstractSqlAcceptanceTest;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcPersistor;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager;
 import com.gruelbox.transactionoutbox.r2dbc.R2dbcRawTransactionManager.ConnectionFactoryWrapper;
@@ -14,8 +13,6 @@ import io.r2dbc.pool.ConnectionPool;
 import io.r2dbc.pool.ConnectionPoolConfiguration;
 import io.r2dbc.spi.Connection;
 import io.r2dbc.spi.ConnectionFactory;
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -24,8 +21,11 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+
 @Slf4j
-abstract class AbstractR2dbcAcceptanceTest
+public abstract class AbstractR2dbcAcceptanceTest
     extends AbstractSqlAcceptanceTest<Connection, R2dbcTransaction, R2dbcRawTransactionManager> {
 
   protected abstract ConnectionFactory createConnectionFactory();
@@ -73,13 +73,13 @@ abstract class AbstractR2dbcAcceptanceTest
   @Override
   protected CompletableFuture<Void> scheduleWithTx(
       SchedulerProxyFactory outbox, R2dbcTransaction tx, int arg1, String arg2) {
-    return outbox.schedule(InterfaceProcessor.class).processAsync(arg1, arg2, tx);
+    return outbox.schedule(AsyncInterfaceProcessor.class).processAsync(arg1, arg2, tx);
   }
 
   @Override
   protected CompletableFuture<Void> scheduleWithCtx(
       SchedulerProxyFactory outbox, Object context, int arg1, String arg2) {
-    return outbox.schedule(InterfaceProcessor.class).processAsync(arg1, arg2, (Connection) context);
+    return outbox.schedule(AsyncInterfaceProcessor.class).processAsync(arg1, arg2, (Connection) context);
   }
 
   @Override

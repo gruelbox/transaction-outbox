@@ -10,9 +10,6 @@
   <packaging>jar</packaging>
   <artifactId>transactionoutbox-r2dbc</artifactId>
   <description>R2DBC support for Transaction Outbox</description>
-  <properties>
-    <r2dbc.version>1.0.0.RELEASE</r2dbc.version>
-  </properties>
   <dependencies>
     <!-- Run time -->
     <dependency>
@@ -23,12 +20,10 @@
     <dependency>
       <groupId>io.projectreactor</groupId>
       <artifactId>reactor-core</artifactId>
-      <version>3.5.6</version>
     </dependency>
     <dependency>
       <groupId>io.r2dbc</groupId>
       <artifactId>r2dbc-spi</artifactId>
-      <version>${r2dbc.version}</version>
     </dependency>
     <!-- Compile time -->
     <dependency>
@@ -93,26 +88,18 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>r2dbc-postgresql</artifactId>
-      <version>1.0.1.RELEASE</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.r2dbc</groupId>
       <artifactId>r2dbc-pool</artifactId>
-      <version>${r2dbc.version}</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.r2dbc</groupId>
       <artifactId>r2dbc-h2</artifactId>
-      <version>1.0.0.RELEASE</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.asyncer</groupId>
       <artifactId>r2dbc-mysql</artifactId>
-      <version>1.0.1</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.tngtech.archunit</groupId>

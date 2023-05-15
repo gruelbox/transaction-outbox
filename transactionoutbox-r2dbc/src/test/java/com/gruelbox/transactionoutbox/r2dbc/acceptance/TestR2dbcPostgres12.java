@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox.r2dbc.acceptance;
 
 import static com.gruelbox.transactionoutbox.r2dbc.UsesPostgres12.connectionConfiguration;
 
+import com.gruelbox.transactionoutbox.acceptance.AbstractR2dbcAcceptanceTest;
 import com.gruelbox.transactionoutbox.r2dbc.UsesPostgres12;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import com.gruelbox.transactionoutbox.sql.Dialects;

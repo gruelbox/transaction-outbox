@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox.r2dbc.acceptance;
 
+import com.gruelbox.transactionoutbox.acceptance.AbstractR2dbcAcceptanceTest;
 import com.gruelbox.transactionoutbox.r2dbc.UsesMySql8;
 import com.gruelbox.transactionoutbox.sql.Dialect;
 import com.gruelbox.transactionoutbox.sql.Dialects;

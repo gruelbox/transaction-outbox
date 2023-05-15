@@ -37,6 +37,7 @@
     <maven.source.plugin.version>3.2.1</maven.source.plugin.version>
     <nexus.staging.plugin.version>1.6.13</nexus.staging.plugin.version>
     <maven.gpg.plugin.version>3.1.0</maven.gpg.plugin.version>
+    <r2dbc.version>1.0.0.RELEASE</r2dbc.version>
   </properties>
   <modules>
     <module>transactionoutbox-core</module>
@@ -77,6 +78,16 @@
         <artifactId>lombok</artifactId>
         <version>1.18.24</version>
         <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.projectreactor</groupId>
+        <artifactId>reactor-core</artifactId>
+        <version>3.5.6</version>
+      </dependency>
+      <dependency>
+        <groupId>io.r2dbc</groupId>
+        <artifactId>r2dbc-spi</artifactId>
+        <version>${r2dbc.version}</version>
       </dependency>
       <dependency>
         <groupId>org.junit.jupiter</groupId>
@@ -184,6 +195,30 @@
         <groupId>com.oracle.database.jdbc</groupId>
         <artifactId>ojdbc11</artifactId>
         <version>21.9.0.0</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>r2dbc-postgresql</artifactId>
+        <version>1.0.1.RELEASE</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.r2dbc</groupId>
+        <artifactId>r2dbc-pool</artifactId>
+        <version>${r2dbc.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.r2dbc</groupId>
+        <artifactId>r2dbc-h2</artifactId>
+        <version>1.0.0.RELEASE</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.asyncer</groupId>
+        <artifactId>r2dbc-mysql</artifactId>
+        <version>1.0.1</version>
         <scope>test</scope>
       </dependency>
     </dependencies>

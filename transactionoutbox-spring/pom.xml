@@ -24,6 +24,12 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
+      <groupId>com.gruelbox</groupId>
+      <artifactId>transactionoutbox-r2dbc</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-tx</artifactId>
       <version>${spring.version}</version>
@@ -32,6 +38,12 @@
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-jdbc</artifactId>
+      <version>${spring.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-r2dbc</artifactId>
       <version>${spring.version}</version>
       <scope>provided</scope>
     </dependency>
@@ -92,6 +104,13 @@
       <version>${spring.boot.version}</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.springframework.data</groupId>
+      <artifactId>spring-data-r2dbc</artifactId>
+      <version>${spring.boot.version}</version>
+      <scope>test</scope>
+    </dependency>
+
     <dependency>
       <groupId>org.hamcrest</groupId>
       <artifactId>hamcrest-core</artifactId>
