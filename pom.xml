@@ -38,7 +38,6 @@
     <module>transactionoutbox-core</module>
     <module>transactionoutbox-jackson</module>
     <module>transactionoutbox-guice</module>
-    <module>transactionoutbox-jooq</module>
     <module>transactionoutbox-quarkus</module>
   </modules>
   <dependencyManagement>
@@ -274,11 +273,12 @@
       </build>
     </profile>
     <profile>
-      <id>spring</id>
+      <id>java-17-modules</id>
       <activation>
         <jdk>[17,)</jdk>
       </activation>
       <modules>
+        <module>transactionoutbox-jooq</module>
         <module>transactionoutbox-spring</module>
       </modules>
     </profile>
