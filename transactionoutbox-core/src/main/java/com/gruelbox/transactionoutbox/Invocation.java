@@ -20,7 +20,9 @@ import org.slf4j.MDC;
 @Slf4j
 public class Invocation {
 
-  /** @return The class name (as provided/expected by an {@link Instantiator}). */
+  /**
+   * @return The class name (as provided/expected by an {@link Instantiator}).
+   */
   @SuppressWarnings("JavaDoc")
   @SerializedName("c")
   String className;
@@ -40,12 +42,16 @@ public class Invocation {
   @SerializedName("p")
   Class<?>[] parameterTypes;
 
-  /** @return The arguments to call. Must match {@link #parameterTypes}. */
+  /**
+   * @return The arguments to call. Must match {@link #parameterTypes}.
+   */
   @SuppressWarnings("JavaDoc")
   @SerializedName("a")
   Object[] args;
 
-  /** @return Thread-local context to recreate when running the task. */
+  /**
+   * @return Thread-local context to recreate when running the task.
+   */
   @SuppressWarnings("JavaDoc")
   @SerializedName("x")
   Map<String, String> mdc;
@@ -84,18 +90,12 @@ public class Invocation {
     this.mdc = mdc;
   }
 
-  void invoke(Object instance, TransactionOutboxListener listener)
-      throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-    Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
-    method.setAccessible(true);
-    if (log.isDebugEnabled()) {
-      log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
-    }
+  void withinMDC(Runnable runnable) {
     if (mdc != null && MDC.getMDCAdapter() != null) {
       var oldMdc = MDC.getCopyOfContextMap();
       MDC.setContextMap(mdc);
       try {
-        listener.wrapInvocation(() -> method.invoke(instance, args));
+        runnable.run();
       } finally {
         if (oldMdc == null) {
           MDC.clear();
@@ -104,7 +104,17 @@ public class Invocation {
         }
       }
     } else {
-      listener.wrapInvocation(() -> method.invoke(instance, args));
+      runnable.run();
     }
+  }
+
+  void invoke(Object instance, TransactionOutboxListener listener)
+      throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+    Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
+    method.setAccessible(true);
+    if (log.isDebugEnabled()) {
+      log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
+    }
+    listener.wrapInvocation(() -> method.invoke(instance, args));
   }
 }

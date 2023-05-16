@@ -104,7 +104,9 @@ public class TransactionOutboxEntry implements Validatable {
   @EqualsAndHashCode.Exclude @ToString.Exclude private volatile boolean initialized;
   @EqualsAndHashCode.Exclude @ToString.Exclude private String description;
 
-  /** @return A textual description of the task. */
+  /**
+   * @return A textual description of the task.
+   */
   public String description() {
     if (!this.initialized) {
       synchronized (this) {

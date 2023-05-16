@@ -8,7 +8,7 @@
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox/badge)](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox)
 
-A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. `TransactionOutbox` has a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks. Every aspect is highly configurable or overridable. It features out-of-the-box support for **Spring DI**, **Spring Txn**, **Guice**, **MySQL 5 & 8**, **PostgreSQL 9-12** and **H2**.
+A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. `TransactionOutbox` has a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks. Every aspect is highly configurable or overridable. It features out-of-the-box support for **Spring DI**, **Spring Txn**, **Guice**, **MySQL 5 & 8**, **PostgreSQL 9-12**, **Oracle 18 & 21** and **H2**.
 
 ## Contents
 
@@ -109,7 +109,7 @@ If you find yourself wondering _why bother with the queues now_? You're quite ri
 
 ### Requirements
 - At least **Java 11**. Downgrading to requiring Java 8 is [under consideration](https://github.com/gruelbox/transaction-outbox/issues/29).
-- Currently, **MySQL**, **PostgreSQL** or **H2** databases (pull requests to support Oracle, SQL Server or any other traditional RDMBS would be trivial. Beyond that, a SQL database is not strictly necessary for the pattern to work, merely a data store with the concept of a transaction spanning multiple mutation operations).
+- Currently, **MySQL**, **PostgreSQL**, **Oracle** or **H2** databases (pull requests to support SQL Server or any other traditional RDMBS would be trivial. Beyond that, a SQL database is not strictly necessary for the pattern to work, merely a data store with the concept of a transaction spanning multiple mutation operations).
 - Database access via **JDBC** (In principle, JDBC should not be required - alternatives such as R2DBC are under investigation - but the API is currently tied to it)
 - Native transactions (not JTA or similar).
 - (Optional) Proxying non-interfaces requires [ByteBuddy](https://bytebuddy.net/#/) and for proxying classes without default constructors [Objenesis](http://objenesis.org/) to be added as a dependency
@@ -231,6 +231,10 @@ See [transaction-outbox-guice](transactionoutbox-guice/README.md), which integra
 ### jOOQ
 
 See [transaction-outbox-jooq](transactionoutbox-jooq/README.md), which integrates jOOQ transaction management with `TransactionOutbox`.
+
+### Oracle
+
+Oracle database compatibility requires to configure Oracle jdbc driver using following VM argument : -Doracle.jdbc.javaNetNio=false
 
 ## Set up the background worker
 

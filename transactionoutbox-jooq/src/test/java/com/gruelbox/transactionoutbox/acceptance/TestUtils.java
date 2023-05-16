@@ -57,7 +57,7 @@ class TestUtils {
   static void createTestTable(DSLContext dsl) {
     log.info("Creating table");
     dsl.dropTableIfExists(TEST_TABLE).execute();
-    dsl.createTable(TEST_TABLE).column("VALUE", SQLDataType.INTEGER).execute();
+    dsl.createTable(TEST_TABLE).column("VAL", SQLDataType.INTEGER).execute();
   }
 
   static void writeRecord(Configuration configuration, int value) {
@@ -78,7 +78,7 @@ class TestUtils {
     assertTrue(
         dsl.select()
             .from(TEST_TABLE)
-            .where(DSL.field("VALUE").eq(value))
+            .where(DSL.field("VAL").eq(value))
             .fetchOptional()
             .isPresent());
   }
@@ -87,7 +87,7 @@ class TestUtils {
     assertFalse(
         dsl.select()
             .from(TEST_TABLE)
-            .where(DSL.field("VALUE").eq(value))
+            .where(DSL.field("VAL").eq(value))
             .fetchOptional()
             .isPresent());
   }

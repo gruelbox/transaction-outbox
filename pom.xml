@@ -1,25 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--suppress MavenModelInspection, MavenModelInspection, MavenModelInspection -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-parent</artifactId>
   <packaging>pom</packaging>
   <version>${revision}</version>
-
   <name>Transaction Outbox Parent</name>
   <description>A safe implementation of the transactional outbox pattern for Java.</description>
   <inceptionYear>2020</inceptionYear>
   <url>https://github.com/gruelbox/transaction-outbox</url>
-
   <organization>
     <name>Graham Crockford</name>
     <url>https://gruelbox.com</url>
   </organization>
-
   <properties>
     <!-- Core -->
     <maven.compiler.source>11</maven.compiler.source>
@@ -27,38 +21,37 @@
     <file.encoding>UTF-8</file.encoding>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-
     <!-- For delomboking -->
     <src.dir>src/main/java</src.dir>
     <test.dir>src/test/java</test.dir>
     <skip.format>false</skip.format>
-
     <!-- Dependency versions -->
-    <logback.version>1.2.11</logback.version>
+    <logback.version>1.4.7</logback.version>
     <revision>1.3.99999-SNAPSHOT</revision>
-    <junit.jupiter.version>5.9.0</junit.jupiter.version>
-    <testcontainers.version>1.16.3</testcontainers.version>
+    <junit.jupiter.version>5.9.3</junit.jupiter.version>
+    <testcontainers.version>1.18.1</testcontainers.version>
+    <maven.source.plugin.version>3.2.1</maven.source.plugin.version>
+    <nexus.staging.plugin.version>1.6.13</nexus.staging.plugin.version>
+    <maven.gpg.plugin.version>3.1.0</maven.gpg.plugin.version>
   </properties>
-
   <modules>
     <module>transactionoutbox-core</module>
     <module>transactionoutbox-jackson</module>
-    <module>transactionoutbox-spring</module>
     <module>transactionoutbox-guice</module>
     <module>transactionoutbox-jooq</module>
+    <module>transactionoutbox-quarkus</module>
   </modules>
-
   <dependencyManagement>
     <dependencies>
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>1.7.36</version>
+        <version>2.0.7</version>
       </dependency>
       <dependency>
         <groupId>net.bytebuddy</groupId>
         <artifactId>byte-buddy</artifactId>
-        <version>1.12.13</version>
+        <version>1.14.4</version>
         <optional>true</optional>
       </dependency>
       <dependency>
@@ -70,16 +63,14 @@
       <dependency>
         <groupId>com.google.code.gson</groupId>
         <artifactId>gson</artifactId>
-        <version>2.9.1</version>
+        <version>2.10.1</version>
       </dependency>
-
       <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
         <version>1.18.24</version>
         <scope>provided</scope>
       </dependency>
-
       <dependency>
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter-engine</artifactId>
@@ -125,7 +116,7 @@
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>1.4.200</version>
+        <version>2.1.214</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -161,7 +152,7 @@
       <dependency>
         <groupId>org.postgresql</groupId>
         <artifactId>postgresql</artifactId>
-        <version>42.4.1</version>
+        <version>42.6.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -170,15 +161,25 @@
         <version>8.0.30</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>oracle-xe</artifactId>
+        <version>${testcontainers.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.oracle.database.jdbc</groupId>
+        <artifactId>ojdbc11</artifactId>
+        <version>21.9.0.0</version>
+        <scope>test</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
-
   <build>
-
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.10.1</version>
+        <version>3.11.0</version>
         <configuration>
           <source>${maven.compiler.source}</source>
           <target>${maven.compiler.target}</target>
@@ -187,17 +188,19 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-        <version>3.2.2</version>
+        <version>3.3.0</version>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.0.0-M7</version>
+        <version>3.1.0</version>
+        <configuration>
+          <argLine>-Doracle.jdbc.javaNetNio=false</argLine>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>flatten-maven-plugin</artifactId>
-        <version>1.2.7</version>
+        <version>1.5.0</version>
         <configuration>
           <flattenMode>oss</flattenMode>
         </configuration>
@@ -218,36 +221,66 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>com.spotify.fmt</groupId>
+        <artifactId>fmt-maven-plugin</artifactId>
+        <version>2.20</version>
+        <configuration>
+          <verbose>true</verbose>
+          <filesNamePattern>.*\.java</filesNamePattern>
+          <skip>false</skip>
+          <skipSortingImports>false</skipSortingImports>
+          <style>google</style>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>validate</phase>
+            <goals>
+              <goal>format</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>au.com.acegi</groupId>
+        <artifactId>xml-format-maven-plugin</artifactId>
+        <version>3.2.2</version>
+      </plugin>
     </plugins>
   </build>
-
   <profiles>
     <profile>
-      <id>active-on-jdk-11</id>
-      <activation>
-        <jdk>[11,16)</jdk>
-      </activation>
-
+      <id>concise</id>
       <build>
         <plugins>
           <plugin>
-            <groupId>com.coveo</groupId>
-            <artifactId>fmt-maven-plugin</artifactId>
-            <version>2.13</version>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <dependencies>
+              <dependency>
+                <groupId>me.fabriciorby</groupId>
+                <artifactId>maven-surefire-junit5-tree-reporter</artifactId>
+                <version>1.2.1</version>
+              </dependency>
+            </dependencies>
             <configuration>
-              <filesNamePattern>.*\.java</filesNamePattern>
-              <skip>${skip.format}</skip>
+              <reportFormat>plain</reportFormat>
+              <consoleOutputReporter>
+                <disable>true</disable>
+              </consoleOutputReporter>
+              <statelessTestsetInfoReporter implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5StatelessTestsetInfoTreeReporterUnicode"/>
             </configuration>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>format</goal>
-                </goals>
-              </execution>
-            </executions>
-        </plugin>
+          </plugin>
         </plugins>
       </build>
+    </profile>
+    <profile>
+      <id>spring</id>
+      <activation>
+        <jdk>[17,)</jdk>
+      </activation>
+      <modules>
+        <module>transactionoutbox-spring</module>
+      </modules>
     </profile>
     <profile>
       <id>release</id>
@@ -259,7 +292,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-source-plugin</artifactId>
-            <version>3.2.1</version>
+            <version>${maven.source.plugin.version}</version>
             <executions>
               <execution>
                 <id>attach-sources</id>
@@ -272,7 +305,7 @@
           <plugin>
             <groupId>org.sonatype.plugins</groupId>
             <artifactId>nexus-staging-maven-plugin</artifactId>
-            <version>1.6.13</version>
+            <version>${nexus.staging.plugin.version}</version>
             <extensions>true</extensions>
             <configuration>
               <serverId>ossrh</serverId>
@@ -283,7 +316,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
-            <version>3.0.1</version>
+            <version>${maven.gpg.plugin.version}</version>
             <executions>
               <execution>
                 <id>sign-artifacts</id>
@@ -357,7 +390,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-javadoc-plugin</artifactId>
-            <version>3.4.0</version>
+            <version>3.5.0</version>
             <configuration>
               <failOnError>true</failOnError>
               <quiet>true</quiet>
@@ -377,14 +410,12 @@
       </build>
     </profile>
   </profiles>
-
   <licenses>
     <license>
       <name>The Apache License, Version 2.0</name>
       <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
     </license>
   </licenses>
-
   <developers>
     <developer>
       <name>Graham Crockford</name>
@@ -393,20 +424,16 @@
       <organizationUrl>https://gruelbox.com</organizationUrl>
     </developer>
   </developers>
-
   <issueManagement>
     <system>GitHub Issues</system>
     <url>https://github.com/gruelbox/transaction-outbox/issues</url>
   </issueManagement>
-
   <scm>
     <connection>scm:git:https://github.com/gruelbox/transaction-outbox.git</connection>
-    <developerConnection>scm:git:git@github.com:gruelbox/transaction-outbox.git
-    </developerConnection>
+    <developerConnection>scm:git:git@github.com:gruelbox/transaction-outbox.git</developerConnection>
     <url>https://github.com/gruelbox/transaction-outbox</url>
     <tag>HEAD</tag>
   </scm>
-
   <distributionManagement>
     <repository>
       <id>github</id>

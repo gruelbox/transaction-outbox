@@ -48,11 +48,15 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Builder.Default
   private final int writeLockTimeoutSeconds = 2;
 
-  /** @param dialect The database dialect to use. Required. */
+  /**
+   * @param dialect The database dialect to use. Required.
+   */
   @SuppressWarnings("JavaDoc")
   private final Dialect dialect;
 
-  /** @param tableName The database table name. The default is {@code TXNO_OUTBOX}. */
+  /**
+   * @param tableName The database table name. The default is {@code TXNO_OUTBOX}.
+   */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
   private final String tableName = "TXNO_OUTBOX";
@@ -103,6 +107,7 @@ public class DefaultPersistor implements Persistor, Validatable {
       stmt.addBatch();
       log.debug("Inserted {} in batch", entry.description());
     } else {
+      //noinspection resource
       try (PreparedStatement stmt = tx.connection().prepareStatement(insertSql)) {
         setupInsert(entry, writer, stmt);
         stmt.executeUpdate();
@@ -138,6 +143,7 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   @Override
   public void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception {
+    //noinspection resource
     try (PreparedStatement stmt =
         // language=MySQL
         tx.connection()
@@ -153,6 +159,7 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   @Override
   public void update(Transaction tx, TransactionOutboxEntry entry) throws Exception {
+    //noinspection resource
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
@@ -182,6 +189,7 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   @Override
   public boolean lock(Transaction tx, TransactionOutboxEntry entry) throws Exception {
+    //noinspection resource
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
@@ -219,12 +227,19 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   @Override
   public boolean unblock(Transaction tx, String entryId) throws Exception {
+    @SuppressWarnings("resource")
     PreparedStatement stmt =
         tx.prepareBatchStatement(
             "UPDATE "
                 + tableName
-                + " SET attempts = 0, blocked = false "
-                + "WHERE blocked = true AND processed = false AND id = ?");
+                + " SET attempts = 0, blocked = "
+                + dialect.booleanValue(false)
+                + " "
+                + "WHERE blocked = "
+                + dialect.booleanValue(true)
+                + " AND processed = "
+                + dialect.booleanValue(false)
+                + " AND id = ?");
     stmt.setString(1, entryId);
     stmt.setQueryTimeout(writeLockTimeoutSeconds);
     return stmt.executeUpdate() != 0;
@@ -234,6 +249,7 @@ public class DefaultPersistor implements Persistor, Validatable {
   public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
       throws Exception {
     String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
+    //noinspection resource
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
@@ -242,7 +258,11 @@ public class DefaultPersistor implements Persistor, Validatable {
                     + ALL_FIELDS
                     + " FROM "
                     + tableName
-                    + " WHERE nextAttemptTime < ? AND blocked = false AND processed = false LIMIT ?"
+                    + " WHERE nextAttemptTime < ? AND blocked = "
+                    + dialect.booleanValue(false)
+                    + " AND processed = "
+                    + dialect.booleanValue(false)
+                    + dialect.getLimitCriteria()
                     + forUpdate)) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
@@ -253,6 +273,7 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Override
   public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now)
       throws Exception {
+    //noinspection resource
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(dialect.getDeleteExpired().replace("{{table}}", tableName))) {
@@ -298,6 +319,7 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   // For testing. Assumed low volume.
   public void clear(Transaction tx) throws SQLException {
+    //noinspection resource
     try (Statement stmt = tx.connection().createStatement()) {
       stmt.execute("DELETE FROM " + tableName);
     }

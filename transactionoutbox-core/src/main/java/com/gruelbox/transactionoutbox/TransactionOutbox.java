@@ -17,7 +17,9 @@ import org.slf4j.event.Level;
  */
 public interface TransactionOutbox {
 
-  /** @return A builder for creating a new instance of {@link TransactionOutbox}. */
+  /**
+   * @return A builder for creating a new instance of {@link TransactionOutbox}.
+   */
   static TransactionOutboxBuilder builder() {
     return TransactionOutboxImpl.builder();
   }
@@ -111,7 +113,7 @@ public interface TransactionOutbox {
    * @return True if the request to unblock the entry was successful. May return false if another
    *     thread unblocked the entry first.
    */
-  @SuppressWarnings({"unchecked", "rawtypes"})
+  @SuppressWarnings("unused")
   boolean unblock(String entryId, Object transactionContext);
 
   /**
