@@ -11,7 +11,7 @@
   <artifactId>transactionoutbox-quarkus</artifactId>
   <description>A safe implementation of the transactional outbox pattern for Java (Quarkus extension library)</description>
   <properties>
-    <quarkus.version>2.16.5.Final</quarkus.version>
+    <quarkus.version>3.2.2.Final</quarkus.version>
   </properties>
   <dependencies>
     <!-- Runtime -->
