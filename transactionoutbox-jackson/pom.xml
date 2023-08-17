@@ -13,7 +13,7 @@
   <properties>
     <guice.version>5.2.4.RELEASE</guice.version>
     <jackson.version>2.15.2</jackson.version>
-    <commons.lang.version>3.12.0</commons.lang.version>
+    <commons.lang.version>3.13.0</commons.lang.version>
   </properties>
   <dependencies>
     <!-- Run time -->
