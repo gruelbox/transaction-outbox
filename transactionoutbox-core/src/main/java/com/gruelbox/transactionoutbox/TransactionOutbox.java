@@ -90,8 +90,6 @@ public interface TransactionOutbox {
   @SuppressWarnings("UnusedReturnValue")
   boolean flush();
 
-  boolean flushOrdered();
-
   /**
    * Unblocks a blocked entry and resets the attempt count so that it will be retried again.
    * Requires an active transaction and a transaction manager that supports thread local context.
@@ -142,7 +140,6 @@ public interface TransactionOutbox {
     protected Boolean serializeMdc;
     protected Duration retentionThreshold;
     protected Boolean initializeImmediately;
-    protected Boolean submitImmediately;
 
     protected TransactionOutboxBuilder() {}
 
@@ -290,16 +287,6 @@ public interface TransactionOutbox {
     }
 
     /**
-     * @param submitImmediately If true, a task will be submitted immediately after scheduling.
-     *     Defaults to true.
-     * @return Builder.
-     */
-    public TransactionOutboxBuilder submitImmediately(boolean submitImmediately) {
-      this.submitImmediately = submitImmediately;
-      return this;
-    }
-
-    /**
      * Creates and initialises the {@link TransactionOutbox}.
      *
      * @return The outbox implementation.
@@ -325,9 +312,17 @@ public interface TransactionOutbox {
      */
     ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId);
 
-    default ParameterizedScheduleBuilder groupId(String groupId) {
-      return this;
-    }
+    /**
+     * Specifies a group id for the request. This defaults to {@code null}, but if non-null, enables
+     * requests to be executed in the order created within the group of requests using the same
+     * group id. If non-null, the request will not be sumbitted immediately. Instead, ordered
+     * requests are processed only with {@link TransactionOutbox#flush()}.
+     *
+     * @param groupId The group id identifying requests that must be processed in order. May be
+     *     {@code null}, in which case no ordering is enforced.
+     * @return Builder.
+     */
+    ParameterizedScheduleBuilder groupId(String groupId);
 
     /**
      * Equivalent to {@link TransactionOutbox#schedule(Class)}, but applying additional parameters

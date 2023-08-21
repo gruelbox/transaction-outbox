@@ -105,8 +105,5 @@ public interface Persistor {
   List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
       throws Exception;
 
-  List<TransactionOutboxEntry> selectBatchOrdered(Transaction tx, int batchSize, Instant now)
-      throws Exception;
-
   int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now) throws Exception;
 }

@@ -37,7 +37,6 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private final boolean serializeMdc;
   private final Validator validator;
   private final Duration retentionThreshold;
-  private final boolean submitImmediately;
   private final AtomicBoolean initialized = new AtomicBoolean();
   private final ProxyFactory proxyFactory = new ProxyFactory();
 
@@ -54,8 +53,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       Level logLevelTemporaryFailure,
       Boolean serializeMdc,
       Duration retentionThreshold,
-      Boolean initializeImmediately,
-      Boolean submitImmediately) {
+      Boolean initializeImmediately) {
     this.transactionManager = transactionManager;
     this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
     this.persistor = persistor;
@@ -69,7 +67,6 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     this.validator = new Validator(this.clockProvider);
     this.serializeMdc = serializeMdc == null || serializeMdc;
     this.retentionThreshold = retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold;
-    this.submitImmediately = submitImmediately == null || submitImmediately;
     this.validator.validate(this);
     if (initializeImmediately == null || initializeImmediately) {
       initialize();
@@ -120,35 +117,22 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   @SuppressWarnings("UnusedReturnValue")
   @Override
   public boolean flush() {
-    return flush(false);
-  }
-
-  @Override
-  public boolean flushOrdered() {
-    return flush(true);
-  }
-
-  private boolean flush(boolean isOrdered) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
     Instant now = clockProvider.get().instant();
-    List<TransactionOutboxEntry> batch = flush(now, isOrdered);
+    List<TransactionOutboxEntry> batch = flush(now);
     expireIdempotencyProtection(now);
     return !batch.isEmpty();
   }
 
-  private List<TransactionOutboxEntry> flush(Instant now, boolean isOrdered) {
+  private List<TransactionOutboxEntry> flush(Instant now) {
     log.debug("Flushing stale tasks");
     var batch =
         transactionManager.inTransactionReturns(
             transaction -> {
               List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
-              uncheckedly(
-                      () ->
-                          isOrdered
-                              ? persistor.selectBatchOrdered(transaction, flushBatchSize, now)
-                              : persistor.selectBatch(transaction, flushBatchSize, now))
+              uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize, now))
                   .forEach(
                       entry -> {
                         log.debug("Reprocessing {}", entry.description());
@@ -256,7 +240,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                           groupId);
                   validator.validate(entry);
                   persistor.save(extracted.getTransaction(), entry);
-                  if (submitImmediately) {
+                  if (groupId == null) {
                     extracted
                         .getTransaction()
                         .addPostCommitHook(
@@ -427,8 +411,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
           logLevelTemporaryFailure,
           serializeMdc,
           retentionThreshold,
-          initializeImmediately,
-          submitImmediately);
+          initializeImmediately);
     }
   }
 

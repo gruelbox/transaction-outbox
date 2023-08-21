@@ -101,11 +101,14 @@ class DefaultMigrationManager {
               "ALTER TABLE TXNO_OUTBOX ADD COLUMN createTime TIMESTAMP(6) NULL AFTER invocation",
               Map.of(
                   Dialect.POSTGRESQL_9,
-                  "ALTER TABLE TXNO_OUTBOX ADD COLUMN createTime TIMESTAMP(6)")),
+                  "ALTER TABLE TXNO_OUTBOX ADD COLUMN createTime TIMESTAMP(6)",
+                  Dialect.ORACLE,
+                  "ALTER TABLE TXNO_OUTBOX ADD createTime TIMESTAMP(6)")),
           new Migration(
               10,
               "Add groupId column to outbox",
-              "ALTER TABLE TXNO_OUTBOX ADD COLUMN groupId VARCHAR(250)"));
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN groupId VARCHAR(250)",
+              Map.of(Dialect.ORACLE, "ALTER TABLE TXNO_OUTBOX ADD groupId VARCHAR2(250)")));
 
   static void migrate(TransactionManager transactionManager, Dialect dialect) {
     transactionManager.inTransaction(

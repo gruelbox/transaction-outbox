@@ -14,17 +14,33 @@ import lombok.Getter;
 @Beta
 public enum Dialect {
   MY_SQL_5(
-      false, false, Constants.DEFAULT_DELETE_EXPIRED_STMT, Constants.DEFAULT_LIMIT_CRITERIA), //
-  MY_SQL_8(true, true, Constants.DEFAULT_DELETE_EXPIRED_STMT, Constants.DEFAULT_LIMIT_CRITERIA), //
+      false,
+      false,
+      false,
+      Constants.DEFAULT_DELETE_EXPIRED_STMT,
+      Constants.DEFAULT_LIMIT_CRITERIA), //
+  MY_SQL_8(
+      true,
+      true,
+      true,
+      Constants.DEFAULT_DELETE_EXPIRED_STMT,
+      Constants.DEFAULT_LIMIT_CRITERIA), //
   POSTGRESQL_9(
+      true,
       true,
       true,
       "DELETE FROM {{table}} WHERE id IN (SELECT id FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?)",
       Constants.DEFAULT_LIMIT_CRITERIA), //
-  H2(false, true, Constants.DEFAULT_DELETE_EXPIRED_STMT, Constants.DEFAULT_LIMIT_CRITERIA), //
+  H2(
+      false,
+      true,
+      true,
+      Constants.DEFAULT_DELETE_EXPIRED_STMT,
+      Constants.DEFAULT_LIMIT_CRITERIA), //
   ORACLE(
       true,
       true,
+      false,
       "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0 AND ROWNUM <= ?",
       Constants.ORACLE_LIMIT_CRITERIA);
 
@@ -36,7 +52,18 @@ public enum Dialect {
   @SuppressWarnings("JavaDoc")
   private final boolean supportsSkipLock;
 
+  /**
+   * @return True if dialect supports use of SQL window functions.
+   */
+  @SuppressWarnings("JavaDoc")
   private final boolean supportsWindowFunctions;
+
+  /**
+   * @return True if dialect supports use of ({@code FOR UPDATE}) in queries using SQL window
+   *     functions.
+   */
+  @SuppressWarnings("JavaDoc")
+  private final boolean supportsWindowFunctionsForUpdate;
 
   /**
    * @return Format string for the SQL required to delete expired retained records.

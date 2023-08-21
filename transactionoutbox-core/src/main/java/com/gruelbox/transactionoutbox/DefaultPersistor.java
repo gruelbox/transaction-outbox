@@ -256,6 +256,13 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Override
   public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
       throws Exception {
+    List<TransactionOutboxEntry> results = selectBatchUnordered(tx, batchSize, now);
+    results.addAll(selectBatchOrdered(tx, batchSize - results.size(), now));
+    return results;
+  }
+
+  public List<TransactionOutboxEntry> selectBatchUnordered(
+      Transaction tx, int batchSize, Instant now) throws Exception {
     String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
     //noinspection resource
     try (PreparedStatement stmt =
@@ -279,7 +286,6 @@ public class DefaultPersistor implements Persistor, Validatable {
     }
   }
 
-  @Override
   public List<TransactionOutboxEntry> selectBatchOrdered(
       final Transaction tx, final int batchSize, final Instant now) throws Exception {
     String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
@@ -289,17 +295,21 @@ public class DefaultPersistor implements Persistor, Validatable {
                 dialect.isSupportsWindowFunctions()
                     ? "WITH t AS"
                         + " ("
-                        + "   SELECT rank() over (PARTITION BY groupid ORDER BY createtime) AS rn, "
+                        + "   SELECT RANK() OVER (PARTITION BY groupid ORDER BY createtime) AS rn, "
                         + ALL_FIELDS
                         + "   FROM "
                         + tableName
-                        + "   WHERE processed = false"
-                        + " ) "
+                        + "   WHERE processed = "
+                        + dialect.booleanValue(false)
+                        + " )"
                         + " SELECT "
                         + ALL_FIELDS
                         + " FROM t "
-                        + " WHERE rn = 1 AND nextAttemptTime < ? AND blocked = false AND groupid IS NOT null LIMIT ?"
-                        + forUpdate
+                        + " WHERE rn = 1 AND nextAttemptTime < ? AND blocked = "
+                        + dialect.booleanValue(false)
+                        + " AND groupid IS NOT NULL "
+                        + dialect.getLimitCriteria()
+                        + (dialect.isSupportsWindowFunctionsForUpdate() ? forUpdate : "")
                     : "SELECT "
                         + ALL_FIELDS
                         + " FROM"
@@ -307,14 +317,18 @@ public class DefaultPersistor implements Persistor, Validatable {
                         + "   SELECT groupid AS group_id, MIN(createtime) AS min_create_time"
                         + "   FROM "
                         + tableName
-                        + "   WHERE processed = false"
+                        + "   WHERE processed = "
+                        + dialect.booleanValue(false)
                         + "   GROUP BY group_id"
                         + " ) AS t"
                         + " JOIN "
                         + tableName
                         + " t1"
                         + " ON t1.groupid = t.group_id AND t1.createtime = t.min_create_time"
-                        + " WHERE nextAttemptTime < ? AND blocked = false AND groupid IS NOT null LIMIT ?"
+                        + " WHERE nextAttemptTime < ? AND blocked = "
+                        + dialect.booleanValue(false)
+                        + " AND groupid IS NOT NULL "
+                        + dialect.getLimitCriteria()
                         + forUpdate)) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
