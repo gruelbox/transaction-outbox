@@ -2,7 +2,6 @@ package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import java.time.LocalDateTime;
-import javax.inject.Provider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +16,7 @@ class EventuallyConsistentController {
       LoggerFactory.getLogger(EventuallyConsistentController.class);
 
   @Autowired private CustomerRepository customerRepository;
-  @Autowired private Provider<TransactionOutbox> outbox;
+  @Autowired private TransactionOutbox outbox;
   @Autowired private EventRepository eventRepository;
   @Autowired private EventPublisher eventPublisher;
 
@@ -27,7 +26,6 @@ class EventuallyConsistentController {
   public String createCustomer() {
     LOGGER.info("Creating customers");
     outbox
-        .get()
         .schedule(eventPublisher.getClass()) // Just a trick to get autowiring to work.
         .publish(1L, "Created customers", LocalDateTime.now());
     customerRepository.save(new Customer(1L, "Martin", "Carthy"));

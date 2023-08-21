@@ -8,7 +8,7 @@
 [![CD](https://github.com/gruelbox/transaction-outbox/workflows/Continous%20Delivery/badge.svg)](https://github.com/gruelbox/transaction-outbox/actions)
 [![CodeFactor](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox/badge)](https://www.codefactor.io/repository/github/gruelbox/transaction-outbox)
 
-A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. `TransactionOutbox` has a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks. Every aspect is highly configurable or overridable. It features out-of-the-box support for **Spring DI**, **Spring Txn**, **Guice**, **MySQL 5 & 8**, **PostgreSQL 9-12** and **H2**.
+A flexible implementation of the [Transaction Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) for Java. `TransactionOutbox` has a clean, extensible API, very few dependencies and plays nicely with a variety of database platforms, transaction management approaches and application frameworks. Every aspect is highly configurable or overridable. It features out-of-the-box support for **Spring DI**, **Spring Txn**, **Guice**, **MySQL 5 & 8**, **PostgreSQL 9-12**, **Oracle 18 & 21** and **H2**.
 
 ## Contents
 
@@ -27,6 +27,8 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
 1. [Advanced](#advanced)
    1. [The nested outbox pattern](#the-nested-outbox-pattern)
    1. [Idempotency protection](#idempotency-protection)
+   1. [Flexible serialization](#flexible-serialization-beta)
+   1. [Clustering](#clustering)
 1. [Configuration reference](#configuration-reference)
 1. [Stubbing in tests](#stubbing-in-tests)
 
@@ -107,7 +109,7 @@ If you find yourself wondering _why bother with the queues now_? You're quite ri
 
 ### Requirements
 - At least **Java 11**. Downgrading to requiring Java 8 is [under consideration](https://github.com/gruelbox/transaction-outbox/issues/29).
-- Currently, **MySQL**, **PostgreSQL** or **H2** databases (pull requests to support Oracle, SQL Server or any other traditional RDMBS would be trivial. Beyond that, a SQL database is not strictly necessary for the pattern to work, merely a data store with the concept of a transaction spanning multiple mutation operations).
+- Currently, **MySQL**, **PostgreSQL**, **Oracle** or **H2** databases (pull requests to support SQL Server or any other traditional RDMBS would be trivial. Beyond that, a SQL database is not strictly necessary for the pattern to work, merely a data store with the concept of a transaction spanning multiple mutation operations).
 - Database access via **JDBC** (In principle, JDBC should not be required - alternatives such as R2DBC are under investigation - but the API is currently tied to it)
 - Native transactions (not JTA or similar).
 - (Optional) Proxying non-interfaces requires [ByteBuddy](https://bytebuddy.net/#/) and for proxying classes without default constructors [Objenesis](http://objenesis.org/) to be added as a dependency
@@ -121,14 +123,14 @@ The latest stable release is available from Maven Central. Stable releases are [
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
-  <version>4.2.268</version>
+  <version>5.3.370</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-core:4.2.268'
+implementation 'com.gruelbox:transactionoutbox-core:5.3.370'
 ```
 
 ### Development snapshots
@@ -230,6 +232,10 @@ See [transaction-outbox-guice](transactionoutbox-guice/README.md), which integra
 
 See [transaction-outbox-jooq](transactionoutbox-jooq/README.md), which integrates jOOQ transaction management with `TransactionOutbox`.
 
+### Oracle
+
+Oracle database compatibility requires to configure Oracle jdbc driver using following VM argument : -Doracle.jdbc.javaNetNio=false
+
 ## Set up the background worker
 
 At the moment, if any work fails first time, it won't be retried. All we need to add is a background thread that repeatedly calls [`TransactionOutbox.flush()`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html) to pick up and reprocess stale work.
@@ -262,7 +268,9 @@ backgroundThread.interrupt();
 backgroundThread.join();
 ```
 
-Don't worry about it running on multiple instances simultaneously. It's designed to handle concurrent use (particularly on databases that support `SKIP LOCKED`, such as Postgres and MySQL 8+), and indeed multi-processing it can be a benefit; spreading high workloads across instances without any need for more complex high-availability configuration (that said, if you want to distribute work across a cluster at point of submission, this is also supported).
+`flush()` is designed to handle concurrent use on databases that support `SKIP LOCKED`, such as Postgres and MySQL 8+. Feel free to run this as often as you like (within reason, e.g. once a minute) on every instance of your application.  This can have the benefit of spreading work across multiple instances when the work backlog is extremely high, but is not as effective as a proper [clustering](#clustering) approach.
+
+However, multiple concurrent calls to `flush()` can cause lock timeout errors on databases without `SKIP LOCKED` support, such as MySQL 5.7.  This is harmless, but will cause a lot of log noise, so you may prefer to run on a single instance at a time to avoid this.
 
 ## Managing the "dead letter queue"
 
@@ -340,6 +348,118 @@ outbox.with()
 
 Where `context-clientid` is a globally-unique identifier derived from the incoming request. Such ids are usually available from queue middleware as message ids, or if not you can require as part of the incoming API (possibly with a tenant prefix to ensure global uniqueness across tenants).
 
+### Flexible serialization (beta)
+
+Most people will use the default persistor, `DefaultPersistor`, to persist tasks to a relational database. This uses `DefaultInvocationSerializer` by default, which in turn uses [GSON](https://github.com/google/gson) to serialize as JSON.  `DefaultInvocationSerializer` is extremely limited by design, with a small list of allowed classes in method arguments. 
+You can extend the list of support types by calling `serializableTypes` in its builder, but it will always be restricted to this global list. This is by design, to avoid building a [deserialization of untrusted data](https://owasp.org/www-community/vulnerabilities/Deserialization_of_untrusted_data) vulnerability into the library.
+
+Furthermore, there is no support for the case where run-time and compile-time types differ, such as in polymorphic collections. The following will always fail with `DefaultInvocationSerializer`:
+```
+outbox.schedule(Service.class).processList(List.of(1, "2", 3L));
+```
+However, if you completely trust your serialized data (for example, your developers don't have write access to your production database, and the access credentials are well guarded) then you may prefer to have 100% flexibility, with no need to declare the types used and the ability to use any combination of run-time and compile-time types.
+
+See [transaction-outbox-jackson](transactionoutbox-jackson/README.md), which uses a specially-configured Jackson `ObjectMapper` to achieve this.
+
+### Clustering
+
+The default mechanism for _running_ tasks (either immediately, or when they are picked up by background processing) is via a `java.concurrent.Executor`, which effectively does the following:
+```
+executor.execute(() -> outbox.processNow(transactionOutboxEntry));
+```
+This offloads processing to a background thread _on the application instance_ on which the task was picked up. Under high load, this can mean thousands of tasks being picked up from the database queue and submitted at the same time on the same application instance, even if there are 20 instances of the application, effectively limiting the total rate of processing to what a single instance can handle.
+
+If you want to instead push the work for processing by _any_ of your application instances, thus spreading the work around a cluster, there are multiple approaches, just some of which are listed below:
+
+* An HTTP endpoint on a load-balanced DNS with service discovery (such as a container orchestrator e.g. Kubernetes or Nomad)
+* A shared queue (AWS SQS, ActiveMQ, ZeroMQ)
+* A lower-level clustering/messaging toolkit such as [JGroups](http://www.jgroups.org/).
+
+All of these can be implemented as follows:
+
+When defining the `TransactionOutbox`, replace `ExecutorSubmitter` with something which serializes a `TransactionOutboxEntry` and ships it to the remote queue/address. Here's what configuration might look for a `RestApiSubmitter` which ships the request to a load-balanced endpoint hosted on Nomad/Consul:
+```
+TransactionOutbox outbox = TransactionOutbox.builder().submitter(restApiSubmitter)
+```
+It is strongly advised that you use a local executor in-line, to ensure that if there are communications issues with your endpoint or queue, it doesn't fail the calling thread.  Here is an example using [Feign](https://github.com/OpenFeign/feign):
+```
+@Slf4j
+class RestApiSubmitter implements Submitter {
+
+  private final FeignResource feignResource;
+  private final ExecutorService localExecutor;
+  private final Provider<TransactionOutbox> outbox;
+
+  @Inject
+  RestApiExecutor(String endpointUrl, ExecutorService localExecutor, ObjectMapper objectMapper, Provider<TransactionOutbox> outbox) {
+    this.feignResource = Feign.builder()
+      .decoder(new JacksonDecoder(objectMapper))
+      .target(GitHub.class, "https://api.github.com");;
+    this.localExecutor = localExecutor;
+    this.outbox = outbox;
+  }
+
+  @Override
+  public void submit(TransactionOutboxEntry entry, Consumer<TransactionOutboxEntry> leIgnore) {
+    try {
+      localExecutor.execute(() -> processRemotely(entry));
+      log.info("Queued {} to be sent for remote processing", entry.description());
+    } catch (RejectedExecutionException e) {
+      log.info("Will queue {} for processing when local executor is available", entry.description());
+    } catch (Exception e) {
+      log.warn("Failed to queue {} for execution at {}. It will be re-attempted later.", entry.description(), url, e);
+    }
+  }
+
+  private void processRemotely(TransactionOutboxEntry entry) {
+    try {
+      feignResource.process(entry);
+      log.info("Submitted {} for remote processing at {}", entry.description(), url);
+    } catch (Exception e) {
+      log.warn(
+        "Failed to submit {} for remote processing at {}. It will be re-attempted later.",
+        entry.description(),
+        url,
+        e
+      );
+    }
+  }
+  
+  public interface FeignResource {
+    @RequestLine("POST /outbox/process")
+    void process(TransactionOutboxEntry entry);
+  }
+  
+}
+```
+Then listen on your communication mechanism for incoming serialized `TransactionOutboxEntry`s, and push them to a normal local `ExecutorSubmitter`.  Here's what a JAX-RS example might look like:
+```
+@POST
+@Path("/outbox/process")
+void processOutboxEntry(String entry) {
+  TransactionOutboxEntry entry = somethingWhichCanSerializeTransactionOutboxEntries.deserialize(entry);
+  Submitter submitter = ExecutorSubmitter.builder().executor(localExecutor).logLevelWorkQueueSaturation(Level.INFO).build();
+  submitter.submit(entry, outbox.get()::processNow);
+}
+```
+This whole approach is complicated a little by the inherent difficulty in serializing and deserializing a `TransactionOutboxEntry`, which is extremely polymorphic in nature. A reference approach is provided by [transaction-outbox-jackson](transactionoutbox-jackson/README.md), which provides the features necessary to make a Jackson `ObjectMapper` able to handle the work.  With that on the classpath you can use an `ObjectMapper` as follows:
+```
+// Add support for TransactionOutboxEntry to your normal application ObjectMapper
+yourNormalSharedObjectMapper.registerModule(new TransactionOutboxJacksonModule());
+
+// (Optional) support deep polymorphic requests - for this we need to copy the object
+// mapper so it doesn't break the way the rest of your application works
+ObjectMapper objectMapper = yourNormalSharedObjectMapper.copy();
+objectMapper.setDefaultTyping(TransactionOutboxJacksonModule.typeResolver());
+
+// Serialize
+String message = objectMapper.writeValueAsString(entry);
+
+// Deserialize
+TransactionOutboxEntry entry = objectMapper.readValue(message, TransactionOutboxEntry.class);
+```
+Armed with the above, happy clustering!
+
 ## Configuration reference
 
 This example shows a number of other configuration options in action:
@@ -378,7 +498,7 @@ TransactionOutbox outbox = TransactionOutbox.builder()
     // Change the log level used when work cannot be submitted to a saturated queue to INFO level (the default
     // is WARN, which you should probably consider a production incident). You can also change the Executor used
     // for submitting work to a shared thread pool used by the rest of your application. Fully-custom Submitter
-    // implementations are also easy to implement.
+    // implementations are also easy to implement, for example to cluster work.
     .submitter(ExecutorSubmitter.builder()
         .executor(ForkJoinPool.commonPool())
         .logLevelWorkQueueSaturation(Level.INFO)

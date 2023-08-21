@@ -3,7 +3,7 @@ package com.gruelbox.transactionoutbox;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.Executor;
-import javax.validation.ClockProvider;
+import java.util.function.Supplier;
 import lombok.ToString;
 import org.slf4j.MDC;
 import org.slf4j.event.Level;
@@ -16,7 +16,9 @@ import org.slf4j.event.Level;
  */
 public interface TransactionOutbox {
 
-  /** @return A builder for creating a new instance of {@link TransactionOutbox}. */
+  /**
+   * @return A builder for creating a new instance of {@link TransactionOutbox}.
+   */
   static TransactionOutboxBuilder builder() {
     return TransactionOutboxImpl.builder();
   }
@@ -111,7 +113,7 @@ public interface TransactionOutbox {
    * @return True if the request to unblock the entry was successful. May return false if another
    *     thread unblocked the entry first.
    */
-  @SuppressWarnings({"unchecked", "rawtypes"})
+  @SuppressWarnings("unused")
   boolean unblock(String entryId, Object transactionContext);
 
   /**
@@ -133,7 +135,7 @@ public interface TransactionOutbox {
     protected Duration attemptFrequency;
     protected int blockAfterAttempts;
     protected int flushBatchSize;
-    protected ClockProvider clockProvider;
+    protected Supplier<Clock> clockProvider;
     protected TransactionOutboxListener listener;
     protected Persistor persistor;
     protected Level logLevelTemporaryFailure;
@@ -215,7 +217,7 @@ public interface TransactionOutbox {
      *     Defaults to the system clock.
      * @return Builder.
      */
-    public TransactionOutboxBuilder clockProvider(ClockProvider clockProvider) {
+    public TransactionOutboxBuilder clockProvider(Supplier<Clock> clockProvider) {
       this.clockProvider = clockProvider;
       return this;
     }
@@ -289,7 +291,7 @@ public interface TransactionOutbox {
 
     /**
      * @param submitImmediately If true, a task will be submitted immediately after scheduling.
-     * Defaults to true.
+     *     Defaults to true.
      * @return Builder.
      */
     public TransactionOutboxBuilder submitImmediately(boolean submitImmediately) {

@@ -15,21 +15,21 @@ jobs:
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
-          java-version: 11
+          java-version: 17
           server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
           settings-path: ${{ github.workspace }} # location for the settings.xml file
 
       - name: Build, publish to GPR and tag
         run: |
           if [ "$GITHUB_REPOSITORY" == "gruelbox/transaction-outbox" ]; then
-            revision="4.2.$GITHUB_RUN_NUMBER"
+            revision="5.3.$GITHUB_RUN_NUMBER"
             echo "Building $revision at $GITHUB_SHA"
-            mvn -Pdelombok -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision="$revision"
+            mvn -Pconcise,delombok -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision="$revision" -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
             echo "Tagging $revision"
             git tag $revision
             git push origin $revision
           else
-            mvn -Pdelombok -B package
+            mvn -Pconcise,delombok -B package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
           fi
         env:
           GITHUB_TOKEN: ${{ github.token }}

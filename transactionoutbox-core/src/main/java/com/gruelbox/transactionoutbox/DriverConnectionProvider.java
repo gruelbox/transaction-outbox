@@ -4,7 +4,6 @@ import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import javax.validation.constraints.NotBlank;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -25,15 +24,12 @@ import lombok.extern.slf4j.Slf4j;
  */
 @SuperBuilder
 @Slf4j
-final class DriverConnectionProvider implements ConnectionProvider {
+final class DriverConnectionProvider implements ConnectionProvider, Validatable {
 
-  @NotBlank private final String driverClassName;
-
-  @NotBlank private final String url;
-
-  @NotBlank private final String user;
-
-  @NotBlank private final String password;
+  private final String driverClassName;
+  private final String url;
+  private final String user;
+  private final String password;
 
   private volatile boolean initialized;
 
@@ -53,5 +49,13 @@ final class DriverConnectionProvider implements ConnectionProvider {
           connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
           return connection;
         });
+  }
+
+  @Override
+  public void validate(Validator validator) {
+    validator.notBlank("driverClassName", driverClassName);
+    validator.notBlank("url", url);
+    validator.notBlank("user", user);
+    validator.notBlank("password", password);
   }
 }

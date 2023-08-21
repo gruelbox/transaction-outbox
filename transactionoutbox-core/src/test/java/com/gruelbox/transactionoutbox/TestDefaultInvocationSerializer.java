@@ -2,16 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.time.DayOfWeek;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.Month;
-import java.time.MonthDay;
-import java.time.Period;
-import java.time.Year;
-import java.time.YearMonth;
+import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.Map;
@@ -148,7 +139,8 @@ class TestDefaultInvocationSerializer {
         MonthDay.class,
         Period.class,
         Year.class,
-        YearMonth.class
+        YearMonth.class,
+        ZonedDateTime.class
       };
       Object[] values = {
         Duration.ofDays(1),
@@ -159,7 +151,8 @@ class TestDefaultInvocationSerializer {
         MonthDay.of(1, 1),
         Period.ofMonths(1),
         Year.now(),
-        YearMonth.now()
+        YearMonth.now(),
+        ZonedDateTime.now()
       };
       check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
     }

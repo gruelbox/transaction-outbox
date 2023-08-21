@@ -22,17 +22,7 @@ import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.ParsePosition;
-import java.time.DayOfWeek;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.Month;
-import java.time.MonthDay;
-import java.time.Period;
-import java.time.Year;
-import java.time.YearMonth;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Calendar;
@@ -44,7 +34,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
-
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -65,6 +54,7 @@ import lombok.extern.slf4j.Slf4j;
  *         <li>{@link java.time.Instant}
  *         <li>{@link java.time.LocalDate}
  *         <li>{@link java.time.LocalDateTime}
+ *         <li>{@link java.time.ZonedDateTime}
  *         <li>{@link java.time.Month}
  *         <li>{@link java.time.MonthDay}
  *         <li>{@link java.time.Period}
@@ -94,6 +84,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
                     version == null ? 2 : version))
             .registerTypeAdapter(Date.class, new UtcDateTypeAdapter())
             .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeTypeAdapter())
+            .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeTypeAdapter())
             .registerTypeAdapter(Instant.class, new InstantTypeAdapter())
             .registerTypeAdapter(Duration.class, new DurationTypeAdapter())
             .registerTypeAdapter(LocalDate.class, new LocalDateTypeAdapter())
@@ -123,8 +114,8 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       implements JsonSerializer<Invocation>, JsonDeserializer<Invocation> {
 
     private final int version;
-    private Map<Class<?>, String> classToName = new HashMap<>();
-    private Map<String, Class<?>> nameToClass = new HashMap<>();
+    private final Map<Class<?>, String> classToName = new HashMap<>();
+    private final Map<String, Class<?>> nameToClass = new HashMap<>();
 
     InvocationJsonSerializer(Set<Class<?>> serializableClasses, int version) {
       this.version = version;
@@ -156,6 +147,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       addClass(Instant.class);
       addClass(LocalDate.class);
       addClass(LocalDateTime.class);
+      addClass(ZonedDateTime.class);
       addClass(Month.class);
       addClass(MonthDay.class);
       addClass(Period.class);
@@ -335,6 +327,19 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
             "Cannot serialize class - not found: " + clazz.getName());
       }
       return name;
+    }
+  }
+
+  static final class ZonedDateTimeTypeAdapter extends TypeAdapter<ZonedDateTime> {
+
+    @Override
+    public void write(final JsonWriter out, final ZonedDateTime value) throws IOException {
+      out.value(value.format(DateTimeFormatter.ISO_ZONED_DATE_TIME));
+    }
+
+    @Override
+    public ZonedDateTime read(final JsonReader in) throws IOException {
+      return ZonedDateTime.parse(in.nextString(), DateTimeFormatter.ISO_ZONED_DATE_TIME);
     }
   }
 

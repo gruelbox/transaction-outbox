@@ -13,7 +13,6 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import javax.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -34,7 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @SuperBuilder
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
-public class DefaultPersistor implements Persistor {
+public class DefaultPersistor implements Persistor, Validatable {
 
   private static final String ALL_FIELDS =
       "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version, "
@@ -48,18 +47,19 @@ public class DefaultPersistor implements Persistor {
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  @NotNull
   private final int writeLockTimeoutSeconds = 2;
 
-  /** @param dialect The database dialect to use. Required. */
+  /**
+   * @param dialect The database dialect to use. Required.
+   */
   @SuppressWarnings("JavaDoc")
-  @NotNull
   private final Dialect dialect;
 
-  /** @param tableName The database table name. The default is {@code TXNO_OUTBOX}. */
+  /**
+   * @param tableName The database table name. The default is {@code TXNO_OUTBOX}.
+   */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  @NotNull
   private final String tableName = "TXNO_OUTBOX";
 
   /**
@@ -70,7 +70,6 @@ public class DefaultPersistor implements Persistor {
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
-  @NotNull
   private final boolean migrate = true;
 
   /**
@@ -84,6 +83,12 @@ public class DefaultPersistor implements Persistor {
       InvocationSerializer.createDefaultJsonSerializer();
 
   @Override
+  public void validate(Validator validator) {
+    validator.notNull("dialect", dialect);
+    validator.notNull("tableName", tableName);
+  }
+
+  @Override
   public void migrate(TransactionManager transactionManager) {
     if (migrate) {
       DefaultMigrationManager.migrate(transactionManager, dialect);
@@ -94,7 +99,11 @@ public class DefaultPersistor implements Persistor {
   public void save(Transaction tx, TransactionOutboxEntry entry)
       throws SQLException, AlreadyScheduledException {
     var insertSql =
-        "INSERT INTO " + tableName + " (" + ALL_FIELDS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO "
+            + tableName
+            + " ("
+            + ALL_FIELDS
+            + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
     if (entry.getUniqueRequestId() == null) {
@@ -103,6 +112,7 @@ public class DefaultPersistor implements Persistor {
       stmt.addBatch();
       log.debug("Inserted {} in batch", entry.description());
     } else {
+      //noinspection resource
       try (PreparedStatement stmt = tx.connection().prepareStatement(insertSql)) {
         setupInsert(entry, writer, stmt);
         stmt.executeUpdate();
@@ -141,6 +151,7 @@ public class DefaultPersistor implements Persistor {
 
   @Override
   public void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception {
+    //noinspection resource
     try (PreparedStatement stmt =
         // language=MySQL
         tx.connection()
@@ -156,6 +167,7 @@ public class DefaultPersistor implements Persistor {
 
   @Override
   public void update(Transaction tx, TransactionOutboxEntry entry) throws Exception {
+    //noinspection resource
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
@@ -185,6 +197,7 @@ public class DefaultPersistor implements Persistor {
 
   @Override
   public boolean lock(Transaction tx, TransactionOutboxEntry entry) throws Exception {
+    //noinspection resource
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
@@ -222,12 +235,19 @@ public class DefaultPersistor implements Persistor {
 
   @Override
   public boolean unblock(Transaction tx, String entryId) throws Exception {
+    @SuppressWarnings("resource")
     PreparedStatement stmt =
         tx.prepareBatchStatement(
             "UPDATE "
                 + tableName
-                + " SET attempts = 0, blocked = false "
-                + "WHERE blocked = true AND processed = false AND id = ?");
+                + " SET attempts = 0, blocked = "
+                + dialect.booleanValue(false)
+                + " "
+                + "WHERE blocked = "
+                + dialect.booleanValue(true)
+                + " AND processed = "
+                + dialect.booleanValue(false)
+                + " AND id = ?");
     stmt.setString(1, entryId);
     stmt.setQueryTimeout(writeLockTimeoutSeconds);
     return stmt.executeUpdate() != 0;
@@ -237,6 +257,7 @@ public class DefaultPersistor implements Persistor {
   public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
       throws Exception {
     String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
+    //noinspection resource
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
@@ -245,7 +266,12 @@ public class DefaultPersistor implements Persistor {
                     + ALL_FIELDS
                     + " FROM "
                     + tableName
-                    + " WHERE nextAttemptTime < ? AND blocked = false AND processed = false and groupid is null LIMIT ?"
+                    + " WHERE nextAttemptTime < ? AND blocked = "
+                    + dialect.booleanValue(false)
+                    + " AND processed = "
+                    + dialect.booleanValue(false)
+                    + " AND groupid IS NULL "
+                    + dialect.getLimitCriteria()
                     + forUpdate)) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
@@ -263,29 +289,33 @@ public class DefaultPersistor implements Persistor {
                 dialect.isSupportsWindowFunctions()
                     ? "WITH t AS"
                         + " ("
-                        + "   SELECT rank() over (PARTITION BY groupid ORDER BY createtime) AS rn, " + ALL_FIELDS
-                        + "   FROM " + tableName
+                        + "   SELECT rank() over (PARTITION BY groupid ORDER BY createtime) AS rn, "
+                        + ALL_FIELDS
+                        + "   FROM "
+                        + tableName
                         + "   WHERE processed = false"
                         + " ) "
-                        + " SELECT " + ALL_FIELDS
+                        + " SELECT "
+                        + ALL_FIELDS
                         + " FROM t "
                         + " WHERE rn = 1 AND nextAttemptTime < ? AND blocked = false AND groupid IS NOT null LIMIT ?"
                         + forUpdate
-                    :
-                      "SELECT "
+                    : "SELECT "
                         + ALL_FIELDS
                         + " FROM"
                         + " ("
                         + "   SELECT groupid AS group_id, MIN(createtime) AS min_create_time"
-                        + "   FROM " + tableName
+                        + "   FROM "
+                        + tableName
                         + "   WHERE processed = false"
                         + "   GROUP BY group_id"
                         + " ) AS t"
-                        + " JOIN " + tableName + " t1"
+                        + " JOIN "
+                        + tableName
+                        + " t1"
                         + " ON t1.groupid = t.group_id AND t1.createtime = t.min_create_time"
                         + " WHERE nextAttemptTime < ? AND blocked = false AND groupid IS NOT null LIMIT ?"
-                        + forUpdate
-            )) {
+                        + forUpdate)) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
       return gatherResults(batchSize, stmt);
@@ -295,6 +325,7 @@ public class DefaultPersistor implements Persistor {
   @Override
   public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now)
       throws Exception {
+    //noinspection resource
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(dialect.getDeleteExpired().replace("{{table}}", tableName))) {
@@ -345,6 +376,7 @@ public class DefaultPersistor implements Persistor {
 
   // For testing. Assumed low volume.
   public void clear(Transaction tx) throws SQLException {
+    //noinspection resource
     try (Statement stmt = tx.connection().createStatement()) {
       stmt.execute("DELETE FROM " + tableName);
     }
