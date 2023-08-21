@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox.acceptance;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -241,6 +242,55 @@ abstract class AbstractAcceptanceTest {
                 .process("6"));
 
     MatcherAssert.assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
+  }
+
+  @Test
+  void orderedRequests() {
+
+    TransactionManager transactionManager = simpleTxnManager();
+
+    List<String> ids = new ArrayList<>();
+    AtomicReference<Clock> clockProvider = new AtomicReference<>(Clock.systemDefaultZone());
+
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    ids.add((String) entry.getInvocation().getArgs()[0]);
+                  }
+                })
+            .submitter(Submitter.withExecutor(Runnable::run))
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .clockProvider(clockProvider::get)
+            .build();
+
+    clearOutbox();
+
+    String groupId = "groupId1";
+    transactionManager.inTransaction(
+        () -> outbox.with().groupId(groupId).schedule(ClassProcessor.class).process("2"));
+    clockProvider.set(
+        Clock.fixed(clockProvider.get().instant().minusSeconds(1), clockProvider.get().getZone()));
+    transactionManager.inTransaction(
+        () -> outbox.with().groupId(groupId).schedule(ClassProcessor.class).process("1"));
+    clockProvider.set(
+        Clock.fixed(clockProvider.get().instant().plusSeconds(2), clockProvider.get().getZone()));
+    transactionManager.inTransaction(
+        () -> outbox.with().groupId(groupId).schedule(ClassProcessor.class).process("3"));
+
+    // Ensure no tasks were processed immediately, as a group id was provided
+    MatcherAssert.assertThat(ids, equalTo(new ArrayList<>(List.of())));
+
+    // Run the clock over the threshold
+    clockProvider.set(
+        Clock.fixed(clockProvider.get().instant().plusSeconds(120), clockProvider.get().getZone()));
+    while (outbox.flush()) {}
+
+    // Ensure tasks were processed in order, as all shared the same group id
+    MatcherAssert.assertThat(ids, equalTo(new ArrayList<>(List.of("1", "2", "3"))));
   }
 
   /**
