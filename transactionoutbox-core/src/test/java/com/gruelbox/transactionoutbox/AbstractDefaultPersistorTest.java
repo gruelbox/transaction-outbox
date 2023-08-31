@@ -3,11 +3,25 @@ package com.gruelbox.transactionoutbox;
 import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import lombok.extern.slf4j.Slf4j;
+import org.hamcrest.Description;
+import org.hamcrest.TypeSafeMatcher;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
@@ -18,13 +32,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import lombok.extern.slf4j.Slf4j;
-import org.hamcrest.Description;
-import org.hamcrest.TypeSafeMatcher;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 @Slf4j
 abstract class AbstractDefaultPersistorTest {
@@ -275,7 +282,8 @@ abstract class AbstractDefaultPersistorTest {
 
   @Test
   void testSkipLocked() throws Exception {
-    Assumptions.assumeTrue(dialect().isSupportsSkipLock());
+    // Skip this test for dialects that do not support SKIP LOCKED
+    Assumptions.assumeFalse(dialect() == Dialect.MY_SQL_5 || dialect() == Dialect.H2);
 
     var entry1 = createEntry("FOO1", now.minusSeconds(1), false);
     var entry2 = createEntry("FOO2", now.minusSeconds(1), false);

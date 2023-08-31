@@ -41,6 +41,15 @@ class DefaultMigrationManager {
                       + "    attempts NUMBER,\n"
                       + "    blacklisted NUMBER(1),\n"
                       + "    version NUMBER\n"
+                      + ")",
+                  Dialect.MSSQL,
+                  "CREATE TABLE TXNO_OUTBOX (\n"
+                      + "    id VARCHAR(36) PRIMARY KEY,\n"
+                      + "    invocation NVARCHAR(MAX),\n"
+                      + "    nextAttemptTime DATETIME2(6),\n"
+                      + "    attempts INT,\n"
+                      + "    blacklisted BIT,\n"
+                      + "    version INT\n"
                       + ")")),
           new Migration(
               2,
@@ -48,16 +57,23 @@ class DefaultMigrationManager {
               "ALTER TABLE TXNO_OUTBOX ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE",
               Map.of(
                   Dialect.ORACLE,
-                  "ALTER TABLE TXNO_OUTBOX ADD uniqueRequestId VARCHAR(100) NULL UNIQUE")),
+                  "ALTER TABLE TXNO_OUTBOX ADD uniqueRequestId VARCHAR(100) NULL UNIQUE",
+                  Dialect.MSSQL,
+                  "ALTER TABLE TXNO_OUTBOX ADD uniqueRequestId VARCHAR(100)")),
           new Migration(
               3,
               "Add processed flag",
               "ALTER TABLE TXNO_OUTBOX ADD COLUMN processed BOOLEAN",
-              Map.of(Dialect.ORACLE, "ALTER TABLE TXNO_OUTBOX ADD processed NUMBER(1)")),
+              Map.of(
+                  Dialect.ORACLE,
+                  "ALTER TABLE TXNO_OUTBOX ADD processed NUMBER(1)",
+                  Dialect.MSSQL,
+                  "ALTER TABLE TXNO_OUTBOX ADD processed BIT")),
           new Migration(
               4,
               "Add flush index",
-              "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blacklisted, nextAttemptTime)"),
+              "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blacklisted, "
+                  + "nextAttemptTime)"),
           new Migration(
               5,
               "Increase size of uniqueRequestId",
@@ -68,7 +84,9 @@ class DefaultMigrationManager {
                   Dialect.H2,
                   "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)",
                   Dialect.ORACLE,
-                  "ALTER TABLE TXNO_OUTBOX MODIFY uniqueRequestId VARCHAR2(250)")),
+                  "ALTER TABLE TXNO_OUTBOX MODIFY uniqueRequestId VARCHAR2(250)",
+                  Dialect.MSSQL,
+                  "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")),
           new Migration(
               6,
               "Rename column blacklisted to blocked",
@@ -79,22 +97,41 @@ class DefaultMigrationManager {
                   Dialect.ORACLE,
                   "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked",
                   Dialect.H2,
-                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")),
+                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked",
+                  Dialect.MSSQL,
+                  "EXEC sp_rename 'TXNO_OUTBOX.blacklisted', 'blocked', 'COLUMN'")),
           new Migration(
               7,
               "Add lastAttemptTime column to outbox",
-              "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER "
+                  + "invocation",
               Map.of(
                   Dialect.POSTGRESQL_9,
                   "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6)",
                   Dialect.ORACLE,
-                  "ALTER TABLE TXNO_OUTBOX ADD lastAttemptTime TIMESTAMP(6)")),
+                  "ALTER TABLE TXNO_OUTBOX ADD lastAttemptTime TIMESTAMP(6)",
+                  Dialect.MSSQL,
+                  "ALTER TABLE TXNO_OUTBOX ADD lastAttemptTime DATETIME2(6)")),
           new Migration(
               8,
               "Update length of invocation column on outbox for MySQL dialects only.",
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation MEDIUMTEXT",
               Map.of(
-                  Dialect.POSTGRESQL_9, "", Dialect.H2, "", Dialect.ORACLE, "SELECT * FROM dual")));
+                  Dialect.POSTGRESQL_9,
+                  "",
+                  Dialect.H2,
+                  "",
+                  Dialect.ORACLE,
+                  "SELECT * FROM dual",
+                  Dialect.MSSQL,
+                  "")),
+          new Migration(
+              9,
+              "Add unique constraint that allows multiple nulls for uniqueRequestId column on outbox for SQLServer dialects only.",
+              "",
+              Map.of(
+                  Dialect.MSSQL,
+                  "CREATE UNIQUE INDEX UX_TXNO_OUTBOX_uniqueRequestId ON TXNO_OUTBOX (uniqueRequestId) WHERE uniqueRequestId IS NOT NULL")));
 
   static void migrate(TransactionManager transactionManager, Dialect dialect) {
     transactionManager.inTransaction(
@@ -114,7 +151,10 @@ class DefaultMigrationManager {
   private static void runSql(Connection connection, Migration migration, Dialect dialect) {
     log.info("Running migration: {}", migration.name);
     try (Statement s = connection.createStatement()) {
-      s.execute(migration.sqlFor(dialect));
+      String sql = migration.sqlFor(dialect);
+      if (sql != null && !sql.isBlank()) {
+        s.execute(sql);
+      }
       if (s.executeUpdate("UPDATE TXNO_VERSION SET version = " + migration.version) != 1) {
         s.execute("INSERT INTO TXNO_VERSION VALUES (" + migration.version + ")");
       }
@@ -123,8 +163,21 @@ class DefaultMigrationManager {
 
   private static int currentVersion(Connection connection, Dialect dialect) throws SQLException {
     createVersionTableIfNotExists(connection, dialect);
+    String sql;
+    switch (dialect) {
+      case MSSQL:
+        sql = "SELECT version FROM TXNO_VERSION WITH (updlock, holdlock, rowlock)";
+        break;
+      case H2:
+      case ORACLE:
+      case MY_SQL_5:
+      case MY_SQL_8:
+      case POSTGRESQL_9:
+      default:
+        sql = "SELECT version FROM TXNO_VERSION FOR UPDATE";
+    }
     try (Statement s = connection.createStatement();
-        ResultSet rs = s.executeQuery("SELECT version FROM TXNO_VERSION FOR UPDATE")) {
+        ResultSet rs = s.executeQuery(sql)) {
       if (!rs.next()) {
         return 0;
       }
@@ -142,6 +195,15 @@ class DefaultMigrationManager {
           } catch (SQLException e) {
             // oracle code for name already used by an existing object
             if (!e.getMessage().contains("955")) {
+              throw e;
+            }
+          }
+          break;
+        case MSSQL:
+          try {
+            s.execute("CREATE TABLE TXNO_VERSION (version INT)");
+          } catch (SQLException e) {
+            if (e.getErrorCode() != 2714) {
               throw e;
             }
           }
