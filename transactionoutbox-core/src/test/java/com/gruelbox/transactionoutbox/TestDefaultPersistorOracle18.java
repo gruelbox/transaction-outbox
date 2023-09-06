@@ -15,7 +15,7 @@ class TestDefaultPersistorOracle18 extends AbstractDefaultPersistorTest {
       (JdbcDatabaseContainer)
           new OracleContainer("gvenzl/oracle-xe:18-slim").withStartupTimeout(Duration.ofHours(1));
 
-  private DefaultPersistor persistor = DefaultPersistor.builder().dialect(Dialect.ORACLE).build();
+  private DefaultPersistor persistor = DefaultPersistor.builder().dialect(dialect()).build();
 
   private TransactionManager txManager =
       TransactionManager.fromConnectionDetails(
@@ -35,7 +35,7 @@ class TestDefaultPersistorOracle18 extends AbstractDefaultPersistorTest {
   }
 
   @Override
-  protected Dialect dialect() {
-    return Dialect.ORACLE;
+  protected DialectSql dialect() {
+    return new DialectSqlOracleImpl();
   }
 }

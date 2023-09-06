@@ -48,7 +48,7 @@ class TestJacksonSerializer {
 
     persistor =
         DefaultPersistor.builder()
-            .dialect(Dialect.H2)
+            .dialect(new DialectSqlH2Impl())
             .serializer(JacksonInvocationSerializer.builder().mapper(mapper).build())
             .build();
     outbox =

@@ -14,7 +14,7 @@ class TestDefaultPersistorMySql5 extends AbstractDefaultPersistorTest {
   private static final JdbcDatabaseContainer container =
       new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1));
 
-  private DefaultPersistor persistor = DefaultPersistor.builder().dialect(Dialect.MY_SQL_5).build();
+  private DefaultPersistor persistor = DefaultPersistor.builder().dialect(dialect()).build();
   private TransactionManager txManager =
       TransactionManager.fromConnectionDetails(
           "com.mysql.cj.jdbc.Driver",
@@ -33,7 +33,7 @@ class TestDefaultPersistorMySql5 extends AbstractDefaultPersistorTest {
   }
 
   @Override
-  protected Dialect dialect() {
-    return Dialect.MY_SQL_5;
+  protected DialectSql dialect() {
+    return new DialectSqlMySQL5Impl();
   }
 }

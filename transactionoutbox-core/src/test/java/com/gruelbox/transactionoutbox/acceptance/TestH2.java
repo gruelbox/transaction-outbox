@@ -18,7 +18,7 @@ class TestH2 extends AbstractAcceptanceTest {
   @Override
   protected ConnectionDetails connectionDetails() {
     return ConnectionDetails.builder()
-        .dialect(Dialect.H2)
+        .dialect(new DialectSqlH2Impl())
         .driverClassName("org.h2.Driver")
         .url(
             "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE")

@@ -33,7 +33,7 @@ abstract class AbstractDefaultPersistorTest {
 
   protected abstract DefaultPersistor persistor();
 
-  protected abstract Dialect dialect();
+  protected abstract DialectSql dialect();
 
   protected abstract TransactionManager txManager();
 

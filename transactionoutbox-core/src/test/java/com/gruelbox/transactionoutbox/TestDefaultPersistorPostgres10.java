@@ -15,8 +15,7 @@ class TestDefaultPersistorPostgres10 extends AbstractDefaultPersistorTest {
       (JdbcDatabaseContainer)
           new PostgreSQLContainer("postgres:10").withStartupTimeout(Duration.ofHours(1));
 
-  private DefaultPersistor persistor =
-      DefaultPersistor.builder().dialect(Dialect.POSTGRESQL_9).build();
+  private DefaultPersistor persistor = DefaultPersistor.builder().dialect(dialect()).build();
   private TransactionManager txManager =
       TransactionManager.fromConnectionDetails(
           "org.postgresql.Driver",
@@ -35,7 +34,7 @@ class TestDefaultPersistorPostgres10 extends AbstractDefaultPersistorTest {
   }
 
   @Override
-  protected Dialect dialect() {
-    return Dialect.POSTGRESQL_9;
+  protected DialectSql dialect() {
+    return new DialectSqlPostgresImpl();
   }
 }

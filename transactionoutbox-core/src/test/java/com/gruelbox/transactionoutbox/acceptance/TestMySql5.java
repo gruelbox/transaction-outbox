@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
-import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.DialectSqlMySQL5Impl;
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.MySQLContainer;
@@ -19,7 +19,7 @@ class TestMySql5 extends AbstractAcceptanceTest {
   @Override
   protected ConnectionDetails connectionDetails() {
     return ConnectionDetails.builder()
-        .dialect(Dialect.MY_SQL_5)
+        .dialect(new DialectSqlMySQL5Impl())
         .driverClassName("com.mysql.cj.jdbc.Driver")
         .url(container.getJdbcUrl())
         .user(container.getUsername())

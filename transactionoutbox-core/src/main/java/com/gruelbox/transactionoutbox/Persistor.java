@@ -19,6 +19,26 @@ public interface Persistor {
    * @return The persistor.
    */
   static DefaultPersistor forDialect(Dialect dialect) {
+    return DefaultPersistor.builder().dialect(selectDialectSql(dialect)).build();
+  }
+
+  static DialectSql selectDialectSql(Dialect dialect) {
+    switch (dialect) {
+      case MY_SQL_8:
+        return new DialectSqlMySQL8Impl();
+      case POSTGRESQL_9:
+        return new DialectSqlPostgresImpl();
+      case H2:
+        return new DialectSqlH2Impl();
+      case ORACLE:
+        return new DialectSqlOracleImpl();
+      case MY_SQL_5:
+      default:
+        return new DialectSqlMySQL5Impl();
+    }
+  }
+
+  static DefaultPersistor forDialect(DialectSql dialect) {
     return DefaultPersistor.builder().dialect(dialect).build();
   }
 
