@@ -1,12 +1,10 @@
 package com.gruelbox.transactionoutbox;
 
-import lombok.EqualsAndHashCode;
-
 import java.sql.SQLException;
 import java.sql.Statement;
+import lombok.EqualsAndHashCode;
 
-/**
- * SQL implementation for MySQL 5. */
+/** SQL implementation for MySQL 5. */
 @EqualsAndHashCode
 public class DialectMySQL5Impl implements Dialect {
 

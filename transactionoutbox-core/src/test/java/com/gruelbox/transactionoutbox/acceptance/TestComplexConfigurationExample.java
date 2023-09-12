@@ -3,7 +3,6 @@ package com.gruelbox.transactionoutbox.acceptance;
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
 import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.DialectPostgres9Impl;
 import com.gruelbox.transactionoutbox.ExecutorSubmitter;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.TransactionManager;

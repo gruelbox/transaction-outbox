@@ -1,7 +1,5 @@
 package com.gruelbox.transactionoutbox;
 
-import lombok.EqualsAndHashCode;
-
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -26,5 +24,6 @@ public interface Dialect {
   void createVersionTableIfNotExists(Statement s) throws SQLException;
   // Required so the dialects can be used as keys in a Map.
   boolean equals(Object o);
+
   int hashCode();
 }

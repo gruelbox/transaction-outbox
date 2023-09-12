@@ -1,9 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
-import lombok.EqualsAndHashCode;
-
 import java.sql.SQLException;
 import java.sql.Statement;
+import lombok.EqualsAndHashCode;
 
 /** Dialect SQL implementation for Oracle. */
 @EqualsAndHashCode

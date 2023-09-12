@@ -5,7 +5,6 @@ import static org.junit.Assert.assertTrue;
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
 import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.DialectH2Impl;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import java.util.Set;
