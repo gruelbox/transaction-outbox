@@ -710,6 +710,6 @@ abstract class AbstractAcceptanceTest {
     String url;
     String user;
     String password;
-    DialectSql dialect;
+    Dialect dialect;
   }
 }

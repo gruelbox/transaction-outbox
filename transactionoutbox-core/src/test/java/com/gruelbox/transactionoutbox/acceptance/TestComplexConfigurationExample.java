@@ -2,7 +2,8 @@ package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
 import com.gruelbox.transactionoutbox.DefaultPersistor;
-import com.gruelbox.transactionoutbox.DialectSqlPostgresImpl;
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.DialectPostgres9Impl;
 import com.gruelbox.transactionoutbox.ExecutorSubmitter;
 import com.gruelbox.transactionoutbox.Instantiator;
 import com.gruelbox.transactionoutbox.TransactionManager;
@@ -55,7 +56,7 @@ class TestComplexConfigurationExample {
                 DefaultPersistor.builder()
                     // Selecting the right SQL dialect ensures that features such as SKIP LOCKED are
                     // used correctly.
-                    .dialect(new DialectSqlPostgresImpl())
+                    .dialect(Dialect.POSTGRESQL_9)
                     // Override the table name (defaults to "TXNO_OUTBOX")
                     .tableName("transactionOutbox")
                     // Shorten the time we will wait for write locks (defaults to 2)

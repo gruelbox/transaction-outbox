@@ -1,6 +1,5 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
-import static org.junit.Assert.*;
 import static org.junit.Assert.assertTrue;
 
 import com.gruelbox.transactionoutbox.*;
@@ -18,7 +17,7 @@ class TestH2 extends AbstractAcceptanceTest {
   @Override
   protected ConnectionDetails connectionDetails() {
     return ConnectionDetails.builder()
-        .dialect(new DialectSqlH2Impl())
+        .dialect(Dialect.H2)
         .driverClassName("org.h2.Driver")
         .url(
             "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE")

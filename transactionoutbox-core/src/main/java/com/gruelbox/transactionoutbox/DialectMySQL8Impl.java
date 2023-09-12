@@ -1,12 +1,10 @@
 package com.gruelbox.transactionoutbox;
 
-/** Dialect SQL implementation for MySQL 8. */
-public class DialectSqlMySQL8Impl extends DialectSqlMySQL5Impl {
-  @Override
-  public Dialect getDialect() {
-    return Dialect.MY_SQL_8;
-  }
+import lombok.EqualsAndHashCode;
 
+/** Dialect SQL implementation for MySQL 8. */
+@EqualsAndHashCode
+public class DialectMySQL8Impl extends DialectMySQL5Impl {
   @Override
   public String lock(String tableName) {
     return "SELECT id, invocation FROM "

@@ -52,7 +52,7 @@ public class DefaultPersistor implements Persistor, Validatable {
    * @param dialect The database dialect to use. Required.
    */
   @SuppressWarnings("JavaDoc")
-  private final DialectSql dialect;
+  private final Dialect dialect;
 
   /**
    * @param tableName The database table name. The default is {@code TXNO_OUTBOX}.
@@ -90,7 +90,7 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Override
   public void migrate(TransactionManager transactionManager) {
     if (migrate) {
-      DefaultMigrationManager.migrate(transactionManager, dialect.getDialect());
+      DefaultMigrationManager.migrate(transactionManager, dialect);
     }
   }
 

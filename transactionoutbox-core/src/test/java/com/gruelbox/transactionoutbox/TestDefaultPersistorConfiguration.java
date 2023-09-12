@@ -18,7 +18,7 @@ class TestDefaultPersistorConfiguration {
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(
-                DefaultPersistor.builder().dialect(new DialectSqlH2Impl()).migrate(false).build())
+                DefaultPersistor.builder().dialect(new DialectH2Impl()).migrate(false).build())
             .build();
 
     transactionManager.inTransactionThrows(

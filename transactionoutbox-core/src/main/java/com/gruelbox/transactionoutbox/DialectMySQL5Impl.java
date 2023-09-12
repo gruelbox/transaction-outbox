@@ -1,11 +1,14 @@
 package com.gruelbox.transactionoutbox;
 
-/** Dialect SQL implementation for MySQL 5. */
-public class DialectSqlMySQL5Impl implements DialectSql {
-  @Override
-  public Dialect getDialect() {
-    return Dialect.MY_SQL_5;
-  }
+import lombok.EqualsAndHashCode;
+
+import java.sql.SQLException;
+import java.sql.Statement;
+
+/**
+ * SQL implementation for MySQL 5. */
+@EqualsAndHashCode
+public class DialectMySQL5Impl implements Dialect {
 
   @Override
   public String lock(String tableName) {
@@ -43,5 +46,10 @@ public class DialectSqlMySQL5Impl implements DialectSql {
   @Override
   public boolean isSupportsSkipLock() {
     return false;
+  }
+
+  @Override
+  public void createVersionTableIfNotExists(Statement s) throws SQLException {
+    s.execute("CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
   }
 }

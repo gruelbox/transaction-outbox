@@ -135,25 +135,7 @@ class DefaultMigrationManager {
   private static void createVersionTableIfNotExists(Connection connection, Dialect dialect)
       throws SQLException {
     try (Statement s = connection.createStatement()) {
-      switch (dialect) {
-        case ORACLE:
-          try {
-            s.execute("CREATE TABLE TXNO_VERSION (version NUMBER)");
-          } catch (SQLException e) {
-            // oracle code for name already used by an existing object
-            if (!e.getMessage().contains("955")) {
-              throw e;
-            }
-          }
-          break;
-        case MY_SQL_5:
-        case H2:
-        case MY_SQL_8:
-        case POSTGRESQL_9:
-        default:
-          s.execute("CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
-          break;
-      }
+      dialect.createVersionTableIfNotExists(s);
     }
   }
 

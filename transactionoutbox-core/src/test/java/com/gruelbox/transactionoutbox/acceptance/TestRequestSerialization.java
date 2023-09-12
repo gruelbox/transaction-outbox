@@ -4,7 +4,8 @@ import static org.junit.Assert.assertTrue;
 
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
 import com.gruelbox.transactionoutbox.DefaultPersistor;
-import com.gruelbox.transactionoutbox.DialectSqlH2Impl;
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.DialectH2Impl;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import java.util.Set;
@@ -51,7 +52,7 @@ public class TestRequestSerialization {
 
   protected AbstractAcceptanceTest.ConnectionDetails connectionDetails() {
     return AbstractAcceptanceTest.ConnectionDetails.builder()
-        .dialect(new DialectSqlH2Impl())
+        .dialect(Dialect.H2)
         .driverClassName("org.h2.Driver")
         .url(
             "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE")

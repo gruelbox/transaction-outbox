@@ -1,11 +1,13 @@
 package com.gruelbox.transactionoutbox;
 
+import lombok.EqualsAndHashCode;
+
+import java.sql.SQLException;
+import java.sql.Statement;
+
 /** Dialect SQL implementation for Oracle. */
-public class DialectSqlOracleImpl extends DialectSqlMySQL8Impl {
-  @Override
-  public Dialect getDialect() {
-    return Dialect.ORACLE;
-  }
+@EqualsAndHashCode
+public class DialectOracleImpl extends DialectMySQL8Impl {
 
   @Override
   public String selectBatch(String tableName, String allFields, int batchSize) {
@@ -26,5 +28,17 @@ public class DialectSqlOracleImpl extends DialectSqlMySQL8Impl {
         + " WHERE nextAttemptTime < ? AND processed = ? AND blocked = ?"
         + " AND ROWNUM <= "
         + batchSize;
+  }
+
+  @Override
+  public void createVersionTableIfNotExists(Statement s) throws SQLException {
+    try {
+      s.execute("CREATE TABLE TXNO_VERSION (version NUMBER)");
+    } catch (SQLException e) {
+      // oracle code for name already used by an existing object
+      if (!e.getMessage().contains("955")) {
+        throw e;
+      }
+    }
   }
 }

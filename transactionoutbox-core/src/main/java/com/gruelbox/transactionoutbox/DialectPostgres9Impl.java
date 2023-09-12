@@ -1,11 +1,10 @@
 package com.gruelbox.transactionoutbox;
 
+import lombok.EqualsAndHashCode;
+
 /** Dialect SQL implementation for Postgres 9+. */
-public class DialectSqlPostgresImpl extends DialectSqlMySQL8Impl {
-  @Override
-  public Dialect getDialect() {
-    return Dialect.POSTGRESQL_9;
-  }
+@EqualsAndHashCode
+public class DialectPostgres9Impl extends DialectMySQL8Impl {
 
   @Override
   public String deleteExpired(String tableName, int batchSize) {

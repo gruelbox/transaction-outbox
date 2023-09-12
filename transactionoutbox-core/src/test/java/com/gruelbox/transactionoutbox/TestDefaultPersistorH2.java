@@ -5,7 +5,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 class TestDefaultPersistorH2 extends AbstractDefaultPersistorTest {
 
-  private final DefaultPersistor persistor = DefaultPersistor.builder().dialect(dialect()).build();
+  private DefaultPersistor persistor = DefaultPersistor.builder().dialect(Dialect.H2).build();
   private TransactionManager txManager =
       TransactionManager.fromConnectionDetails(
           "org.h2.Driver",
@@ -24,7 +24,7 @@ class TestDefaultPersistorH2 extends AbstractDefaultPersistorTest {
   }
 
   @Override
-  protected DialectSql dialect() {
-    return new DialectSqlH2Impl();
+  protected Dialect dialect() {
+    return Dialect.H2;
   }
 }

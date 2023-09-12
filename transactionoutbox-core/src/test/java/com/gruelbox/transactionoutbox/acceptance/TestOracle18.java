@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
-import com.gruelbox.transactionoutbox.DialectSqlOracleImpl;
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.DialectOracleImpl;
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.OracleContainer;
@@ -20,7 +21,7 @@ class TestOracle18 extends AbstractAcceptanceTest {
   @Override
   protected ConnectionDetails connectionDetails() {
     return ConnectionDetails.builder()
-        .dialect(new DialectSqlOracleImpl())
+        .dialect(Dialect.ORACLE)
         .driverClassName("oracle.jdbc.OracleDriver")
         .url(container.getJdbcUrl())
         .user(container.getUsername())
