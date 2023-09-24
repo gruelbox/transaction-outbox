@@ -1,9 +1,12 @@
 package com.gruelbox.transactionoutbox;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.startsWith;
 
 import com.gruelbox.transactionoutbox.acceptance.TestUtils;
+import java.io.StringWriter;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import org.junit.jupiter.api.Test;
@@ -33,6 +36,30 @@ class TestDefaultPersistorConfiguration {
             }
           }
         });
+  }
+
+  @Test
+  final void writeSchema() {
+    StringWriter stringWriter = new StringWriter();
+
+    DefaultPersistor defaultPersistor = DefaultPersistor.builder().dialect(Dialect.H2).build();
+    defaultPersistor.writeSchema(stringWriter);
+
+    String migrations = stringWriter.toString();
+
+    assertThat(migrations, startsWith("-- 1: Create outbox table"));
+    assertThat(
+        migrations,
+        containsString(
+            "-- 2: Add unique request id"
+                + System.lineSeparator()
+                + "ALTER TABLE TXNO_OUTBOX ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE"));
+    assertThat(
+        migrations,
+        containsString(
+            "-- 8: Update length of invocation column on outbox for MySQL dialects only."
+                + System.lineSeparator()
+                + "-- Nothing for H2"));
   }
 
   private TransactionManager simpleTxnManager() {
