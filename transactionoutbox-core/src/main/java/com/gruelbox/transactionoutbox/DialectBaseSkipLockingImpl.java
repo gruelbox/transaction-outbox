@@ -3,6 +3,9 @@ package com.gruelbox.transactionoutbox;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/**
+ * A SQL implementation for databases that support skip locking.
+ */
 final class DialectBaseSkipLockingImpl implements Dialect {
   @Override
   public String lock(String tableName) {
