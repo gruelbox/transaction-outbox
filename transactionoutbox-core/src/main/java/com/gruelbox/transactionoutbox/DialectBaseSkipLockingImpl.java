@@ -2,21 +2,21 @@ package com.gruelbox.transactionoutbox;
 
 import java.sql.SQLException;
 import java.sql.Statement;
-import lombok.EqualsAndHashCode;
 
-/** Dialect SQL implementation for Oracle. */
-@EqualsAndHashCode
-final class DialectOracleImpl implements Dialect {
-  private final Dialect skipLockingBase = new DialectBaseSkipLockingImpl();
-
+final class DialectBaseSkipLockingImpl implements Dialect {
   @Override
   public String lock(String tableName) {
-    return skipLockingBase.lock(tableName);
+    return "SELECT id, invocation FROM "
+        + tableName
+        + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED";
   }
 
   @Override
   public String unblock(String tableName) {
-    return skipLockingBase.unblock(tableName);
+    return "UPDATE "
+        + tableName
+        + " SET attempts = ?, blocked = ? "
+        + "WHERE blocked = ? AND processed = ? AND id = ?";
   }
 
   @Override
@@ -26,7 +26,7 @@ final class DialectOracleImpl implements Dialect {
         + " FROM "
         + tableName
         + " WHERE nextAttemptTime < ? AND blocked = ? AND processed = ? "
-        + " AND ROWNUM <= "
+        + "LIMIT "
         + batchSize
         + " FOR UPDATE SKIP LOCKED";
   }
@@ -35,25 +35,18 @@ final class DialectOracleImpl implements Dialect {
   public String deleteExpired(String tableName, int batchSize) {
     return "DELETE FROM "
         + tableName
-        + " WHERE nextAttemptTime < ? AND processed = ? AND blocked = ?"
-        + " AND ROWNUM <= "
+        + " WHERE nextAttemptTime < ? AND processed = ? AND "
+        + "blocked = ? LIMIT "
         + batchSize;
   }
 
   @Override
   public boolean isSupportsSkipLock() {
-    return skipLockingBase.isSupportsSkipLock();
+    return true;
   }
 
   @Override
   public void createVersionTableIfNotExists(Statement s) throws SQLException {
-    try {
-      s.execute("CREATE TABLE TXNO_VERSION (version NUMBER)");
-    } catch (SQLException e) {
-      // oracle code for name already used by an existing object
-      if (!e.getMessage().contains("955")) {
-        throw e;
-      }
-    }
+    s.execute("CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
   }
 }

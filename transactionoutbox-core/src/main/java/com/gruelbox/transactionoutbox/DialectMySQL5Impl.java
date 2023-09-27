@@ -6,48 +6,36 @@ import lombok.EqualsAndHashCode;
 
 /** SQL implementation for MySQL 5. */
 @EqualsAndHashCode
-public class DialectMySQL5Impl implements Dialect {
+final class DialectMySQL5Impl implements Dialect {
+  private final Dialect lockingBase = new DialectBaseLockingImpl();
 
   @Override
   public String lock(String tableName) {
-    return "SELECT id, invocation FROM " + tableName + " WHERE id = ? AND version = ? FOR UPDATE";
+    return lockingBase.lock(tableName);
   }
 
   @Override
   public String unblock(String tableName) {
-    return "UPDATE "
-        + tableName
-        + " SET attempts = ?, blocked = ? "
-        + "WHERE blocked = ? AND processed = ? AND id = ?";
+    return lockingBase.unblock(tableName);
   }
 
   @Override
   public String selectBatch(String tableName, String allFields, int batchSize) {
-    return "SELECT "
-        + allFields
-        + " FROM "
-        + tableName
-        + " WHERE nextAttemptTime < ? AND blocked = ? AND processed = ? "
-        + "LIMIT "
-        + batchSize;
+    return lockingBase.selectBatch(tableName, allFields, batchSize);
   }
 
   @Override
   public String deleteExpired(String tableName, int batchSize) {
-    return "DELETE FROM "
-        + tableName
-        + " WHERE nextAttemptTime < ? AND processed = ? AND "
-        + "blocked = ? LIMIT "
-        + batchSize;
+    return lockingBase.deleteExpired(tableName, batchSize);
   }
 
   @Override
   public boolean isSupportsSkipLock() {
-    return false;
+    return lockingBase.isSupportsSkipLock();
   }
 
   @Override
   public void createVersionTableIfNotExists(Statement s) throws SQLException {
-    s.execute("CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
+    lockingBase.createVersionTableIfNotExists(s);
   }
 }
