@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import lombok.ToString;
@@ -40,8 +41,9 @@ public interface TransactionOutbox {
    *
    * <p>Usage:
    *
-   * <pre>transactionOutbox.schedule(MyService.class)
-   *   .runMyMethod("with", "some", "arguments");</pre>
+   * <pre>
+   * transactionOutbox.schedule(MyService.class).runMyMethod("with", "some", "arguments");
+   * </pre>
    *
    * <p>This will write a record to the database using the supplied {@link Persistor} and {@link
    * Instantiator}, using the current database transaction, which will get rolled back if the rest
@@ -115,6 +117,26 @@ public interface TransactionOutbox {
   boolean unblock(String entryId, Object transactionContext);
 
   /**
+   * Unblocks all blocked entries and resets the attempt count so that they will be retried again.
+   * Requires an active transaction and a transaction manager that supports thread local context.
+   *
+   * @return unblocked entries count.
+   */
+  int unblockAll();
+
+  /**
+   * Clears failed entries of their failed state and resets the attempt count so that they will be
+   * retried again. Requires an active transaction and a transaction manager that supports supplied
+   * context.
+   *
+   * @param transactionContext The transaction context ({@link TransactionManager} implementation
+   *     specific).
+   * @return unblocked entries count.
+   */
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  int unblockAll(Object transactionContext);
+
+  /**
    * Processes an entry immediately in the current thread. Intended for use in custom
    * implementations of {@link Submitter} and should not generally otherwise be called.
    *
@@ -123,22 +145,43 @@ public interface TransactionOutbox {
   @SuppressWarnings("WeakerAccess")
   void processNow(TransactionOutboxEntry entry);
 
+  /**
+   * Get blocked entries with pagination.
+   *
+   * @param page page number
+   * @param batchSize The number of records to select.
+   * @return blocked entries
+   */
+  List<TransactionOutboxEntry> getBlockedEntries(int page, int batchSize);
+
   /** Builder for {@link TransactionOutbox}. */
   @ToString
   abstract class TransactionOutboxBuilder {
 
     protected TransactionManager transactionManager;
+
     protected Instantiator instantiator;
+
     protected Submitter submitter;
+
     protected Duration attemptFrequency;
+
     protected int blockAfterAttempts;
+
     protected int flushBatchSize;
+
     protected Supplier<Clock> clockProvider;
+
     protected TransactionOutboxListener listener;
+
     protected Persistor persistor;
+
     protected Level logLevelTemporaryFailure;
+
     protected Boolean serializeMdc;
+
     protected Duration retentionThreshold;
+
     protected Boolean initializeImmediately;
 
     protected TransactionOutboxBuilder() {}
@@ -318,10 +361,9 @@ public interface TransactionOutbox {
      *
      * <p>Usage example:
      *
-     * <pre>transactionOutbox.with()
-     * .uniqueRequestId("my-request")
-     * .schedule(MyService.class)
-     * .runMyMethod("with", "some", "arguments");</pre>
+     * <pre>
+     * transactionOutbox.with().uniqueRequestId("my-request").schedule(MyService.class).runMyMethod("with", "some", "arguments");
+     * </pre>
      *
      * @param clazz The class to proxy.
      * @param <T> The type to proxy.

@@ -49,4 +49,15 @@ public class StubPersistor implements Persistor {
   public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now) {
     return 0;
   }
+
+  @Override
+  public int unblockAll(Transaction tx) throws Exception {
+    return 0;
+  }
+
+  @Override
+  public List<TransactionOutboxEntry> selectBlocked(Transaction tx, int page, int batchSize)
+      throws Exception {
+    return List.of();
+  }
 }

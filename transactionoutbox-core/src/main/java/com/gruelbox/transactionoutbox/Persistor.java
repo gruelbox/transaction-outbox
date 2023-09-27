@@ -91,6 +91,27 @@ public interface Persistor {
   boolean unblock(Transaction tx, String entryId) throws Exception;
 
   /**
+   * Clears the blocked flag and resets the attempt count to zero for all blocked entries.
+   *
+   * @param tx The current {@link Transaction}.
+   * @return unblocked entries count
+   * @throws Exception Any other exception.
+   */
+  int unblockAll(Transaction tx) throws Exception;
+
+  /**
+   * Selects up to a specified maximum number of blocked records with pagination.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param page the page to get
+   * @param batchSize The number of records to select.
+   * @return The records.
+   * @throws Exception Any exception.
+   */
+  List<TransactionOutboxEntry> selectBlocked(Transaction tx, int page, int batchSize)
+      throws Exception;
+
+  /**
    * Selects up to a specified maximum number of non-blocked records which have passed their {@link
    * TransactionOutboxEntry#getNextAttemptTime()}. Until a subsequent call to {@link
    * #lock(Transaction, TransactionOutboxEntry)}, these records may be selected by another instance
