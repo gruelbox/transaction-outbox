@@ -271,13 +271,9 @@ abstract class AbstractAcceptanceTest {
 
     String groupId = "groupId1";
     transactionManager.inTransaction(
-        () -> outbox.with().groupId(groupId).schedule(ClassProcessor.class).process("2"));
-    clockProvider.set(
-        Clock.fixed(clockProvider.get().instant().minusSeconds(1), clockProvider.get().getZone()));
-    transactionManager.inTransaction(
         () -> outbox.with().groupId(groupId).schedule(ClassProcessor.class).process("1"));
-    clockProvider.set(
-        Clock.fixed(clockProvider.get().instant().plusSeconds(2), clockProvider.get().getZone()));
+    transactionManager.inTransaction(
+        () -> outbox.with().groupId(groupId).schedule(ClassProcessor.class).process("2"));
     transactionManager.inTransaction(
         () -> outbox.with().groupId(groupId).schedule(ClassProcessor.class).process("3"));
 

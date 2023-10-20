@@ -50,7 +50,10 @@ abstract class AbstractDefaultPersistorTest {
     Thread.sleep(1100);
     txManager()
         .inTransactionThrows(
-            tx -> assertThat(persistor().selectBatch(tx, 100, now.plusMillis(1)), contains(entry)));
+            tx ->
+                assertThat(
+                    persistor().selectBatch(tx, 100, now.plusMillis(1)),
+                    contains(samePropertyValuesAs(entry, "createTime"))));
   }
 
   @Test
@@ -72,7 +75,9 @@ abstract class AbstractDefaultPersistorTest {
     txManager()
         .inTransactionThrows(
             tx ->
-                assertThat(persistor().selectBatch(tx, 100, now.plusMillis(1)), contains(entry1)));
+                assertThat(
+                    persistor().selectBatch(tx, 100, now.plusMillis(1)),
+                    contains(samePropertyValuesAs(entry1, "createTime"))));
 
     TransactionOutboxEntry entry2 = createEntry("FOO2", now, false, "context-clientkey2");
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry2));
@@ -82,7 +87,9 @@ abstract class AbstractDefaultPersistorTest {
             tx ->
                 assertThat(
                     persistor().selectBatch(tx, 100, now.plusMillis(1)),
-                    containsInAnyOrder(entry1, entry2)));
+                    containsInAnyOrder(
+                        samePropertyValuesAs(entry1, "createTime"),
+                        samePropertyValuesAs(entry2, "createTime"))));
 
     TransactionOutboxEntry entry3 = createEntry("FOO3", now, false, "context-clientkey1");
     Assertions.assertThrows(
@@ -93,7 +100,9 @@ abstract class AbstractDefaultPersistorTest {
             tx ->
                 assertThat(
                     persistor().selectBatch(tx, 100, now.plusMillis(1)),
-                    containsInAnyOrder(entry1, entry2)));
+                    containsInAnyOrder(
+                        samePropertyValuesAs(entry1, "createTime"),
+                        samePropertyValuesAs(entry2, "createTime"))));
   }
 
   @Test

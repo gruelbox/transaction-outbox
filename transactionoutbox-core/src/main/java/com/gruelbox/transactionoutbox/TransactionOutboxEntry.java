@@ -101,9 +101,23 @@ public class TransactionOutboxEntry implements Validatable {
   @Setter
   private int version;
 
-  @Getter private Instant createTime;
+  /**
+   * @param createTime The timestamp when the task was created.
+   * @return The timestamp when the task was created.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  private Instant createTime;
 
-  @Getter private String groupId;
+  /**
+   * @param groupId The group ID identifying requests that must be processed in order or null if no
+   *     ordering is enforced.
+   * @return The group ID identifying requests that must be processed in order or null if no
+   *     ordering is enforced.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  private String groupId;
 
   @EqualsAndHashCode.Exclude @ToString.Exclude private volatile boolean initialized;
   @EqualsAndHashCode.Exclude @ToString.Exclude private String description;

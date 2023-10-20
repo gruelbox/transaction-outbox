@@ -103,7 +103,9 @@ public class DefaultPersistor implements Persistor, Validatable {
             + tableName
             + " ("
             + ALL_FIELDS
-            + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "
+            + dialect.getCurrentTimestamp()
+            + ", ?)";
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
     if (entry.getUniqueRequestId() == null) {
@@ -144,9 +146,7 @@ public class DefaultPersistor implements Persistor, Validatable {
     stmt.setBoolean(7, entry.isBlocked());
     stmt.setBoolean(8, entry.isProcessed());
     stmt.setInt(9, entry.getVersion());
-    stmt.setTimestamp(
-        10, entry.getCreateTime() == null ? null : Timestamp.from(entry.getCreateTime()));
-    stmt.setString(11, entry.getGroupId());
+    stmt.setString(10, entry.getGroupId());
   }
 
   @Override
@@ -295,7 +295,7 @@ public class DefaultPersistor implements Persistor, Validatable {
                 dialect.isSupportsWindowFunctions()
                     ? "WITH t AS"
                         + " ("
-                        + "   SELECT RANK() OVER (PARTITION BY groupid ORDER BY createtime) AS rn, "
+                        + "   SELECT ROW_NUMBER() OVER (PARTITION BY groupid ORDER BY createtime) AS rn, "
                         + ALL_FIELDS
                         + "   FROM "
                         + tableName
