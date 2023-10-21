@@ -1,8 +1,12 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.arrayContaining;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasProperty;
 import static org.junit.Assert.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -287,6 +291,72 @@ abstract class AbstractAcceptanceTest {
 
     // Ensure tasks were processed in order, as all shared the same group id
     MatcherAssert.assertThat(ids, equalTo(new ArrayList<>(List.of("1", "2", "3"))));
+  }
+
+  /**
+   * Runs ordered task which will fail enough times to enter a blocked state but will then pass when
+   * retried after it is unblocked, while ensuring that remaining tasks in the same ordered group
+   * are held back until the earlier task has completed
+   */
+  @Test
+  final void orderedBlockAndThenUnblockForRetry() throws Exception {
+    TransactionManager transactionManager = simpleTxnManager();
+    CountDownLatch successLatch = new CountDownLatch(2);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    var orderedEntryListener = new OrderedEntryListener(successLatch, blockLatch);
+    AtomicInteger attempts = new AtomicInteger();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .instantiator(new FailingInstantiator(attempts))
+            .attemptFrequency(Duration.ofMillis(500))
+            .listener(orderedEntryListener)
+            .blockAfterAttempts(2)
+            .build();
+
+    clearOutbox();
+
+    withRunningFlusher(
+        outbox,
+        () -> {
+          String groupId = "groupId1";
+          transactionManager.inTransaction(
+              () ->
+                  outbox
+                      .with()
+                      .groupId(groupId)
+                      .schedule(InterfaceProcessor.class)
+                      .process(1, "Whee"));
+          transactionManager.inTransaction(
+              () ->
+                  outbox
+                      .with()
+                      .groupId(groupId)
+                      .schedule(InterfaceProcessor.class)
+                      .process(2, "Whee"));
+          assertTrue(blockLatch.await(10, TimeUnit.SECONDS));
+          assertTrue(
+              transactionManager.inTransactionReturns(
+                  tx -> outbox.unblock(orderedEntryListener.getBlocked().getId())));
+          assertTrue(successLatch.await(10, TimeUnit.SECONDS));
+          var orderedEntryEvents = orderedEntryListener.getOrderedEntries();
+          assertThat(
+              orderedEntryEvents,
+              contains(
+                  allOf(
+                      hasProperty("invocation", hasProperty("args", arrayContaining(1, "Whee"))),
+                      hasProperty("blocked", equalTo(false))),
+                  allOf(
+                      hasProperty("invocation", hasProperty("args", arrayContaining(1, "Whee"))),
+                      hasProperty("blocked", equalTo(true))),
+                  allOf(
+                      hasProperty("invocation", hasProperty("args", arrayContaining(1, "Whee"))),
+                      hasProperty("blocked", equalTo(false))),
+                  allOf(
+                      hasProperty("invocation", hasProperty("args", arrayContaining(2, "Whee"))),
+                      hasProperty("blocked", equalTo(false)))));
+        });
   }
 
   /**
