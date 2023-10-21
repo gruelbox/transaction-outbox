@@ -12,8 +12,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -146,8 +148,15 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
               return result;
             });
     log.debug("Got batch of {}", batch.size());
-    batch.forEach(this::submitNow);
+    batch.stream().filter(entry -> entry.getGroupId() == null).forEach(this::submitNow);
     log.debug("Submitted batch");
+    List<CompletableFuture<Void>> orderedFutures =
+        batch.stream()
+            .filter(entry -> entry.getGroupId() != null)
+            .map(entry -> CompletableFuture.runAsync(() -> this.processNow(entry)))
+            .collect(Collectors.toList());
+    orderedFutures.forEach(CompletableFuture::join);
+    log.debug("Processed ordered tasks in batch");
     return batch;
   }
 

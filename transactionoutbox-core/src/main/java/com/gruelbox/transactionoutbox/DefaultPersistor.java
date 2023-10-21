@@ -261,7 +261,7 @@ public class DefaultPersistor implements Persistor, Validatable {
     return results;
   }
 
-  public List<TransactionOutboxEntry> selectBatchUnordered(
+  private List<TransactionOutboxEntry> selectBatchUnordered(
       Transaction tx, int batchSize, Instant now) throws Exception {
     String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
     //noinspection resource
@@ -286,7 +286,7 @@ public class DefaultPersistor implements Persistor, Validatable {
     }
   }
 
-  public List<TransactionOutboxEntry> selectBatchOrdered(
+  private List<TransactionOutboxEntry> selectBatchOrdered(
       final Transaction tx, final int batchSize, final Instant now) throws Exception {
     String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
     try (PreparedStatement stmt =
