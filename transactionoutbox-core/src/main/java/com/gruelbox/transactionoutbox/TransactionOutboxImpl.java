@@ -257,9 +257,11 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                               listener.scheduled(entry);
                               submitNow(entry);
                             });
+                    log.debug(
+                        "Scheduled {} for running after transaction commit", entry.description());
+                  } else {
+                    log.debug("Scheduled {} for running in next flush", entry.description());
                   }
-                  log.debug(
-                      "Scheduled {} for running after transaction commit", entry.description());
                   return null;
                 }));
   }
