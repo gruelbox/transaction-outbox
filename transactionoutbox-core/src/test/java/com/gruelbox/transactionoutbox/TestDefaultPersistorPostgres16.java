@@ -7,13 +7,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-class TestDefaultPersistorPostgres10 extends AbstractDefaultPersistorTest {
+class TestDefaultPersistorPostgres16 extends AbstractDefaultPersistorTest {
 
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
       (JdbcDatabaseContainer)
-          new PostgreSQLContainer("postgres:10").withStartupTimeout(Duration.ofHours(1));
+          new PostgreSQLContainer("postgres:16").withStartupTimeout(Duration.ofHours(1));
 
   private DefaultPersistor persistor =
       DefaultPersistor.builder().dialect(Dialect.POSTGRESQL_9).build();
