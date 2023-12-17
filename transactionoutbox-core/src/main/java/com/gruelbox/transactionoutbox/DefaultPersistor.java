@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
+import java.io.Writer;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -64,8 +65,9 @@ public class DefaultPersistor implements Persistor, Validatable {
   /**
    * @param migrate Set to false to disable automatic database migrations. This may be preferred if
    *     the default migration behaviour interferes with your existing toolset, and you prefer to
-   *     manage the migrations explicitly (e.g. using FlyWay or Liquibase), or your do not give the
-   *     application DDL permissions at runtime.
+   *     manage the migrations explicitly (e.g. using FlyWay or Liquibase), or you do not give the
+   *     application DDL permissions at runtime. You may use {@link #writeSchema(Writer)} to access
+   *     the migrations.
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
@@ -74,7 +76,7 @@ public class DefaultPersistor implements Persistor, Validatable {
   /**
    * @param serializer The serializer to use for {@link Invocation}s. See {@link
    *     InvocationSerializer} for more information. Defaults to {@link
-   *     InvocationSerializer#createDefaultJsonSerializer()} with no custom serializable classes..
+   *     InvocationSerializer#createDefaultJsonSerializer()} with no custom serializable classes.
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
@@ -92,6 +94,16 @@ public class DefaultPersistor implements Persistor, Validatable {
     if (migrate) {
       DefaultMigrationManager.migrate(transactionManager, dialect);
     }
+  }
+
+  /**
+   * Provides access to the database schema so that you may optionally use your existing toolset to
+   * manage migrations.
+   *
+   * @param writer The writer to which the migrations are written.
+   */
+  public void writeSchema(Writer writer) {
+    DefaultMigrationManager.writeSchema(writer, dialect);
   }
 
   @Override

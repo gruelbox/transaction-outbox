@@ -1,5 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -108,6 +110,25 @@ class DefaultMigrationManager {
             throw new RuntimeException("Migrations failed", e);
           }
         });
+  }
+
+  static void writeSchema(Writer writer, Dialect dialect) {
+    PrintWriter printWriter = new PrintWriter(writer);
+    MIGRATIONS.forEach(
+        migration -> {
+          printWriter.print("-- ");
+          printWriter.print(migration.version);
+          printWriter.print(": ");
+          printWriter.println(migration.name);
+          String sql = migration.sqlFor(dialect);
+          if (sql.isEmpty()) {
+            printWriter.println("-- Nothing for " + dialect);
+          } else {
+            printWriter.println(sql);
+          }
+          printWriter.println();
+        });
+    printWriter.flush();
   }
 
   @SneakyThrows
