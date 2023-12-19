@@ -405,7 +405,7 @@ public abstract class AbstractAcceptanceTest {
         Dialect.MY_SQL_8.equals(connectionDetails().dialect())
             || Dialect.MY_SQL_5.equals(connectionDetails().dialect()));
 
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
