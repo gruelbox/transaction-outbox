@@ -17,23 +17,11 @@ class TestH2 extends AbstractAcceptanceTest {
 
   static final ThreadLocal<Boolean> inWrappedInvocation = ThreadLocal.withInitial(() -> false);
 
-  @Override
-  protected ConnectionDetails connectionDetails() {
-    return ConnectionDetails.builder()
-        .dialect(Dialect.H2)
-        .driverClassName("org.h2.Driver")
-        .url(
-            "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE")
-        .user("test")
-        .password("test")
-        .build();
-  }
-
   @Test
   final void wrapInvocations() throws InterruptedException {
 
     CountDownLatch latch = new CountDownLatch(1);
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
@@ -78,7 +66,7 @@ class TestH2 extends AbstractAcceptanceTest {
   final void wrapInvocationsWithMDC() throws InterruptedException {
 
     CountDownLatch latch = new CountDownLatch(1);
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
