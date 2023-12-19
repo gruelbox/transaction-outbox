@@ -50,7 +50,8 @@ class TestH2 extends AbstractAcceptanceTest {
                         new TransactionOutboxListener() {
                           @Override
                           public void wrapInvocation(Invocator invocator)
-                              throws IllegalAccessException, IllegalArgumentException,
+                              throws IllegalAccessException,
+                                  IllegalArgumentException,
                                   InvocationTargetException {
                             inWrappedInvocation.set(true);
                             try {
@@ -94,7 +95,8 @@ class TestH2 extends AbstractAcceptanceTest {
                         new TransactionOutboxListener() {
                           @Override
                           public void wrapInvocation(Invocator invocator)
-                              throws IllegalAccessException, IllegalArgumentException,
+                              throws IllegalAccessException,
+                                  IllegalArgumentException,
                                   InvocationTargetException {
                             MDC.put("BAR", "true");
                             try {

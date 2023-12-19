@@ -1,23 +1,15 @@
-package com.gruelbox.transactionoutbox;
+package persistor;
 
-import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
+import com.gruelbox.transactionoutbox.*;
 import java.math.BigDecimal;
-import java.sql.SQLException;
 import java.time.Instant;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.time.temporal.ChronoUnit;
+import java.util.concurrent.*;
 import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeMatcher;
@@ -27,24 +19,33 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 @Slf4j
-abstract class AbstractDefaultPersistorTest {
+public abstract class AbstractPersistorTest {
 
-  private Instant now = now();
-
-  protected abstract DefaultPersistor persistor();
+  private final Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
   protected abstract Dialect dialect();
 
+  protected abstract Persistor persistor();
+
   protected abstract TransactionManager txManager();
 
+  protected void validateState() {}
+
   @BeforeEach
-  void beforeAll() throws SQLException {
+  public void beforeEach() throws Exception {
+    Boolean connected =
+        txManager().inTransactionReturnsThrows(tx -> persistor().checkConnection(tx));
+    assertTrue(connected);
     persistor().migrate(txManager());
+    log.info("Validating state");
+    validateState();
+    log.info("Clearing old records");
     txManager().inTransactionThrows(persistor()::clear);
+    log.info("Cleared");
   }
 
   @Test
-  void testInsertAndSelect() throws Exception {
+  public void testInsertAndSelect() throws Exception {
     TransactionOutboxEntry entry = createEntry("FOO", now, false);
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
     Thread.sleep(1100);
@@ -54,7 +55,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testInsertWithUniqueRequestIdFailureBubblesExceptionUp() {
+  public void testInsertWithUniqueRequestIdFailureBubblesExceptionUp() {
     var invalidEntry =
         createEntry("FOO", now, false).toBuilder()
             .uniqueRequestId("INTENTIONALLY_TOO_LONG_TO_CAUSE_BLOW_UP".repeat(10))
@@ -65,7 +66,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testInsertDuplicate() throws Exception {
+  public void testInsertDuplicate() throws Exception {
     TransactionOutboxEntry entry1 = createEntry("FOO1", now, false, "context-clientkey1");
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry1));
     Thread.sleep(1100);
@@ -97,7 +98,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testBatchLimitUnderThreshold() throws Exception {
+  public void testBatchLimitUnderThreshold() throws Exception {
     txManager()
         .inTransactionThrows(
             tx -> {
@@ -111,7 +112,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testBatchLimitMatchingThreshold() throws Exception {
+  public void testBatchLimitMatchingThreshold() throws Exception {
     txManager()
         .inTransactionThrows(
             tx -> {
@@ -125,7 +126,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testBatchLimitOverThreshold() throws Exception {
+  public void testBatchLimitOverThreshold() throws Exception {
     txManager()
         .inTransactionThrows(
             tx -> {
@@ -139,7 +140,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testBatchHorizon() throws Exception {
+  public void testBatchHorizon() throws Exception {
     txManager()
         .inTransactionThrows(
             tx -> {
@@ -153,7 +154,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testBlockedEntriesExcluded() throws Exception {
+  public void testBlockedEntriesExcluded() throws Exception {
     txManager()
         .inTransactionThrows(
             tx -> {
@@ -197,7 +198,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testUpdate() throws Exception {
+  public void testUpdate() throws Exception {
     var entry = createEntry("FOO1", now, false);
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
     entry.setAttempts(1);
@@ -222,7 +223,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testUpdateOptimisticLockFailure() throws Exception {
+  public void testUpdateOptimisticLockFailure() throws Exception {
     TransactionOutboxEntry entry = createEntry("FOO1", now, false);
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
     TransactionOutboxEntry original = entry.toBuilder().build();
@@ -237,14 +238,14 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testDelete() throws Exception {
+  public void testDelete() throws Exception {
     TransactionOutboxEntry entry = createEntry("FOO1", now, false);
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
     txManager().inTransaction(tx -> assertDoesNotThrow(() -> persistor().delete(tx, entry)));
   }
 
   @Test
-  void testDeleteOptimisticLockFailure() throws Exception {
+  public void testDeleteOptimisticLockFailure() throws Exception {
     TransactionOutboxEntry entry = createEntry("FOO1", now, false);
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
     txManager().inTransaction(tx -> assertDoesNotThrow(() -> persistor().delete(tx, entry)));
@@ -254,7 +255,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testLock() throws Exception {
+  public void testLock() throws Exception {
     TransactionOutboxEntry entry = createEntry("FOO1", now, false);
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
     entry.setAttempts(1);
@@ -263,7 +264,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testLockOptimisticLockFailure() throws Exception {
+  public void testLockOptimisticLockFailure() throws Exception {
     TransactionOutboxEntry entry = createEntry("FOO1", now, false);
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
     TransactionOutboxEntry original = entry.toBuilder().build();
@@ -274,7 +275,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testSkipLocked() throws Exception {
+  public void testSkipLocked() throws Exception {
     Assumptions.assumeTrue(dialect().isSupportsSkipLock());
 
     var entry1 = createEntry("FOO1", now.minusSeconds(1), false);
@@ -348,7 +349,7 @@ abstract class AbstractDefaultPersistorTest {
   }
 
   @Test
-  void testLockPessimisticLockFailure() throws Exception {
+  public void testLockPessimisticLockFailure() throws Exception {
     TransactionOutboxEntry entry = createEntry("FOO1", now, false);
     txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
 

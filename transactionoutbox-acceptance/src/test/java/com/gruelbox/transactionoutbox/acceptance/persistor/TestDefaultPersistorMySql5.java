@@ -1,20 +1,24 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.acceptance.persistor;
 
+import com.gruelbox.transactionoutbox.DefaultPersistor;
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.TransactionManager;
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import persistor.AbstractPersistorTest;
 
 @Testcontainers
-class TestDefaultPersistorMySql8 extends AbstractDefaultPersistorTest {
+class TestDefaultPersistorMySql5 extends AbstractPersistorTest {
 
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      new MySQLContainer<>("mysql:8").withStartupTimeout(Duration.ofHours(1));
+      new MySQLContainer<>("mysql:5").withStartupTimeout(Duration.ofHours(1));
 
-  private DefaultPersistor persistor = DefaultPersistor.builder().dialect(Dialect.MY_SQL_8).build();
+  private DefaultPersistor persistor = DefaultPersistor.builder().dialect(Dialect.MY_SQL_5).build();
   private TransactionManager txManager =
       TransactionManager.fromConnectionDetails(
           "com.mysql.cj.jdbc.Driver",
@@ -34,6 +38,6 @@ class TestDefaultPersistorMySql8 extends AbstractDefaultPersistorTest {
 
   @Override
   protected Dialect dialect() {
-    return Dialect.MY_SQL_8;
+    return Dialect.MY_SQL_5;
   }
 }

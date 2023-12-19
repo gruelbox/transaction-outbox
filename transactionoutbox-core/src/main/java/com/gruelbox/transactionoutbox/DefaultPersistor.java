@@ -330,10 +330,20 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   // For testing. Assumed low volume.
+  @Override
   public void clear(Transaction tx) throws SQLException {
     //noinspection resource
     try (Statement stmt = tx.connection().createStatement()) {
       stmt.execute("DELETE FROM " + tableName);
+    }
+  }
+
+  @Override
+  public boolean checkConnection(Transaction tx) throws SQLException {
+    //noinspection resource
+    try (Statement stmt = tx.connection().createStatement();
+        ResultSet rs = stmt.executeQuery(dialect.getCheckSql())) {
+      return rs.next() && (rs.getInt(1) == 1);
     }
   }
 }

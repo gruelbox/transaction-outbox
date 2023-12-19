@@ -49,4 +49,12 @@ public class StubPersistor implements Persistor {
   public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now) {
     return 0;
   }
+
+  @Override
+  public void clear(Transaction tx) {}
+
+  @Override
+  public boolean checkConnection(Transaction tx) {
+    return true;
+  }
 }

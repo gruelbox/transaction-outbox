@@ -39,6 +39,8 @@
     <module>transactionoutbox-jackson</module>
     <module>transactionoutbox-guice</module>
     <module>transactionoutbox-quarkus</module>
+    <module>transactionoutbox-testing</module>
+    <module>transactionoutbox-acceptance</module>
   </modules>
   <dependencyManagement>
     <dependencies>

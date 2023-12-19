@@ -1,13 +1,17 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.acceptance.persistor;
 
+import com.gruelbox.transactionoutbox.DefaultPersistor;
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.TransactionManager;
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import persistor.AbstractPersistorTest;
 
 @Testcontainers
-class TestDefaultPersistorPostgres16 extends AbstractDefaultPersistorTest {
+class TestDefaultPersistorPostgres16 extends AbstractPersistorTest {
 
   @Container
   @SuppressWarnings("rawtypes")

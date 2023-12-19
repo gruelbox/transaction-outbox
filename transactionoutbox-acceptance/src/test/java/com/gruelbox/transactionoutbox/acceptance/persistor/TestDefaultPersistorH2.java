@@ -1,9 +1,13 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.acceptance.persistor;
 
+import com.gruelbox.transactionoutbox.DefaultPersistor;
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.TransactionManager;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import persistor.AbstractPersistorTest;
 
 @Testcontainers
-class TestDefaultPersistorH2 extends AbstractDefaultPersistorTest {
+class TestDefaultPersistorH2 extends AbstractPersistorTest {
 
   private DefaultPersistor persistor = DefaultPersistor.builder().dialect(Dialect.H2).build();
   private TransactionManager txManager =

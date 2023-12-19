@@ -1,25 +1,27 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.acceptance.persistor;
 
+import com.gruelbox.transactionoutbox.DefaultPersistor;
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.TransactionManager;
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
-import org.testcontainers.containers.OracleContainer;
+import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import persistor.AbstractPersistorTest;
 
 @Testcontainers
-class TestDefaultPersistorOracle18 extends AbstractDefaultPersistorTest {
+class TestDefaultPersistorMySql8 extends AbstractPersistorTest {
 
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      (JdbcDatabaseContainer)
-          new OracleContainer("gvenzl/oracle-xe:18-slim").withStartupTimeout(Duration.ofHours(1));
+      new MySQLContainer<>("mysql:8").withStartupTimeout(Duration.ofHours(1));
 
-  private DefaultPersistor persistor = DefaultPersistor.builder().dialect(Dialect.ORACLE).build();
-
+  private DefaultPersistor persistor = DefaultPersistor.builder().dialect(Dialect.MY_SQL_8).build();
   private TransactionManager txManager =
       TransactionManager.fromConnectionDetails(
-          "oracle.jdbc.OracleDriver",
+          "com.mysql.cj.jdbc.Driver",
           container.getJdbcUrl(),
           container.getUsername(),
           container.getPassword());
@@ -36,6 +38,6 @@ class TestDefaultPersistorOracle18 extends AbstractDefaultPersistorTest {
 
   @Override
   protected Dialect dialect() {
-    return Dialect.ORACLE;
+    return Dialect.MY_SQL_8;
   }
 }
