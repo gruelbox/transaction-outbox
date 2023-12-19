@@ -1,10 +1,13 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.jooq;
 
 import com.gruelbox.transactionoutbox.spi.AbstractThreadLocalTransactionManager;
 import com.gruelbox.transactionoutbox.spi.SimpleTransaction;
+import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
+
+import java.util.Optional;
 
 /**
  * jOOQ transaction manager which uses thread-local context. Best used with {@link

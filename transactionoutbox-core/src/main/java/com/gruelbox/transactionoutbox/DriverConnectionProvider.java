@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
-import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 
 import java.sql.Connection;
 import java.sql.DriverManager;

@@ -1,5 +1,7 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spi;
 
+import com.gruelbox.transactionoutbox.ThrowingRunnable;
+import com.gruelbox.transactionoutbox.UncheckedException;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
@@ -9,10 +11,10 @@ import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
 @Slf4j
-class Utils {
+public class Utils {
 
   @SuppressWarnings({"SameParameterValue", "WeakerAccess", "UnusedReturnValue"})
-  static boolean safelyRun(String gerund, ThrowingRunnable runnable) {
+  public static boolean safelyRun(String gerund, ThrowingRunnable runnable) {
     try {
       runnable.run();
       return true;
@@ -23,11 +25,11 @@ class Utils {
   }
 
   @SuppressWarnings("unused")
-  static void safelyClose(AutoCloseable... closeables) {
+  public static void safelyClose(AutoCloseable... closeables) {
     safelyClose(Arrays.asList(closeables));
   }
 
-  static void safelyClose(Iterable<? extends AutoCloseable> closeables) {
+  public static void safelyClose(Iterable<? extends AutoCloseable> closeables) {
     closeables.forEach(
         d -> {
           if (d == null) return;
@@ -35,7 +37,7 @@ class Utils {
         });
   }
 
-  static void uncheck(ThrowingRunnable runnable) {
+  public static void uncheck(ThrowingRunnable runnable) {
     try {
       runnable.run();
     } catch (Exception e) {
@@ -43,7 +45,7 @@ class Utils {
     }
   }
 
-  static <T> T uncheckedly(Callable<T> runnable) {
+  public static <T> T uncheckedly(Callable<T> runnable) {
     try {
       return runnable.call();
     } catch (Exception e) {
@@ -51,7 +53,7 @@ class Utils {
     }
   }
 
-  static <T> T uncheckAndThrow(Throwable e) {
+  public static <T> T uncheckAndThrow(Throwable e) {
     if (e instanceof RuntimeException) {
       throw (RuntimeException) e;
     }
@@ -61,7 +63,7 @@ class Utils {
     throw new UncheckedException(e);
   }
 
-  static <T> T createLoggingProxy(ProxyFactory proxyFactory, Class<T> clazz) {
+  public static <T> T createLoggingProxy(ProxyFactory proxyFactory, Class<T> clazz) {
     return proxyFactory.createProxy(
         clazz,
         (method, args) -> {
@@ -77,12 +79,12 @@ class Utils {
         });
   }
 
-  static <T> T firstNonNull(T one, Supplier<T> two) {
+  public static <T> T firstNonNull(T one, Supplier<T> two) {
     if (one == null) return two.get();
     return one;
   }
 
-  static void logAtLevel(Logger logger, Level level, String message, Object... args) {
+  public static void logAtLevel(Logger logger, Level level, String message, Object... args) {
     switch (level) {
       case ERROR:
         logger.error(message, args);

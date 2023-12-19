@@ -1,56 +1,67 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spring;
 
+import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.spi.Utils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.datasource.DataSourceUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
 import javax.sql.DataSource;
-import javax.transaction.Status;
-import javax.transaction.Synchronization;
-import javax.transaction.TransactionSynchronizationRegistry;
-import javax.transaction.Transactional;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.SQLException;
 
 import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 
-/**
- * @deprecated use {@link com.gruelbox.transactionoutbox.quarkus.QuarkusTransactionManager}.
- */
-@ApplicationScoped
-@Deprecated(forRemoval = true)
-public class QuarkusTransactionManager implements ThreadLocalContextTransactionManager {
+/** Transaction manager which uses spring-tx and Hibernate. */
+@Slf4j
+@Service
+public class SpringTransactionManager implements ThreadLocalContextTransactionManager {
 
-  private final CdiTransaction transactionInstance = new CdiTransaction();
+  private final SpringTransaction transactionInstance = new SpringTransaction();
+  private final DataSource dataSource;
 
-  private final DataSource datasource;
-
-  private final TransactionSynchronizationRegistry tsr;
-
-  @Inject
-  public QuarkusTransactionManager(DataSource datasource, TransactionSynchronizationRegistry tsr) {
-    this.datasource = datasource;
-    this.tsr = tsr;
+  @Autowired
+  protected SpringTransactionManager(DataSource dataSource) {
+    this.dataSource = dataSource;
   }
 
   @Override
-  @Transactional(value = Transactional.TxType.REQUIRES_NEW)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void inTransaction(Runnable runnable) {
     uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromRunnable(runnable)));
   }
 
   @Override
-  @Transactional(value = Transactional.TxType.REQUIRES_NEW)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void inTransaction(TransactionalWork work) {
     uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work)));
   }
 
   @Override
-  @Transactional(value = Transactional.TxType.REQUIRES_NEW)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public <T> T inTransactionReturns(TransactionalSupplier<T> supplier) {
+    return uncheckedly(
+        () -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromSupplier(supplier)));
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public <E extends Exception> void inTransactionThrows(ThrowingTransactionalWork<E> work)
+      throws E {
+    inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work));
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public <T, E extends Exception> T inTransactionReturnsThrows(
       ThrowingTransactionalSupplier<T, E> work) throws E {
     return work.doWork(transactionInstance);
@@ -59,21 +70,19 @@ public class QuarkusTransactionManager implements ThreadLocalContextTransactionM
   @Override
   public <T, E extends Exception> T requireTransactionReturns(
       ThrowingTransactionalSupplier<T, E> work) throws E, NoTransactionActiveException {
-    if (tsr.getTransactionStatus() != Status.STATUS_ACTIVE) {
+
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
       throw new NoTransactionActiveException();
     }
 
     return work.doWork(transactionInstance);
   }
 
-  private final class CdiTransaction implements Transaction {
+  private final class SpringTransaction implements Transaction {
 
-    public final Connection connection() {
-      try {
-        return datasource.getConnection();
-      } catch (SQLException e) {
-        throw new RuntimeException(e);
-      }
+    @Override
+    public Connection connection() {
+      return DataSourceUtils.getConnection(dataSource);
     }
 
     @Override
@@ -81,12 +90,12 @@ public class QuarkusTransactionManager implements ThreadLocalContextTransactionM
       BatchCountingStatement preparedStatement =
           Utils.uncheckedly(
               () -> BatchCountingStatementHandler.countBatches(connection().prepareStatement(sql)));
-
-      tsr.registerInterposedSynchronization(
-          new Synchronization() {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
             @Override
-            public void beforeCompletion() {
+            public void beforeCommit(boolean readOnly) {
               if (preparedStatement.getBatchCount() != 0) {
+                log.debug("Flushing batches");
                 Utils.uncheck(preparedStatement::executeBatch);
               }
             }
@@ -96,19 +105,15 @@ public class QuarkusTransactionManager implements ThreadLocalContextTransactionM
               Utils.safelyClose(preparedStatement);
             }
           });
-
       return preparedStatement;
     }
 
     @Override
     public void addPostCommitHook(Runnable runnable) {
-      tsr.registerInterposedSynchronization(
-          new Synchronization() {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
             @Override
-            public void beforeCompletion() {}
-
-            @Override
-            public void afterCompletion(int status) {
+            public void afterCommit() {
               runnable.run();
             }
           });
@@ -122,7 +127,6 @@ public class QuarkusTransactionManager implements ThreadLocalContextTransactionM
   private static final class BatchCountingStatementHandler implements InvocationHandler {
 
     private final PreparedStatement delegate;
-
     private int count = 0;
 
     private BatchCountingStatementHandler(PreparedStatement delegate) {

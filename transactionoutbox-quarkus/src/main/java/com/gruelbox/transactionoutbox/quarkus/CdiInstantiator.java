@@ -1,14 +1,10 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.quarkus;
 
 import com.gruelbox.transactionoutbox.spi.AbstractFullyQualifiedNameInstantiator;
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.spi.CDI;
 
-/**
- * @deprecated use {@link com.gruelbox.transactionoutbox.quarkus.CdiInstantiator}.
- */
 @ApplicationScoped
-@Deprecated(forRemoval = true)
 public class CdiInstantiator extends AbstractFullyQualifiedNameInstantiator {
 
   public static CdiInstantiator create() {

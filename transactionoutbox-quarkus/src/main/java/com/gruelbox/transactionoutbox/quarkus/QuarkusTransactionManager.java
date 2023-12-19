@@ -1,7 +1,15 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.quarkus;
 
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
+
+import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.spi.Utils;
-
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.sql.DataSource;
@@ -9,20 +17,10 @@ import javax.transaction.Status;
 import javax.transaction.Synchronization;
 import javax.transaction.TransactionSynchronizationRegistry;
 import javax.transaction.Transactional;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import javax.transaction.Transactional.TxType;
 
-import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
-
-/**
- * @deprecated use {@link com.gruelbox.transactionoutbox.quarkus.QuarkusTransactionManager}.
- */
+/** Transaction manager which uses cdi and quarkus. */
 @ApplicationScoped
-@Deprecated(forRemoval = true)
 public class QuarkusTransactionManager implements ThreadLocalContextTransactionManager {
 
   private final CdiTransaction transactionInstance = new CdiTransaction();
@@ -38,19 +36,19 @@ public class QuarkusTransactionManager implements ThreadLocalContextTransactionM
   }
 
   @Override
-  @Transactional(value = Transactional.TxType.REQUIRES_NEW)
+  @Transactional(value = TxType.REQUIRES_NEW)
   public void inTransaction(Runnable runnable) {
     uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromRunnable(runnable)));
   }
 
   @Override
-  @Transactional(value = Transactional.TxType.REQUIRES_NEW)
+  @Transactional(value = TxType.REQUIRES_NEW)
   public void inTransaction(TransactionalWork work) {
     uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work)));
   }
 
   @Override
-  @Transactional(value = Transactional.TxType.REQUIRES_NEW)
+  @Transactional(value = TxType.REQUIRES_NEW)
   public <T, E extends Exception> T inTransactionReturnsThrows(
       ThrowingTransactionalSupplier<T, E> work) throws E {
     return work.doWork(transactionInstance);

@@ -3,7 +3,7 @@ package com.gruelbox.transactionoutbox.guice.acceptance;
 import com.google.inject.Guice;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
-import com.gruelbox.transactionoutbox.GuiceInstantiator;
+import com.gruelbox.transactionoutbox.guice.GuiceInstantiator;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;

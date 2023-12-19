@@ -1,16 +1,21 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spi;
 
-import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 
+import com.gruelbox.transactionoutbox.Instantiator;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Abstract {@link Instantiator} implementation which simplifies the creation of implementations
+ * which instantiate based on the clazz FQN.
+ */
 @Slf4j
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-abstract class AbstractFullyQualifiedNameInstantiator implements Instantiator {
+public abstract class AbstractFullyQualifiedNameInstantiator implements Instantiator {
 
   @Override
   public final String getName(Class<?> clazz) {

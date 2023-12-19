@@ -11,7 +11,6 @@ import lombok.Getter;
  */
 @AllArgsConstructor
 @Getter
-@Beta
 public enum Dialect {
   MY_SQL_5(
       false,

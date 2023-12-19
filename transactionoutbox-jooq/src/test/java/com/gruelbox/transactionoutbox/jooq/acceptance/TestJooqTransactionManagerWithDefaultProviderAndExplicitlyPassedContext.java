@@ -2,7 +2,7 @@ package com.gruelbox.transactionoutbox.jooq.acceptance;
 
 import static com.gruelbox.transactionoutbox.jooq.acceptance.JooqTestUtils.createTestTable;
 import static com.gruelbox.transactionoutbox.testing.TestUtils.runSql;
-import static com.gruelbox.transactionoutbox.testing.TestUtils.uncheck;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 import static java.util.concurrent.CompletableFuture.runAsync;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
