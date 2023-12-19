@@ -1,17 +1,17 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.testing;
 
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import lombok.Getter;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
 
 /**
  * Collects an ordered list of all entry events (*excluding blocked events) that have hit this
  * listener until a specified number of blocks / successes have occurred.
  */
-final class OrderedEntryListener implements TransactionOutboxListener {
+public final class OrderedEntryListener implements TransactionOutboxListener {
   private final CountDownLatch successLatch;
   private final CountDownLatch blockedLatch;
 
@@ -57,8 +57,8 @@ final class OrderedEntryListener implements TransactionOutboxListener {
    *
    * @return unmodifiable list of ordered outbox entry events.
    */
-  public ImmutableList<TransactionOutboxEntry> getOrderedEntries() {
-    return ImmutableList.copyOf(orderedEntries);
+  public List<TransactionOutboxEntry> getOrderedEntries() {
+    return List.copyOf(orderedEntries);
   }
 
   private TransactionOutboxEntry from(TransactionOutboxEntry entry) {

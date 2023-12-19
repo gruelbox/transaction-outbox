@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.testing.AbstractAcceptanceTest;
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -9,13 +10,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SuppressWarnings("WeakerAccess")
 @Testcontainers
-class TestPostgres11 extends AbstractAcceptanceTest {
+class TestPostgres15 extends AbstractAcceptanceTest {
 
   @Container
-  @SuppressWarnings("rawtypes")
+  @SuppressWarnings({"rawtypes", "resource"})
   private static final JdbcDatabaseContainer container =
       (JdbcDatabaseContainer)
-          new PostgreSQLContainer("postgres:11").withStartupTimeout(Duration.ofHours(1));
+          new PostgreSQLContainer("postgres:15").withStartupTimeout(Duration.ofHours(1));
 
   @Override
   protected ConnectionDetails connectionDetails() {

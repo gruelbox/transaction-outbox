@@ -1,20 +1,9 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.isA;
-import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.*;
 
-import com.gruelbox.transactionoutbox.Instantiator;
-import com.gruelbox.transactionoutbox.StubParameterContextTransactionManager;
-import com.gruelbox.transactionoutbox.StubPersistor;
-import com.gruelbox.transactionoutbox.StubThreadLocalTransactionManager;
-import com.gruelbox.transactionoutbox.Submitter;
-import com.gruelbox.transactionoutbox.Transaction;
-import com.gruelbox.transactionoutbox.TransactionManager;
-import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.*;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -129,12 +118,12 @@ class TestStubbing {
       invocations.add(args);
     }
 
-    void doThing(int arg1, Transaction transaction) {
+    void doThing(@SuppressWarnings("SameParameterValue") int arg1, Transaction transaction) {
       assertThat(transaction, notNullValue());
       invocations.add(List.of(arg1, transaction));
     }
 
-    void doThing(int arg1, Context context) {
+    void doThing(@SuppressWarnings("SameParameterValue") int arg1, Context context) {
       assertThat(context, notNullValue());
       invocations.add(List.of(arg1, context));
     }

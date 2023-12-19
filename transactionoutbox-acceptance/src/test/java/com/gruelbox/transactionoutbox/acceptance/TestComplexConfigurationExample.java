@@ -1,14 +1,6 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
-import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
-import com.gruelbox.transactionoutbox.DefaultPersistor;
-import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.ExecutorSubmitter;
-import com.gruelbox.transactionoutbox.Instantiator;
-import com.gruelbox.transactionoutbox.TransactionManager;
-import com.gruelbox.transactionoutbox.TransactionOutbox;
-import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.*;
 import java.sql.Connection;
 import java.time.Duration;
 import java.util.Currency;
@@ -134,9 +126,11 @@ class TestComplexConfigurationExample {
     }
   }
 
-  void performRemoteCall(SaleType saleType, Money amount) {}
+  void performRemoteCall(
+      @SuppressWarnings({"unused", "SameParameterValue"}) SaleType saleType,
+      @SuppressWarnings("unused") Money amount) {}
 
-  private void writeSomeChanges(Connection connection) {}
+  private void writeSomeChanges(@SuppressWarnings("unused") Connection connection) {}
 
   private interface ServiceLocator {
     <T> T createInstance(Class<T> clazz);
@@ -156,13 +150,15 @@ class TestComplexConfigurationExample {
     String id;
   }
 
+  @SuppressWarnings("unused")
   private enum SaleType {
     SALE,
     REFUND
   }
 
   private interface Money {
-    static Money of(int amount, Currency currency) {
+    static Money of(
+        @SuppressWarnings("unused") int amount, @SuppressWarnings("unused") Currency currency) {
       return null;
     }
   }

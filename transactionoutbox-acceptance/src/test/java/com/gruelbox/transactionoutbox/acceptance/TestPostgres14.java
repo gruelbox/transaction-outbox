@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
 import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.testing.AbstractAcceptanceTest;
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -12,7 +13,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class TestPostgres14 extends AbstractAcceptanceTest {
 
   @Container
-  @SuppressWarnings("rawtypes")
+  @SuppressWarnings({"rawtypes", "resource"})
   private static final JdbcDatabaseContainer container =
       (JdbcDatabaseContainer)
           new PostgreSQLContainer("postgres:14").withStartupTimeout(Duration.ofHours(1));

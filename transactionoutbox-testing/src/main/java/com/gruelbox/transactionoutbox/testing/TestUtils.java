@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.testing;
 
 import com.gruelbox.transactionoutbox.TransactionManager;
 import java.sql.Statement;

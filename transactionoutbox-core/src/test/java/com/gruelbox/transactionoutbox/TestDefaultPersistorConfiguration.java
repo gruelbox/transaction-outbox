@@ -1,11 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.startsWith;
+import static org.hamcrest.Matchers.*;
 
-import com.gruelbox.transactionoutbox.acceptance.TestUtils;
 import java.io.StringWriter;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -15,13 +12,12 @@ class TestDefaultPersistorConfiguration {
   @Test
   final void whenMigrateIsFalseDoNotMigrate() throws Exception {
     TransactionManager transactionManager = simpleTxnManager();
-    TestUtils.runSql(transactionManager, "DROP ALL OBJECTS");
+    runSql(transactionManager, "DROP ALL OBJECTS");
 
-    TransactionOutbox outbox =
-        TransactionOutbox.builder()
-            .transactionManager(transactionManager)
-            .persistor(DefaultPersistor.builder().dialect(Dialect.H2).migrate(false).build())
-            .build();
+    TransactionOutbox.builder()
+        .transactionManager(transactionManager)
+        .persistor(DefaultPersistor.builder().dialect(Dialect.H2).migrate(false).build())
+        .build();
 
     transactionManager.inTransactionThrows(
         tx -> {
@@ -68,5 +64,19 @@ class TestDefaultPersistorConfiguration {
         "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE",
         "test",
         "test");
+  }
+
+  private void runSql(
+      TransactionManager transactionManager, @SuppressWarnings("SameParameterValue") String sql) {
+    transactionManager.inTransaction(
+        tx -> {
+          try {
+            try (Statement statement = tx.connection().createStatement()) {
+              statement.execute(sql);
+            }
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        });
   }
 }

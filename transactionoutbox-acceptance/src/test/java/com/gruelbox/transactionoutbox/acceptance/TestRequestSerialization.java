@@ -1,12 +1,11 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
-import com.gruelbox.transactionoutbox.DefaultPersistor;
-import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.TransactionManager;
-import com.gruelbox.transactionoutbox.TransactionOutbox;
+import com.gruelbox.transactionoutbox.*;
+import com.gruelbox.transactionoutbox.testing.AbstractAcceptanceTest;
+import com.gruelbox.transactionoutbox.testing.LatchListener;
+import com.gruelbox.transactionoutbox.testing.TestUtils;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;

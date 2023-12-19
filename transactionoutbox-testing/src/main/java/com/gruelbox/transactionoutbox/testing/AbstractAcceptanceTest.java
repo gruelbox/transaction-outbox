@@ -1,9 +1,8 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.testing;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
-import static org.junit.Assert.*;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 import com.gruelbox.transactionoutbox.*;
 import com.zaxxer.hikari.HikariConfig;
@@ -18,12 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,17 +27,15 @@ import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
-import org.hamcrest.BaseMatcher;
-import org.hamcrest.Description;
 import org.hamcrest.MatcherAssert;
-import org.junit.Assume;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Slf4j
-abstract class AbstractAcceptanceTest {
+public abstract class AbstractAcceptanceTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractAcceptanceTest.class);
   private final ExecutorService unreliablePool =
@@ -397,6 +389,10 @@ abstract class AbstractAcceptanceTest {
 
   @Test
   final void onSchedulingFailure_BubbleExceptionsUp() throws Exception {
+    Assumptions.assumeTrue(
+        Dialect.MY_SQL_8.equals(connectionDetails().dialect())
+            || Dialect.MY_SQL_5.equals(connectionDetails().dialect()));
+
     TransactionManager transactionManager = simpleTxnManager();
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
@@ -421,31 +417,17 @@ abstract class AbstractAcceptanceTest {
 
     withRunningFlusher(
         outbox,
-        () -> {
-          // run for mysql only.
-          var dialect = connectionDetails().dialect();
-          Assume.assumeThat(
-              dialect,
-              new BaseMatcher<>() {
-                @Override
-                public void describeTo(Description description) {}
-
-                @Override
-                public boolean matches(Object o) {
-                  return Dialect.MY_SQL_8.equals(o) || Dialect.MY_SQL_5.equals(o);
-                }
-              });
-          assertThrows(
-              Exception.class,
-              () ->
-                  transactionManager.inTransaction(
-                      () ->
-                          outbox
-                              .with()
-                              .uniqueRequestId("some_unique_id")
-                              .schedule(InterfaceProcessor.class)
-                              .process(1, "This invocation is too long".repeat(650000))));
-        });
+        () ->
+            assertThrows(
+                Exception.class,
+                () ->
+                    transactionManager.inTransaction(
+                        () ->
+                            outbox
+                                .with()
+                                .uniqueRequestId("some_unique_id")
+                                .schedule(InterfaceProcessor.class)
+                                .process(1, "This invocation is too long".repeat(650000)))));
   }
 
   @Test
@@ -475,8 +457,9 @@ abstract class AbstractAcceptanceTest {
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
           assertTrue(blockLatch.await(10, TimeUnit.SECONDS));
           assertTrue(
-              transactionManager.inTransactionReturns(
-                  tx -> outbox.unblock(orderedEntryListener.getBlocked().getId())));
+              (Boolean)
+                  transactionManager.inTransactionReturns(
+                      tx -> outbox.unblock(orderedEntryListener.getBlocked().getId())));
           assertTrue(successLatch.await(10, TimeUnit.SECONDS));
           var orderedEntryEvents = orderedEntryListener.getOrderedEntries();
           log.info("The entry life cycle is: {}", orderedEntryEvents);
@@ -528,8 +511,9 @@ abstract class AbstractAcceptanceTest {
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
           assertTrue(blockLatch.await(3, TimeUnit.SECONDS));
           assertTrue(
-              transactionManager.inTransactionReturns(
-                  tx -> outbox.unblock(latchListener.getBlocked().getId())));
+              (Boolean)
+                  transactionManager.inTransactionReturns(
+                      tx -> outbox.unblock(latchListener.getBlocked().getId())));
           assertTrue(successLatch.await(3, TimeUnit.SECONDS));
         });
   }
@@ -578,7 +562,7 @@ abstract class AbstractAcceptanceTest {
                               outbox.schedule(InterfaceProcessor.class).process(i * 10 + j, "Whee");
                             }
                           }));
-          assertTrue("Latch not opened in time", latch.await(30, TimeUnit.SECONDS));
+          assertTrue(latch.await(30, TimeUnit.SECONDS), "Latch not opened in time");
         });
 
     MatcherAssert.assertThat(
@@ -705,7 +689,7 @@ abstract class AbstractAcceptanceTest {
   @Value
   @Accessors(fluent = true)
   @Builder
-  static class ConnectionDetails {
+  public static class ConnectionDetails {
     String driverClassName;
     String url;
     String user;

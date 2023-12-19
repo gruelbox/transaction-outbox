@@ -1,4 +1,4 @@
-package persistor;
+package com.gruelbox.transactionoutbox.testing;
 
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -406,7 +406,10 @@ public abstract class AbstractPersistorTest {
   }
 
   private TransactionOutboxEntry createEntry(
-      String id, Instant nextAttemptTime, boolean blocked, String uniqueId) {
+      String id,
+      Instant nextAttemptTime,
+      @SuppressWarnings("SameParameterValue") boolean blocked,
+      String uniqueId) {
     return TransactionOutboxEntry.builder()
         .id(id)
         .invocation(createInvocation())
