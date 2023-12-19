@@ -28,9 +28,7 @@ import lombok.Value;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.MatcherAssert;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,9 +39,23 @@ public abstract class AbstractAcceptanceTest {
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
-  protected abstract ConnectionDetails connectionDetails();
-
   private static final Random random = new Random();
+  protected HikariDataSource dataSource;
+
+  @BeforeEach
+  final void baseBeforeEach() {
+    HikariConfig config = new HikariConfig();
+    config.setJdbcUrl(connectionDetails().url());
+    config.setUsername(connectionDetails().user());
+    config.setPassword(connectionDetails().password());
+    config.addDataSourceProperty("cachePrepStmts", "true");
+    dataSource = new HikariDataSource(config);
+  }
+
+  @AfterEach
+  final void baseAfterEach() {
+    dataSource.close();
+  }
 
   /**
    * Uses a simple direct transaction manager and connection manager and attempts to fire an
@@ -53,7 +65,7 @@ public abstract class AbstractAcceptanceTest {
   final void simpleConnectionProviderCustomInstantiatorInterfaceClass()
       throws InterruptedException {
 
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
 
     CountDownLatch latch = new CountDownLatch(1);
     CountDownLatch chainedLatch = new CountDownLatch(1);
@@ -110,7 +122,7 @@ public abstract class AbstractAcceptanceTest {
   @Test
   final void noAutomaticInitialization() {
 
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
@@ -124,7 +136,7 @@ public abstract class AbstractAcceptanceTest {
             .initializeImmediately(false)
             .build();
 
-    Persistor.forDialect(connectionDetails().dialect()).migrate(simpleTxnManager());
+    Persistor.forDialect(connectionDetails().dialect()).migrate(txManager());
     clearOutbox();
 
     Assertions.assertThrows(
@@ -137,7 +149,7 @@ public abstract class AbstractAcceptanceTest {
   @Test
   void duplicateRequests() {
 
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
 
     List<String> ids = new ArrayList<>();
     AtomicReference<Clock> clockProvider = new AtomicReference<>(Clock.systemDefaultZone());
@@ -242,7 +254,7 @@ public abstract class AbstractAcceptanceTest {
   @Test
   final void dataSourceConnectionProviderReflectionInstantiatorConcreteClass()
       throws InterruptedException {
-    try (HikariDataSource ds = pooledDataSource()) {
+    try (HikariDataSource ds = dataSource) {
 
       CountDownLatch latch = new CountDownLatch(1);
 
@@ -363,7 +375,7 @@ public abstract class AbstractAcceptanceTest {
    */
   @Test
   final void retryBehaviour() throws Exception {
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
     CountDownLatch latch = new CountDownLatch(1);
     AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
@@ -393,7 +405,7 @@ public abstract class AbstractAcceptanceTest {
         Dialect.MY_SQL_8.equals(connectionDetails().dialect())
             || Dialect.MY_SQL_5.equals(connectionDetails().dialect()));
 
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
     CountDownLatch latch = new CountDownLatch(1);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -432,7 +444,7 @@ public abstract class AbstractAcceptanceTest {
 
   @Test
   final void lastAttemptTime_updatesEveryTime() throws Exception {
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blockLatch = new CountDownLatch(1);
     AtomicInteger attempts = new AtomicInteger();
@@ -487,7 +499,7 @@ public abstract class AbstractAcceptanceTest {
    */
   @Test
   final void blockAndThenUnblockForRetry() throws Exception {
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blockLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blockLatch);
@@ -523,7 +535,7 @@ public abstract class AbstractAcceptanceTest {
   final void highVolumeUnreliable() throws Exception {
     int count = 10;
 
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
     CountDownLatch latch = new CountDownLatch(count * 10);
     ConcurrentHashMap<Integer, Integer> results = new ConcurrentHashMap<>();
     ConcurrentHashMap<Integer, Integer> duplicates = new ConcurrentHashMap<>();
@@ -573,26 +585,24 @@ public abstract class AbstractAcceptanceTest {
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
   }
 
-  protected TransactionManager simpleTxnManager() {
-    return TransactionManager.fromConnectionDetails(
-        connectionDetails().driverClassName(),
-        connectionDetails().url(),
-        connectionDetails().user(),
-        connectionDetails().password());
+  protected ConnectionDetails connectionDetails() {
+    return ConnectionDetails.builder()
+        .dialect(Dialect.H2)
+        .driverClassName("org.h2.Driver")
+        .url(
+            "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE;DATABASE_TO_UPPER=FALSE")
+        .user("test")
+        .password("test")
+        .build();
   }
 
-  private HikariDataSource pooledDataSource() {
-    HikariConfig config = new HikariConfig();
-    config.setJdbcUrl(connectionDetails().url());
-    config.setUsername(connectionDetails().user());
-    config.setPassword(connectionDetails().password());
-    config.addDataSourceProperty("cachePrepStmts", "true");
-    return new HikariDataSource(config);
+  protected TransactionManager txManager() {
+    return TransactionManager.fromDataSource(dataSource);
   }
 
   protected void clearOutbox() {
     DefaultPersistor persistor = Persistor.forDialect(connectionDetails().dialect());
-    TransactionManager transactionManager = simpleTxnManager();
+    TransactionManager transactionManager = txManager();
     transactionManager.inTransaction(
         tx -> {
           try {
@@ -603,7 +613,7 @@ public abstract class AbstractAcceptanceTest {
         });
   }
 
-  private void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
+  protected void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
       throws Exception {
     Thread backgroundThread =
         new Thread(
