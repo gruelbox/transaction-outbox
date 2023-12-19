@@ -10,6 +10,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import com.gruelbox.transactionoutbox.jooq.JooqTransactionListener;
+import com.gruelbox.transactionoutbox.jooq.JooqTransactionManager;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
