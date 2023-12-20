@@ -2,9 +2,9 @@ package com.gruelbox.transactionoutbox.spring.acceptance;
 
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.Persistor;
+import com.gruelbox.transactionoutbox.SpringInstantiator;
+import com.gruelbox.transactionoutbox.SpringTransactionManager;
 import com.gruelbox.transactionoutbox.TransactionOutbox;
-import com.gruelbox.transactionoutbox.spring.SpringInstantiator;
-import com.gruelbox.transactionoutbox.spring.SpringTransactionManager;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
