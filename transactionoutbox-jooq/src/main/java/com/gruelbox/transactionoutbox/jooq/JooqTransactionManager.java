@@ -1,15 +1,18 @@
 package com.gruelbox.transactionoutbox.jooq;
 
-import com.gruelbox.transactionoutbox.*;
+import com.gruelbox.transactionoutbox.ParameterContextTransactionManager;
+import com.gruelbox.transactionoutbox.ThreadLocalContextTransactionManager;
+import com.gruelbox.transactionoutbox.TransactionManager;
+import com.gruelbox.transactionoutbox.TransactionOutbox;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
 
 /**
  * Transaction manager which uses jOOQ's transaction management. In order to wire into JOOQ's
  * transaction lifecycle, a slightly convoluted construction process is required which involves
- * first creating a {@link JooqTransactionListener}, including it in the JOOQ {@link
- * Configuration} while constructing the root {@link DSLContext}, and then finally linking
- * the listener to the new {@link JooqTransactionManager}:
+ * first creating a {@link JooqTransactionListener}, including it in the JOOQ {@link Configuration}
+ * while constructing the root {@link DSLContext}, and then finally linking the listener to the new
+ * {@link JooqTransactionManager}:
  *
  * <pre>
  * DataSourceConnectionProvider connectionProvider = new DataSourceConnectionProvider(dataSource);
@@ -22,7 +25,8 @@ import org.jooq.DSLContext;
  * DSLContext dsl = DSL.using(configuration);
  * return JooqTransactionManager.create(dsl, listener);</pre>
  */
-public interface JooqTransactionManager extends TransactionManager, com.gruelbox.transactionoutbox.JooqTransactionManager {
+public interface JooqTransactionManager
+    extends TransactionManager, com.gruelbox.transactionoutbox.JooqTransactionManager {
 
   /**
    * Creates the {@link org.jooq.TransactionListener} to wire into the {@link DSLContext}. See
@@ -56,8 +60,8 @@ public interface JooqTransactionManager extends TransactionManager, com.gruelbox
   /**
    * Creates a transaction manager which uses explicitly-passed context, allowing multiple active
    * contexts in the current thread and contexts which are passed between threads. Requires a {@link
-   * Configuration} for the transaction context or a {@link org.jooq.Transaction} to be
-   * used to be passed any method called via {@link TransactionOutbox#schedule(Class)}. Example:
+   * Configuration} for the transaction context or a {@link org.jooq.Transaction} to be used to be
+   * passed any method called via {@link TransactionOutbox#schedule(Class)}. Example:
    *
    * <pre>
    * void doSchedule() {

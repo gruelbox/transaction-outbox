@@ -2,7 +2,6 @@ package com.gruelbox.transactionoutbox.spring.acceptance;
 
 import com.gruelbox.transactionoutbox.TransactionOutbox;
 import java.time.LocalDateTime;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

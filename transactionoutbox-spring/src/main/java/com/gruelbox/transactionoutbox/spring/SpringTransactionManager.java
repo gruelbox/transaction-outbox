@@ -1,7 +1,16 @@
 package com.gruelbox.transactionoutbox.spring;
 
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
+
 import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.spi.Utils;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.datasource.DataSourceUtils;
@@ -10,16 +19,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-
-import javax.sql.DataSource;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-
-import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
-import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 
 /** Transaction manager which uses spring-tx and Hibernate. */
 @Slf4j

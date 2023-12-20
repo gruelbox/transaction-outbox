@@ -44,7 +44,8 @@ class JooqTestUtils {
         dsl.select().from(TEST_TABLE).where(DSL.field(VAL).eq(value)).fetchOptional().isPresent());
   }
 
-  static void assertRecordNotExists(DSLContext dsl, @SuppressWarnings("SameParameterValue") int value) {
+  static void assertRecordNotExists(
+      DSLContext dsl, @SuppressWarnings("SameParameterValue") int value) {
     assertFalse(
         dsl.select().from(TEST_TABLE).where(DSL.field(VAL).eq(value)).fetchOptional().isPresent());
   }

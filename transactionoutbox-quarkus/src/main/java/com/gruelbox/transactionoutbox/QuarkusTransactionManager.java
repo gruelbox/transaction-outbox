@@ -1,7 +1,14 @@
 package com.gruelbox.transactionoutbox;
 
-import com.gruelbox.transactionoutbox.spi.Utils;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 
+import com.gruelbox.transactionoutbox.spi.Utils;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.sql.DataSource;
@@ -9,14 +16,6 @@ import javax.transaction.Status;
 import javax.transaction.Synchronization;
 import javax.transaction.TransactionSynchronizationRegistry;
 import javax.transaction.Transactional;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-
-import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 
 /**
  * @deprecated use {@link com.gruelbox.transactionoutbox.quarkus.QuarkusTransactionManager}.
