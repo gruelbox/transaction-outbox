@@ -1,7 +1,6 @@
 package com.gruelbox.transactionoutbox.spring.acceptance;
 
 import com.gruelbox.transactionoutbox.TransactionOutbox;
-import java.time.LocalDateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,16 +8,23 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
+
+@SuppressWarnings("unused")
 @RestController
 class EventuallyConsistentController {
 
   private static final Logger LOGGER =
       LoggerFactory.getLogger(EventuallyConsistentController.class);
 
-  @Autowired private CustomerRepository customerRepository;
-  @Autowired private TransactionOutbox outbox;
-  @Autowired private EventRepository eventRepository;
-  @Autowired private EventPublisher eventPublisher;
+  @Autowired
+  private CustomerRepository customerRepository;
+  @Autowired
+  private TransactionOutbox outbox;
+  @Autowired
+  private EventRepository eventRepository;
+  @Autowired
+  private EventPublisher eventPublisher;
 
   @SuppressWarnings("SameReturnValue")
   @RequestMapping("/createCustomer")
