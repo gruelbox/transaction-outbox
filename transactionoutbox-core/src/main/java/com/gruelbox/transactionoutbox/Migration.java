@@ -2,9 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import lombok.Value;
 
-/**
- * A database migration script entry. See {@link Dialect#getMigrations()}.
- */
+/** A database migration script entry. See {@link Dialect#getMigrations()}. */
 @Value
 public class Migration {
   int version;
