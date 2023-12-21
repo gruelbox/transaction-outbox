@@ -36,7 +36,8 @@ class DefaultDialect implements Dialect {
   @Override
   public void createVersionTableIfNotExists(Connection connection) throws SQLException {
     try (Statement s = connection.createStatement()) {
-      s.execute("CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
+      s.execute(
+          "CREATE TABLE IF NOT EXISTS TXNO_VERSION (id INT DEFAULT 0, version INT, PRIMARY KEY (id))");
     }
   }
 
