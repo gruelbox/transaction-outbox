@@ -12,7 +12,7 @@
   <description>A safe implementation of the transactional outbox pattern for Java (Jackson extension library)</description>
   <properties>
     <guice.version>5.2.4.RELEASE</guice.version>
-    <jackson.version>2.15.2</jackson.version>
+    <jackson.version>2.16.0</jackson.version>
     <commons.lang.version>3.13.0</commons.lang.version>
   </properties>
   <dependencies>
