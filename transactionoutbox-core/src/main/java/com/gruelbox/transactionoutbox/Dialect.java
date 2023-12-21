@@ -1,77 +1,250 @@
 package com.gruelbox.transactionoutbox;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Collection;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 
-/**
- * The SQL dialects supported by {@link DefaultPersistor}. Currently this is only used to determine
- * whether {@code SKIP LOCKED} is available, so using the wrong dialect may work for unsupported
- * database platforms. However, in future this is likely to extend to other SQL features and
- * possibly be expanded to an interface to allow easier extension.
- */
-@AllArgsConstructor
-@Getter
-public enum Dialect {
-  MY_SQL_5(
-      false,
-      Constants.DEFAULT_DELETE_EXPIRED_STMT,
-      Constants.DEFAULT_LIMIT_CRITERIA,
-      Constants.DEFAULT_CHECK_SQL), //
-  MY_SQL_8(
-      true,
-      Constants.DEFAULT_DELETE_EXPIRED_STMT,
-      Constants.DEFAULT_LIMIT_CRITERIA,
-      Constants.DEFAULT_CHECK_SQL), //
-  POSTGRESQL_9(
-      true,
-      "DELETE FROM {{table}} WHERE id IN (SELECT id FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?)",
-      Constants.DEFAULT_LIMIT_CRITERIA,
-      Constants.DEFAULT_CHECK_SQL), //
-  H2(
-      false,
-      Constants.DEFAULT_DELETE_EXPIRED_STMT,
-      Constants.DEFAULT_LIMIT_CRITERIA,
-      Constants.DEFAULT_CHECK_SQL), //
-  ORACLE(
-      true,
-      "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0 AND ROWNUM <= ?",
-      Constants.ORACLE_LIMIT_CRITERIA,
-      "SELECT 1 FROM DUAL");
+/** The SQL dialects supported by {@link DefaultPersistor}. */
+public interface Dialect {
 
   /**
    * @return True if hot row support ({@code SKIP LOCKED}) is available, increasing performance when
    *     there are multiple instances of the application potentially competing to process the same
    *     task.
    */
-  @SuppressWarnings("JavaDoc")
-  private final boolean supportsSkipLock;
+  boolean isSupportsSkipLock();
 
   /**
    * @return Format string for the SQL required to delete expired retained records.
    */
-  @SuppressWarnings("JavaDoc")
-  private final String deleteExpired;
+  String getDeleteExpired();
 
-  private final String limitCriteria;
+  String getLimitCriteria();
 
-  private final String checkSql;
+  String getCheckSql();
 
-  private static class Constants {
-    static final String DEFAULT_DELETE_EXPIRED_STMT =
-        "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?";
+  String booleanValue(boolean criteriaValue);
 
-    static final String DEFAULT_LIMIT_CRITERIA = " LIMIT ?";
+  void createVersionTableIfNotExists(Connection connection) throws SQLException;
 
-    static final String ORACLE_LIMIT_CRITERIA = " AND ROWNUM <= ?";
+  Stream<Migration> getMigrations();
 
-    static final String DEFAULT_CHECK_SQL = "SELECT 1";
+  Dialect MY_SQL_5 = DefaultDialect.builder("MY_SQL_5").build();
+  Dialect MY_SQL_8 = DefaultDialect.builder("MY_SQL_8").supportsSkipLock(true).build();
+  Dialect POSTGRESQL_9 =
+      DefaultDialect.builder("POSTGRESQL_9")
+          .supportsSkipLock(true)
+          .deleteExpired(
+              "DELETE FROM {{table}} WHERE id IN (SELECT id FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?)")
+          .changeMigration(
+              5, "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)")
+          .changeMigration(6, "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")
+          .changeMigration(7, "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6)")
+          .disableMigration(8)
+          .build();
+
+  Dialect H2 =
+      DefaultDialect.builder("H2")
+          .changeMigration(5, "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")
+          .changeMigration(6, "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")
+          .disableMigration(8)
+          .build();
+  Dialect ORACLE =
+      DefaultDialect.builder("ORACLE")
+          .supportsSkipLock(true)
+          .deleteExpired(
+              "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0 AND ROWNUM <= ?")
+          .limitCriteria(" AND ROWNUM <= ?")
+          .checkSql("SELECT 1 FROM DUAL")
+          .changeMigration(
+              1,
+              "CREATE TABLE TXNO_OUTBOX (\n"
+                  + "    id VARCHAR2(36) PRIMARY KEY,\n"
+                  + "    invocation CLOB,\n"
+                  + "    nextAttemptTime TIMESTAMP(6),\n"
+                  + "    attempts NUMBER,\n"
+                  + "    blacklisted NUMBER(1),\n"
+                  + "    version NUMBER\n"
+                  + ")")
+          .changeMigration(
+              2, "ALTER TABLE TXNO_OUTBOX ADD uniqueRequestId VARCHAR(100) NULL UNIQUE")
+          .changeMigration(3, "ALTER TABLE TXNO_OUTBOX ADD processed NUMBER(1)")
+          .changeMigration(5, "ALTER TABLE TXNO_OUTBOX MODIFY uniqueRequestId VARCHAR2(250)")
+          .changeMigration(6, "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")
+          .changeMigration(7, "ALTER TABLE TXNO_OUTBOX ADD lastAttemptTime TIMESTAMP(6)")
+          .disableMigration(8)
+          .booleanValueFrom(v -> v ? "1" : "0")
+          .createVersionTableBy(
+              connection -> {
+                try (Statement s = connection.createStatement()) {
+                  try {
+                    s.execute("CREATE TABLE TXNO_VERSION (version NUMBER)");
+                  } catch (SQLException e) {
+                    // oracle code for name already used by an existing object
+                    if (!e.getMessage().contains("955")) {
+                      throw e;
+                    }
+                  }
+                }
+              })
+          .build();
+}
+
+@FunctionalInterface
+interface SQLAction {
+  void doAction(Connection connection) throws SQLException;
+}
+
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+class DefaultDialect implements Dialect {
+
+  static Builder builder(String name) {
+    return new Builder(name);
   }
 
-  public String booleanValue(boolean criteriaValue) {
-    String valueToReturn;
-    if (this == ORACLE) valueToReturn = criteriaValue ? "1" : "0";
-    else valueToReturn = criteriaValue ? Boolean.TRUE.toString() : Boolean.FALSE.toString();
+  @Getter private final String name;
+  @Getter private final boolean supportsSkipLock;
+  @Getter private final String deleteExpired;
+  @Getter private final String limitCriteria;
+  @Getter private final String checkSql;
+  private final Collection<Migration> migrations;
 
-    return valueToReturn;
+  @Override
+  public String booleanValue(boolean criteriaValue) {
+    return criteriaValue ? Boolean.TRUE.toString() : Boolean.FALSE.toString();
+  }
+
+  @Override
+  public void createVersionTableIfNotExists(Connection connection) throws SQLException {
+    try (Statement s = connection.createStatement()) {
+      s.execute("CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
+    }
+  }
+
+  @Override
+  public String toString() {
+    return name;
+  }
+
+  @Override
+  public Stream<Migration> getMigrations() {
+    return migrations.stream();
+  }
+
+  @Setter
+  @Accessors(fluent = true)
+  static final class Builder {
+    private final String name;
+    private boolean supportsSkipLock = false;
+    private String deleteExpired =
+        "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?";
+    private String limitCriteria = " LIMIT ?";
+    private String checkSql = "SELECT 1";
+    private Map<Integer, Migration> migrations;
+    private Function<Boolean, String> booleanValueFrom;
+    private SQLAction createVersionTableBy;
+
+    Builder(String name) {
+      this.name = name;
+      this.migrations = new TreeMap<>();
+      migrations.put(
+          1,
+          new Migration(
+              1,
+              "Create outbox table",
+              "CREATE TABLE TXNO_OUTBOX (\n"
+                  + "    id VARCHAR(36) PRIMARY KEY,\n"
+                  + "    invocation TEXT,\n"
+                  + "    nextAttemptTime TIMESTAMP(6),\n"
+                  + "    attempts INT,\n"
+                  + "    blacklisted BOOLEAN,\n"
+                  + "    version INT\n"
+                  + ")"));
+      migrations.put(
+          2,
+          new Migration(
+              2,
+              "Add unique request id",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE"));
+      migrations.put(
+          3,
+          new Migration(
+              3, "Add processed flag", "ALTER TABLE TXNO_OUTBOX ADD COLUMN processed BOOLEAN"));
+      migrations.put(
+          4,
+          new Migration(
+              4,
+              "Add flush index",
+              "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blacklisted, nextAttemptTime)"));
+      migrations.put(
+          5,
+          new Migration(
+              5,
+              "Increase size of uniqueRequestId",
+              "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN uniqueRequestId VARCHAR(250)"));
+      migrations.put(
+          6,
+          new Migration(
+              6,
+              "Rename column blacklisted to blocked",
+              "ALTER TABLE TXNO_OUTBOX CHANGE COLUMN blacklisted blocked VARCHAR(250)"));
+      migrations.put(
+          7,
+          new Migration(
+              7,
+              "Add lastAttemptTime column to outbox",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation"));
+      migrations.put(
+          8,
+          new Migration(
+              8,
+              "Update length of invocation column on outbox for MySQL dialects only.",
+              "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation MEDIUMTEXT"));
+    }
+
+    Builder setMigration(Migration migration) {
+      this.migrations.put(migration.getVersion(), migration);
+      return this;
+    }
+
+    Builder changeMigration(int version, String sql) {
+      return setMigration(this.migrations.get(version).withSql(sql));
+    }
+
+    Builder disableMigration(@SuppressWarnings("SameParameterValue") int version) {
+      return setMigration(this.migrations.get(version).withSql(null));
+    }
+
+    Dialect build() {
+      return new DefaultDialect(
+          name, supportsSkipLock, deleteExpired, limitCriteria, checkSql, migrations.values()) {
+        @Override
+        public String booleanValue(boolean criteriaValue) {
+          if (booleanValueFrom != null) {
+            return booleanValueFrom.apply(criteriaValue);
+          }
+          return super.booleanValue(criteriaValue);
+        }
+
+        @Override
+        public void createVersionTableIfNotExists(Connection connection) throws SQLException {
+          if (createVersionTableBy != null) {
+            createVersionTableBy.doAction(connection);
+          } else {
+            super.createVersionTableIfNotExists(connection);
+          }
+        }
+      };
+    }
   }
 }
