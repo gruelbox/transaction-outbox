@@ -1,5 +1,9 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.AbstractThreadLocalTransactionManager;
+import com.gruelbox.transactionoutbox.spi.ProxyFactory;
+import com.gruelbox.transactionoutbox.spi.SimpleTransaction;
+import com.gruelbox.transactionoutbox.spi.Utils;
 import java.sql.Connection;
 import lombok.extern.slf4j.Slf4j;
 
@@ -11,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 public class StubThreadLocalTransactionManager
     extends AbstractThreadLocalTransactionManager<SimpleTransaction> {
 
-  @Beta
   public StubThreadLocalTransactionManager() {
     // Nothing to do
   }

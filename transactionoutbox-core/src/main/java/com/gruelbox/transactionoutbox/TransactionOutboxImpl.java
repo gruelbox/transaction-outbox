@@ -1,10 +1,12 @@
 package com.gruelbox.transactionoutbox;
 
-import static com.gruelbox.transactionoutbox.Utils.logAtLevel;
-import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
+import static com.gruelbox.transactionoutbox.spi.Utils.logAtLevel;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.time.temporal.ChronoUnit.MINUTES;
 
+import com.gruelbox.transactionoutbox.spi.ProxyFactory;
+import com.gruelbox.transactionoutbox.spi.Utils;
 import java.lang.reflect.InvocationTargetException;
 import java.time.Clock;
 import java.time.Duration;

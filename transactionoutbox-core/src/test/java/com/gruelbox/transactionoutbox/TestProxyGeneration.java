@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.gruelbox.transactionoutbox.spi.ProxyFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

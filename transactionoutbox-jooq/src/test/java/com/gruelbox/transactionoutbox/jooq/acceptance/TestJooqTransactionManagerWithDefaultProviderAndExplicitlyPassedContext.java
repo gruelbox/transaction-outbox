@@ -1,32 +1,17 @@
 package com.gruelbox.transactionoutbox.jooq.acceptance;
 
 import static com.gruelbox.transactionoutbox.jooq.acceptance.JooqTestUtils.createTestTable;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 import static com.gruelbox.transactionoutbox.testing.TestUtils.runSql;
-import static com.gruelbox.transactionoutbox.testing.TestUtils.uncheck;
 import static java.util.concurrent.CompletableFuture.runAsync;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
-import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.JooqTransactionManager;
-import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.ThrowingRunnable;
-import com.gruelbox.transactionoutbox.Transaction;
-import com.gruelbox.transactionoutbox.TransactionManager;
-import com.gruelbox.transactionoutbox.TransactionOutbox;
-import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.*;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;

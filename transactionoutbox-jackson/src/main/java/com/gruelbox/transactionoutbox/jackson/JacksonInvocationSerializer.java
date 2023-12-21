@@ -1,7 +1,6 @@
 package com.gruelbox.transactionoutbox.jackson;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gruelbox.transactionoutbox.Beta;
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
 import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.InvocationSerializer;
@@ -21,7 +20,6 @@ import lombok.Builder;
  * href="https://github.com/gruelbox/transaction-outbox/issues/236#issuecomment-1024929436">here</a>)
  * which is why it is not included in the core library.
  */
-@Beta
 public final class JacksonInvocationSerializer implements InvocationSerializer {
   private final ObjectMapper mapper;
   private final InvocationSerializer defaultInvocationSerializer;

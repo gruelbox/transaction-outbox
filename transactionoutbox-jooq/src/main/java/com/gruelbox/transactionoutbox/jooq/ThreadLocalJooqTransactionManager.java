@@ -1,5 +1,6 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.jooq;
 
+import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
 import com.gruelbox.transactionoutbox.spi.AbstractThreadLocalTransactionManager;
 import com.gruelbox.transactionoutbox.spi.SimpleTransaction;
 import lombok.extern.slf4j.Slf4j;

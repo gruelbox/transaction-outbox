@@ -1,5 +1,8 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.jooq;
 
+import com.gruelbox.transactionoutbox.ParameterContextTransactionManager;
+import com.gruelbox.transactionoutbox.ThrowingTransactionalSupplier;
+import com.gruelbox.transactionoutbox.Transaction;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
@@ -10,7 +13,6 @@ import org.jooq.DSLContext;
  * connected to the {@link DSLContext}.
  */
 @Slf4j
-@Beta
 final class DefaultJooqTransactionManager
     implements ParameterContextTransactionManager<Configuration> {
 

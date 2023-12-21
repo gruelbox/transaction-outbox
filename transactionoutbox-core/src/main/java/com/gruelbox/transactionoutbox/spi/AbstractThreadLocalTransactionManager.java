@@ -1,5 +1,6 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spi;
 
+import com.gruelbox.transactionoutbox.*;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.Optional;
@@ -11,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @SuperBuilder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-abstract class AbstractThreadLocalTransactionManager<TX extends SimpleTransaction>
+public abstract class AbstractThreadLocalTransactionManager<TX extends SimpleTransaction>
     implements ThreadLocalContextTransactionManager {
 
   private final ThreadLocal<Deque<TX>> transactions = ThreadLocal.withInitial(LinkedList::new);
@@ -43,12 +44,12 @@ abstract class AbstractThreadLocalTransactionManager<TX extends SimpleTransactio
     return work.doWork(peekTransaction().orElseThrow(NoTransactionActiveException::new));
   }
 
-  final TX pushTransaction(TX transaction) {
+  public final TX pushTransaction(TX transaction) {
     transactions.get().push(transaction);
     return transaction;
   }
 
-  final TX popTransaction() {
+  public final TX popTransaction() {
     TX result = transactions.get().pop();
     if (transactions.get().isEmpty()) {
       transactions.remove();
@@ -56,7 +57,7 @@ abstract class AbstractThreadLocalTransactionManager<TX extends SimpleTransactio
     return result;
   }
 
-  Optional<TX> peekTransaction() {
+  public Optional<TX> peekTransaction() {
     return Optional.ofNullable(transactions.get().peek());
   }
 }

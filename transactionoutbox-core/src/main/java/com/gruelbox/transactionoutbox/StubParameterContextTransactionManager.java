@@ -1,5 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.ProxyFactory;
+import com.gruelbox.transactionoutbox.spi.SimpleTransaction;
+import com.gruelbox.transactionoutbox.spi.Utils;
 import java.sql.Connection;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -22,7 +25,6 @@ public class StubParameterContextTransactionManager<C>
    * @param contextClass The class that represents the context. Must support equals/hashCode.
    * @param contextFactory Generates context instances when transactions are started.
    */
-  @Beta
   public StubParameterContextTransactionManager(Class<C> contextClass, Supplier<C> contextFactory) {
     this.contextClass = contextClass;
     this.contextFactory = contextFactory;

@@ -1,8 +1,9 @@
-package com.gruelbox.transactionoutbox;
+package com.gruelbox.transactionoutbox.spi;
 
-import static com.gruelbox.transactionoutbox.Utils.safelyClose;
-import static com.gruelbox.transactionoutbox.Utils.uncheck;
+import static com.gruelbox.transactionoutbox.spi.Utils.safelyClose;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 
+import com.gruelbox.transactionoutbox.Transaction;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -15,8 +16,8 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-@AllArgsConstructor(access = AccessLevel.PROTECTED)
-class SimpleTransaction implements Transaction, AutoCloseable {
+@AllArgsConstructor(access = AccessLevel.PUBLIC)
+public final class SimpleTransaction implements Transaction, AutoCloseable {
 
   private final List<Runnable> postCommitHooks = new ArrayList<>();
   private final Map<String, PreparedStatement> preparedStatements = new HashMap<>();
@@ -24,22 +25,22 @@ class SimpleTransaction implements Transaction, AutoCloseable {
   private final Object context;
 
   @Override
-  public final Connection connection() {
+  public Connection connection() {
     return connection;
   }
 
   @Override
-  public final void addPostCommitHook(Runnable runnable) {
+  public void addPostCommitHook(Runnable runnable) {
     postCommitHooks.add(runnable);
   }
 
   @Override
-  public final PreparedStatement prepareBatchStatement(String sql) {
+  public PreparedStatement prepareBatchStatement(String sql) {
     return preparedStatements.computeIfAbsent(
         sql, s -> Utils.uncheckedly(() -> connection.prepareStatement(s)));
   }
 
-  final void flushBatches() {
+  public void flushBatches() {
     if (!preparedStatements.isEmpty()) {
       log.debug("Flushing batches");
       for (PreparedStatement statement : preparedStatements.values()) {
@@ -48,18 +49,18 @@ class SimpleTransaction implements Transaction, AutoCloseable {
     }
   }
 
-  final void processHooks() {
+  public void processHooks() {
     if (!postCommitHooks.isEmpty()) {
       log.debug("Running post-commit hooks");
       postCommitHooks.forEach(Runnable::run);
     }
   }
 
-  void commit() {
+  public void commit() {
     uncheck(connection::commit);
   }
 
-  void rollback() throws SQLException {
+  public void rollback() throws SQLException {
     connection.rollback();
   }
 
