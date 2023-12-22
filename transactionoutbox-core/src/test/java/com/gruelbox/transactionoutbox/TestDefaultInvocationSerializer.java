@@ -4,12 +4,9 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Stream;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DynamicNode;
@@ -32,9 +29,10 @@ class TestDefaultInvocationSerializer {
         Stream.of(Arguments.of(1), Arguments.of(2), Arguments.of(new Object[] {null})));
   }
 
+  @SuppressWarnings("JUnitMalformedDeclaration")
   static class Inner {
 
-    private DefaultInvocationSerializer serializer;
+    private final DefaultInvocationSerializer serializer;
 
     Inner(Integer version) {
       this.serializer =
@@ -122,9 +120,16 @@ class TestDefaultInvocationSerializer {
     }
 
     @Test
+    void testJavaDateEnumsNulls() {
+      Class<?>[] primitives = {DayOfWeek.class, Month.class, ChronoUnit.class};
+      Object[] values = {null, null, null};
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
+
+    @Test
     void testJavaUtilDate() {
-      Class<?>[] primitives = {Date.class};
-      Object[] values = {new Date()};
+      Class<?>[] primitives = {Date.class, Date.class};
+      Object[] values = {new Date(), null};
       check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
     }
 
@@ -134,7 +139,6 @@ class TestDefaultInvocationSerializer {
         Duration.class,
         Instant.class,
         LocalDate.class,
-        LocalDateTime.class,
         LocalDateTime.class,
         MonthDay.class,
         Period.class,
@@ -147,7 +151,6 @@ class TestDefaultInvocationSerializer {
         Instant.now(),
         LocalDate.now(),
         LocalDateTime.now(),
-        null,
         MonthDay.of(1, 1),
         Period.ofMonths(1),
         Year.now(),
@@ -158,9 +161,33 @@ class TestDefaultInvocationSerializer {
     }
 
     @Test
+    void testJavaTimeClassesNulls() {
+      Class<?>[] primitives = {
+        Duration.class,
+        Instant.class,
+        LocalDate.class,
+        LocalDateTime.class,
+        MonthDay.class,
+        Period.class,
+        Year.class,
+        YearMonth.class,
+        ZonedDateTime.class
+      };
+      Object[] values = new Object[9];
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
+
+    @Test
     void testCustomEnum() {
       Class<?>[] primitives = {ExampleCustomEnum.class, ExampleCustomEnum.class};
       Object[] values = {ExampleCustomEnum.ONE, ExampleCustomEnum.TWO};
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
+
+    @Test
+    void testCustomEnumNulls() {
+      Class<?>[] primitives = {ExampleCustomEnum.class};
+      Object[] values = {null};
       check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
     }
 
@@ -188,6 +215,13 @@ class TestDefaultInvocationSerializer {
       check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
     }
 
+    @Test
+    void testUUIDNull() {
+      Class<?>[] primitives = {UUID.class};
+      Object[] values = {null};
+      check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
+    }
+
     void check(Invocation invocation) {
       Invocation deserialized = serdeser(invocation);
       Assertions.assertEquals(deserialized, serdeser(invocation));
@@ -197,7 +231,7 @@ class TestDefaultInvocationSerializer {
     Invocation serdeser(Invocation invocation) {
       var writer = new StringWriter();
       serializer.serializeInvocation(invocation, writer);
-      log.info("Serialised as: {}", writer.toString());
+      log.info("Serialised as: {}", writer);
       return serializer.deserializeInvocation(new StringReader(writer.toString()));
     }
   }
@@ -207,6 +241,7 @@ class TestDefaultInvocationSerializer {
     TWO
   }
 
+  @Getter
   static class ExampleCustomClass {
 
     private final String arg1;
@@ -215,14 +250,6 @@ class TestDefaultInvocationSerializer {
     ExampleCustomClass(String arg1, String arg2) {
       this.arg1 = arg1;
       this.arg2 = arg2;
-    }
-
-    public String getArg1() {
-      return arg1;
-    }
-
-    public String getArg2() {
-      return arg2;
     }
 
     @Override
