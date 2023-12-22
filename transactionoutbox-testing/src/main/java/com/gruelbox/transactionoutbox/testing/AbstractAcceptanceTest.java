@@ -95,7 +95,7 @@ public abstract class AbstractAcceptanceTest {
                             chainedLatch.countDown();
                           }
                         }))
-            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .persistor(persistor())
             .initializeImmediately(false)
             .build();
 
@@ -598,6 +598,10 @@ public abstract class AbstractAcceptanceTest {
 
   protected TransactionManager txManager() {
     return TransactionManager.fromDataSource(dataSource);
+  }
+
+  protected Persistor persistor() {
+    return Persistor.forDialect(connectionDetails().dialect());
   }
 
   protected void clearOutbox() {
