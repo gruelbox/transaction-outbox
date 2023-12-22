@@ -13,7 +13,7 @@
   <description>A safe implementation of the transactional outbox pattern for Java (Quarkus extension library)
   </description>
   <properties>
-    <quarkus.version>2.16.5.Final</quarkus.version>
+    <quarkus.version>3.6.4</quarkus.version>
   </properties>
   <dependencies>
     <!-- Runtime -->
@@ -35,28 +35,6 @@
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-junit5</artifactId>
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.junit.jupiter</groupId>
-          <artifactId>junit-jupiter-engine</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.junit.jupiter</groupId>
-          <artifactId>junit-jupiter-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.junit.jupiter</groupId>
-          <artifactId>junit-jupiter-params</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-engine</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-params</artifactId>
     </dependency>
     <dependency>
       <groupId>io.quarkus</groupId>

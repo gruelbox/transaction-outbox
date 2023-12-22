@@ -1,19 +1,19 @@
 package com.gruelbox.transactionoutbox.quarkus.acceptance;
 
 import com.gruelbox.transactionoutbox.TransactionOutbox;
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import javax.transaction.Transactional;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 
 @ApplicationScoped
 public class BusinessService {
-  private DaoImpl dao;
-
-  @Inject private TransactionOutbox outbox;
+  private final DaoImpl dao;
+  private final TransactionOutbox outbox;
 
   @Inject
-  public BusinessService(DaoImpl dao) {
+  public BusinessService(DaoImpl dao, TransactionOutbox outbox) {
     this.dao = dao;
+    this.outbox = outbox;
   }
 
   @Transactional

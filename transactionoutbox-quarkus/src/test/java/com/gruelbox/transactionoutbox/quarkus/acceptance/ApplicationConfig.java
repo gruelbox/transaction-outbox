@@ -1,16 +1,10 @@
 package com.gruelbox.transactionoutbox.quarkus.acceptance;
 
-import com.gruelbox.transactionoutbox.CdiInstantiator;
-import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.Persistor;
-import com.gruelbox.transactionoutbox.QuarkusTransactionManager;
-import com.gruelbox.transactionoutbox.TransactionOutbox;
-import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
-import com.gruelbox.transactionoutbox.TransactionOutboxListener;
+import com.gruelbox.transactionoutbox.*;
+import jakarta.enterprise.inject.Produces;
+import jakarta.ws.rs.core.Application;
 import java.util.HashSet;
 import java.util.Set;
-import javax.enterprise.inject.Produces;
-import javax.ws.rs.core.Application;
 
 public class ApplicationConfig extends Application {
 
