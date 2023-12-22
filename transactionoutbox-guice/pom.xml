@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>transactionoutbox-parent</artifactId>
     <groupId>com.gruelbox</groupId>
@@ -9,7 +10,8 @@
   <name>Transaction Outbox Guice</name>
   <packaging>jar</packaging>
   <artifactId>transactionoutbox-guice</artifactId>
-  <description>A safe implementation of the transactional outbox pattern for Java (Guice extension library)</description>
+  <description>A safe implementation of the transactional outbox pattern for Java (Guice extension library)
+  </description>
   <properties>
     <guice.version>5.2.4.RELEASE</guice.version>
   </properties>
@@ -23,7 +25,21 @@
     <dependency>
       <groupId>com.google.inject</groupId>
       <artifactId>guice</artifactId>
-      <version>7.0.0</version>
+      <version>6.0.0</version>
+      <exclusions>
+        <!-- There's a vulnerability in the version provided by Guice 6.0.0 -->
+        <exclusion>
+          <groupId>com.google.guava</groupId>
+          <artifactId>guava</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- There's a vulnerability in the version provided by Guice 6.0.0 -->
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>33.0.0-jre</version>
+      <scope>test</scope>
     </dependency>
     <!-- Compile time -->
     <dependency>
