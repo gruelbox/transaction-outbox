@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
-import static com.gruelbox.transactionoutbox.Utils.uncheck;
-import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 
 import java.lang.reflect.Method;
 import javax.sql.DataSource;

@@ -6,12 +6,10 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 /**
- * Instantiator that uses the spring {@link ApplicationContext} to source objects. It requires that
- * classes scheduled have a unique name in the context, so doesn't often play well with proxies and
- * other auto-generated code such as repositories based on {@code CrudRepository}.
+ * @deprecated use {@link com.gruelbox.transactionoutbox.spring.SpringInstantiator}.
  */
-@Beta
 @Service
+@Deprecated(forRemoval = true)
 public class SpringInstantiator implements Instantiator {
 
   private final ApplicationContext applicationContext;

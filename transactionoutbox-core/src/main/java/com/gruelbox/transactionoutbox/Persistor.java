@@ -105,5 +105,29 @@ public interface Persistor {
   List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
       throws Exception;
 
+  /**
+   * Deletes records which have processed and passed their expiry time, in specified batch sizes.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param batchSize The number of records to select.
+   * @param now The time to use when selecting records.
+   * @return The number of records deleted.
+   * @throws Exception Any exception.
+   */
   int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now) throws Exception;
+
+  /**
+   * Checks the connection status of a transaction.
+   *
+   * @param tx The current {@link Transaction}.
+   * @return true if connected and working.
+   */
+  boolean checkConnection(Transaction tx) throws Exception;
+
+  /**
+   * Clears the database. For testing only.
+   *
+   * @param tx The current {@link Transaction}.
+   */
+  void clear(Transaction tx) throws Exception;
 }

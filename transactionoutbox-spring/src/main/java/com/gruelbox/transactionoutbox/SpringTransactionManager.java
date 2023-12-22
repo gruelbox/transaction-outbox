@@ -1,8 +1,9 @@
 package com.gruelbox.transactionoutbox;
 
-import static com.gruelbox.transactionoutbox.Utils.uncheck;
-import static com.gruelbox.transactionoutbox.Utils.uncheckedly;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 
+import com.gruelbox.transactionoutbox.spi.Utils;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -18,17 +19,19 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** Transaction manager which uses spring-tx and Hibernate. */
-@Beta
+/**
+ * @deprecated use {@link com.gruelbox.transactionoutbox.spring.SpringTransactionManager}.
+ */
 @Slf4j
 @Service
+@Deprecated(forRemoval = true)
 public class SpringTransactionManager implements ThreadLocalContextTransactionManager {
 
   private final SpringTransaction transactionInstance = new SpringTransaction();
   private final DataSource dataSource;
 
   @Autowired
-  SpringTransactionManager(DataSource dataSource) {
+  protected SpringTransactionManager(DataSource dataSource) {
     this.dataSource = dataSource;
   }
 

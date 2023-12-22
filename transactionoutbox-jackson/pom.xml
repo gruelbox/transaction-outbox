@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>transactionoutbox-parent</artifactId>
     <groupId>com.gruelbox</groupId>
@@ -9,11 +10,11 @@
   <name>Transaction Outbox Jackson</name>
   <packaging>jar</packaging>
   <artifactId>transactionoutbox-jackson</artifactId>
-  <description>A safe implementation of the transactional outbox pattern for Java (Jackson extension library)</description>
+  <description>A safe implementation of the transactional outbox pattern for Java (Jackson extension library)
+  </description>
   <properties>
-    <guice.version>5.2.4.RELEASE</guice.version>
-    <jackson.version>2.15.0</jackson.version>
-    <commons.lang.version>3.12.0</commons.lang.version>
+    <jackson.version>2.16.0</jackson.version>
+    <commons.lang.version>3.14.0</commons.lang.version>
   </properties>
   <dependencies>
     <!-- Run time -->
@@ -39,9 +40,29 @@
     </dependency>
     <!-- Test -->
     <dependency>
+      <groupId>com.gruelbox</groupId>
+      <artifactId>transactionoutbox-testing</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-guava</artifactId>
       <version>${jackson.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <!-- There's a vulnerability in the version provided by Jackson -->
+        <exclusion>
+          <groupId>com.google.guava</groupId>
+          <artifactId>guava</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- There's a vulnerability in the version provided by Jackson -->
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>33.0.0-jre</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -57,32 +78,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-engine</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-all</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.zaxxer</groupId>
-      <artifactId>HikariCP</artifactId>
     </dependency>
   </dependencies>
 </project>

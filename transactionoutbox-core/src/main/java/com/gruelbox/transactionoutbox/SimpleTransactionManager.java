@@ -1,5 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.AbstractThreadLocalTransactionManager;
+import com.gruelbox.transactionoutbox.spi.SimpleTransaction;
+import com.gruelbox.transactionoutbox.spi.Utils;
 import java.sql.Connection;
 import java.sql.SQLException;
 import lombok.experimental.SuperBuilder;

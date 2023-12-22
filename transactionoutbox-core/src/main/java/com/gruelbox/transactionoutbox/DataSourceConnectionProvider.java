@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.Utils;
 import java.sql.Connection;
 import javax.sql.DataSource;
 import lombok.Builder;

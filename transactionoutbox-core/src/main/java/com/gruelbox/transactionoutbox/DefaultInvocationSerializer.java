@@ -530,6 +530,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
 
       return formatted.toString();
     }
+
     /**
      * Zero pad a number to a specified length
      *

@@ -11,42 +11,44 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v1
+      - name: Set up JDK 21
+        uses: actions/setup-java@v2
         with:
-          java-version: 17
+          distribution: 'zulu'
+          java-package: jdk
+          java-version: 21
 
       - name: Build with Maven and delombok
         run: mvn -Pconcise,delombok -B package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: javadocs-core
           path: transactionoutbox-core/target/apidocs
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: javadocs-guice
           path: transactionoutbox-guice/target/apidocs
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: javadocs-jackson
           path: transactionoutbox-jackson/target/apidocs
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: javadocs-jooq
           path: transactionoutbox-jooq/target/apidocs
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: javadocs-quarkus
           path: transactionoutbox-quarkus/target/apidocs
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: javadocs-spring
           path: transactionoutbox-spring/target/apidocs

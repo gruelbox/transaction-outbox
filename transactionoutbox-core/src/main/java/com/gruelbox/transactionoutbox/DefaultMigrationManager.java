@@ -1,14 +1,18 @@
 package com.gruelbox.transactionoutbox;
 
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
+
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import lombok.AllArgsConstructor;
-import lombok.SneakyThrows;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -18,161 +22,140 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 class DefaultMigrationManager {
 
-  /** Migrations can be dialect specific * */
-  private static final List<Migration> MIGRATIONS =
-      List.of(
-          new Migration(
-              1,
-              "Create outbox table",
-              "CREATE TABLE TXNO_OUTBOX (\n"
-                  + "    id VARCHAR(36) PRIMARY KEY,\n"
-                  + "    invocation TEXT,\n"
-                  + "    nextAttemptTime TIMESTAMP(6),\n"
-                  + "    attempts INT,\n"
-                  + "    blacklisted BOOLEAN,\n"
-                  + "    version INT\n"
-                  + ")",
-              Map.of(
-                  Dialect.ORACLE,
-                  "CREATE TABLE TXNO_OUTBOX (\n"
-                      + "    id VARCHAR2(36) PRIMARY KEY,\n"
-                      + "    invocation CLOB,\n"
-                      + "    nextAttemptTime TIMESTAMP(6),\n"
-                      + "    attempts NUMBER,\n"
-                      + "    blacklisted NUMBER(1),\n"
-                      + "    version NUMBER\n"
-                      + ")")),
-          new Migration(
-              2,
-              "Add unique request id",
-              "ALTER TABLE TXNO_OUTBOX ADD COLUMN uniqueRequestId VARCHAR(100) NULL UNIQUE",
-              Map.of(
-                  Dialect.ORACLE,
-                  "ALTER TABLE TXNO_OUTBOX ADD uniqueRequestId VARCHAR(100) NULL UNIQUE")),
-          new Migration(
-              3,
-              "Add processed flag",
-              "ALTER TABLE TXNO_OUTBOX ADD COLUMN processed BOOLEAN",
-              Map.of(Dialect.ORACLE, "ALTER TABLE TXNO_OUTBOX ADD processed NUMBER(1)")),
-          new Migration(
-              4,
-              "Add flush index",
-              "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blacklisted, nextAttemptTime)"),
-          new Migration(
-              5,
-              "Increase size of uniqueRequestId",
-              "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN uniqueRequestId VARCHAR(250)",
-              Map.of(
-                  Dialect.POSTGRESQL_9,
-                  "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)",
-                  Dialect.H2,
-                  "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)",
-                  Dialect.ORACLE,
-                  "ALTER TABLE TXNO_OUTBOX MODIFY uniqueRequestId VARCHAR2(250)")),
-          new Migration(
-              6,
-              "Rename column blacklisted to blocked",
-              "ALTER TABLE TXNO_OUTBOX CHANGE COLUMN blacklisted blocked VARCHAR(250)",
-              Map.of(
-                  Dialect.POSTGRESQL_9,
-                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked",
-                  Dialect.ORACLE,
-                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked",
-                  Dialect.H2,
-                  "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")),
-          new Migration(
-              7,
-              "Add lastAttemptTime column to outbox",
-              "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6) NULL AFTER invocation",
-              Map.of(
-                  Dialect.POSTGRESQL_9,
-                  "ALTER TABLE TXNO_OUTBOX ADD COLUMN lastAttemptTime TIMESTAMP(6)",
-                  Dialect.ORACLE,
-                  "ALTER TABLE TXNO_OUTBOX ADD lastAttemptTime TIMESTAMP(6)")),
-          new Migration(
-              8,
-              "Update length of invocation column on outbox for MySQL dialects only.",
-              "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation MEDIUMTEXT",
-              Map.of(
-                  Dialect.POSTGRESQL_9, "", Dialect.H2, "", Dialect.ORACLE, "SELECT * FROM dual")));
+  private static final Executor basicExecutor =
+      runnable -> {
+        new Thread(runnable).start();
+      };
+
+  private static CountDownLatch waitLatch;
+  private static CountDownLatch readyLatch;
+
+  static void withLatch(CountDownLatch readyLatch, Consumer<CountDownLatch> runnable) {
+    waitLatch = new CountDownLatch(1);
+    DefaultMigrationManager.readyLatch = readyLatch;
+    try {
+      runnable.accept(waitLatch);
+    } finally {
+      waitLatch = null;
+      DefaultMigrationManager.readyLatch = null;
+    }
+  }
 
   static void migrate(TransactionManager transactionManager, Dialect dialect) {
     transactionManager.inTransaction(
         transaction -> {
           try {
             int currentVersion = currentVersion(transaction.connection(), dialect);
-            MIGRATIONS.stream()
-                .filter(migration -> migration.version > currentVersion)
-                .forEach(migration -> runSql(transaction.connection(), migration, dialect));
+            dialect
+                .getMigrations()
+                .filter(migration -> migration.getVersion() > currentVersion)
+                .forEach(
+                    migration ->
+                        uncheck(
+                            () -> runSql(transactionManager, transaction.connection(), migration)));
           } catch (Exception e) {
             throw new RuntimeException("Migrations failed", e);
           }
         });
   }
 
-  @SneakyThrows
-  private static void runSql(Connection connection, Migration migration, Dialect dialect) {
-    log.info("Running migration: {}", migration.name);
-    try (Statement s = connection.createStatement()) {
-      s.execute(migration.sqlFor(dialect));
-      if (s.executeUpdate("UPDATE TXNO_VERSION SET version = " + migration.version) != 1) {
-        s.execute("INSERT INTO TXNO_VERSION VALUES (" + migration.version + ")");
+  static void writeSchema(Writer writer, Dialect dialect) {
+    PrintWriter printWriter = new PrintWriter(writer);
+    dialect
+        .getMigrations()
+        .forEach(
+            migration -> {
+              printWriter.print("-- ");
+              printWriter.print(migration.getVersion());
+              printWriter.print(": ");
+              printWriter.println(migration.getName());
+              if (migration.getSql() == null || migration.getSql().isEmpty()) {
+                printWriter.println("-- Nothing for " + dialect);
+              } else {
+                printWriter.println(migration.getSql());
+              }
+              printWriter.println();
+            });
+    printWriter.flush();
+  }
+
+  private static void runSql(TransactionManager txm, Connection connection, Migration migration)
+      throws SQLException {
+    log.info("Running migration {}: {}", migration.getVersion(), migration.getName());
+
+    if (migration.getSql() != null && !migration.getSql().isEmpty()) {
+      CompletableFuture.runAsync(
+              () -> {
+                try {
+                  txm.inTransactionThrows(
+                      tx -> {
+                        try (var s = tx.connection().prepareStatement(migration.getSql())) {
+                          s.execute();
+                        }
+                      });
+                } catch (SQLException e) {
+                  throw new RuntimeException(e);
+                }
+              },
+              basicExecutor)
+          .join();
+    }
+
+    try (var s = connection.prepareStatement("UPDATE TXNO_VERSION SET version = ?")) {
+      s.setInt(1, migration.getVersion());
+      if (s.executeUpdate() != 1) {
+        throw new IllegalStateException("Version table should already exist");
       }
     }
   }
 
   private static int currentVersion(Connection connection, Dialect dialect) throws SQLException {
-    createVersionTableIfNotExists(connection, dialect);
-    try (Statement s = connection.createStatement();
-        ResultSet rs = s.executeQuery("SELECT version FROM TXNO_VERSION FOR UPDATE")) {
-      if (!rs.next()) {
-        return 0;
+    dialect.createVersionTableIfNotExists(connection);
+    int version = fetchCurrentVersion(connection);
+    if (version >= 0) {
+      return version;
+    }
+    try {
+      log.info("No version record found. Attempting to create");
+      if (waitLatch != null) {
+        log.info("Stopping at latch");
+        readyLatch.countDown();
+        if (!waitLatch.await(10, TimeUnit.SECONDS)) {
+          throw new IllegalStateException("Latch not released in 10 seconds");
+        }
+        log.info("Latch released");
       }
-      return rs.getInt(1);
+      try (var s = connection.prepareStatement("INSERT INTO TXNO_VERSION (version) VALUES (0)")) {
+        s.executeUpdate();
+      }
+      log.info("Created version record.");
+      return fetchCurrentVersion(connection);
+    } catch (Exception e) {
+      log.info(
+          "Error attempting to create ({} - {}). May have been beaten to it, attempting second fetch",
+          e.getClass().getSimpleName(),
+          e.getMessage());
+      version = fetchCurrentVersion(connection);
+      if (version >= 0) {
+        return version;
+      }
+      throw new IllegalStateException("Unable to read or create version record", e);
     }
   }
 
-  private static void createVersionTableIfNotExists(Connection connection, Dialect dialect)
-      throws SQLException {
-    try (Statement s = connection.createStatement()) {
-      switch (dialect) {
-        case ORACLE:
-          try {
-            s.execute("CREATE TABLE TXNO_VERSION (version NUMBER)");
-          } catch (SQLException e) {
-            // oracle code for name already used by an existing object
-            if (!e.getMessage().contains("955")) {
-              throw e;
-            }
-          }
-          break;
-        case MY_SQL_5:
-        case H2:
-        case MY_SQL_8:
-        case POSTGRESQL_9:
-        default:
-          s.execute("CREATE TABLE IF NOT EXISTS TXNO_VERSION (version INT)");
-          break;
+  private static int fetchCurrentVersion(Connection connection) throws SQLException {
+    try (PreparedStatement s =
+            connection.prepareStatement("SELECT version FROM TXNO_VERSION FOR UPDATE");
+        ResultSet rs = s.executeQuery()) {
+      if (rs.next()) {
+        var version = rs.getInt(1);
+        log.info("Current version is {}, obtained lock", version);
+        if (rs.next()) {
+          throw new IllegalStateException("More than one version record");
+        }
+        return version;
       }
-    }
-  }
-
-  @AllArgsConstructor
-  private static final class Migration {
-    private final int version;
-
-    private final String name;
-
-    private final String sql;
-
-    private final Map<Dialect, String> dialectSpecific;
-
-    Migration(int version, String name, String sql) {
-      this(version, name, sql, Collections.emptyMap());
-    }
-
-    String sqlFor(Dialect dialect) {
-      return dialectSpecific.getOrDefault(dialect, sql);
+      return -1;
     }
   }
 }

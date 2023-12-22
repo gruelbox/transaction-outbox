@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.AbstractFullyQualifiedNameInstantiator;
 import java.util.function.Function;
 import lombok.experimental.SuperBuilder;
 
