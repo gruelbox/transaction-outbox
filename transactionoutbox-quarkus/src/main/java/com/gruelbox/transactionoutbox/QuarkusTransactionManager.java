@@ -3,19 +3,19 @@ package com.gruelbox.transactionoutbox;
 import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 
 import com.gruelbox.transactionoutbox.spi.Utils;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Status;
+import jakarta.transaction.Synchronization;
+import jakarta.transaction.TransactionSynchronizationRegistry;
+import jakarta.transaction.Transactional;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
 import javax.sql.DataSource;
-import javax.transaction.Status;
-import javax.transaction.Synchronization;
-import javax.transaction.TransactionSynchronizationRegistry;
-import javax.transaction.Transactional;
 
 /**
  * @deprecated use {@link com.gruelbox.transactionoutbox.quarkus.QuarkusTransactionManager}.
@@ -67,7 +67,7 @@ public class QuarkusTransactionManager implements ThreadLocalContextTransactionM
 
   private final class CdiTransaction implements Transaction {
 
-    public final Connection connection() {
+    public Connection connection() {
       try {
         return datasource.getConnection();
       } catch (SQLException e) {

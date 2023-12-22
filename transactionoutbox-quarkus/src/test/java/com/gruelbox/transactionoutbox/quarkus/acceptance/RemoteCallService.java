@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.quarkus.acceptance;
 
-import javax.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
 public class RemoteCallService {
