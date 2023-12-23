@@ -18,6 +18,7 @@ jobs:
           java-package: jdk
           java-version: 21
           settings-path: "~" # location for the settings.xml file
+          cache: 'maven'
 
       - name: Build and publish
         run: |
