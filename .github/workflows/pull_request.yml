@@ -21,5 +21,6 @@ jobs:
           distribution: 'zulu'
           java-package: jdk
           java-version: ${{ matrix.jdk }}
+          cache: 'maven'
       - name: Build with Maven
         run: mvn -Pconcise -B fmt:check package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
