@@ -20,6 +20,7 @@ jobs:
           java-version: 21
           server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
           settings-path: ${{ github.workspace }} # location for the settings.xml file
+          cache: 'maven'
 
       - name: Build, publish to GPR and tag
         run: |
