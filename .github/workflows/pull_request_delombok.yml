@@ -19,6 +19,7 @@ jobs:
           distribution: 'zulu'
           java-package: jdk
           java-version: 21
+          cache: 'maven'
 
       - name: Build with Maven and delombok
         run: mvn -Pconcise,delombok -B package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
