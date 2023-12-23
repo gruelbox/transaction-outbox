@@ -25,14 +25,14 @@ which is why it is not included in the core library.
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-jackson</artifactId>
-  <version>5.3.370</version>
+  <version>5.4.421</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-jackson:5.3.370'
+implementation 'com.gruelbox:transactionoutbox-jackson:5.4.421'
 ```
 
 ### Development snapshots
