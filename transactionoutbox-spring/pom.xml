@@ -55,6 +55,12 @@
     </dependency>
     <!-- Test -->
     <dependency>
+      <groupId>com.gruelbox</groupId>
+      <artifactId>transactionoutbox-jackson</artifactId>
+      <scope>test</scope>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
     </dependency>
@@ -99,6 +105,12 @@
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-params</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <version>4.2.0</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>
