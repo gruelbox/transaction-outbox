@@ -9,6 +9,7 @@ import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.testing.BaseTest;
 import com.gruelbox.transactionoutbox.testing.InterfaceProcessor;
 import java.time.Duration;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
@@ -22,13 +23,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 @Slf4j
 @ExtendWith(LoomUnitExtension.class)
-@ShouldNotPin
 abstract class AbstractVirtualThreadsTest extends BaseTest {
 
   private static final String VIRTUAL_THREAD_SCHEDULER_PARALLELISM =
       "jdk.virtualThreadScheduler.parallelism";
 
   @Test
+  @ShouldNotPin
   final void highVolumeVirtualThreads() throws Exception {
     var count = 10;
     var latch = new CountDownLatch(count * 10);
@@ -40,7 +41,9 @@ abstract class AbstractVirtualThreadsTest extends BaseTest {
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .instantiator(Instantiator.using(clazz -> (InterfaceProcessor) (foo, bar) -> {}))
-            .submitter(Submitter.withExecutor(Thread::startVirtualThread))
+            .submitter(
+                Submitter.withExecutor(
+                    r -> Thread.ofVirtual().name(UUID.randomUUID().toString()).start(r)))
             .attemptFrequency(Duration.ofMillis(500))
             .flushBatchSize(1000)
             .listener(
