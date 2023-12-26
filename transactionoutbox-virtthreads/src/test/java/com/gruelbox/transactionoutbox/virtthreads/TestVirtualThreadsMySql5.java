@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.virtthreads;
 
-import com.gruelbox.transactionoutbox.Dialect;
+import static com.gruelbox.transactionoutbox.Dialect.MY_SQL_5;
+
 import java.time.Duration;
 import org.junit.jupiter.api.Disabled;
 import org.testcontainers.containers.JdbcDatabaseContainer;
@@ -21,7 +22,7 @@ class TestVirtualThreadsMySql5 extends AbstractVirtualThreadsTest {
   @Override
   protected ConnectionDetails connectionDetails() {
     return ConnectionDetails.builder()
-        .dialect(Dialect.MY_SQL_5)
+        .dialect(MY_SQL_5)
         .driverClassName("com.mysql.cj.jdbc.Driver")
         .url(container.getJdbcUrl())
         .user(container.getUsername())

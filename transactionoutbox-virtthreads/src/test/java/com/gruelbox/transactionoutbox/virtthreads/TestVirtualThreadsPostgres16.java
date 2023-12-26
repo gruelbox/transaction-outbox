@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.virtthreads;
 
-import com.gruelbox.transactionoutbox.Dialect;
+import static com.gruelbox.transactionoutbox.Dialect.POSTGRESQL_9;
+
 import java.time.Duration;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -20,7 +21,7 @@ class TestVirtualThreadsPostgres16 extends AbstractVirtualThreadsTest {
   @Override
   protected ConnectionDetails connectionDetails() {
     return ConnectionDetails.builder()
-        .dialect(Dialect.POSTGRESQL_9)
+        .dialect(POSTGRESQL_9)
         .driverClassName("org.postgresql.Driver")
         .url(container.getJdbcUrl())
         .user(container.getUsername())

@@ -1,5 +1,7 @@
 package com.gruelbox.transactionoutbox.testing;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.jupiter.api.Assertions.*;
@@ -23,7 +25,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.hamcrest.MatcherAssert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -89,15 +90,15 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
           outbox.schedule(InterfaceProcessor.class).process(3, "Whee");
           try {
             // Should not be fired until after commit
-            assertFalse(latch.await(2, TimeUnit.SECONDS));
+            assertFalse(latch.await(2, SECONDS));
           } catch (InterruptedException e) {
             fail("Interrupted");
           }
         });
 
     // Should be fired after commit
-    assertTrue(chainedLatch.await(2, TimeUnit.SECONDS));
-    assertTrue(latch.await(1, TimeUnit.SECONDS));
+    assertTrue(chainedLatch.await(2, SECONDS));
+    assertTrue(latch.await(1, SECONDS));
     assertTrue(gotScheduled.get());
   }
 
@@ -226,7 +227,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                 .schedule(ClassProcessor.class)
                 .process("6"));
 
-    MatcherAssert.assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
+    assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
   }
 
   /**
@@ -254,7 +255,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
 
       transactionManager.inTransaction(() -> outbox.schedule(ClassProcessor.class).process(myId));
 
-      assertTrue(latch.await(2, TimeUnit.SECONDS));
+      assertTrue(latch.await(2, SECONDS));
       assertEquals(List.of(myId), ClassProcessor.PROCESSED);
     }
   }
@@ -346,7 +347,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
       }
       postCommitHooks.forEach(Runnable::run);
 
-      assertTrue(latch.await(2, TimeUnit.SECONDS));
+      assertTrue(latch.await(2, SECONDS));
       assertEquals(List.of(myId), ClassProcessor.PROCESSED);
     }
   }
@@ -377,7 +378,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(latch.await(15, TimeUnit.SECONDS));
+          assertTrue(latch.await(15, SECONDS));
         });
   }
 
@@ -449,12 +450,12 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blockLatch.await(10, TimeUnit.SECONDS));
+          assertTrue(blockLatch.await(10, SECONDS));
           assertTrue(
               (Boolean)
                   transactionManager.inTransactionReturns(
                       tx -> outbox.unblock(orderedEntryListener.getBlocked().getId())));
-          assertTrue(successLatch.await(10, TimeUnit.SECONDS));
+          assertTrue(successLatch.await(10, SECONDS));
           var orderedEntryEvents = orderedEntryListener.getOrderedEntries();
           log.info("The entry life cycle is: {}", orderedEntryEvents);
 
@@ -503,12 +504,12 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blockLatch.await(3, TimeUnit.SECONDS));
+          assertTrue(blockLatch.await(3, SECONDS));
           assertTrue(
               (Boolean)
                   transactionManager.inTransactionReturns(
                       tx -> outbox.unblock(latchListener.getBlocked().getId())));
-          assertTrue(successLatch.await(3, TimeUnit.SECONDS));
+          assertTrue(successLatch.await(3, SECONDS));
         });
   }
 
@@ -556,12 +557,12 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                               outbox.schedule(InterfaceProcessor.class).process(i * 10 + j, "Whee");
                             }
                           }));
-          assertTrue(latch.await(30, TimeUnit.SECONDS), "Latch not opened in time");
+          assertTrue(latch.await(30, SECONDS), "Latch not opened in time");
         });
 
-    MatcherAssert.assertThat(
+    assertThat(
         "Should never get duplicates running to full completion", duplicates.keySet(), empty());
-    MatcherAssert.assertThat(
+    assertThat(
         "Only got: " + results.keySet(),
         results.keySet(),
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
