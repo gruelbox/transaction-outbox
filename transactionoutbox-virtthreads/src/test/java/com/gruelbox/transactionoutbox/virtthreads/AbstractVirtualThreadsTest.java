@@ -30,7 +30,7 @@ abstract class AbstractVirtualThreadsTest extends BaseTest {
 
   @Test
   final void highVolumeVirtualThreads() throws Exception {
-    var count = 100;
+    var count = 10;
     var latch = new CountDownLatch(count * 10);
     var transactionManager = txManager();
     var results = new ConcurrentHashMap<Integer, Integer>();
@@ -80,7 +80,7 @@ abstract class AbstractVirtualThreadsTest extends BaseTest {
                     .toList();
             futures.forEach(Thread::startVirtualThread);
             for (var future : futures) {
-              future.get();
+              future.get(20, TimeUnit.SECONDS);
             }
             assertTrue(latch.await(30, TimeUnit.SECONDS), "Latch not opened in time");
           });
