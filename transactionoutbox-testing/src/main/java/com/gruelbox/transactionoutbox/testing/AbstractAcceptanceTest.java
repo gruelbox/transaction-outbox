@@ -1,11 +1,12 @@
 package com.gruelbox.transactionoutbox.testing;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.gruelbox.transactionoutbox.*;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -22,40 +23,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
-import lombok.Builder;
 import lombok.SneakyThrows;
-import lombok.Value;
-import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
-import org.hamcrest.MatcherAssert;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Slf4j
-public abstract class AbstractAcceptanceTest {
+public abstract class AbstractAcceptanceTest extends BaseTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractAcceptanceTest.class);
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
   private static final Random random = new Random();
-  protected HikariDataSource dataSource;
-
-  @BeforeEach
-  final void baseBeforeEach() {
-    HikariConfig config = new HikariConfig();
-    config.setJdbcUrl(connectionDetails().url());
-    config.setUsername(connectionDetails().user());
-    config.setPassword(connectionDetails().password());
-    config.addDataSourceProperty("cachePrepStmts", "true");
-    dataSource = new HikariDataSource(config);
-  }
-
-  @AfterEach
-  final void baseAfterEach() {
-    dataSource.close();
-  }
 
   /**
    * Uses a simple direct transaction manager and connection manager and attempts to fire an
@@ -107,15 +90,15 @@ public abstract class AbstractAcceptanceTest {
           outbox.schedule(InterfaceProcessor.class).process(3, "Whee");
           try {
             // Should not be fired until after commit
-            assertFalse(latch.await(2, TimeUnit.SECONDS));
+            assertFalse(latch.await(2, SECONDS));
           } catch (InterruptedException e) {
             fail("Interrupted");
           }
         });
 
     // Should be fired after commit
-    assertTrue(chainedLatch.await(2, TimeUnit.SECONDS));
-    assertTrue(latch.await(1, TimeUnit.SECONDS));
+    assertTrue(chainedLatch.await(2, SECONDS));
+    assertTrue(latch.await(1, SECONDS));
     assertTrue(gotScheduled.get());
   }
 
@@ -244,7 +227,7 @@ public abstract class AbstractAcceptanceTest {
                 .schedule(ClassProcessor.class)
                 .process("6"));
 
-    MatcherAssert.assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
+    assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
   }
 
   /**
@@ -272,7 +255,7 @@ public abstract class AbstractAcceptanceTest {
 
       transactionManager.inTransaction(() -> outbox.schedule(ClassProcessor.class).process(myId));
 
-      assertTrue(latch.await(2, TimeUnit.SECONDS));
+      assertTrue(latch.await(2, SECONDS));
       assertEquals(List.of(myId), ClassProcessor.PROCESSED);
     }
   }
@@ -364,7 +347,7 @@ public abstract class AbstractAcceptanceTest {
       }
       postCommitHooks.forEach(Runnable::run);
 
-      assertTrue(latch.await(2, TimeUnit.SECONDS));
+      assertTrue(latch.await(2, SECONDS));
       assertEquals(List.of(myId), ClassProcessor.PROCESSED);
     }
   }
@@ -395,7 +378,7 @@ public abstract class AbstractAcceptanceTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(latch.await(15, TimeUnit.SECONDS));
+          assertTrue(latch.await(15, SECONDS));
         });
   }
 
@@ -467,12 +450,12 @@ public abstract class AbstractAcceptanceTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blockLatch.await(10, TimeUnit.SECONDS));
+          assertTrue(blockLatch.await(10, SECONDS));
           assertTrue(
               (Boolean)
                   transactionManager.inTransactionReturns(
                       tx -> outbox.unblock(orderedEntryListener.getBlocked().getId())));
-          assertTrue(successLatch.await(10, TimeUnit.SECONDS));
+          assertTrue(successLatch.await(10, SECONDS));
           var orderedEntryEvents = orderedEntryListener.getOrderedEntries();
           log.info("The entry life cycle is: {}", orderedEntryEvents);
 
@@ -521,12 +504,12 @@ public abstract class AbstractAcceptanceTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blockLatch.await(3, TimeUnit.SECONDS));
+          assertTrue(blockLatch.await(3, SECONDS));
           assertTrue(
               (Boolean)
                   transactionManager.inTransactionReturns(
                       tx -> outbox.unblock(latchListener.getBlocked().getId())));
-          assertTrue(successLatch.await(3, TimeUnit.SECONDS));
+          assertTrue(successLatch.await(3, SECONDS));
         });
   }
 
@@ -574,77 +557,15 @@ public abstract class AbstractAcceptanceTest {
                               outbox.schedule(InterfaceProcessor.class).process(i * 10 + j, "Whee");
                             }
                           }));
-          assertTrue(latch.await(30, TimeUnit.SECONDS), "Latch not opened in time");
+          assertTrue(latch.await(30, SECONDS), "Latch not opened in time");
         });
 
-    MatcherAssert.assertThat(
+    assertThat(
         "Should never get duplicates running to full completion", duplicates.keySet(), empty());
-    MatcherAssert.assertThat(
+    assertThat(
         "Only got: " + results.keySet(),
         results.keySet(),
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
-  }
-
-  protected ConnectionDetails connectionDetails() {
-    return ConnectionDetails.builder()
-        .dialect(Dialect.H2)
-        .driverClassName("org.h2.Driver")
-        .url(
-            "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=60000;LOB_TIMEOUT=2000;MV_STORE=TRUE;DATABASE_TO_UPPER=FALSE")
-        .user("test")
-        .password("test")
-        .build();
-  }
-
-  protected TransactionManager txManager() {
-    return TransactionManager.fromDataSource(dataSource);
-  }
-
-  protected Persistor persistor() {
-    return Persistor.forDialect(connectionDetails().dialect());
-  }
-
-  protected void clearOutbox() {
-    DefaultPersistor persistor = Persistor.forDialect(connectionDetails().dialect());
-    TransactionManager transactionManager = txManager();
-    transactionManager.inTransaction(
-        tx -> {
-          try {
-            persistor.clear(tx);
-          } catch (SQLException e) {
-            throw new RuntimeException(e);
-          }
-        });
-  }
-
-  protected void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
-      throws Exception {
-    Thread backgroundThread =
-        new Thread(
-            () -> {
-              while (!Thread.interrupted()) {
-                try {
-                  // Keep flushing work until there's nothing left to flush
-                  //noinspection StatementWithEmptyBody
-                  while (outbox.flush()) {}
-                } catch (Exception e) {
-                  log.error("Error flushing transaction outbox. Pausing", e);
-                }
-                try {
-                  //noinspection BusyWait
-                  Thread.sleep(250);
-                } catch (InterruptedException e) {
-                  break;
-                }
-              }
-            });
-    backgroundThread.start();
-    try {
-      runnable.run();
-    } finally {
-      backgroundThread.interrupt();
-      backgroundThread.join();
-    }
   }
 
   private static class FailingInstantiator implements Instantiator {
@@ -698,16 +619,5 @@ public abstract class AbstractAcceptanceTest {
         throw new UnsupportedOperationException();
       }
     }
-  }
-
-  @Value
-  @Accessors(fluent = true)
-  @Builder
-  public static class ConnectionDetails {
-    String driverClassName;
-    String url;
-    String user;
-    String password;
-    Dialect dialect;
   }
 }

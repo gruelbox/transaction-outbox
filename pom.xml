@@ -158,9 +158,9 @@
         <scope>test</scope>
       </dependency>
       <dependency>
-        <groupId>mysql</groupId>
-        <artifactId>mysql-connector-java</artifactId>
-        <version>8.0.33</version>
+        <groupId>com.mysql</groupId>
+        <artifactId>mysql-connector-j</artifactId>
+        <version>8.2.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -284,6 +284,15 @@
       <modules>
         <module>transactionoutbox-jooq</module>
         <module>transactionoutbox-spring</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>java-21-modules</id>
+      <activation>
+        <jdk>[21,)</jdk>
+      </activation>
+      <modules>
+        <module>transactionoutbox-virtthreads</module>
       </modules>
     </profile>
     <profile>
