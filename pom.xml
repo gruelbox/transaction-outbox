@@ -30,7 +30,7 @@
     <logback.version>1.4.14</logback.version>
     <revision>1.3.99999-SNAPSHOT</revision>
     <junit.jupiter.version>5.10.1</junit.jupiter.version>
-    <testcontainers.version>1.19.3</testcontainers.version>
+    <testcontainers.version>1.19.7</testcontainers.version>
     <maven.source.plugin.version>3.3.0</maven.source.plugin.version>
     <nexus.staging.plugin.version>1.6.13</nexus.staging.plugin.version>
     <maven.gpg.plugin.version>3.1.0</maven.gpg.plugin.version>
@@ -160,7 +160,7 @@
       <dependency>
         <groupId>com.mysql</groupId>
         <artifactId>mysql-connector-j</artifactId>
-        <version>8.2.0</version>
+        <version>8.3.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
