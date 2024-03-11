@@ -4,28 +4,17 @@ import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.TransactionManager;
 import com.gruelbox.transactionoutbox.testing.AbstractPersistorTest;
-import java.time.Duration;
-import org.testcontainers.containers.JdbcDatabaseContainer;
-import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
 class TestDefaultPersistorMySql8 extends AbstractPersistorTest {
-
-  @Container
-  @SuppressWarnings({"rawtypes", "resource"})
-  private static final JdbcDatabaseContainer container =
-      new MySQLContainer<>("mysql:8").withStartupTimeout(Duration.ofHours(1));
 
   private final DefaultPersistor persistor =
       DefaultPersistor.builder().dialect(Dialect.MY_SQL_8).build();
   private final TransactionManager txManager =
       TransactionManager.fromConnectionDetails(
           "com.mysql.cj.jdbc.Driver",
-          container.getJdbcUrl(),
-          container.getUsername(),
-          container.getPassword());
+          "jdbc:tc:mysql:8:///test?TC_REUSABLE=true&TC_TMPFS=/var/lib/mysql:rw",
+          "test",
+          "test");
 
   @Override
   protected DefaultPersistor persistor() {
