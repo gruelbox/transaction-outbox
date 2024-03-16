@@ -47,13 +47,12 @@ public class StubPersistor implements Persistor {
   }
 
   @Override
-  public List<String> selectActiveTopics(Transaction tx) throws Exception {
+  public List<String> selectActiveTopics(Transaction tx) {
     return List.of();
   }
 
   @Override
-  public Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic)
-      throws Exception {
+  public Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic) {
     return Optional.empty();
   }
 
