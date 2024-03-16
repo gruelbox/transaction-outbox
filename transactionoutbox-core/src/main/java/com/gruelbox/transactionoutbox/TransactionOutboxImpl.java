@@ -108,7 +108,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public <T> T schedule(Class<T> clazz) {
-    return schedule(clazz, null);
+    return schedule(clazz, null, null);
   }
 
   @Override
@@ -222,7 +222,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private <T> T schedule(Class<T> clazz, String uniqueRequestId) {
+  private <T> T schedule(Class<T> clazz, String uniqueRequestId, String orderPartition) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
@@ -238,7 +238,8 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                           extracted.getMethodName(),
                           extracted.getParameters(),
                           extracted.getArgs(),
-                          uniqueRequestId);
+                          uniqueRequestId,
+                          orderPartition);
                   validator.validate(entry);
                   persistor.save(extracted.getTransaction(), entry);
                   extracted
@@ -313,7 +314,12 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   }
 
   private TransactionOutboxEntry newEntry(
-      Class<?> clazz, String methodName, Class<?>[] params, Object[] args, String uniqueRequestId) {
+      Class<?> clazz,
+      String methodName,
+      Class<?>[] params,
+      Object[] args,
+      String uniqueRequestId,
+      String partition) {
     return TransactionOutboxEntry.builder()
         .id(UUID.randomUUID().toString())
         .invocation(
@@ -326,6 +332,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
         .lastAttemptTime(null)
         .nextAttemptTime(after(attemptFrequency))
         .uniqueRequestId(uniqueRequestId)
+        .partition(partition)
         .build();
   }
 
@@ -410,6 +417,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private class ParameterizedScheduleBuilderImpl implements ParameterizedScheduleBuilder {
 
     private String uniqueRequestId;
+    private String orderPartition;
 
     @Override
     public ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId) {
@@ -418,11 +426,17 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
 
     @Override
+    public ParameterizedScheduleBuilder ordered(String partition) {
+      this.orderPartition = partition;
+      return this;
+    }
+
+    @Override
     public <T> T schedule(Class<T> clazz) {
       if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
         throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
       }
-      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId);
+      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, orderPartition);
     }
   }
 }

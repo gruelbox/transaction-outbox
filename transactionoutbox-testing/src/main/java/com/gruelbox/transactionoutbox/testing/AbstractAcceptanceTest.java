@@ -40,6 +40,33 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
 
   private static final Random random = new Random();
 
+  @Test
+  final void sequencing() {
+    TransactionManager transactionManager = txManager();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(
+                Instantiator.using(
+                    clazz ->
+                        (InterfaceProcessor)
+                            (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
+            .persistor(persistor())
+            .initializeImmediately(false)
+            .build();
+
+    outbox.initialize();
+    clearOutbox();
+
+    transactionManager.inTransaction(
+        () ->
+            outbox
+                .with()
+                .ordered("my-partition")
+                .schedule(InterfaceProcessor.class)
+                .process(3, "Whee"));
+  }
+
   /**
    * Uses a simple direct transaction manager and connection manager and attempts to fire an
    * interface using a custom instantiator.

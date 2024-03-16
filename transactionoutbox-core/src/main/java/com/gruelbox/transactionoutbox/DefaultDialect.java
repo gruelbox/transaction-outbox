@@ -120,6 +120,29 @@ class DefaultDialect implements Dialect {
               8,
               "Update length of invocation column on outbox for MySQL dialects only.",
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation MEDIUMTEXT"));
+      migrations.put(
+          9,
+          new Migration(
+              9,
+              "Add partition",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN partition VARCHAR(255) NULL"));
+      migrations.put(
+          10,
+          new Migration(10, "Add sequence", "ALTER TABLE TXNO_OUTBOX ADD COLUMN seq BIGINT NULL"));
+      migrations.put(
+          11,
+          new Migration(
+              10,
+              "Add sequence table",
+              "CREATE TABLE TXNO_SEQUENCE (partition VARCHAR(255) NOT NULL, seq BIGINT NOT NULL, PRIMARY KEY (partition, seq))"));
+      migrations.put(
+          12, new Migration(12, "Drop index", "DROP INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX"));
+      migrations.put(
+          13,
+          new Migration(
+              13,
+              "Modify flush index to support ordering",
+              "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blocked, nextAttemptTime, partition, seq)"));
     }
 
     Builder setMigration(Migration migration) {

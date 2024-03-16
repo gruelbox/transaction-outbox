@@ -312,6 +312,8 @@ public interface TransactionOutbox {
      */
     ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId);
 
+    ParameterizedScheduleBuilder ordered(String partition);
+
     /**
      * Equivalent to {@link TransactionOutbox#schedule(Class)}, but applying additional parameters
      * to the request as configured using {@link TransactionOutbox#with()}.

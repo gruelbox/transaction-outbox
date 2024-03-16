@@ -15,6 +15,8 @@ import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 import javax.sql.DataSource;
 
 /**
@@ -67,6 +69,8 @@ public class QuarkusTransactionManager implements ThreadLocalContextTransactionM
 
   private final class CdiTransaction implements Transaction {
 
+    private final Map<String, PreparedStatement> preparedStatements = new HashMap<>();
+
     public Connection connection() {
       try {
         return datasource.getConnection();
@@ -77,26 +81,34 @@ public class QuarkusTransactionManager implements ThreadLocalContextTransactionM
 
     @Override
     public PreparedStatement prepareBatchStatement(String sql) {
-      BatchCountingStatement preparedStatement =
-          Utils.uncheckedly(
-              () -> BatchCountingStatementHandler.countBatches(connection().prepareStatement(sql)));
+      return preparedStatements.computeIfAbsent(
+          sql,
+          s ->
+              Utils.uncheckedly(
+                  () -> {
+                    BatchCountingStatement preparedStatement =
+                        Utils.uncheckedly(
+                            () ->
+                                BatchCountingStatementHandler.countBatches(
+                                    connection().prepareStatement(sql)));
 
-      tsr.registerInterposedSynchronization(
-          new Synchronization() {
-            @Override
-            public void beforeCompletion() {
-              if (preparedStatement.getBatchCount() != 0) {
-                Utils.uncheck(preparedStatement::executeBatch);
-              }
-            }
+                    tsr.registerInterposedSynchronization(
+                        new Synchronization() {
+                          @Override
+                          public void beforeCompletion() {
+                            if (preparedStatement.getBatchCount() != 0) {
+                              Utils.uncheck(preparedStatement::executeBatch);
+                            }
+                          }
 
-            @Override
-            public void afterCompletion(int status) {
-              Utils.safelyClose(preparedStatement);
-            }
-          });
+                          @Override
+                          public void afterCompletion(int status) {
+                            Utils.safelyClose(preparedStatement);
+                          }
+                        });
 
-      return preparedStatement;
+                    return preparedStatement;
+                  }));
     }
 
     @Override

@@ -4,11 +4,7 @@ import static java.util.stream.Collectors.joining;
 
 import java.time.Instant;
 import java.util.Arrays;
-import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 /**
@@ -35,6 +31,21 @@ public class TransactionOutboxEntry implements Validatable {
   @SuppressWarnings("JavaDoc")
   @Getter
   private final String uniqueRequestId;
+
+  /**
+   * @param partition An optional scope for ordered sequencing.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  private final String partition;
+
+  /**
+   * @param sequence The ordered sequence within the {@code partition}.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  @Setter
+  private Long sequence;
 
   /**
    * @param invocation The method invocation to perform.
