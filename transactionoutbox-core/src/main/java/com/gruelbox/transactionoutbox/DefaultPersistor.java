@@ -13,7 +13,6 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
-
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -119,8 +118,7 @@ public class DefaultPersistor implements Persistor, Validatable {
     serializer.serializeInvocation(entry.getInvocation(), writer);
     if (entry.getTopic() != null) {
       setNextSequence(tx, entry);
-      log.info(
-          "Assigned sequence number {} to topic {}", entry.getSequence(), entry.getTopic());
+      log.info("Assigned sequence number {} to topic {}", entry.getSequence(), entry.getTopic());
     }
     PreparedStatement stmt = tx.prepareBatchStatement(insertSql);
     setupInsert(entry, writer, stmt);
@@ -325,56 +323,45 @@ public class DefaultPersistor implements Persistor, Validatable {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
       var result = new ArrayList<TransactionOutboxEntry>(batchSize);
-      gatherResults(batchSize, stmt, result);
+      gatherResults(stmt, result);
       return result;
     }
   }
 
   @Override
-  public Set<TransactionOutboxEntry> selectBatchOrdered(final Transaction tx, final int batchSize, final Instant now) throws Exception {
+  public List<String> selectActiveTopics(Transaction tx) throws Exception {
+    var sql = "SELECT DISTINCT topic FROM %s WHERE topic <> '' AND processed = %s";
+    String falseStr = dialect.booleanValue(false);
+    //noinspection resource
     try (PreparedStatement stmt =
-             tx.connection()
-                 .prepareStatement(
-                     dialect.isSupportsWindowFunctions()
-                         ? batchOrderedSqlWindowFunctions()
-                         : batchOrderedSqlNonWindowFunctions())) {
-      stmt.setTimestamp(1, Timestamp.from(now));
-      stmt.setInt(2, batchSize);
-      var result = new HashSet<TransactionOutboxEntry>();
-      gatherResults(batchSize, stmt, result);
+        tx.connection().prepareStatement(String.format(sql, tableName, falseStr, falseStr))) {
+      var result = new ArrayList<String>();
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          result.add(rs.getString(1));
+        }
+      }
       return result;
     }
   }
 
-  private String batchOrderedSqlWindowFunctions() {
-    var subquery = String.format(
-        "SELECT ROW_NUMBER() OVER (PARTITION BY topic ORDER BY seq) AS rn, %s FROM %s WHERE topic <> '' AND processed = %s",
-        ALL_FIELDS,
-        tableName,
-        dialect.booleanValue(false));
-    return String.format(
-        "SELECT %s FROM (%s) t WHERE rn = 1 AND nextAttemptTime < ? AND topic <> '' and processed = %s %s",
-        ALL_FIELDS,
-        subquery,
-        dialect.booleanValue(false)
-        dialect.getLimitCriteria());
+  @Override
+  public Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic)
+      throws Exception {
+    PreparedStatement stmt =
+        tx.prepareBatchStatement(
+            String.format(
+                "SELECT %s FROM %s "
+                    + "WHERE topic = ? "
+                    + "AND processed = %s "
+                    + "ORDER BY seq ASC %s",
+                ALL_FIELDS, tableName, dialect.booleanValue(false), dialect.getLimitCriteria()));
+    stmt.setString(1, topic);
+    stmt.setInt(2, 1);
+    var results = new ArrayList<TransactionOutboxEntry>(1);
+    gatherResults(stmt, results);
+    return results.stream().findFirst();
   }
-
-  private String batchOrderedSqlNonWindowFunctions() {
-    var subquery = String.format(
-        "SELECT %s FROM (SELECT topic, MIN(seq) AS min_seq FROM %s WHERE topic <> '' AND processed = %s",
-        ALL_FIELDS,
-        tableName,
-        dialect.booleanValue(false));
-    return String.format(
-        "SELECT %s FROM %s m JOIN (%s) t ON m.topic = t.topic AND m.seq = t.min_seq WHERE nextAttemptTime < ? AND topic <> '' and processed = %s %s",
-        ALL_FIELDS,
-        tableName,
-        subquery,
-        dialect.booleanValue(false),
-        dialect.getLimitCriteria());
-  }
-
 
   @Override
   public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now)
@@ -389,7 +376,7 @@ public class DefaultPersistor implements Persistor, Validatable {
     }
   }
 
-  private void gatherResults(int batchSize, PreparedStatement stmt, Collection<TransactionOutboxEntry> output)
+  private void gatherResults(PreparedStatement stmt, Collection<TransactionOutboxEntry> output)
       throws SQLException, IOException {
     try (ResultSet rs = stmt.executeQuery()) {
       while (rs.next()) {

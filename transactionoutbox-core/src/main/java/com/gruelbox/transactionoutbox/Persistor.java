@@ -2,7 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 
 /**
  * Saves and loads {@link TransactionOutboxEntry}s. For most use cases, just use {@link
@@ -106,7 +106,9 @@ public interface Persistor {
   List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
       throws Exception;
 
-  Set<TransactionOutboxEntry> selectBatchOrdered(final Transaction tx, final int batchSize, final Instant now) throws Exception;
+  List<String> selectActiveTopics(final Transaction tx) throws Exception;
+
+  Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic) throws Exception;
 
   /**
    * Deletes records which have processed and passed their expiry time, in specified batch sizes.

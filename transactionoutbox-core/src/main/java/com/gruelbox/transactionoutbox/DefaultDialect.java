@@ -23,7 +23,6 @@ class DefaultDialect implements Dialect {
 
   @Getter private final String name;
   @Getter private final boolean supportsSkipLock;
-  @Getter private final boolean supportsWindowFunctions;
   @Getter private final String deleteExpired;
   @Getter private final String limitCriteria;
   @Getter private final String checkSql;
@@ -57,7 +56,6 @@ class DefaultDialect implements Dialect {
   static final class Builder {
     private final String name;
     private boolean supportsSkipLock = false;
-    private boolean supportsWindowFunctions = false;
     private String deleteExpired =
         "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?";
     private String limitCriteria = " LIMIT ?";
@@ -125,9 +123,7 @@ class DefaultDialect implements Dialect {
       migrations.put(
           9,
           new Migration(
-              9,
-              "Add topic",
-              "ALTER TABLE TXNO_OUTBOX ADD COLUMN topic VARCHAR(250) NULL"));
+              9, "Add topic", "ALTER TABLE TXNO_OUTBOX ADD COLUMN topic VARCHAR(250) NULL"));
       migrations.put(
           10,
           new Migration(10, "Add sequence", "ALTER TABLE TXNO_OUTBOX ADD COLUMN seq BIGINT NULL"));
@@ -138,13 +134,11 @@ class DefaultDialect implements Dialect {
               "Add sequence table",
               "CREATE TABLE TXNO_SEQUENCE (topic VARCHAR(250) NOT NULL, seq BIGINT NOT NULL, PRIMARY KEY (topic, seq))"));
       migrations.put(
-          12, new Migration(12, "Drop index", "DROP INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX"));
-      migrations.put(
-          13,
+          12,
           new Migration(
-              13,
-              "Modify flush index to support ordering",
-              "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blocked, nextAttemptTime, topic, seq)"));
+              12,
+              "Add flush index to support ordering",
+              "CREATE INDEX IX_TXNO_OUTBOX_2 ON TXNO_OUTBOX (topic, processed, seq)"));
     }
 
     Builder setMigration(Migration migration) {
@@ -162,7 +156,12 @@ class DefaultDialect implements Dialect {
 
     Dialect build() {
       return new DefaultDialect(
-          name, supportsSkipLock, supportsWindowFunctions, deleteExpired, limitCriteria, checkSql, migrations.values()) {
+          name,
+          supportsSkipLock,
+          deleteExpired,
+          limitCriteria,
+          checkSql,
+          migrations.values()) {
         @Override
         public String booleanValue(boolean criteriaValue) {
           if (booleanValueFrom != null) {

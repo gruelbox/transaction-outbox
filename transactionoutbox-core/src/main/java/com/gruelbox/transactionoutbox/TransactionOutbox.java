@@ -92,6 +92,7 @@ public interface TransactionOutbox {
 
   /**
    * TODO
+   *
    * @param executor
    * @return
    */
@@ -323,40 +324,40 @@ public interface TransactionOutbox {
      * Specifies that the request should be applied in a strictly-ordered fashion within the
      * specified topic.
      *
-     * <p>This is useful for a number of applications, such as feeding messages into
-     * an ordered pipeline such as a FIFO queue or Kafka topic, or for reliable data replication,
-     * such as when feeding a data warehouse or distributed cache.</p>
+     * <p>This is useful for a number of applications, such as feeding messages into an ordered
+     * pipeline such as a FIFO queue or Kafka topic, or for reliable data replication, such as when
+     * feeding a data warehouse or distributed cache.
      *
-     * <p>Note that using this option has a number of consequences:</p>
+     * <p>Note that using this option has a number of consequences:
      *
      * <ul>
-     *   <li>Requests are not processed immediately when submitting a request, as normal, and
-     *   are not processed by {@link TransactionOutbox#flush()} either. Requests are processed
-     *   up only when calling {@link TransactionOutbox#flushOrdered(Executor)}. As a result
-     *   there will be increased delay between the source transaction being committed and the request
-     *   being processed.</li>
-     *   <li>If a request fails, no further requests will be processed <em>in that topic</em> until a
-     *   subsequent retry allows the failing request to succeed, to preserve ordered processing.
-     *   This means it is possible for topics to become entirely frozen in the event that a
-     *   request fails repeatedly. For this reason, it is essential to use a
-     *   {@link TransactionOutboxListener} to watch for failing requests and investigate
-     *   quickly. Note that other topics will be unaffected.</li>
-     *   <lI>For the same reason, {@link TransactionOutboxBuilder#blockAfterAttempts} is
-     *   ignored for all requests that use this option. The only safe way to recover from
-     *   a failing request is to make the request succeed.</li>
+     *   <li>Requests are not processed immediately when submitting a request, as normal, and are
+     *       not processed by {@link TransactionOutbox#flush()} either. Requests are processed up
+     *       only when calling {@link TransactionOutbox#flushOrdered(Executor)}. As a result there
+     *       will be increased delay between the source transaction being committed and the request
+     *       being processed.
+     *   <li>If a request fails, no further requests will be processed <em>in that topic</em> until
+     *       a subsequent retry allows the failing request to succeed, to preserve ordered
+     *       processing. This means it is possible for topics to become entirely frozen in the event
+     *       that a request fails repeatedly. For this reason, it is essential to use a {@link
+     *       TransactionOutboxListener} to watch for failing requests and investigate quickly. Note
+     *       that other topics will be unaffected.
+     *   <lI>For the same reason, {@link TransactionOutboxBuilder#blockAfterAttempts} is ignored for
+     *       all requests that use this option. The only safe way to recover from a failing request
+     *       is to make the request succeed.
      *   <li>A single topic can only be processed in single-threaded fashion, so if your requests
-     *   use a small number of topics, scalability will be affected since the degree of
-     *   parallelism will be reduced.</li>
+     *       use a small number of topics, scalability will be affected since the degree of
+     *       parallelism will be reduced.
      *   <li>Throughput is significantly reduced and database load increased more generally, even
-     *   with larger numbers of topics, since records are only processed one-at-a-time rather
-     *   than in batches, which is less optimised.</li>
-     *   <li>In general,
-     *   <a href="https://shermanonsoftware.com/2019/09/04/your-database-is-not-a-queue/">
-     *     databases are not well optimised for this sort of thing</a>. Don't expect miracles. If
-     *     you need more throughput, you probably need to think twice about your architecture.
-     *     Consider the <a href="https://martinfowler.com/eaaDev/EventSourcing.html">event
-     *     sourcing pattern</a>, for example, where the message queue is the primary data
-     *     store rather than a secondary, and remove the need for an outbox entirely.</li>
+     *       with larger numbers of topics, since records are only processed one-at-a-time rather
+     *       than in batches, which is less optimised.
+     *   <li>In general, <a
+     *       href="https://shermanonsoftware.com/2019/09/04/your-database-is-not-a-queue/">databases
+     *       are not well optimised for this sort of thing</a>. Don't expect miracles. If you need
+     *       more throughput, you probably need to think twice about your architecture. Consider the
+     *       <a href="https://martinfowler.com/eaaDev/EventSourcing.html">event sourcing
+     *       pattern</a>, for example, where the message queue is the primary data store rather than
+     *       a secondary, and remove the need for an outbox entirely.
      * </ul>
      *
      * @param topic a free-text string up to 250 characters.

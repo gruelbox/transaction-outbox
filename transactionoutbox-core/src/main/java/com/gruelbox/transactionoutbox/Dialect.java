@@ -16,12 +16,6 @@ public interface Dialect {
   boolean isSupportsSkipLock();
 
   /**
-   * @return True if window functions are supported. This improves performance when using ordered
-   * processing.
-   */
-  boolean isSupportsWindowFunctions();
-
-  /**
    * @return Format string for the SQL required to delete expired retained records.
    */
   String getDeleteExpired();
@@ -37,7 +31,11 @@ public interface Dialect {
   Stream<Migration> getMigrations();
 
   Dialect MY_SQL_5 = DefaultDialect.builder("MY_SQL_5").build();
-  Dialect MY_SQL_8 = DefaultDialect.builder("MY_SQL_8").supportsSkipLock(true).supportsWindowFunctions(true).build();
+  Dialect MY_SQL_8 =
+      DefaultDialect.builder("MY_SQL_8")
+          .supportsSkipLock(true)
+          .supportsWindowFunctions(true)
+          .build();
   Dialect POSTGRESQL_9 =
       DefaultDialect.builder("POSTGRESQL_9")
           .supportsSkipLock(true)

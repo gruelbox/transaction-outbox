@@ -8,9 +8,7 @@ import static java.time.temporal.ChronoUnit.MINUTES;
 import com.gruelbox.transactionoutbox.spi.ProxyFactory;
 import com.gruelbox.transactionoutbox.spi.Utils;
 import java.lang.reflect.InvocationTargetException;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
+import java.time.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -155,32 +153,35 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public boolean flushOrdered(Executor executor) {
+    log.debug("Processing topics");
     return transactionManager.inTransactionReturns(
         tx -> {
-          Set<String> failingTopics = new HashSet<>();
-          Set<TransactionOutboxEntry> lastSetOfResults = new HashSet<>();
-          int count = 0;
-          do {
-            var nextSetOfResults = uncheckedly(() -> persistor.selectBatchOrdered(tx, flushBatchSize, clockProvider.get().instant()));
-            var batch = new ArrayList<CompletableFuture<?>>();
-            for (var request : nextSetOfResults) {
-              if (failingTopics.contains(request.getTopic())) {
+          var now = clockProvider.get().instant();
+          var topics = uncheckedly(() -> persistor.selectActiveTopics(tx));
+          var futures = new ArrayList<CompletableFuture<?>>();
+          if (!topics.isEmpty()) {
+            log.info("Active topics: {}", topics);
+            for (String topic : topics) {
+              var request = uncheckedly(() -> persistor.nextInTopic(tx, topic));
+              if (request.isEmpty()) {
+                log.info(" > [{}] is already processed", topic);
                 continue;
               }
-              if (lastSetOfResults.contains(request)) {
-                failingTopics.add(request.getTopic());
-              } else {
-                count++;
-                batch.add(CompletableFuture.runAsync(() -> processNow(request), executor));
+              if (!request.get().getNextAttemptTime().isBefore(now)) {
+                log.info(
+                    " > [{}] seq {} is not ready for retry. Next attempt after {}",
+                    topic,
+                    request.get().getSequence(),
+                    ZonedDateTime.ofInstant(request.get().getNextAttemptTime(), ZoneId.of("UTC")));
+                continue;
               }
+              var future = CompletableFuture.runAsync(() -> processNow(request.get()), executor);
+              futures.add(future);
             }
-            lastSetOfResults = nextSetOfResults;
-            if (batch.isEmpty()) {
-              break;
-            }
-            CompletableFuture.allOf(batch.toArray(new CompletableFuture[0])).join();
-          } while (count < flushBatchSize);
-          return count > 0;
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            return !futures.isEmpty();
+          }
+          return false;
         });
   }
 
@@ -363,7 +364,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                 args,
                 serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null))
         .lastAttemptTime(null)
-        .nextAttemptTime(after(attemptFrequency))
+        .nextAttemptTime(clockProvider.get().instant())
         .uniqueRequestId(uniqueRequestId)
         .topic(topic)
         .build();

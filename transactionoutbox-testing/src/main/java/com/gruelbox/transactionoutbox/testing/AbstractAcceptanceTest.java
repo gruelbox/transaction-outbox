@@ -41,7 +41,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
   private static final Random random = new Random();
 
   @Test
-  final void sequencing() {
+  final void sequencing() throws Exception {
     TransactionManager transactionManager = txManager();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -58,13 +58,19 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     outbox.initialize();
     clearOutbox();
 
-    transactionManager.inTransaction(
-        () ->
-            outbox
-                .with()
-                .ordered("my-topic")
-                .schedule(InterfaceProcessor.class)
-                .process(3, "Whee"));
+    withRunningFlusher(
+        outbox,
+        () -> {
+          transactionManager.inTransaction(
+              () ->
+                  outbox
+                      .with()
+                      .ordered("my-topic")
+                      .schedule(InterfaceProcessor.class)
+                      .process(3, "Whee"));
+
+          Thread.sleep(1000);
+        });
   }
 
   /**

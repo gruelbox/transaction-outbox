@@ -163,7 +163,6 @@ public class TransactionOutboxEntry implements Validatable {
     validator.nullOrNotBlank("uniqueRequestId", uniqueRequestId);
     validator.nullOrNotBlank("topic", topic);
     validator.notNull("invocation", invocation);
-    validator.inFuture("nextAttemptTime", nextAttemptTime);
     validator.positiveOrZero("attempts", attempts);
     validator.positiveOrZero("version", version);
   }

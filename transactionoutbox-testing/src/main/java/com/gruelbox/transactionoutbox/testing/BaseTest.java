@@ -4,6 +4,7 @@ import com.gruelbox.transactionoutbox.*;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
+import java.util.concurrent.ForkJoinPool;
 import lombok.Builder;
 import lombok.Value;
 import lombok.experimental.Accessors;
@@ -73,8 +74,10 @@ public abstract class BaseTest {
                   // Keep flushing work until there's nothing left to flush
                   //noinspection StatementWithEmptyBody
                   while (outbox.flush()) {}
+                  //noinspection StatementWithEmptyBody
+                  while (outbox.flushOrdered(ForkJoinPool.commonPool())) {}
                 } catch (Exception e) {
-                  log.error("Error flushing transaction outbox. Pausing", e);
+                  log.error("Error flushing transaction outbox", e);
                 }
                 try {
                   //noinspection BusyWait
