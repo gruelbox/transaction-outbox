@@ -62,7 +62,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         () ->
             outbox
                 .with()
-                .ordered("my-partition")
+                .ordered("my-topic")
                 .schedule(InterfaceProcessor.class)
                 .process(3, "Whee"));
   }

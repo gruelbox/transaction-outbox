@@ -16,6 +16,12 @@ public interface Dialect {
   boolean isSupportsSkipLock();
 
   /**
+   * @return True if window functions are supported. This improves performance when using ordered
+   * processing.
+   */
+  boolean isSupportsWindowFunctions();
+
+  /**
    * @return Format string for the SQL required to delete expired retained records.
    */
   String getDeleteExpired();
@@ -31,10 +37,11 @@ public interface Dialect {
   Stream<Migration> getMigrations();
 
   Dialect MY_SQL_5 = DefaultDialect.builder("MY_SQL_5").build();
-  Dialect MY_SQL_8 = DefaultDialect.builder("MY_SQL_8").supportsSkipLock(true).build();
+  Dialect MY_SQL_8 = DefaultDialect.builder("MY_SQL_8").supportsSkipLock(true).supportsWindowFunctions(true).build();
   Dialect POSTGRESQL_9 =
       DefaultDialect.builder("POSTGRESQL_9")
           .supportsSkipLock(true)
+          .supportsWindowFunctions(true)
           .deleteExpired(
               "DELETE FROM {{table}} WHERE id IN (SELECT id FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?)")
           .changeMigration(
@@ -46,12 +53,14 @@ public interface Dialect {
 
   Dialect H2 =
       DefaultDialect.builder("H2")
+          .supportsWindowFunctions(true)
           .changeMigration(5, "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")
           .changeMigration(6, "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")
           .disableMigration(8)
           .build();
   Dialect ORACLE =
       DefaultDialect.builder("ORACLE")
+          .supportsWindowFunctions(true)
           .supportsSkipLock(true)
           .deleteExpired(
               "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0 AND ROWNUM <= ?")

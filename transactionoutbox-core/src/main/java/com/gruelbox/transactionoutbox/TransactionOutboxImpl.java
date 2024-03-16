@@ -11,9 +11,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import lombok.ToString;
@@ -153,6 +153,37 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     return batch;
   }
 
+  @Override
+  public boolean flushOrdered(Executor executor) {
+    return transactionManager.inTransactionReturns(
+        tx -> {
+          Set<String> failingTopics = new HashSet<>();
+          Set<TransactionOutboxEntry> lastSetOfResults = new HashSet<>();
+          int count = 0;
+          do {
+            var nextSetOfResults = uncheckedly(() -> persistor.selectBatchOrdered(tx, flushBatchSize, clockProvider.get().instant()));
+            var batch = new ArrayList<CompletableFuture<?>>();
+            for (var request : nextSetOfResults) {
+              if (failingTopics.contains(request.getTopic())) {
+                continue;
+              }
+              if (lastSetOfResults.contains(request)) {
+                failingTopics.add(request.getTopic());
+              } else {
+                count++;
+                batch.add(CompletableFuture.runAsync(() -> processNow(request), executor));
+              }
+            }
+            lastSetOfResults = nextSetOfResults;
+            if (batch.isEmpty()) {
+              break;
+            }
+            CompletableFuture.allOf(batch.toArray(new CompletableFuture[0])).join();
+          } while (count < flushBatchSize);
+          return count > 0;
+        });
+  }
+
   private void expireIdempotencyProtection(Instant now) {
     long totalRecordsDeleted = 0;
     int recordsDeleted;
@@ -222,7 +253,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private <T> T schedule(Class<T> clazz, String uniqueRequestId, String orderPartition) {
+  private <T> T schedule(Class<T> clazz, String uniqueRequestId, String topic) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
@@ -239,7 +270,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                           extracted.getParameters(),
                           extracted.getArgs(),
                           uniqueRequestId,
-                          orderPartition);
+                          topic);
                   validator.validate(entry);
                   persistor.save(extracted.getTransaction(), entry);
                   extracted
@@ -247,7 +278,9 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                       .addPostCommitHook(
                           () -> {
                             listener.scheduled(entry);
-                            submitNow(entry);
+                            if (entry.getTopic() == null) {
+                              submitNow(entry);
+                            }
                           });
                   log.debug(
                       "Scheduled {} for running after transaction commit", entry.description());
@@ -319,7 +352,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       Class<?>[] params,
       Object[] args,
       String uniqueRequestId,
-      String partition) {
+      String topic) {
     return TransactionOutboxEntry.builder()
         .id(UUID.randomUUID().toString())
         .invocation(
@@ -332,7 +365,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
         .lastAttemptTime(null)
         .nextAttemptTime(after(attemptFrequency))
         .uniqueRequestId(uniqueRequestId)
-        .partition(partition)
+        .topic(topic)
         .build();
   }
 
@@ -417,7 +450,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private class ParameterizedScheduleBuilderImpl implements ParameterizedScheduleBuilder {
 
     private String uniqueRequestId;
-    private String orderPartition;
+    private String topic;
 
     @Override
     public ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId) {
@@ -426,8 +459,8 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
 
     @Override
-    public ParameterizedScheduleBuilder ordered(String partition) {
-      this.orderPartition = partition;
+    public ParameterizedScheduleBuilder ordered(String topic) {
+      this.topic = topic;
       return this;
     }
 
@@ -436,7 +469,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
         throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
       }
-      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, orderPartition);
+      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, topic);
     }
   }
 }
