@@ -6,6 +6,7 @@ import java.sql.Statement;
 import java.util.Collection;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import lombok.AccessLevel;
@@ -42,6 +43,17 @@ class DefaultDialect implements Dialect {
   }
 
   @Override
+  public String fetchAndLockNextInTopic(String fields, String table) {
+    return String.format(
+        "SELECT %s FROM %s"
+            + " WHERE topic =  "
+            + " AND processed = %s"
+            + " ORDER BY seq ASC"
+            + " %s FOR UPDATE",
+        fields, table, booleanValue(false), limitCriteria.replace("?", "1"));
+  }
+
+  @Override
   public String toString() {
     return name;
   }
@@ -63,6 +75,7 @@ class DefaultDialect implements Dialect {
     private Map<Integer, Migration> migrations;
     private Function<Boolean, String> booleanValueFrom;
     private SQLAction createVersionTableBy;
+    private BiFunction<String, String, String> fetchAndLockNextInTopic;
 
     Builder(String name) {
       this.name = name;
@@ -174,6 +187,14 @@ class DefaultDialect implements Dialect {
           } else {
             super.createVersionTableIfNotExists(connection);
           }
+        }
+
+        @Override
+        public String fetchAndLockNextInTopic(String fields, String table) {
+          if (fetchAndLockNextInTopic != null) {
+            return fetchAndLockNextInTopic.apply(fields, table);
+          }
+          return super.fetchAndLockNextInTopic(fields, table);
         }
       };
     }

@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
@@ -159,34 +160,15 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
           if (!topics.isEmpty()) {
             log.info("Active topics: {}", topics);
             for (String topic : topics) {
-              var future = flushTopic(executor, tx, topic, now);
-              if (future != null) {
-                futures.add(future.thenApply(it -> true));
-              }
+              futures.add(
+                  CompletableFuture.runAsync(() -> processNextInTopic(topic), executor)
+                      .thenApply(it -> true));
             }
           }
         });
 
     var allResults = futures.stream().reduce((f1, f2) -> f1.thenCombine(f2, (d1, d2) -> d1 || d2));
     return allResults.map(CompletableFuture::join).orElse(false);
-  }
-
-  private CompletableFuture<Void> flushTopic(
-      Executor executor, Transaction tx, String topic, Instant now) {
-    var request = uncheckedly(() -> persistor.nextInTopic(tx, topic));
-    if (request.isEmpty()) {
-      log.info(" > [{}] is already processed", topic);
-      return null;
-    }
-    if (!request.get().getNextAttemptTime().isBefore(now)) {
-      log.info(
-          " > [{}] seq {} is not ready for retry. Next attempt after {}",
-          topic,
-          request.get().getSequence(),
-          ZonedDateTime.ofInstant(request.get().getNextAttemptTime(), ZoneId.of("UTC")));
-      return null;
-    }
-    return CompletableFuture.runAsync(() -> processNow(request.get()), executor);
   }
 
   private void expireIdempotencyProtection(Instant now) {
@@ -300,45 +282,89 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   @Override
   @SuppressWarnings("WeakerAccess")
   public void processNow(TransactionOutboxEntry entry) {
+    initialize();
+    Boolean success = null;
+    try {
+      success =
+          transactionManager.inTransactionReturnsThrows(
+              tx -> {
+                if (!persistor.lock(tx, entry)) {
+                  return false;
+                }
+                processWithExistingLock(tx, entry);
+                return true;
+              });
+    } catch (InvocationTargetException e) {
+      updateAttemptCount(entry, e.getCause());
+    } catch (Exception e) {
+      updateAttemptCount(entry, e);
+    }
+    if (success != null) {
+      if (success) {
+        log.info("Processed {}", entry.description());
+        listener.success(entry);
+      } else {
+        log.debug("Skipped task {} - may be locked or already processed", entry.getId());
+      }
+    }
+  }
+
+  private void processNextInTopic(String topic) {
+    var attempted = new AtomicReference<TransactionOutboxEntry>();
+    var success = false;
+    try {
+      success =
+          transactionManager.inTransactionReturnsThrows(
+              tx -> {
+                var next =
+                    persistor
+                        .nextInTopic(tx, topic)
+                        .filter(
+                            it -> it.getNextAttemptTime().isBefore(clockProvider.get().instant()));
+                if (next.isPresent()) {
+                  attempted.set(next.get());
+                  processWithExistingLock(tx, next.get());
+                  return true;
+                }
+                return false;
+              });
+    } catch (InvocationTargetException e) {
+      if (attempted.get() != null) {
+        updateAttemptCount(attempted.get(), e.getCause());
+      }
+    } catch (Exception e) {
+      if (attempted.get() != null) {
+        updateAttemptCount(attempted.get(), e);
+      }
+    }
+    if (success) {
+      log.info("Processed {}", attempted.get().description());
+      listener.success(attempted.get());
+    } else if (attempted.get() == null) {
+      log.debug("Nothing available in topic {}. May be empty or pausing for retry", topic);
+    }
+  }
+
+  private void processWithExistingLock(Transaction tx, TransactionOutboxEntry entry)
+      throws Exception {
+    initialize();
     entry
         .getInvocation()
         .withinMDC(
             () -> {
-              try {
-                initialize();
-                var success =
-                    transactionManager.inTransactionReturnsThrows(
-                        transaction -> {
-                          if (!persistor.lock(transaction, entry)) {
-                            return false;
-                          }
-                          log.info("Processing {}", entry.description());
-                          invoke(entry, transaction);
-                          if (entry.getUniqueRequestId() == null) {
-                            persistor.delete(transaction, entry);
-                          } else {
-                            log.debug(
-                                "Deferring deletion of {} by {}",
-                                entry.description(),
-                                retentionThreshold);
-                            entry.setProcessed(true);
-                            entry.setLastAttemptTime(Instant.now(clockProvider.get()));
-                            entry.setNextAttemptTime(after(retentionThreshold));
-                            persistor.update(transaction, entry);
-                          }
-                          return true;
-                        });
-                if (success) {
-                  log.info("Processed {}", entry.description());
-                  listener.success(entry);
-                } else {
-                  log.debug("Skipped task {} - may be locked or already processed", entry.getId());
-                }
-              } catch (InvocationTargetException e) {
-                updateAttemptCount(entry, e.getCause());
-              } catch (Exception e) {
-                updateAttemptCount(entry, e);
+              log.info("Processing {}", entry.description());
+              invoke(entry, tx);
+              if (entry.getUniqueRequestId() == null) {
+                persistor.delete(tx, entry);
+              } else {
+                log.debug(
+                    "Deferring deletion of {} by {}", entry.description(), retentionThreshold);
+                entry.setProcessed(true);
+                entry.setLastAttemptTime(Instant.now(clockProvider.get()));
+                entry.setNextAttemptTime(after(retentionThreshold));
+                persistor.update(tx, entry);
               }
+              return true;
             });
   }
 
@@ -395,7 +421,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
-      var blocked = entry.getAttempts() >= blockAfterAttempts;
+      var blocked = entry.getTopic() != null & entry.getAttempts() >= blockAfterAttempts;
       entry.setBlocked(blocked);
       entry.setLastAttemptTime(Instant.now(clockProvider.get()));
       entry.setNextAttemptTime(after(attemptFrequency));

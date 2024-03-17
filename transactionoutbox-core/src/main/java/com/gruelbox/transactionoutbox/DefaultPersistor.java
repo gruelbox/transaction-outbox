@@ -347,15 +347,8 @@ public class DefaultPersistor implements Persistor, Validatable {
   public Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic)
       throws Exception {
     PreparedStatement stmt =
-        tx.prepareBatchStatement(
-            String.format(
-                "SELECT * FROM (SELECT %s FROM %s "
-                    + "WHERE topic = ? "
-                    + "AND processed = %s "
-                    + "ORDER BY seq ASC) x WHERE 1=1 %s",
-                ALL_FIELDS, tableName, dialect.booleanValue(false), dialect.getLimitCriteria()));
+        tx.prepareBatchStatement(dialect.fetchAndLockNextInTopic(ALL_FIELDS, tableName));
     stmt.setString(1, topic);
-    stmt.setInt(2, 1);
     var results = new ArrayList<TransactionOutboxEntry>(1);
     gatherResults(stmt, results);
     return results.stream().findFirst();

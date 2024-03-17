@@ -28,6 +28,8 @@ public interface Dialect {
 
   void createVersionTableIfNotExists(Connection connection) throws SQLException;
 
+  String fetchAndLockNextInTopic(String fields, String table);
+
   Stream<Migration> getMigrations();
 
   Dialect MY_SQL_5 = DefaultDialect.builder("MY_SQL_5").build();
@@ -93,5 +95,15 @@ public interface Dialect {
                   }
                 }
               })
+          .fetchAndLockNextInTopic(
+              (fields, table) ->
+                  String.format(
+                      "SELECT %s FROM %s outer"
+                          + " WHERE outer.topic = ?"
+                          + " AND outer.processed = 0"
+                          + " AND outer.seq = ("
+                          + "SELECT MIN(seq) FROM %s inner WHERE inner.topic=outer.topic AND inner.processed=0"
+                          + " ) FOR UPDATE",
+                      fields, table, table))
           .build();
 }
