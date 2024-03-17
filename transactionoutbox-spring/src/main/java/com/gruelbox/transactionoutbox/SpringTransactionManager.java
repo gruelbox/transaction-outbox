@@ -9,8 +9,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.util.HashMap;
-import java.util.Map;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,8 +81,6 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
 
   private final class SpringTransaction implements Transaction {
 
-    private final Map<String, PreparedStatement> preparedStatements = new HashMap<>();
-
     @Override
     public Connection connection() {
       return DataSourceUtils.getConnection(dataSource);
@@ -92,33 +88,25 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
 
     @Override
     public PreparedStatement prepareBatchStatement(String sql) {
-      return preparedStatements.computeIfAbsent(
-          sql,
-          s ->
-              Utils.uncheckedly(
-                  () -> {
-                    BatchCountingStatement preparedStatement =
-                        Utils.uncheckedly(
-                            () ->
-                                BatchCountingStatementHandler.countBatches(
-                                    connection().prepareStatement(sql)));
-                    TransactionSynchronizationManager.registerSynchronization(
-                        new TransactionSynchronization() {
-                          @Override
-                          public void beforeCommit(boolean readOnly) {
-                            if (preparedStatement.getBatchCount() != 0) {
-                              log.debug("Flushing batches");
-                              Utils.uncheck(preparedStatement::executeBatch);
-                            }
-                          }
+      BatchCountingStatement preparedStatement =
+          Utils.uncheckedly(
+              () -> BatchCountingStatementHandler.countBatches(connection().prepareStatement(sql)));
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void beforeCommit(boolean readOnly) {
+              if (preparedStatement.getBatchCount() != 0) {
+                log.debug("Flushing batches");
+                Utils.uncheck(preparedStatement::executeBatch);
+              }
+            }
 
-                          @Override
-                          public void afterCompletion(int status) {
-                            Utils.safelyClose(preparedStatement);
-                          }
-                        });
-                    return preparedStatement;
-                  }));
+            @Override
+            public void afterCompletion(int status) {
+              Utils.safelyClose(preparedStatement);
+            }
+          });
+      return preparedStatement;
     }
 
     @Override

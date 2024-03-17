@@ -280,22 +280,24 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   @Override
   public boolean unblock(Transaction tx, String entryId) throws Exception {
-    @SuppressWarnings("resource")
-    PreparedStatement stmt =
-        tx.prepareBatchStatement(
-            "UPDATE "
-                + tableName
-                + " SET attempts = 0, blocked = "
-                + dialect.booleanValue(false)
-                + " "
-                + "WHERE blocked = "
-                + dialect.booleanValue(true)
-                + " AND processed = "
-                + dialect.booleanValue(false)
-                + " AND id = ?");
-    stmt.setString(1, entryId);
-    stmt.setQueryTimeout(writeLockTimeoutSeconds);
-    return stmt.executeUpdate() != 0;
+    //noinspection resource
+    try (PreparedStatement stmt =
+        tx.connection()
+            .prepareStatement(
+                "UPDATE "
+                    + tableName
+                    + " SET attempts = 0, blocked = "
+                    + dialect.booleanValue(false)
+                    + " "
+                    + "WHERE blocked = "
+                    + dialect.booleanValue(true)
+                    + " AND processed = "
+                    + dialect.booleanValue(false)
+                    + " AND id = ?")) {
+      stmt.setString(1, entryId);
+      stmt.setQueryTimeout(writeLockTimeoutSeconds);
+      return stmt.executeUpdate() != 0;
+    }
   }
 
   @Override
@@ -346,12 +348,14 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Override
   public Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic)
       throws Exception {
-    PreparedStatement stmt =
-        tx.prepareBatchStatement(dialect.fetchAndLockNextInTopic(ALL_FIELDS, tableName));
-    stmt.setString(1, topic);
-    var results = new ArrayList<TransactionOutboxEntry>(1);
-    gatherResults(stmt, results);
-    return results.stream().findFirst();
+    //noinspection resource
+    try (PreparedStatement stmt =
+        tx.connection().prepareStatement(dialect.fetchAndLockNextInTopic(ALL_FIELDS, tableName))) {
+      stmt.setString(1, topic);
+      var results = new ArrayList<TransactionOutboxEntry>(1);
+      gatherResults(stmt, results);
+      return results.stream().findFirst();
+    }
   }
 
   @Override
