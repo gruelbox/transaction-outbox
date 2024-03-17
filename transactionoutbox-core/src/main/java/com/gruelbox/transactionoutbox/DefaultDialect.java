@@ -46,7 +46,7 @@ class DefaultDialect implements Dialect {
   public String fetchAndLockNextInTopic(String fields, String table) {
     return String.format(
         "SELECT %s FROM %s"
-            + " WHERE topic =  "
+            + " WHERE topic = ?"
             + " AND processed = %s"
             + " ORDER BY seq ASC"
             + " %s FOR UPDATE",

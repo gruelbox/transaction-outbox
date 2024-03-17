@@ -154,18 +154,14 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
         CompletableFuture.runAsync(() -> expireIdempotencyProtection(now), executor)
             .thenApply(it -> false));
 
-    transactionManager.inTransaction(
-        tx -> {
-          var topics = uncheckedly(() -> persistor.selectActiveTopics(tx));
-          if (!topics.isEmpty()) {
-            log.info("Active topics: {}", topics);
-            for (String topic : topics) {
-              futures.add(
-                  CompletableFuture.runAsync(() -> processNextInTopic(topic), executor)
-                      .thenApply(it -> true));
-            }
-          }
-        });
+    var topics =
+        transactionManager.inTransactionReturns(
+            tx -> uncheckedly(() -> persistor.selectActiveTopics(tx)));
+    if (!topics.isEmpty()) {
+      topics.stream()
+          .map(topic -> CompletableFuture.supplyAsync(() -> processNextInTopic(topic), executor))
+          .forEach(futures::add);
+    }
 
     var allResults = futures.stream().reduce((f1, f2) -> f1.thenCombine(f2, (d1, d2) -> d1 || d2));
     return allResults.map(CompletableFuture::join).orElse(false);
@@ -309,24 +305,30 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private void processNextInTopic(String topic) {
+  private boolean processNextInTopic(String topic) {
     var attempted = new AtomicReference<TransactionOutboxEntry>();
     var success = false;
     try {
       success =
           transactionManager.inTransactionReturnsThrows(
               tx -> {
-                var next =
-                    persistor
-                        .nextInTopic(tx, topic)
-                        .filter(
-                            it -> it.getNextAttemptTime().isBefore(clockProvider.get().instant()));
+                var next = persistor.nextInTopic(tx, topic);
                 if (next.isPresent()) {
-                  attempted.set(next.get());
-                  processWithExistingLock(tx, next.get());
-                  return true;
+                  if (next.get().getNextAttemptTime().isBefore(clockProvider.get().instant())) {
+                    log.info("Topic {}: processing seq {}", topic, next.get().getSequence());
+                    attempted.set(next.get());
+                    processWithExistingLock(tx, next.get());
+                    return true;
+                  } else {
+                    log.info(
+                        "Topic {}: ignoring until {}",
+                        topic,
+                        ZonedDateTime.ofInstant(next.get().getNextAttemptTime(), ZoneId.of("UTC")));
+                    return false;
+                  }
+                } else {
+                  return false;
                 }
-                return false;
               });
     } catch (InvocationTargetException e) {
       if (attempted.get() != null) {
@@ -340,9 +342,8 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     if (success) {
       log.info("Processed {}", attempted.get().description());
       listener.success(attempted.get());
-    } else if (attempted.get() == null) {
-      log.debug("Nothing available in topic {}. May be empty or pausing for retry", topic);
     }
+    return success;
   }
 
   private void processWithExistingLock(Transaction tx, TransactionOutboxEntry entry)
@@ -421,7 +422,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
-      var blocked = entry.getTopic() != null & entry.getAttempts() >= blockAfterAttempts;
+      var blocked = (entry.getTopic() == null) && (entry.getAttempts() >= blockAfterAttempts);
       entry.setBlocked(blocked);
       entry.setLastAttemptTime(Instant.now(clockProvider.get()));
       entry.setNextAttemptTime(after(attemptFrequency));

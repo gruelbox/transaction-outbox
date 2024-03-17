@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractAcceptanceTest extends BaseTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractAcceptanceTest.class);
+
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
@@ -42,19 +43,27 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
 
   @Test
   final void sequencing() throws Exception {
+    int countPerTopic = 50;
+
     AtomicInteger lastSequenceTopic1 = new AtomicInteger();
     AtomicInteger lastSequenceTopic2 = new AtomicInteger();
-    CountDownLatch latch = new CountDownLatch(200);
+    CountDownLatch latch = new CountDownLatch(countPerTopic * 2);
 
     TransactionManager transactionManager = txManager();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
+            .submitter(Submitter.withExecutor(unreliablePool))
+            .attemptFrequency(Duration.ofMillis(500))
             .instantiator(
                 Instantiator.using(
                     clazz ->
                         (InterfaceProcessor)
                             (foo, bar) -> {
+                              if (random.nextInt(10) == 5) {
+                                throw new RuntimeException(
+                                    "Temporary failure of InterfaceProcessor");
+                              }
                               var lastSequence =
                                   ("topic1".equals(bar)) ? lastSequenceTopic1 : lastSequenceTopic2;
                               if ((lastSequence.get() == foo - 1)) {
@@ -78,7 +87,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     withRunningFlusher(
         outbox,
         () -> {
-          for (int ix = 1; ix <= 100; ix++) {
+          for (int ix = 1; ix <= countPerTopic; ix++) {
             final int i = ix;
             transactionManager.inTransaction(
                 () -> {
@@ -95,8 +104,8 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                 });
           }
           assertTrue(latch.await(30, SECONDS));
-          assertEquals(100, lastSequenceTopic1.get());
-          assertEquals(100, lastSequenceTopic2.get());
+          assertEquals(countPerTopic, lastSequenceTopic1.get());
+          assertEquals(countPerTopic, lastSequenceTopic2.get());
         });
   }
 
