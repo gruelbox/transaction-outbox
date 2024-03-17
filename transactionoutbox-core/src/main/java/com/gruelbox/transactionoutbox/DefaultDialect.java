@@ -123,14 +123,16 @@ class DefaultDialect implements Dialect {
       migrations.put(
           9,
           new Migration(
-              9, "Add topic", "ALTER TABLE TXNO_OUTBOX ADD COLUMN topic VARCHAR(250) NULL"));
+              9,
+              "Add topic",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN topic VARCHAR(250) NOT NULL DEFAULT '*'"));
       migrations.put(
           10,
           new Migration(10, "Add sequence", "ALTER TABLE TXNO_OUTBOX ADD COLUMN seq BIGINT NULL"));
       migrations.put(
           11,
           new Migration(
-              10,
+              11,
               "Add sequence table",
               "CREATE TABLE TXNO_SEQUENCE (topic VARCHAR(250) NOT NULL, seq BIGINT NOT NULL, PRIMARY KEY (topic, seq))"));
       migrations.put(
@@ -156,12 +158,7 @@ class DefaultDialect implements Dialect {
 
     Dialect build() {
       return new DefaultDialect(
-          name,
-          supportsSkipLock,
-          deleteExpired,
-          limitCriteria,
-          checkSql,
-          migrations.values()) {
+          name, supportsSkipLock, deleteExpired, limitCriteria, checkSql, migrations.values()) {
         @Override
         public String booleanValue(boolean criteriaValue) {
           if (booleanValueFrom != null) {

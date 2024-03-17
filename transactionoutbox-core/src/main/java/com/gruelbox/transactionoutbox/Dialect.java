@@ -31,15 +31,10 @@ public interface Dialect {
   Stream<Migration> getMigrations();
 
   Dialect MY_SQL_5 = DefaultDialect.builder("MY_SQL_5").build();
-  Dialect MY_SQL_8 =
-      DefaultDialect.builder("MY_SQL_8")
-          .supportsSkipLock(true)
-          .supportsWindowFunctions(true)
-          .build();
+  Dialect MY_SQL_8 = DefaultDialect.builder("MY_SQL_8").supportsSkipLock(true).build();
   Dialect POSTGRESQL_9 =
       DefaultDialect.builder("POSTGRESQL_9")
           .supportsSkipLock(true)
-          .supportsWindowFunctions(true)
           .deleteExpired(
               "DELETE FROM {{table}} WHERE id IN (SELECT id FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?)")
           .changeMigration(
@@ -51,14 +46,12 @@ public interface Dialect {
 
   Dialect H2 =
       DefaultDialect.builder("H2")
-          .supportsWindowFunctions(true)
           .changeMigration(5, "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")
           .changeMigration(6, "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")
           .disableMigration(8)
           .build();
   Dialect ORACLE =
       DefaultDialect.builder("ORACLE")
-          .supportsWindowFunctions(true)
           .supportsSkipLock(true)
           .deleteExpired(
               "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0 AND ROWNUM <= ?")
@@ -81,6 +74,11 @@ public interface Dialect {
           .changeMigration(6, "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")
           .changeMigration(7, "ALTER TABLE TXNO_OUTBOX ADD lastAttemptTime TIMESTAMP(6)")
           .disableMigration(8)
+          .changeMigration(9, "ALTER TABLE TXNO_OUTBOX ADD topic VARCHAR(250) DEFAULT '*' NOT NULL")
+          .changeMigration(10, "ALTER TABLE TXNO_OUTBOX ADD seq NUMBER")
+          .changeMigration(
+              11,
+              "CREATE TABLE TXNO_SEQUENCE (topic VARCHAR(250) NOT NULL, seq NUMBER NOT NULL, CONSTRAINT PK_TXNO_SEQUENCE PRIMARY KEY (topic, seq))")
           .booleanValueFrom(v -> v ? "1" : "0")
           .createVersionTableBy(
               connection -> {

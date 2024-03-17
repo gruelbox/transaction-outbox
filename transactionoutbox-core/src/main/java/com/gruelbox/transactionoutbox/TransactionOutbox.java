@@ -67,6 +67,17 @@ public interface TransactionOutbox {
   ParameterizedScheduleBuilder with();
 
   /**
+   * Flush in a single thread. Calls {@link #flush(Executor)} with an {@link Executor} which runs
+   * all work in the current thread.
+   *
+   * @see #flush(Executor)
+   * @return true if any work was flushed.
+   */
+  default boolean flush() {
+    return flush(Runnable::run);
+  }
+
+  /**
    * Identifies any stale tasks queued using {@link #schedule(Class)} (those which were queued more
    * than supplied {@link TransactionOutboxBuilder#attemptFrequency(Duration)} ago and have been
    * tried less than {@link TransactionOutboxBuilder#blockAfterAttempts(int)} )} times) and attempts
@@ -85,18 +96,11 @@ public interface TransactionOutbox {
    * <p>Additionally, expires any records completed prior to the {@link
    * TransactionOutboxBuilder#retentionThreshold(Duration)}.
    *
+   * @param executor to be used for parallelising work (note that the method overall is blocking and
+   *     this is solely ued for fork-join semantics).
    * @return true if any work was flushed.
    */
-  @SuppressWarnings("UnusedReturnValue")
-  boolean flush();
-
-  /**
-   * TODO
-   *
-   * @param executor
-   * @return
-   */
-  boolean flushOrdered(Executor executor);
+  boolean flush(Executor executor);
 
   /**
    * Unblocks a blocked entry and resets the attempt count so that it will be retried again.
@@ -332,10 +336,9 @@ public interface TransactionOutbox {
      *
      * <ul>
      *   <li>Requests are not processed immediately when submitting a request, as normal, and are
-     *       not processed by {@link TransactionOutbox#flush()} either. Requests are processed up
-     *       only when calling {@link TransactionOutbox#flushOrdered(Executor)}. As a result there
-     *       will be increased delay between the source transaction being committed and the request
-     *       being processed.
+     *       processed by {@link TransactionOutbox#flush()} only. As a result there will be
+     *       increased delay between the source transaction being committed and the request being
+     *       processed.
      *   <li>If a request fails, no further requests will be processed <em>in that topic</em> until
      *       a subsequent retry allows the failing request to succeed, to preserve ordered
      *       processing. This means it is possible for topics to become entirely frozen in the event

@@ -165,5 +165,6 @@ public class TransactionOutboxEntry implements Validatable {
     validator.notNull("invocation", invocation);
     validator.positiveOrZero("attempts", attempts);
     validator.positiveOrZero("version", version);
+    validator.isTrue("topic", !"*".equals(topic), "Topic may not be *");
   }
 }

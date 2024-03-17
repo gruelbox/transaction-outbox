@@ -4,18 +4,22 @@ import com.gruelbox.transactionoutbox.*;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import lombok.Builder;
 import lombok.Value;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 
 @Slf4j
 public abstract class BaseTest {
 
   protected HikariDataSource dataSource;
+  private ExecutorService flushExecutor;
 
   @BeforeEach
   final void baseBeforeEach() {
@@ -25,10 +29,13 @@ public abstract class BaseTest {
     config.setPassword(connectionDetails().password());
     config.addDataSourceProperty("cachePrepStmts", "true");
     dataSource = new HikariDataSource(config);
+    flushExecutor = Executors.newFixedThreadPool(4);
   }
 
   @AfterEach
-  final void baseAfterEach() {
+  final void baseAfterEach() throws InterruptedException {
+    flushExecutor.shutdown();
+    Assertions.assertTrue(flushExecutor.awaitTermination(30, TimeUnit.SECONDS));
     dataSource.close();
   }
 
@@ -73,9 +80,7 @@ public abstract class BaseTest {
                 try {
                   // Keep flushing work until there's nothing left to flush
                   //noinspection StatementWithEmptyBody
-                  while (outbox.flush()) {}
-                  //noinspection StatementWithEmptyBody
-                  while (outbox.flushOrdered(ForkJoinPool.commonPool())) {}
+                  while (outbox.flush(flushExecutor)) {}
                 } catch (Exception e) {
                   log.error("Error flushing transaction outbox", e);
                 }

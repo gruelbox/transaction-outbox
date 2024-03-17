@@ -114,19 +114,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     return new ParameterizedScheduleBuilderImpl();
   }
 
-  @SuppressWarnings("UnusedReturnValue")
-  @Override
-  public boolean flush() {
-    if (!initialized.get()) {
-      throw new IllegalStateException("Not initialized");
-    }
-    Instant now = clockProvider.get().instant();
-    List<TransactionOutboxEntry> batch = flush(now);
-    expireIdempotencyProtection(now);
-    return !batch.isEmpty();
-  }
-
-  private List<TransactionOutboxEntry> flush(Instant now) {
+  private boolean flushStale(Instant now) {
     log.debug("Flushing stale tasks");
     var batch =
         transactionManager.inTransactionReturns(
@@ -148,41 +136,57 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     log.debug("Got batch of {}", batch.size());
     batch.forEach(this::submitNow);
     log.debug("Submitted batch");
-    return batch;
+    return !batch.isEmpty();
   }
 
   @Override
-  public boolean flushOrdered(Executor executor) {
-    log.debug("Processing topics");
-    return transactionManager.inTransactionReturns(
+  public boolean flush(Executor executor) {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
+    Instant now = clockProvider.get().instant();
+    List<CompletableFuture<Boolean>> futures = new ArrayList<>();
+
+    futures.add(CompletableFuture.supplyAsync(() -> flushStale(now), executor));
+
+    futures.add(
+        CompletableFuture.runAsync(() -> expireIdempotencyProtection(now), executor)
+            .thenApply(it -> false));
+
+    transactionManager.inTransaction(
         tx -> {
-          var now = clockProvider.get().instant();
           var topics = uncheckedly(() -> persistor.selectActiveTopics(tx));
-          var futures = new ArrayList<CompletableFuture<?>>();
           if (!topics.isEmpty()) {
             log.info("Active topics: {}", topics);
             for (String topic : topics) {
-              var request = uncheckedly(() -> persistor.nextInTopic(tx, topic));
-              if (request.isEmpty()) {
-                log.info(" > [{}] is already processed", topic);
-                continue;
+              var future = flushTopic(executor, tx, topic, now);
+              if (future != null) {
+                futures.add(future.thenApply(it -> true));
               }
-              if (!request.get().getNextAttemptTime().isBefore(now)) {
-                log.info(
-                    " > [{}] seq {} is not ready for retry. Next attempt after {}",
-                    topic,
-                    request.get().getSequence(),
-                    ZonedDateTime.ofInstant(request.get().getNextAttemptTime(), ZoneId.of("UTC")));
-                continue;
-              }
-              var future = CompletableFuture.runAsync(() -> processNow(request.get()), executor);
-              futures.add(future);
             }
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-            return !futures.isEmpty();
           }
-          return false;
         });
+
+    var allResults = futures.stream().reduce((f1, f2) -> f1.thenCombine(f2, (d1, d2) -> d1 || d2));
+    return allResults.map(CompletableFuture::join).orElse(false);
+  }
+
+  private CompletableFuture<Void> flushTopic(
+      Executor executor, Transaction tx, String topic, Instant now) {
+    var request = uncheckedly(() -> persistor.nextInTopic(tx, topic));
+    if (request.isEmpty()) {
+      log.info(" > [{}] is already processed", topic);
+      return null;
+    }
+    if (!request.get().getNextAttemptTime().isBefore(now)) {
+      log.info(
+          " > [{}] seq {} is not ready for retry. Next attempt after {}",
+          topic,
+          request.get().getSequence(),
+          ZonedDateTime.ofInstant(request.get().getNextAttemptTime(), ZoneId.of("UTC")));
+      return null;
+    }
+    return CompletableFuture.runAsync(() -> processNow(request.get()), executor);
   }
 
   private void expireIdempotencyProtection(Instant now) {

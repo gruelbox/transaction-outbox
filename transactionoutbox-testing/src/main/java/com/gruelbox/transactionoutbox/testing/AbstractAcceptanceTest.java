@@ -42,6 +42,10 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
 
   @Test
   final void sequencing() throws Exception {
+    AtomicInteger lastSequenceTopic1 = new AtomicInteger();
+    AtomicInteger lastSequenceTopic2 = new AtomicInteger();
+    CountDownLatch latch = new CountDownLatch(200);
+
     TransactionManager transactionManager = txManager();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
@@ -50,7 +54,20 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                 Instantiator.using(
                     clazz ->
                         (InterfaceProcessor)
-                            (foo, bar) -> LOGGER.info("Processing ({}, {})", foo, bar)))
+                            (foo, bar) -> {
+                              var lastSequence =
+                                  ("topic1".equals(bar)) ? lastSequenceTopic1 : lastSequenceTopic2;
+                              if ((lastSequence.get() == foo - 1)) {
+                                lastSequence.set(foo);
+                                latch.countDown();
+                              } else {
+                                latch.countDown();
+                                throw new IllegalStateException(
+                                    String.format(
+                                        "Ordering violated (previous=%s, seq=%s",
+                                        lastSequence.get(), foo));
+                              }
+                            }))
             .persistor(persistor())
             .initializeImmediately(false)
             .build();
@@ -61,15 +78,25 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     withRunningFlusher(
         outbox,
         () -> {
-          transactionManager.inTransaction(
-              () ->
+          for (int ix = 1; ix <= 100; ix++) {
+            final int i = ix;
+            transactionManager.inTransaction(
+                () -> {
                   outbox
                       .with()
-                      .ordered("my-topic")
+                      .ordered("topic1")
                       .schedule(InterfaceProcessor.class)
-                      .process(3, "Whee"));
-
-          Thread.sleep(1000);
+                      .process(i, "topic1");
+                  outbox
+                      .with()
+                      .ordered("topic2")
+                      .schedule(InterfaceProcessor.class)
+                      .process(i, "topic2");
+                });
+          }
+          assertTrue(latch.await(30, SECONDS));
+          assertEquals(100, lastSequenceTopic1.get());
+          assertEquals(100, lastSequenceTopic2.get());
         });
   }
 

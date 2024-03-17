@@ -37,6 +37,12 @@ class Validator {
     }
   }
 
+  public void isTrue(String propertyName, boolean condition, String message, Object... args) {
+    if (!condition) {
+      error(propertyName, String.format(message, args));
+    }
+  }
+
   public void nullOrNotBlank(String propertyName, String object) {
     if (object != null && object.isEmpty()) {
       error(propertyName, "may be either null or non-blank");

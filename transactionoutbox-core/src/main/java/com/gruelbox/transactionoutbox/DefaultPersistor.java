@@ -4,13 +4,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.SQLIntegrityConstraintViolationException;
-import java.sql.SQLTimeoutException;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.time.Instant;
 import java.util.*;
 import lombok.AccessLevel;
@@ -185,8 +179,12 @@ public class DefaultPersistor implements Persistor, Validatable {
     stmt.setString(1, entry.getId());
     stmt.setString(2, entry.getUniqueRequestId());
     stmt.setString(3, writer.toString());
-    stmt.setString(4, entry.getTopic() == null ? "" : entry.getTopic());
-    stmt.setLong(5, entry.getSequence());
+    stmt.setString(4, entry.getTopic() == null ? "*" : entry.getTopic());
+    if (entry.getSequence() == null) {
+      stmt.setObject(5, null);
+    } else {
+      stmt.setLong(5, entry.getSequence());
+    }
     stmt.setTimestamp(
         6, entry.getLastAttemptTime() == null ? null : Timestamp.from(entry.getLastAttemptTime()));
     stmt.setTimestamp(7, Timestamp.from(entry.getNextAttemptTime()));
@@ -317,7 +315,7 @@ public class DefaultPersistor implements Persistor, Validatable {
                     + dialect.booleanValue(false)
                     + " AND processed = "
                     + dialect.booleanValue(false)
-                    + " AND topic = ''"
+                    + " AND topic = '*'"
                     + dialect.getLimitCriteria()
                     + forUpdate)) {
       stmt.setTimestamp(1, Timestamp.from(now));
@@ -330,7 +328,7 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   @Override
   public List<String> selectActiveTopics(Transaction tx) throws Exception {
-    var sql = "SELECT DISTINCT topic FROM %s WHERE topic <> '' AND processed = %s";
+    var sql = "SELECT DISTINCT topic FROM %s WHERE topic <> '*' AND processed = %s";
     String falseStr = dialect.booleanValue(false);
     //noinspection resource
     try (PreparedStatement stmt =
@@ -351,10 +349,10 @@ public class DefaultPersistor implements Persistor, Validatable {
     PreparedStatement stmt =
         tx.prepareBatchStatement(
             String.format(
-                "SELECT %s FROM %s "
+                "SELECT * FROM (SELECT %s FROM %s "
                     + "WHERE topic = ? "
                     + "AND processed = %s "
-                    + "ORDER BY seq ASC %s",
+                    + "ORDER BY seq ASC) x WHERE 1=1 %s",
                 ALL_FIELDS, tableName, dialect.booleanValue(false), dialect.getLimitCriteria()));
     stmt.setString(1, topic);
     stmt.setInt(2, 1);
@@ -398,7 +396,7 @@ public class DefaultPersistor implements Persistor, Validatable {
               .id(rs.getString("id"))
               .uniqueRequestId(rs.getString("uniqueRequestId"))
               .invocation(serializer.deserializeInvocation(invocationStream))
-              .topic("".equals(topic) ? null : topic)
+              .topic("*".equals(topic) ? null : topic)
               .sequence(sequence)
               .lastAttemptTime(
                   rs.getTimestamp("lastAttemptTime") == null
