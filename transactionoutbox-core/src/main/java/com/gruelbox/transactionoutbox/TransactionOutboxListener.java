@@ -5,6 +5,8 @@ import java.lang.reflect.InvocationTargetException;
 /** A listener for events fired by {@link TransactionOutbox}. */
 public interface TransactionOutboxListener {
 
+  TransactionOutboxListener EMPTY = new TransactionOutboxListener() {};
+
   /**
    * Fired when a transaction outbox task is scheduled.
    *

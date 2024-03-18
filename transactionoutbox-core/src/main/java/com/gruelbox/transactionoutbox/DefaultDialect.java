@@ -6,6 +6,7 @@ import java.sql.Statement;
 import java.util.Collection;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import lombok.AccessLevel;
@@ -42,6 +43,17 @@ class DefaultDialect implements Dialect {
   }
 
   @Override
+  public String fetchAndLockNextInTopic(String fields, String table) {
+    return String.format(
+        "SELECT %s FROM %s"
+            + " WHERE topic = ?"
+            + " AND processed = %s"
+            + " ORDER BY seq ASC"
+            + " %s FOR UPDATE",
+        fields, table, booleanValue(false), limitCriteria.replace("?", "1"));
+  }
+
+  @Override
   public String toString() {
     return name;
   }
@@ -63,6 +75,7 @@ class DefaultDialect implements Dialect {
     private Map<Integer, Migration> migrations;
     private Function<Boolean, String> booleanValueFrom;
     private SQLAction createVersionTableBy;
+    private BiFunction<String, String, String> fetchAndLockNextInTopic;
 
     Builder(String name) {
       this.name = name;
@@ -120,6 +133,27 @@ class DefaultDialect implements Dialect {
               8,
               "Update length of invocation column on outbox for MySQL dialects only.",
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation MEDIUMTEXT"));
+      migrations.put(
+          9,
+          new Migration(
+              9,
+              "Add topic",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN topic VARCHAR(250) NOT NULL DEFAULT '*'"));
+      migrations.put(
+          10,
+          new Migration(10, "Add sequence", "ALTER TABLE TXNO_OUTBOX ADD COLUMN seq BIGINT NULL"));
+      migrations.put(
+          11,
+          new Migration(
+              11,
+              "Add sequence table",
+              "CREATE TABLE TXNO_SEQUENCE (topic VARCHAR(250) NOT NULL, seq BIGINT NOT NULL, PRIMARY KEY (topic, seq))"));
+      migrations.put(
+          12,
+          new Migration(
+              12,
+              "Add flush index to support ordering",
+              "CREATE INDEX IX_TXNO_OUTBOX_2 ON TXNO_OUTBOX (topic, processed, seq)"));
     }
 
     Builder setMigration(Migration migration) {
@@ -153,6 +187,14 @@ class DefaultDialect implements Dialect {
           } else {
             super.createVersionTableIfNotExists(connection);
           }
+        }
+
+        @Override
+        public String fetchAndLockNextInTopic(String fields, String table) {
+          if (fetchAndLockNextInTopic != null) {
+            return fetchAndLockNextInTopic.apply(fields, table);
+          }
+          return super.fetchAndLockNextInTopic(fields, table);
         }
       };
     }

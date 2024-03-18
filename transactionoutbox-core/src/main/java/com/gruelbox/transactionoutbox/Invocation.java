@@ -5,6 +5,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -105,6 +106,24 @@ public class Invocation {
       }
     } else {
       runnable.run();
+    }
+  }
+
+  <T> T withinMDC(Callable<T> callable) throws Exception {
+    if (mdc != null && MDC.getMDCAdapter() != null) {
+      var oldMdc = MDC.getCopyOfContextMap();
+      MDC.setContextMap(mdc);
+      try {
+        return callable.call();
+      } finally {
+        if (oldMdc == null) {
+          MDC.clear();
+        } else {
+          MDC.setContextMap(oldMdc);
+        }
+      }
+    } else {
+      return callable.call();
     }
   }
 

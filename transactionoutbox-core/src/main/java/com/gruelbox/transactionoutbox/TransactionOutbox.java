@@ -67,6 +67,17 @@ public interface TransactionOutbox {
   ParameterizedScheduleBuilder with();
 
   /**
+   * Flush in a single thread. Calls {@link #flush(Executor)} with an {@link Executor} which runs
+   * all work in the current thread.
+   *
+   * @see #flush(Executor)
+   * @return true if any work was flushed.
+   */
+  default boolean flush() {
+    return flush(Runnable::run);
+  }
+
+  /**
    * Identifies any stale tasks queued using {@link #schedule(Class)} (those which were queued more
    * than supplied {@link TransactionOutboxBuilder#attemptFrequency(Duration)} ago and have been
    * tried less than {@link TransactionOutboxBuilder#blockAfterAttempts(int)} )} times) and attempts
@@ -85,10 +96,11 @@ public interface TransactionOutbox {
    * <p>Additionally, expires any records completed prior to the {@link
    * TransactionOutboxBuilder#retentionThreshold(Duration)}.
    *
+   * @param executor to be used for parallelising work (note that the method overall is blocking and
+   *     this is solely ued for fork-join semantics).
    * @return true if any work was flushed.
    */
-  @SuppressWarnings("UnusedReturnValue")
-  boolean flush();
+  boolean flush(Executor executor);
 
   /**
    * Unblocks a blocked entry and resets the attempt count so that it will be retried again.
@@ -311,6 +323,50 @@ public interface TransactionOutbox {
      * @return Builder.
      */
     ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId);
+
+    /**
+     * Specifies that the request should be applied in a strictly-ordered fashion within the
+     * specified topic.
+     *
+     * <p>This is useful for a number of applications, such as feeding messages into an ordered
+     * pipeline such as a FIFO queue or Kafka topic, or for reliable data replication, such as when
+     * feeding a data warehouse or distributed cache.
+     *
+     * <p>Note that using this option has a number of consequences:
+     *
+     * <ul>
+     *   <li>Requests are not processed immediately when submitting a request, as normal, and are
+     *       processed by {@link TransactionOutbox#flush()} only. As a result there will be
+     *       increased delay between the source transaction being committed and the request being
+     *       processed.
+     *   <li>If a request fails, no further requests will be processed <em>in that topic</em> until
+     *       a subsequent retry allows the failing request to succeed, to preserve ordered
+     *       processing. This means it is possible for topics to become entirely frozen in the event
+     *       that a request fails repeatedly. For this reason, it is essential to use a {@link
+     *       TransactionOutboxListener} to watch for failing requests and investigate quickly. Note
+     *       that other topics will be unaffected.
+     *   <lI>For the same reason, {@link TransactionOutboxBuilder#blockAfterAttempts} is ignored for
+     *       all requests that use this option. The only safe way to recover from a failing request
+     *       is to make the request succeed.
+     *   <li>A single topic can only be processed in single-threaded fashion, so if your requests
+     *       use a small number of topics, scalability will be affected since the degree of
+     *       parallelism will be reduced.
+     *   <li>Throughput is significantly reduced and database load increased more generally, even
+     *       with larger numbers of topics, since records are only processed one-at-a-time rather
+     *       than in batches, which is less optimised.
+     *   <li>In general, <a
+     *       href="https://shermanonsoftware.com/2019/09/04/your-database-is-not-a-queue/">databases
+     *       are not well optimised for this sort of thing</a>. Don't expect miracles. If you need
+     *       more throughput, you probably need to think twice about your architecture. Consider the
+     *       <a href="https://martinfowler.com/eaaDev/EventSourcing.html">event sourcing
+     *       pattern</a>, for example, where the message queue is the primary data store rather than
+     *       a secondary, and remove the need for an outbox entirely.
+     * </ul>
+     *
+     * @param topic a free-text string up to 250 characters.
+     * @return Builder.
+     */
+    ParameterizedScheduleBuilder ordered(String topic);
 
     /**
      * Equivalent to {@link TransactionOutbox#schedule(Class)}, but applying additional parameters

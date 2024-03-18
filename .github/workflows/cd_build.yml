@@ -25,7 +25,7 @@ jobs:
       - name: Build, publish to GPR and tag
         run: |
           if [ "$GITHUB_REPOSITORY" == "gruelbox/transaction-outbox" ]; then
-            revision="5.4.$GITHUB_RUN_NUMBER"
+            revision="5.5.$GITHUB_RUN_NUMBER"
             echo "Building $revision at $GITHUB_SHA"
             mvn -Pconcise,delombok -B deploy -s $GITHUB_WORKSPACE/settings.xml -Drevision="$revision" -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
             echo "Tagging $revision"

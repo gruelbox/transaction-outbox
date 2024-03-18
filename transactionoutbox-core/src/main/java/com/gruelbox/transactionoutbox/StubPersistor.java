@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import lombok.Builder;
 
 /** Stub implementation of {@link Persistor}. */
@@ -43,6 +44,16 @@ public class StubPersistor implements Persistor {
   @Override
   public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now) {
     return List.of();
+  }
+
+  @Override
+  public List<String> selectActiveTopics(Transaction tx) {
+    return List.of();
+  }
+
+  @Override
+  public Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic) {
+    return Optional.empty();
   }
 
   @Override

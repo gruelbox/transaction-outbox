@@ -25,6 +25,7 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
 1. [Set up the background worker](#set-up-the-background-worker)
 1. [Managing the "dead letter queue"](#managing-the-dead-letter-queue)
 1. [Advanced](#advanced)
+   1. [Topics and FIFO ordering](#topics-and-fifo-ordering)
    1. [The nested outbox pattern](#the-nested-outbox-pattern)
    1. [Idempotency protection](#idempotency-protection)
    1. [Flexible serialization](#flexible-serialization-beta)
@@ -291,19 +292,67 @@ TransactionOutbox.builder()
 
 To mark the work for reprocessing, just use [`TransactionOutbox.unblock()`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutbox.html). Its failure count will be marked back down to zero and it will get reprocessed on the next call to `flush()`:
 
-```
+```java
 transactionOutboxEntry.unblock(entryId);
 ```
 
 Or if using a `TransactionManager` that relies on explicit context (such as a non-thread local [`JooqTransactionManager`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-jooq/latest/com/gruelbox/transactionoutbox/JooqTransactionManager.html)):
 
-```
+```java
 transactionOutboxEntry.unblock(entryId, context);
 ```
 
 A good approach here is to use the [`TransactionOutboxListener`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutboxListener.html) callback to post an [interactive Slack message](https://api.slack.com/legacy/interactive-messages) - this can operate as both the alert and the "button" allowing a support engineer to submit the work for reprocessing.
 
 ## Advanced
+
+### Topics and FIFO ordering
+
+For some applications, the order in which tasks are processed is important, such as when:
+
+ - using the outbox to write to a FIFO queue, Kafka or AWS Kinesis topic; or
+ - data replication, e.g. when feeding a data warehouse or distributed cache.
+
+In these scenarios, the default behaviour is unsuitable. Tasks are usually processed in a highly parallel fashion.
+Even if the volume of tasks is low, if a task fails and is retried later, it can easily end up processing after
+some later task even if that later task was processed hours or even days after the failing one.
+
+To avoid problems associated with tasks being processed out-of-order, you can order the processing of your tasks
+within a named "topic":
+
+```java
+outbox.with().ordered("topic1").schedule(Service.class).process("red");
+outbox.with().ordered("topic2").schedule(Service.class).process("green");
+outbox.with().ordered("topic1").schedule(Service.class).process("blue");
+outbox.with().ordered("topic2").schedule(Service.class).process("yellow");
+```
+
+No matter what happens:
+
+ - `red` will always need to be processed (successfully) before `blue`;
+ - `green` will always need to be processed (successfully) before `yellow`; but
+ - `red` and `blue` can run in any sequence with respect to `green` and `yellow`.
+
+This functionality was specifically designed to allow outboxed writing to Kafka topics. For maximum throughput
+when writing to Kafka, it is advised that you form your outbox topic name by combining the Kafka topic and partition,
+since that is the boundary where ordering is required.
+
+There are a number of things to consider before using this feature:
+
+ - Tasks are not processed immediately when submitting, as normal, and are processed by 
+   background flushing only. This means there will be an increased delay between the source transaction being
+   committed and the task being processed, depending on how your application calls `TransactionOutbox.flush()`.
+ - If a task fails, no further requests will be processed _in that topic_ until
+   a subsequent retry allows the failing task to succeed, to preserve ordered
+   processing. This means it is possible for topics to become entirely frozen in the event
+   that a task fails repeatedly. For this reason, it is essential to use a 
+   `TransactionOutboxListener` to watch for failing tasks and investigate quickly. Note
+   that other topics will be unaffected.
+ - `TransactionOutboxBuilder.blockAfterAttempts` is ignored for all tasks that use this
+   option.
+ - A single topic can only be processed in single-threaded fashion, but separate topics can be processed in
+   parallel. If your tasks use a small number of topics, scalability will be affected since the degree of 
+   parallelism will be reduced.
 
 ### The nested-outbox pattern
 

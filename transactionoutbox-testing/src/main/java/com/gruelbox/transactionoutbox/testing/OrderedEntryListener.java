@@ -6,39 +6,46 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Collects an ordered list of all entry events (*excluding blocked events) that have hit this
  * listener until a specified number of blocks / successes have occurred.
  */
+@Slf4j
 public final class OrderedEntryListener implements TransactionOutboxListener {
   private final CountDownLatch successLatch;
   private final CountDownLatch blockedLatch;
 
   @Getter private volatile TransactionOutboxEntry blocked;
 
-  private final CopyOnWriteArrayList<TransactionOutboxEntry> orderedEntries;
+  private final CopyOnWriteArrayList<TransactionOutboxEntry> events = new CopyOnWriteArrayList<>();
+  private final CopyOnWriteArrayList<TransactionOutboxEntry> successes =
+      new CopyOnWriteArrayList<>();
 
   OrderedEntryListener(CountDownLatch successLatch, CountDownLatch blockedLatch) {
     this.successLatch = successLatch;
     this.blockedLatch = blockedLatch;
-    orderedEntries = new CopyOnWriteArrayList<>();
   }
 
   @Override
   public void scheduled(TransactionOutboxEntry entry) {
-    orderedEntries.add(from(entry));
+    events.add(from(entry));
   }
 
   @Override
   public void success(TransactionOutboxEntry entry) {
-    orderedEntries.add(from(entry));
+    var copy = from(entry);
+    events.add(copy);
+    successes.add(copy);
+    log.info(
+        "Received success #{}. Counting down at {}", successes.size(), successLatch.getCount());
     successLatch.countDown();
   }
 
   @Override
   public void failure(TransactionOutboxEntry entry, Throwable cause) {
-    orderedEntries.add(from(entry));
+    events.add(from(entry));
   }
 
   @Override
@@ -50,28 +57,21 @@ public final class OrderedEntryListener implements TransactionOutboxListener {
   }
 
   /**
-   * Retrieve an unmodifiable copy of {@link #orderedEntries}. Beware, expectation is that this does
-   * not/ should not get accessed until the correct number of {@link
-   * #success(TransactionOutboxEntry)} and {@link #blocked(TransactionOutboxEntry, Throwable)}}
-   * counts have occurred.
+   * Retrieve an unmodifiable copy of {@link #events}. Beware, expectation is that this does not/
+   * should not get accessed until the correct number of {@link #success(TransactionOutboxEntry)}
+   * and {@link #blocked(TransactionOutboxEntry, Throwable)}} counts have occurred.
    *
    * @return unmodifiable list of ordered outbox entry events.
    */
-  public List<TransactionOutboxEntry> getOrderedEntries() {
-    return List.copyOf(orderedEntries);
+  public List<TransactionOutboxEntry> getEvents() {
+    return List.copyOf(events);
+  }
+
+  public List<TransactionOutboxEntry> getSuccesses() {
+    return List.copyOf(successes);
   }
 
   private TransactionOutboxEntry from(TransactionOutboxEntry entry) {
-    return TransactionOutboxEntry.builder()
-        .id(entry.getId())
-        .uniqueRequestId(entry.getUniqueRequestId())
-        .invocation(entry.getInvocation())
-        .lastAttemptTime(entry.getLastAttemptTime())
-        .nextAttemptTime(entry.getNextAttemptTime())
-        .attempts(entry.getAttempts())
-        .blocked(entry.isBlocked())
-        .processed(entry.isProcessed())
-        .version(entry.getVersion())
-        .build();
+    return entry.toBuilder().build();
   }
 }

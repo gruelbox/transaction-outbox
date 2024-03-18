@@ -1,7 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
 import java.time.Clock;
-import java.time.Instant;
 import java.util.function.Supplier;
 
 class Validator {
@@ -38,6 +37,12 @@ class Validator {
     }
   }
 
+  public void isTrue(String propertyName, boolean condition, String message, Object... args) {
+    if (!condition) {
+      error(propertyName, String.format(message, args));
+    }
+  }
+
   public void nullOrNotBlank(String propertyName, String object) {
     if (object != null && object.isEmpty()) {
       error(propertyName, "may be either null or non-blank");
@@ -48,13 +53,6 @@ class Validator {
     notNull(propertyName, object);
     if (object.isEmpty()) {
       error(propertyName, "may not be blank");
-    }
-  }
-
-  public void inFuture(String propertyName, Instant object) {
-    notNull(propertyName, object);
-    if (!object.isAfter(clockProvider.get().instant())) {
-      error(propertyName, "must be in the future");
     }
   }
 

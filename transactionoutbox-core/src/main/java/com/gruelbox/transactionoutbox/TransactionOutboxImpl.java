@@ -8,23 +8,27 @@ import static java.time.temporal.ChronoUnit.MINUTES;
 import com.gruelbox.transactionoutbox.spi.ProxyFactory;
 import com.gruelbox.transactionoutbox.spi.Utils;
 import java.lang.reflect.InvocationTargetException;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
+import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
+import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.slf4j.event.Level;
 
 @Slf4j
-class TransactionOutboxImpl implements TransactionOutbox, Validatable {
-
-  private static final int DEFAULT_FLUSH_BATCH_SIZE = 4096;
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   private final TransactionManager transactionManager;
   private final Persistor persistor;
@@ -41,39 +45,6 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private final Duration retentionThreshold;
   private final AtomicBoolean initialized = new AtomicBoolean();
   private final ProxyFactory proxyFactory = new ProxyFactory();
-
-  private TransactionOutboxImpl(
-      TransactionManager transactionManager,
-      Instantiator instantiator,
-      Submitter submitter,
-      Duration attemptFrequency,
-      int blockAfterAttempts,
-      int flushBatchSize,
-      Supplier<Clock> clockProvider,
-      TransactionOutboxListener listener,
-      Persistor persistor,
-      Level logLevelTemporaryFailure,
-      Boolean serializeMdc,
-      Duration retentionThreshold,
-      Boolean initializeImmediately) {
-    this.transactionManager = transactionManager;
-    this.instantiator = Utils.firstNonNull(instantiator, Instantiator::usingReflection);
-    this.persistor = persistor;
-    this.submitter = Utils.firstNonNull(submitter, Submitter::withDefaultExecutor);
-    this.attemptFrequency = Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES));
-    this.blockAfterAttempts = blockAfterAttempts < 1 ? 5 : blockAfterAttempts;
-    this.flushBatchSize = flushBatchSize < 1 ? DEFAULT_FLUSH_BATCH_SIZE : flushBatchSize;
-    this.clockProvider = clockProvider == null ? Clock::systemDefaultZone : clockProvider;
-    this.listener = Utils.firstNonNull(listener, () -> new TransactionOutboxListener() {});
-    this.logLevelTemporaryFailure = Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN);
-    this.validator = new Validator(this.clockProvider);
-    this.serializeMdc = serializeMdc == null || serializeMdc;
-    this.retentionThreshold = retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold;
-    this.validator.validate(this);
-    if (initializeImmediately == null || initializeImmediately) {
-      initialize();
-    }
-  }
 
   @Override
   public void validate(Validator validator) {
@@ -108,7 +79,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public <T> T schedule(Class<T> clazz) {
-    return schedule(clazz, null);
+    return schedule(clazz, null, null);
   }
 
   @Override
@@ -116,19 +87,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     return new ParameterizedScheduleBuilderImpl();
   }
 
-  @SuppressWarnings("UnusedReturnValue")
-  @Override
-  public boolean flush() {
-    if (!initialized.get()) {
-      throw new IllegalStateException("Not initialized");
-    }
-    Instant now = clockProvider.get().instant();
-    List<TransactionOutboxEntry> batch = flush(now);
-    expireIdempotencyProtection(now);
-    return !batch.isEmpty();
-  }
-
-  private List<TransactionOutboxEntry> flush(Instant now) {
+  private boolean flushStale(Instant now) {
     log.debug("Flushing stale tasks");
     var batch =
         transactionManager.inTransactionReturns(
@@ -150,7 +109,34 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     log.debug("Got batch of {}", batch.size());
     batch.forEach(this::submitNow);
     log.debug("Submitted batch");
-    return batch;
+    return !batch.isEmpty();
+  }
+
+  @Override
+  public boolean flush(Executor executor) {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
+    Instant now = clockProvider.get().instant();
+    List<CompletableFuture<Boolean>> futures = new ArrayList<>();
+
+    futures.add(CompletableFuture.supplyAsync(() -> flushStale(now), executor));
+
+    futures.add(
+        CompletableFuture.runAsync(() -> expireIdempotencyProtection(now), executor)
+            .thenApply(it -> false));
+
+    var topics =
+        transactionManager.inTransactionReturns(
+            tx -> uncheckedly(() -> persistor.selectActiveTopics(tx)));
+    if (!topics.isEmpty()) {
+      topics.stream()
+          .map(topic -> CompletableFuture.supplyAsync(() -> processNextInTopic(topic), executor))
+          .forEach(futures::add);
+    }
+
+    var allResults = futures.stream().reduce((f1, f2) -> f1.thenCombine(f2, (d1, d2) -> d1 || d2));
+    return allResults.map(CompletableFuture::join).orElse(false);
   }
 
   private void expireIdempotencyProtection(Instant now) {
@@ -222,7 +208,7 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private <T> T schedule(Class<T> clazz, String uniqueRequestId) {
+  private <T> T schedule(Class<T> clazz, String uniqueRequestId, String topic) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
@@ -238,7 +224,8 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                           extracted.getMethodName(),
                           extracted.getParameters(),
                           extracted.getArgs(),
-                          uniqueRequestId);
+                          uniqueRequestId,
+                          topic);
                   validator.validate(entry);
                   persistor.save(extracted.getTransaction(), entry);
                   extracted
@@ -246,7 +233,9 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                       .addPostCommitHook(
                           () -> {
                             listener.scheduled(entry);
-                            submitNow(entry);
+                            if (entry.getTopic() == null) {
+                              submitNow(entry);
+                            }
                           });
                   log.debug(
                       "Scheduled {} for running after transaction commit", entry.description());
@@ -261,45 +250,94 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   @Override
   @SuppressWarnings("WeakerAccess")
   public void processNow(TransactionOutboxEntry entry) {
+    initialize();
+    Boolean success = null;
+    try {
+      success =
+          transactionManager.inTransactionReturnsThrows(
+              tx -> {
+                if (!persistor.lock(tx, entry)) {
+                  return false;
+                }
+                processWithExistingLock(tx, entry);
+                return true;
+              });
+    } catch (InvocationTargetException e) {
+      updateAttemptCount(entry, e.getCause());
+    } catch (Exception e) {
+      updateAttemptCount(entry, e);
+    }
+    if (success != null) {
+      if (success) {
+        log.info("Processed {}", entry.description());
+        listener.success(entry);
+      } else {
+        log.debug("Skipped task {} - may be locked or already processed", entry.getId());
+      }
+    }
+  }
+
+  private boolean processNextInTopic(String topic) {
+    var attempted = new AtomicReference<TransactionOutboxEntry>();
+    var success = false;
+    try {
+      success =
+          transactionManager.inTransactionReturnsThrows(
+              tx -> {
+                var next = persistor.nextInTopic(tx, topic);
+                if (next.isPresent()) {
+                  if (next.get().getNextAttemptTime().isBefore(clockProvider.get().instant())) {
+                    log.info("Topic {}: processing seq {}", topic, next.get().getSequence());
+                    attempted.set(next.get());
+                    processWithExistingLock(tx, next.get());
+                    return true;
+                  } else {
+                    log.info(
+                        "Topic {}: ignoring until {}",
+                        topic,
+                        ZonedDateTime.ofInstant(next.get().getNextAttemptTime(), ZoneId.of("UTC")));
+                    return false;
+                  }
+                } else {
+                  return false;
+                }
+              });
+    } catch (InvocationTargetException e) {
+      if (attempted.get() != null) {
+        updateAttemptCount(attempted.get(), e.getCause());
+      }
+    } catch (Exception e) {
+      if (attempted.get() != null) {
+        updateAttemptCount(attempted.get(), e);
+      }
+    }
+    if (success) {
+      log.info("Processed {}", attempted.get().description());
+      listener.success(attempted.get());
+    }
+    return success;
+  }
+
+  private void processWithExistingLock(Transaction tx, TransactionOutboxEntry entry)
+      throws Exception {
+    initialize();
     entry
         .getInvocation()
         .withinMDC(
             () -> {
-              try {
-                initialize();
-                var success =
-                    transactionManager.inTransactionReturnsThrows(
-                        transaction -> {
-                          if (!persistor.lock(transaction, entry)) {
-                            return false;
-                          }
-                          log.info("Processing {}", entry.description());
-                          invoke(entry, transaction);
-                          if (entry.getUniqueRequestId() == null) {
-                            persistor.delete(transaction, entry);
-                          } else {
-                            log.debug(
-                                "Deferring deletion of {} by {}",
-                                entry.description(),
-                                retentionThreshold);
-                            entry.setProcessed(true);
-                            entry.setLastAttemptTime(Instant.now(clockProvider.get()));
-                            entry.setNextAttemptTime(after(retentionThreshold));
-                            persistor.update(transaction, entry);
-                          }
-                          return true;
-                        });
-                if (success) {
-                  log.info("Processed {}", entry.description());
-                  listener.success(entry);
-                } else {
-                  log.debug("Skipped task {} - may be locked or already processed", entry.getId());
-                }
-              } catch (InvocationTargetException e) {
-                updateAttemptCount(entry, e.getCause());
-              } catch (Exception e) {
-                updateAttemptCount(entry, e);
+              log.info("Processing {}", entry.description());
+              invoke(entry, tx);
+              if (entry.getUniqueRequestId() == null) {
+                persistor.delete(tx, entry);
+              } else {
+                log.debug(
+                    "Deferring deletion of {} by {}", entry.description(), retentionThreshold);
+                entry.setProcessed(true);
+                entry.setLastAttemptTime(Instant.now(clockProvider.get()));
+                entry.setNextAttemptTime(after(retentionThreshold));
+                persistor.update(tx, entry);
               }
+              return true;
             });
   }
 
@@ -313,7 +351,12 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   }
 
   private TransactionOutboxEntry newEntry(
-      Class<?> clazz, String methodName, Class<?>[] params, Object[] args, String uniqueRequestId) {
+      Class<?> clazz,
+      String methodName,
+      Class<?>[] params,
+      Object[] args,
+      String uniqueRequestId,
+      String topic) {
     return TransactionOutboxEntry.builder()
         .id(UUID.randomUUID().toString())
         .invocation(
@@ -324,8 +367,9 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                 args,
                 serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null))
         .lastAttemptTime(null)
-        .nextAttemptTime(after(attemptFrequency))
+        .nextAttemptTime(clockProvider.get().instant())
         .uniqueRequestId(uniqueRequestId)
+        .topic(topic)
         .build();
   }
 
@@ -350,12 +394,9 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
-      var blocked = entry.getAttempts() >= blockAfterAttempts;
+      var blocked = (entry.getTopic() == null) && (entry.getAttempts() >= blockAfterAttempts);
       entry.setBlocked(blocked);
-      entry.setLastAttemptTime(Instant.now(clockProvider.get()));
-      entry.setNextAttemptTime(after(attemptFrequency));
-      validator.validate(entry);
-      transactionManager.inTransactionThrows(transaction -> persistor.update(transaction, entry));
+      transactionManager.inTransactionThrows(tx -> pushBack(tx, entry));
       listener.failure(entry, cause);
       if (blocked) {
         log.error(
@@ -390,39 +431,43 @@ class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
 
     public TransactionOutboxImpl build() {
-      return new TransactionOutboxImpl(
-          transactionManager,
-          instantiator,
-          submitter,
-          attemptFrequency,
-          blockAfterAttempts,
-          flushBatchSize,
-          clockProvider,
-          listener,
-          persistor,
-          logLevelTemporaryFailure,
-          serializeMdc,
-          retentionThreshold,
-          initializeImmediately);
+      Validator validator = new Validator(this.clockProvider);
+      TransactionOutboxImpl impl =
+          new TransactionOutboxImpl(
+              transactionManager,
+              persistor,
+              Utils.firstNonNull(instantiator, Instantiator::usingReflection),
+              Utils.firstNonNull(submitter, Submitter::withDefaultExecutor),
+              Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES)),
+              Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN),
+              blockAfterAttempts < 1 ? 5 : blockAfterAttempts,
+              flushBatchSize < 1 ? 4096 : flushBatchSize,
+              clockProvider == null ? Clock::systemDefaultZone : clockProvider,
+              Utils.firstNonNull(listener, () -> TransactionOutboxListener.EMPTY),
+              serializeMdc == null || serializeMdc,
+              validator,
+              retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold);
+      validator.validate(impl);
+      if (initializeImmediately == null || initializeImmediately) {
+        impl.initialize();
+      }
+      return impl;
     }
   }
 
+  @Accessors(fluent = true, chain = true)
+  @Setter
   private class ParameterizedScheduleBuilderImpl implements ParameterizedScheduleBuilder {
 
     private String uniqueRequestId;
-
-    @Override
-    public ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId) {
-      this.uniqueRequestId = uniqueRequestId;
-      return this;
-    }
+    private String ordered;
 
     @Override
     public <T> T schedule(Class<T> clazz) {
       if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
         throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
       }
-      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId);
+      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered);
     }
   }
 }

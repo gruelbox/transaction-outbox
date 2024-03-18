@@ -4,11 +4,7 @@ import static java.util.stream.Collectors.joining;
 
 import java.time.Instant;
 import java.util.Arrays;
-import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 /**
@@ -35,6 +31,21 @@ public class TransactionOutboxEntry implements Validatable {
   @SuppressWarnings("JavaDoc")
   @Getter
   private final String uniqueRequestId;
+
+  /**
+   * @param topic An optional scope for ordered sequencing.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  private final String topic;
+
+  /**
+   * @param sequence The ordered sequence within the {@code topic}.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  @Setter
+  private Long sequence;
 
   /**
    * @param invocation The method invocation to perform.
@@ -113,7 +124,7 @@ public class TransactionOutboxEntry implements Validatable {
         if (!this.initialized) {
           String description =
               String.format(
-                  "%s.%s(%s) [%s]%s",
+                  "%s.%s(%s) [%s]%s%s",
                   invocation.getClassName(),
                   invocation.getMethodName(),
                   invocation.getArgs() == null
@@ -122,7 +133,8 @@ public class TransactionOutboxEntry implements Validatable {
                           .map(this::stringify)
                           .collect(joining(", ")),
                   id,
-                  uniqueRequestId == null ? "" : " uid=[" + uniqueRequestId + "]");
+                  uniqueRequestId == null ? "" : " uid=[" + uniqueRequestId + "]",
+                  topic == null ? "" : " seq=[" + topic + "/" + sequence + "]");
           this.description = description;
           this.initialized = true;
           return description;
@@ -149,9 +161,10 @@ public class TransactionOutboxEntry implements Validatable {
   public void validate(Validator validator) {
     validator.notNull("id", id);
     validator.nullOrNotBlank("uniqueRequestId", uniqueRequestId);
+    validator.nullOrNotBlank("topic", topic);
     validator.notNull("invocation", invocation);
-    validator.inFuture("nextAttemptTime", nextAttemptTime);
     validator.positiveOrZero("attempts", attempts);
     validator.positiveOrZero("version", version);
+    validator.isTrue("topic", !"*".equals(topic), "Topic may not be *");
   }
 }

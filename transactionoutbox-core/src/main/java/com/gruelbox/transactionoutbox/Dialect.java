@@ -28,6 +28,8 @@ public interface Dialect {
 
   void createVersionTableIfNotExists(Connection connection) throws SQLException;
 
+  String fetchAndLockNextInTopic(String fields, String table);
+
   Stream<Migration> getMigrations();
 
   Dialect MY_SQL_5 = DefaultDialect.builder("MY_SQL_5").build();
@@ -74,6 +76,11 @@ public interface Dialect {
           .changeMigration(6, "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")
           .changeMigration(7, "ALTER TABLE TXNO_OUTBOX ADD lastAttemptTime TIMESTAMP(6)")
           .disableMigration(8)
+          .changeMigration(9, "ALTER TABLE TXNO_OUTBOX ADD topic VARCHAR(250) DEFAULT '*' NOT NULL")
+          .changeMigration(10, "ALTER TABLE TXNO_OUTBOX ADD seq NUMBER")
+          .changeMigration(
+              11,
+              "CREATE TABLE TXNO_SEQUENCE (topic VARCHAR(250) NOT NULL, seq NUMBER NOT NULL, CONSTRAINT PK_TXNO_SEQUENCE PRIMARY KEY (topic, seq))")
           .booleanValueFrom(v -> v ? "1" : "0")
           .createVersionTableBy(
               connection -> {
@@ -88,5 +95,15 @@ public interface Dialect {
                   }
                 }
               })
+          .fetchAndLockNextInTopic(
+              (fields, table) ->
+                  String.format(
+                      "SELECT %s FROM %s outer"
+                          + " WHERE outer.topic = ?"
+                          + " AND outer.processed = 0"
+                          + " AND outer.seq = ("
+                          + "SELECT MIN(seq) FROM %s inner WHERE inner.topic=outer.topic AND inner.processed=0"
+                          + " ) FOR UPDATE",
+                      fields, table, table))
           .build();
 }

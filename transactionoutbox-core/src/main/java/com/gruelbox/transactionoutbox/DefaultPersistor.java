@@ -4,16 +4,9 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.SQLIntegrityConstraintViolationException;
-import java.sql.SQLTimeoutException;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultPersistor implements Persistor, Validatable {
 
   private static final String ALL_FIELDS =
-      "id, uniqueRequestId, invocation, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
+      "id, uniqueRequestId, invocation, topic, seq, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
 
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
@@ -110,26 +103,28 @@ public class DefaultPersistor implements Persistor, Validatable {
   public void save(Transaction tx, TransactionOutboxEntry entry)
       throws SQLException, AlreadyScheduledException {
     var insertSql =
-        "INSERT INTO " + tableName + " (" + ALL_FIELDS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO "
+            + tableName
+            + " ("
+            + ALL_FIELDS
+            + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
+    if (entry.getTopic() != null) {
+      setNextSequence(tx, entry);
+      log.info("Assigned sequence number {} to topic {}", entry.getSequence(), entry.getTopic());
+    }
+    PreparedStatement stmt = tx.prepareBatchStatement(insertSql);
+    setupInsert(entry, writer, stmt);
     if (entry.getUniqueRequestId() == null) {
-      PreparedStatement stmt = tx.prepareBatchStatement(insertSql);
-      setupInsert(entry, writer, stmt);
       stmt.addBatch();
       log.debug("Inserted {} in batch", entry.description());
     } else {
-      //noinspection resource
-      try (PreparedStatement stmt = tx.connection().prepareStatement(insertSql)) {
-        setupInsert(entry, writer, stmt);
+      try {
         stmt.executeUpdate();
         log.debug("Inserted {} immediately", entry.description());
-      } catch (SQLIntegrityConstraintViolationException e) {
-        throw new AlreadyScheduledException(
-            "Request " + entry.description() + " already exists", e);
       } catch (Exception e) {
-        if (e.getClass().getName().equals("org.postgresql.util.PSQLException")
-            && e.getMessage().contains("constraint")) {
+        if (indexViolation(e)) {
           throw new AlreadyScheduledException(
               "Request " + entry.description() + " already exists", e);
         }
@@ -138,19 +133,65 @@ public class DefaultPersistor implements Persistor, Validatable {
     }
   }
 
+  private void setNextSequence(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
+    //noinspection resource
+    var seqSelect =
+        tx.prepareBatchStatement("SELECT seq FROM TXNO_SEQUENCE WHERE topic = ? FOR UPDATE");
+    seqSelect.setString(1, entry.getTopic());
+    try (ResultSet rs = seqSelect.executeQuery()) {
+      if (rs.next()) {
+        entry.setSequence(rs.getLong(1) + 1L);
+        //noinspection resource
+        var seqUpdate =
+            tx.prepareBatchStatement("UPDATE TXNO_SEQUENCE SET seq = ? WHERE topic = ?");
+        seqUpdate.setLong(1, entry.getSequence());
+        seqUpdate.setString(2, entry.getTopic());
+        seqUpdate.executeUpdate();
+      } else {
+        try {
+          entry.setSequence(1L);
+          //noinspection resource
+          var seqInsert =
+              tx.prepareBatchStatement("INSERT INTO TXNO_SEQUENCE (topic, seq) VALUES (?, ?)");
+          seqInsert.setString(1, entry.getTopic());
+          seqInsert.setLong(2, entry.getSequence());
+          seqInsert.executeUpdate();
+        } catch (Exception e) {
+          if (indexViolation(e)) {
+            setNextSequence(tx, entry);
+          } else {
+            throw e;
+          }
+        }
+      }
+    }
+  }
+
+  private boolean indexViolation(Exception e) {
+    return (e instanceof SQLIntegrityConstraintViolationException)
+        || (e.getClass().getName().equals("org.postgresql.util.PSQLException")
+            && e.getMessage().contains("constraint"));
+  }
+
   private void setupInsert(
       TransactionOutboxEntry entry, StringWriter writer, PreparedStatement stmt)
       throws SQLException {
     stmt.setString(1, entry.getId());
     stmt.setString(2, entry.getUniqueRequestId());
     stmt.setString(3, writer.toString());
+    stmt.setString(4, entry.getTopic() == null ? "*" : entry.getTopic());
+    if (entry.getSequence() == null) {
+      stmt.setObject(5, null);
+    } else {
+      stmt.setLong(5, entry.getSequence());
+    }
     stmt.setTimestamp(
-        4, entry.getLastAttemptTime() == null ? null : Timestamp.from(entry.getLastAttemptTime()));
-    stmt.setTimestamp(5, Timestamp.from(entry.getNextAttemptTime()));
-    stmt.setInt(6, entry.getAttempts());
-    stmt.setBoolean(7, entry.isBlocked());
-    stmt.setBoolean(8, entry.isProcessed());
-    stmt.setInt(9, entry.getVersion());
+        6, entry.getLastAttemptTime() == null ? null : Timestamp.from(entry.getLastAttemptTime()));
+    stmt.setTimestamp(7, Timestamp.from(entry.getNextAttemptTime()));
+    stmt.setInt(8, entry.getAttempts());
+    stmt.setBoolean(9, entry.isBlocked());
+    stmt.setBoolean(10, entry.isProcessed());
+    stmt.setInt(11, entry.getVersion());
   }
 
   @Override
@@ -239,22 +280,24 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   @Override
   public boolean unblock(Transaction tx, String entryId) throws Exception {
-    @SuppressWarnings("resource")
-    PreparedStatement stmt =
-        tx.prepareBatchStatement(
-            "UPDATE "
-                + tableName
-                + " SET attempts = 0, blocked = "
-                + dialect.booleanValue(false)
-                + " "
-                + "WHERE blocked = "
-                + dialect.booleanValue(true)
-                + " AND processed = "
-                + dialect.booleanValue(false)
-                + " AND id = ?");
-    stmt.setString(1, entryId);
-    stmt.setQueryTimeout(writeLockTimeoutSeconds);
-    return stmt.executeUpdate() != 0;
+    //noinspection resource
+    try (PreparedStatement stmt =
+        tx.connection()
+            .prepareStatement(
+                "UPDATE "
+                    + tableName
+                    + " SET attempts = 0, blocked = "
+                    + dialect.booleanValue(false)
+                    + " "
+                    + "WHERE blocked = "
+                    + dialect.booleanValue(true)
+                    + " AND processed = "
+                    + dialect.booleanValue(false)
+                    + " AND id = ?")) {
+      stmt.setString(1, entryId);
+      stmt.setQueryTimeout(writeLockTimeoutSeconds);
+      return stmt.executeUpdate() != 0;
+    }
   }
 
   @Override
@@ -274,11 +317,44 @@ public class DefaultPersistor implements Persistor, Validatable {
                     + dialect.booleanValue(false)
                     + " AND processed = "
                     + dialect.booleanValue(false)
+                    + " AND topic = '*'"
                     + dialect.getLimitCriteria()
                     + forUpdate)) {
       stmt.setTimestamp(1, Timestamp.from(now));
       stmt.setInt(2, batchSize);
-      return gatherResults(batchSize, stmt);
+      var result = new ArrayList<TransactionOutboxEntry>(batchSize);
+      gatherResults(stmt, result);
+      return result;
+    }
+  }
+
+  @Override
+  public List<String> selectActiveTopics(Transaction tx) throws Exception {
+    var sql = "SELECT DISTINCT topic FROM %s WHERE topic <> '*' AND processed = %s";
+    String falseStr = dialect.booleanValue(false);
+    //noinspection resource
+    try (PreparedStatement stmt =
+        tx.connection().prepareStatement(String.format(sql, tableName, falseStr, falseStr))) {
+      var result = new ArrayList<String>();
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          result.add(rs.getString(1));
+        }
+      }
+      return result;
+    }
+  }
+
+  @Override
+  public Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic)
+      throws Exception {
+    //noinspection resource
+    try (PreparedStatement stmt =
+        tx.connection().prepareStatement(dialect.fetchAndLockNextInTopic(ALL_FIELDS, tableName))) {
+      stmt.setString(1, topic);
+      var results = new ArrayList<TransactionOutboxEntry>(1);
+      gatherResults(stmt, results);
+      return results.stream().findFirst();
     }
   }
 
@@ -295,25 +371,30 @@ public class DefaultPersistor implements Persistor, Validatable {
     }
   }
 
-  private List<TransactionOutboxEntry> gatherResults(int batchSize, PreparedStatement stmt)
+  private void gatherResults(PreparedStatement stmt, Collection<TransactionOutboxEntry> output)
       throws SQLException, IOException {
     try (ResultSet rs = stmt.executeQuery()) {
-      ArrayList<TransactionOutboxEntry> result = new ArrayList<>(batchSize);
       while (rs.next()) {
-        result.add(map(rs));
+        output.add(map(rs));
       }
-      log.debug("Found {} results", result.size());
-      return result;
+      log.debug("Found {} results", output.size());
     }
   }
 
   private TransactionOutboxEntry map(ResultSet rs) throws SQLException, IOException {
+    String topic = rs.getString("topic");
+    Long sequence = rs.getLong("seq");
+    if (rs.wasNull()) {
+      sequence = null;
+    }
     try (Reader invocationStream = rs.getCharacterStream("invocation")) {
       TransactionOutboxEntry entry =
           TransactionOutboxEntry.builder()
               .id(rs.getString("id"))
               .uniqueRequestId(rs.getString("uniqueRequestId"))
               .invocation(serializer.deserializeInvocation(invocationStream))
+              .topic("*".equals(topic) ? null : topic)
+              .sequence(sequence)
               .lastAttemptTime(
                   rs.getTimestamp("lastAttemptTime") == null
                       ? null
