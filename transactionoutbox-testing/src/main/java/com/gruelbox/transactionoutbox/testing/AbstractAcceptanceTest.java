@@ -22,12 +22,12 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,48 +36,42 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractAcceptanceTest.class);
 
-  private final ExecutorService unreliablePool =
-      new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
+  private ExecutorService unreliablePool;
+  private ExecutorService singleThreadPool;
 
   private static final Random random = new Random();
+
+  @BeforeEach
+  void beforeEachBase() {
+    unreliablePool =
+        new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
+    singleThreadPool = Executors.newSingleThreadExecutor();
+  }
+
+  @AfterEach
+  void afterEachBase() throws InterruptedException {
+    unreliablePool.shutdown();
+    singleThreadPool.shutdown();
+    assertTrue(unreliablePool.awaitTermination(30, SECONDS));
+    assertTrue(singleThreadPool.awaitTermination(30, SECONDS));
+  }
 
   @Test
   final void sequencing() throws Exception {
     int countPerTopic = 50;
 
-    AtomicInteger lastSequenceTopic1 = new AtomicInteger();
-    AtomicInteger lastSequenceTopic2 = new AtomicInteger();
     CountDownLatch latch = new CountDownLatch(countPerTopic * 2);
-
     TransactionManager transactionManager = txManager();
+    OrderedEntryListener orderedEntryListener =
+        new OrderedEntryListener(latch, new CountDownLatch(1));
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
-            .instantiator(
-                Instantiator.using(
-                    clazz ->
-                        (InterfaceProcessor)
-                            (foo, bar) -> {
-                              if (random.nextInt(10) == 5) {
-                                throw new RuntimeException(
-                                    "Temporary failure of InterfaceProcessor");
-                              }
-                              var lastSequence =
-                                  ("topic1".equals(bar)) ? lastSequenceTopic1 : lastSequenceTopic2;
-                              if ((lastSequence.get() == foo - 1)) {
-                                lastSequence.set(foo);
-                                latch.countDown();
-                              } else {
-                                latch.countDown();
-                                throw new IllegalStateException(
-                                    String.format(
-                                        "Ordering violated (previous=%s, seq=%s",
-                                        lastSequence.get(), foo));
-                              }
-                            }))
+            .instantiator(new RandomFailingInstantiator())
             .persistor(persistor())
+            .listener(orderedEntryListener)
             .initializeImmediately(false)
             .build();
 
@@ -104,8 +98,19 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                 });
           }
           assertTrue(latch.await(30, SECONDS));
-          assertEquals(countPerTopic, lastSequenceTopic1.get());
-          assertEquals(countPerTopic, lastSequenceTopic2.get());
+          var indexes = LongStream.range(1, countPerTopic + 1).boxed().collect(Collectors.toList());
+          assertEquals(
+              indexes,
+              orderedEntryListener.getSuccesses().stream()
+                  .filter(it -> "topic1".equals(it.getTopic()))
+                  .map(TransactionOutboxEntry::getSequence)
+                  .collect(Collectors.toList()));
+          assertEquals(
+              indexes,
+              orderedEntryListener.getSuccesses().stream()
+                  .filter(it -> "topic2".equals(it.getTopic()))
+                  .map(TransactionOutboxEntry::getSequence)
+                  .collect(Collectors.toList()));
         });
   }
 
@@ -435,7 +440,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .instantiator(new FailingInstantiator(attempts))
-            .submitter(Submitter.withExecutor(unreliablePool))
+            .submitter(Submitter.withExecutor(singleThreadPool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(new LatchListener(latch))
             .build();
@@ -448,7 +453,8 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
           assertTrue(latch.await(15, SECONDS));
-        });
+        },
+        singleThreadPool);
   }
 
   @Test
@@ -506,7 +512,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .instantiator(new FailingInstantiator(attempts))
-            .submitter(Submitter.withExecutor(unreliablePool))
+            .submitter(Submitter.withExecutor(singleThreadPool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(orderedEntryListener)
             .blockAfterAttempts(2)
@@ -519,30 +525,30 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blockLatch.await(20, SECONDS));
+          assertTrue(blockLatch.await(20, SECONDS), "Entry was not blocked");
           assertTrue(
               (Boolean)
                   transactionManager.inTransactionReturns(
                       tx -> outbox.unblock(orderedEntryListener.getBlocked().getId())));
-          assertTrue(successLatch.await(20, SECONDS));
-          var orderedEntryEvents = orderedEntryListener.getOrderedEntries();
-          log.info("The entry life cycle is: {}", orderedEntryEvents);
+          assertTrue(successLatch.await(20, SECONDS), "Timeout waiting for success");
+          var events = orderedEntryListener.getEvents();
+          log.info("The entry life cycle is: {}", events);
 
           // then we are only dealing in terms of a single outbox entry.
-          assertEquals(
-              1, orderedEntryEvents.stream().map(TransactionOutboxEntry::getId).distinct().count());
+          assertEquals(1, events.stream().map(TransactionOutboxEntry::getId).distinct().count());
           // the first, scheduled entry has no lastAttemptTime set
-          assertNull(orderedEntryEvents.get(0).getLastAttemptTime());
+          assertNull(events.get(0).getLastAttemptTime());
           // all subsequent entries (2 x failures (second of which 'blocks'), 1x success updates
           // against db) have a distinct lastAttemptTime set on them.
           assertEquals(
               3,
-              orderedEntryEvents.stream()
+              events.stream()
                   .skip(1)
                   .map(TransactionOutboxEntry::getLastAttemptTime)
                   .distinct()
                   .count());
-        });
+        },
+        singleThreadPool);
   }
 
   /**
@@ -561,6 +567,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
             .instantiator(new FailingInstantiator(attempts))
+            .submitter(Submitter.withExecutor(singleThreadPool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
             .blockAfterAttempts(2)
@@ -579,7 +586,8 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                   transactionManager.inTransactionReturns(
                       tx -> outbox.unblock(latchListener.getBlocked().getId())));
           assertTrue(successLatch.await(5, SECONDS));
-        });
+        },
+        singleThreadPool);
   }
 
   /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */

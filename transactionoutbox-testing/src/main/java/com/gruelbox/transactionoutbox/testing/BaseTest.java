@@ -4,6 +4,7 @@ import com.gruelbox.transactionoutbox.*;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -73,6 +74,11 @@ public abstract class BaseTest {
 
   protected void withRunningFlusher(TransactionOutbox outbox, ThrowingRunnable runnable)
       throws Exception {
+    withRunningFlusher(outbox, runnable, flushExecutor);
+  }
+
+  protected void withRunningFlusher(
+      TransactionOutbox outbox, ThrowingRunnable runnable, Executor executor) throws Exception {
     Thread backgroundThread =
         new Thread(
             () -> {
@@ -80,7 +86,7 @@ public abstract class BaseTest {
                 try {
                   // Keep flushing work until there's nothing left to flush
                   //noinspection StatementWithEmptyBody
-                  while (outbox.flush(flushExecutor)) {}
+                  while (outbox.flush(executor)) {}
                 } catch (Exception e) {
                   log.error("Error flushing transaction outbox", e);
                 }
