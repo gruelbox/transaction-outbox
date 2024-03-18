@@ -106,8 +106,23 @@ public interface Persistor {
   List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
       throws Exception;
 
+  /**
+   * Selects the list of topics with work awaiting processing.
+   *
+   * @param tx The current {@link Transaction}.
+   * @return The topics.
+   * @throws Exception Any exception.
+   */
   List<String> selectActiveTopics(final Transaction tx) throws Exception;
 
+  /**
+   * Fetches and locks the next available piece of work on the specified topic.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param topic The topic.
+   * @return The next available piece of work on the selected topic.
+   * @throws Exception ANy exception.
+   */
   Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic) throws Exception;
 
   /**
