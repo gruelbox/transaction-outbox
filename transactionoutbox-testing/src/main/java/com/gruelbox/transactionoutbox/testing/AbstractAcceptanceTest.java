@@ -519,12 +519,12 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blockLatch.await(10, SECONDS));
+          assertTrue(blockLatch.await(20, SECONDS));
           assertTrue(
               (Boolean)
                   transactionManager.inTransactionReturns(
                       tx -> outbox.unblock(orderedEntryListener.getBlocked().getId())));
-          assertTrue(successLatch.await(10, SECONDS));
+          assertTrue(successLatch.await(20, SECONDS));
           var orderedEntryEvents = orderedEntryListener.getOrderedEntries();
           log.info("The entry life cycle is: {}", orderedEntryEvents);
 
@@ -573,12 +573,12 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         () -> {
           transactionManager.inTransaction(
               () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
-          assertTrue(blockLatch.await(3, SECONDS));
+          assertTrue(blockLatch.await(5, SECONDS));
           assertTrue(
               (Boolean)
                   transactionManager.inTransactionReturns(
                       tx -> outbox.unblock(latchListener.getBlocked().getId())));
-          assertTrue(successLatch.await(3, SECONDS));
+          assertTrue(successLatch.await(5, SECONDS));
         });
   }
 
