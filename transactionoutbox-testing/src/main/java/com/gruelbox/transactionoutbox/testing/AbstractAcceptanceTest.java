@@ -241,6 +241,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
             tx -> outbox.fetchEntry(callbackEntry.get().getId()).orElseThrow());
 
     assertEquals(callbackEntry.get().getId(), activeEntry.getId());
+    log.info("Checking invocations match: {}", callbackEntry.get().getInvocation());
     assertEquals(callbackEntry.get().getInvocation(), activeEntry.getInvocation());
     assertEquals(0, activeEntry.getAttempts());
     assertNull(activeEntry.getLastAttemptTime());

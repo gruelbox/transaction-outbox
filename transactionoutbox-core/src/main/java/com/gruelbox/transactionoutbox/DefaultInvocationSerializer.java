@@ -204,7 +204,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       try {
         return classLoader != null ? Class.forName(name, false, classLoader) : Class.forName(name);
       } catch (ClassNotFoundException e) {
-        throw new RuntimeException(
+        throw new IllegalArgumentException(
             "Cannot determine array type for "
                 + name
                 + " using "
@@ -222,13 +222,13 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       JsonObject obj = new JsonObject();
       obj.addProperty("c", src.getClassName());
       obj.addProperty("m", src.getMethodName());
-      JsonArray params = new JsonArray();
-      if (src.getParameterTypes().length > 0) {
+      if (src.getParameterTypes() != null) {
+        JsonArray params = new JsonArray();
         JsonArray args = new JsonArray();
         int i = 0;
         for (Class<?> parameterType : src.getParameterTypes()) {
           params.add(nameForClass(parameterType));
-          Object arg = src.getArgs()[i];
+          Object arg = src.getArgs() == null ? null : src.getArgs()[i];
           if (arg == null) {
             JsonObject jsonObject = new JsonObject();
             jsonObject.add("t", null);
@@ -242,9 +242,11 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
           }
           i++;
         }
-        obj.add("a", args);
+        if (src.getArgs() != null) {
+          obj.add("a", args);
+        }
+        obj.add("p", params);
       }
-      obj.add("p", params);
       obj.add("x", context.serialize(src.getMdc()));
       return obj;
     }
@@ -277,7 +279,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       String methodName = jsonObject.get("m").getAsString();
 
       Class<?>[] params = null;
-      if (jsonObject.has("p")) {
+      if (jsonObject.has("p") || version == 1) {
         JsonArray jsonParams = jsonObject.get("p").getAsJsonArray();
         params = new Class<?>[jsonParams.size()];
         for (int i = 0; i < jsonParams.size(); i++) {
@@ -292,7 +294,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       }
 
       Object[] args = null;
-      if (jsonObject.has("a")) {
+      if (jsonObject.has("a") || version == 1) {
         JsonElement argsElement = jsonObject.get("a");
         if (argsElement == null) {
           // For backwards compatibility
@@ -309,7 +311,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
             try {
               args[i] = context.deserialize(argValue, argClass);
             } catch (Exception e) {
-              throw new RuntimeException(
+              throw new IllegalArgumentException(
                   "Failed to deserialize arg [" + argValue + "] of type [" + argType + "]", e);
             }
           }
@@ -459,7 +461,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
   }
 
   static final class UtcDateTypeAdapter extends TypeAdapter<Date> {
-    private final TimeZone UTC_TIME_ZONE = TimeZone.getTimeZone("UTC");
+    private static final TimeZone UTC_TIME_ZONE = TimeZone.getTimeZone("UTC");
 
     @Override
     public void write(JsonWriter out, Date date) throws IOException {
