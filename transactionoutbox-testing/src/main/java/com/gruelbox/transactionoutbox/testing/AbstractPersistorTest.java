@@ -14,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeMatcher;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -276,8 +275,6 @@ public abstract class AbstractPersistorTest {
 
   @Test
   public void testSkipLocked() throws Exception {
-    Assumptions.assumeTrue(dialect().isSupportsSkipLock());
-
     var entry1 = createEntry("FOO1", now.minusSeconds(1), false);
     var entry2 = createEntry("FOO2", now.minusSeconds(1), false);
     var entry3 = createEntry("FOO3", now.minusSeconds(1), false);

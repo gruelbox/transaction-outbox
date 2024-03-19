@@ -31,4 +31,9 @@ class TestDefaultPersistorH2 extends AbstractPersistorTest {
   protected Dialect dialect() {
     return Dialect.H2;
   }
+
+  @Override
+  public void testSkipLocked() throws Exception {
+    // Not supported.
+  }
 }
