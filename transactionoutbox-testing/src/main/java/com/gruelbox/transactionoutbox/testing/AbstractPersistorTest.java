@@ -276,7 +276,6 @@ public abstract class AbstractPersistorTest {
 
   @Test
   public void testSkipLocked() throws Exception {
-    Assumptions.assumeTrue(dialect().isSupportsSkipLock());
 
     var entry1 = createEntry("FOO1", now.minusSeconds(1), false);
     var entry2 = createEntry("FOO2", now.minusSeconds(1), false);

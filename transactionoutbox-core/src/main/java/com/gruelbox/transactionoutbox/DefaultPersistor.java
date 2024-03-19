@@ -42,8 +42,8 @@ public class DefaultPersistor implements Persistor, Validatable {
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
    *     lock. There's no point making this long; it's always better to just back off as quickly as
-   *     possible and try another record. Generally these lock timeouts only kick in if {@link
-   *     Dialect#isSupportsSkipLock()} is false.
+   *     possible and try another record. Generally these lock timeouts only kick in if the database
+   *     does not support skip locking.
    */
   @SuppressWarnings("JavaDoc")
   @Builder.Default
@@ -205,15 +205,10 @@ public class DefaultPersistor implements Persistor, Validatable {
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
-                dialect.isSupportsSkipLock()
-                    // language=MySQL
-                    ? "SELECT id, invocation FROM "
-                        + tableName
-                        + " WHERE id = ? AND version = ? FOR UPDATE SKIP LOCKED"
-                    // language=MySQL
-                    : "SELECT id, invocation FROM "
-                        + tableName
-                        + " WHERE id = ? AND version = ? FOR UPDATE")) {
+                dialect
+                    .getLock()
+                    .replace("{{table}}", tableName)
+                    .replace("{{allFields}}", ALL_FIELDS))) {
       stmt.setString(1, entry.getId());
       stmt.setInt(2, entry.getVersion());
       stmt.setQueryTimeout(writeLockTimeoutSeconds);
@@ -260,24 +255,16 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Override
   public List<TransactionOutboxEntry> selectBatch(Transaction tx, int batchSize, Instant now)
       throws Exception {
-    String forUpdate = dialect.isSupportsSkipLock() ? " FOR UPDATE SKIP LOCKED" : "";
     //noinspection resource
     try (PreparedStatement stmt =
         tx.connection()
             .prepareStatement(
-                // language=MySQL
-                "SELECT "
-                    + ALL_FIELDS
-                    + " FROM "
-                    + tableName
-                    + " WHERE nextAttemptTime < ? AND blocked = "
-                    + dialect.booleanValue(false)
-                    + " AND processed = "
-                    + dialect.booleanValue(false)
-                    + dialect.getLimitCriteria()
-                    + forUpdate)) {
+                dialect
+                    .getSelectBatch()
+                    .replace("{{table}}", tableName)
+                    .replace("{{batchSize}}", Integer.toString(batchSize))
+                    .replace("{{allFields}}", ALL_FIELDS))) {
       stmt.setTimestamp(1, Timestamp.from(now));
-      stmt.setInt(2, batchSize);
       return gatherResults(batchSize, stmt);
     }
   }
@@ -288,9 +275,12 @@ public class DefaultPersistor implements Persistor, Validatable {
     //noinspection resource
     try (PreparedStatement stmt =
         tx.connection()
-            .prepareStatement(dialect.getDeleteExpired().replace("{{table}}", tableName))) {
+            .prepareStatement(
+                dialect
+                    .getDeleteExpired()
+                    .replace("{{table}}", tableName)
+                    .replace("{{batchSize}}", Integer.toString(batchSize)))) {
       stmt.setTimestamp(1, Timestamp.from(now));
-      stmt.setInt(2, batchSize);
       return stmt.executeUpdate();
     }
   }

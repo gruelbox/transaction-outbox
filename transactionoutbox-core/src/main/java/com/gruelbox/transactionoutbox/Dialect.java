@@ -7,20 +7,14 @@ import java.util.stream.Stream;
 
 /** The SQL dialects supported by {@link DefaultPersistor}. */
 public interface Dialect {
-
-  /**
-   * @return True if hot row support ({@code SKIP LOCKED}) is available, increasing performance when
-   *     there are multiple instances of the application potentially competing to process the same
-   *     task.
-   */
-  boolean isSupportsSkipLock();
-
   /**
    * @return Format string for the SQL required to delete expired retained records.
    */
   String getDeleteExpired();
 
-  String getLimitCriteria();
+  String getSelectBatch();
+
+  String getLock();
 
   String getCheckSql();
 
@@ -31,12 +25,29 @@ public interface Dialect {
   Stream<Migration> getMigrations();
 
   Dialect MY_SQL_5 = DefaultDialect.builder("MY_SQL_5").build();
-  Dialect MY_SQL_8 = DefaultDialect.builder("MY_SQL_8").supportsSkipLock(true).build();
+  Dialect MY_SQL_8 =
+      DefaultDialect.builder("MY_SQL_8")
+          .deleteExpired(
+              "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false"
+                  + " LIMIT {{batchSize}}")
+          .selectBatch(
+              "SELECT {{allFields}} FROM {{table}} WHERE nextAttemptTime < ? "
+                  + "AND blocked = false AND processed = false LIMIT {{batchSize}} FOR UPDATE SKIP LOCKED")
+          .lock(
+              "SELECT id, invocation FROM {{table}} WHERE id = ? AND version = ? FOR "
+                  + "UPDATE SKIP LOCKED")
+          .build();
   Dialect POSTGRESQL_9 =
       DefaultDialect.builder("POSTGRESQL_9")
-          .supportsSkipLock(true)
           .deleteExpired(
-              "DELETE FROM {{table}} WHERE id IN (SELECT id FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?)")
+              "DELETE FROM {{table}} WHERE id IN "
+                  + "(SELECT id FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT {{batchSize}})")
+          .selectBatch(
+              "SELECT {{allFields}} FROM {{table}} WHERE nextAttemptTime < ? "
+                  + "AND blocked = false AND processed = false LIMIT {{batchSize}} FOR UPDATE SKIP LOCKED")
+          .lock(
+              "SELECT id, invocation FROM {{table}} WHERE id = ? AND version = ? FOR "
+                  + "UPDATE SKIP LOCKED")
           .changeMigration(
               5, "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)")
           .changeMigration(6, "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked")
@@ -52,10 +63,16 @@ public interface Dialect {
           .build();
   Dialect ORACLE =
       DefaultDialect.builder("ORACLE")
-          .supportsSkipLock(true)
           .deleteExpired(
-              "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0 AND ROWNUM <= ?")
-          .limitCriteria(" AND ROWNUM <= ?")
+              "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0 "
+                  + "AND ROWNUM <= {{batchSize}}")
+          .selectBatch(
+              "SELECT {{allFields}} FROM {{table}} WHERE nextAttemptTime < ? "
+                  + "AND blocked = 0 AND processed = 0 AND ROWNUM <= {{batchSize}} FOR UPDATE "
+                  + "SKIP LOCKED")
+          .lock(
+              "SELECT id, invocation FROM {{table}} WHERE id = ? AND version = ? FOR "
+                  + "UPDATE SKIP LOCKED")
           .checkSql("SELECT 1 FROM DUAL")
           .changeMigration(
               1,

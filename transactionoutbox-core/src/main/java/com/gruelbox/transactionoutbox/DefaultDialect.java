@@ -22,9 +22,9 @@ class DefaultDialect implements Dialect {
   }
 
   @Getter private final String name;
-  @Getter private final boolean supportsSkipLock;
   @Getter private final String deleteExpired;
-  @Getter private final String limitCriteria;
+  @Getter private final String selectBatch;
+  @Getter private final String lock;
   @Getter private final String checkSql;
   private final Collection<Migration> migrations;
 
@@ -57,8 +57,13 @@ class DefaultDialect implements Dialect {
     private final String name;
     private boolean supportsSkipLock = false;
     private String deleteExpired =
-        "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?";
-    private String limitCriteria = " LIMIT ?";
+        "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false"
+            + " LIMIT {{batchSize}}";
+    private String selectBatch =
+        "SELECT {{allFields}} FROM {{table}} WHERE nextAttemptTime < ? "
+            + "AND blocked = false AND processed = false LIMIT {{batchSize}}";
+    private String lock =
+        "SELECT id, invocation FROM {{table}} WHERE id = ? AND version = ? FOR UPDATE";
     private String checkSql = "SELECT 1";
     private Map<Integer, Migration> migrations;
     private Function<Boolean, String> booleanValueFrom;
@@ -137,7 +142,7 @@ class DefaultDialect implements Dialect {
 
     Dialect build() {
       return new DefaultDialect(
-          name, supportsSkipLock, deleteExpired, limitCriteria, checkSql, migrations.values()) {
+          name, deleteExpired, selectBatch, lock, checkSql, migrations.values()) {
         @Override
         public String booleanValue(boolean criteriaValue) {
           if (booleanValueFrom != null) {
