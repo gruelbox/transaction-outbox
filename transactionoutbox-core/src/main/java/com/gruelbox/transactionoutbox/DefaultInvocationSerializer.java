@@ -217,37 +217,39 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
     public JsonElement serialize(Invocation src, Type typeOfSrc, JsonSerializationContext context) {
       if (version == 1) {
         log.warn("Serializing as deprecated version {}", version);
-        return serializeV1(src, typeOfSrc, context);
+        return serializeV1(src, context);
       }
       JsonObject obj = new JsonObject();
       obj.addProperty("c", src.getClassName());
       obj.addProperty("m", src.getMethodName());
       JsonArray params = new JsonArray();
-      JsonArray args = new JsonArray();
-      int i = 0;
-      for (Class<?> parameterType : src.getParameterTypes()) {
-        params.add(nameForClass(parameterType));
-        Object arg = src.getArgs()[i];
-        if (arg == null) {
-          JsonObject jsonObject = new JsonObject();
-          jsonObject.add("t", null);
-          jsonObject.add("v", null);
-          args.add(jsonObject);
-        } else {
-          JsonObject jsonObject = new JsonObject();
-          jsonObject.addProperty("t", nameForClass(arg.getClass()));
-          jsonObject.add("v", context.serialize(arg));
-          args.add(jsonObject);
+      if (src.getParameterTypes().length > 0) {
+        JsonArray args = new JsonArray();
+        int i = 0;
+        for (Class<?> parameterType : src.getParameterTypes()) {
+          params.add(nameForClass(parameterType));
+          Object arg = src.getArgs()[i];
+          if (arg == null) {
+            JsonObject jsonObject = new JsonObject();
+            jsonObject.add("t", null);
+            jsonObject.add("v", null);
+            args.add(jsonObject);
+          } else {
+            JsonObject jsonObject = new JsonObject();
+            jsonObject.addProperty("t", nameForClass(arg.getClass()));
+            jsonObject.add("v", context.serialize(arg));
+            args.add(jsonObject);
+          }
+          i++;
         }
-        i++;
+        obj.add("a", args);
       }
       obj.add("p", params);
-      obj.add("a", args);
       obj.add("x", context.serialize(src.getMdc()));
       return obj;
     }
 
-    JsonElement serializeV1(Invocation src, Type typeOfSrc, JsonSerializationContext context) {
+    JsonElement serializeV1(Invocation src, JsonSerializationContext context) {
       JsonObject obj = new JsonObject();
       obj.addProperty("c", src.getClassName());
       obj.addProperty("m", src.getMethodName());
@@ -274,39 +276,46 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       String className = jsonObject.get("c").getAsString();
       String methodName = jsonObject.get("m").getAsString();
 
-      JsonArray jsonParams = jsonObject.get("p").getAsJsonArray();
-      Class<?>[] params = new Class<?>[jsonParams.size()];
-      for (int i = 0; i < jsonParams.size(); i++) {
-        JsonElement param = jsonParams.get(i);
-        if (param.isJsonObject()) {
-          // For backwards compatibility
-          params[i] = classForName(param.getAsJsonObject().get("t").getAsString());
-        } else {
-          params[i] = classForName(param.getAsString());
-        }
-      }
-
-      JsonElement argsElement = jsonObject.get("a");
-      if (argsElement == null) {
-        // For backwards compatibility
-        argsElement = jsonObject.get("p");
-      }
-      JsonArray jsonArgs = argsElement.getAsJsonArray();
-      Object[] args = new Object[jsonArgs.size()];
-      for (int i = 0; i < jsonArgs.size(); i++) {
-        JsonElement arg = jsonArgs.get(i);
-        JsonElement argType = arg.getAsJsonObject().get("t");
-        if (argType != null) {
-          JsonElement argValue = arg.getAsJsonObject().get("v");
-          Class<?> argClass = classForName(argType.getAsString());
-          try {
-            args[i] = context.deserialize(argValue, argClass);
-          } catch (Exception e) {
-            throw new RuntimeException(
-                "Failed to deserialize arg [" + argValue + "] of type [" + argType + "]", e);
+      Class<?>[] params = null;
+      if (jsonObject.has("p")) {
+        JsonArray jsonParams = jsonObject.get("p").getAsJsonArray();
+        params = new Class<?>[jsonParams.size()];
+        for (int i = 0; i < jsonParams.size(); i++) {
+          JsonElement param = jsonParams.get(i);
+          if (param.isJsonObject()) {
+            // For backwards compatibility
+            params[i] = classForName(param.getAsJsonObject().get("t").getAsString());
+          } else {
+            params[i] = classForName(param.getAsString());
           }
         }
       }
+
+      Object[] args = null;
+      if (jsonObject.has("a")) {
+        JsonElement argsElement = jsonObject.get("a");
+        if (argsElement == null) {
+          // For backwards compatibility
+          argsElement = jsonObject.get("p");
+        }
+        JsonArray jsonArgs = argsElement.getAsJsonArray();
+        args = new Object[jsonArgs.size()];
+        for (int i = 0; i < jsonArgs.size(); i++) {
+          JsonElement arg = jsonArgs.get(i);
+          JsonElement argType = arg.getAsJsonObject().get("t");
+          if (argType != null) {
+            JsonElement argValue = arg.getAsJsonObject().get("v");
+            Class<?> argClass = classForName(argType.getAsString());
+            try {
+              args[i] = context.deserialize(argValue, argClass);
+            } catch (Exception e) {
+              throw new RuntimeException(
+                  "Failed to deserialize arg [" + argValue + "] of type [" + argType + "]", e);
+            }
+          }
+        }
+      }
+
       Map<String, String> mdc = context.deserialize(jsonObject.get("x"), Map.class);
 
       return new Invocation(className, methodName, params, args, mdc);

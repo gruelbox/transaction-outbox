@@ -11,11 +11,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -79,7 +81,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public <T> T schedule(Class<T> clazz) {
-    return schedule(clazz, null, null);
+    return schedule(clazz, null, null, null);
   }
 
   @Override
@@ -114,9 +116,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public boolean flush(Executor executor) {
-    if (!initialized.get()) {
-      throw new IllegalStateException("Not initialized");
-    }
+    checkInitialized();
     Instant now = clockProvider.get().instant();
     List<CompletableFuture<Boolean>> futures = new ArrayList<>();
 
@@ -168,13 +168,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public boolean unblock(String entryId) {
-    if (!initialized.get()) {
-      throw new IllegalStateException("Not initialized");
-    }
-    if (!(transactionManager instanceof ThreadLocalContextTransactionManager)) {
-      throw new UnsupportedOperationException(
-          "This method requires a ThreadLocalContextTransactionManager");
-    }
+    checkInitialized();
+    checkThreadLocalTransactionManager();
     log.info("Unblocking entry {} for retry.", entryId);
     try {
       return ((ThreadLocalContextTransactionManager) transactionManager)
@@ -187,13 +182,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   @Override
   @SuppressWarnings({"unchecked", "rawtypes"})
   public boolean unblock(String entryId, Object transactionContext) {
-    if (!initialized.get()) {
-      throw new IllegalStateException("Not initialized");
-    }
-    if (!(transactionManager instanceof ParameterContextTransactionManager)) {
-      throw new UnsupportedOperationException(
-          "This method requires a ParameterContextTransactionManager");
-    }
+    checkInitialized();
+    checkParameterContextTransactionManager();
     log.info("Unblocking entry {} for retry", entryId);
     try {
       if (transactionContext instanceof Transaction) {
@@ -208,10 +198,12 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private <T> T schedule(Class<T> clazz, String uniqueRequestId, String topic) {
-    if (!initialized.get()) {
-      throw new IllegalStateException("Not initialized");
-    }
+  private <T> T schedule(
+      Class<T> clazz,
+      String uniqueRequestId,
+      String topic,
+      Consumer<TransactionOutboxEntry> entryCallback) {
+    checkInitialized();
     return proxyFactory.createProxy(
         clazz,
         (method, args) ->
@@ -228,6 +220,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                           topic);
                   validator.validate(entry);
                   persistor.save(extracted.getTransaction(), entry);
+                  var entryToCallBack = entry.toBuilder().build();
                   extracted
                       .getTransaction()
                       .addPostCommitHook(
@@ -237,6 +230,9 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                               submitNow(entry);
                             }
                           });
+                  if (entryCallback != null) {
+                    entryCallback.accept(entryToCallBack);
+                  }
                   log.debug(
                       "Scheduled {} for running after transaction commit", entry.description());
                   return null;
@@ -250,8 +246,9 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   @Override
   @SuppressWarnings("WeakerAccess")
   public void processNow(TransactionOutboxEntry entry) {
-    initialize();
+    checkInitialized();
     Boolean success = null;
+    entry.setAttempts(entry.getAttempts() + 1);
     try {
       success =
           transactionManager.inTransactionReturnsThrows(
@@ -320,7 +317,6 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   private void processWithExistingLock(Transaction tx, TransactionOutboxEntry entry)
       throws Exception {
-    initialize();
     entry
         .getInvocation()
         .withinMDC(
@@ -339,6 +335,45 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
               }
               return true;
             });
+  }
+
+  @Override
+  public Optional<TransactionOutboxEntry> fetchEntry(String entryId) {
+    checkInitialized();
+    checkThreadLocalTransactionManager();
+    return ((ThreadLocalContextTransactionManager) transactionManager)
+        .requireTransactionReturns(tx -> uncheckedly(() -> persistor.load(tx, entryId)));
+  }
+
+  @Override
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  public Optional<TransactionOutboxEntry> fetchEntry(String entryId, Object transactionContext) {
+    checkInitialized();
+    checkParameterContextTransactionManager();
+    Transaction tx =
+        ((ParameterContextTransactionManager) transactionManager)
+            .transactionFromContext(transactionContext);
+    return uncheckedly(() -> persistor.load(tx, entryId));
+  }
+
+  private void checkParameterContextTransactionManager() {
+    if (!(transactionManager instanceof ParameterContextTransactionManager)) {
+      throw new UnsupportedOperationException(
+          "This method requires a ParameterContextTransactionManager");
+    }
+  }
+
+  private void checkThreadLocalTransactionManager() {
+    if (!(transactionManager instanceof ThreadLocalContextTransactionManager)) {
+      throw new UnsupportedOperationException(
+          "This method requires a ThreadLocalContextTransactionManager");
+    }
+  }
+
+  private void checkInitialized() {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
   }
 
   private void invoke(TransactionOutboxEntry entry, Transaction transaction)
@@ -393,7 +428,6 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
     try {
-      entry.setAttempts(entry.getAttempts() + 1);
       var blocked = (entry.getTopic() == null) && (entry.getAttempts() >= blockAfterAttempts);
       entry.setBlocked(blocked);
       transactionManager.inTransactionThrows(tx -> pushBack(tx, entry));
@@ -461,13 +495,14 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
     private String uniqueRequestId;
     private String ordered;
+    private Consumer<TransactionOutboxEntry> entryCallback;
 
     @Override
     public <T> T schedule(Class<T> clazz) {
       if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
         throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
       }
-      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered);
+      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered, entryCallback);
     }
   }
 }

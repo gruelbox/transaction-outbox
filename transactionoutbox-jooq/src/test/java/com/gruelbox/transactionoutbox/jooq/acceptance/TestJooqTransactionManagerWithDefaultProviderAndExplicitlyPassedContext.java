@@ -12,6 +12,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
@@ -77,10 +78,19 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
 
     clearOutbox(createTransactionManager());
 
+    AtomicReference<TransactionOutboxEntry> ref = new AtomicReference<>();
+
     createTransactionManager()
         .inTransaction(
             tx -> {
-              outbox.schedule(Worker.class).process(1, tx);
+              outbox
+                  .with()
+                  .uniqueRequestId("foo")
+                  .entryCallback(ref::set)
+                  .schedule(Worker.class)
+                  .process(1, tx);
+              log.info("Created record id {}", ref.get().getId());
+              assertEquals("process", ref.get().getInvocation().getMethodName());
               try {
                 // Should not be fired until after commit
                 assertFalse(latch.await(2, TimeUnit.SECONDS));
@@ -88,6 +98,16 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
                 fail("Interrupted");
               }
             });
+
+    createTransactionManager()
+        .inTransaction(
+            tx ->
+                assertEquals(
+                    ref.get().getInvocation(),
+                    outbox
+                        .fetchEntry(ref.get().getId(), tx.context())
+                        .orElseThrow()
+                        .getInvocation()));
 
     // Should be fired after commit
     assertTrue(latch.await(2, TimeUnit.SECONDS));
@@ -113,9 +133,14 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
     clearOutbox(createTransactionManager());
 
     DSLContext dsl = createDsl();
+
+    AtomicReference<TransactionOutboxEntry> ref = new AtomicReference<>();
+
     dsl.transaction(
         cx1 -> {
-          outbox.schedule(Worker.class).process(1, cx1);
+          outbox.with().entryCallback(ref::set).schedule(Worker.class).process(1, cx1);
+          log.info("Created record id {}", ref.get().getId());
+          assertEquals("process", ref.get().getInvocation().getMethodName());
           try {
             // Should not be fired until after commit
             assertFalse(latch.await(2, TimeUnit.SECONDS));
@@ -123,6 +148,12 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
             fail("Interrupted");
           }
         });
+
+    dsl.transaction(
+        cx1 ->
+            assertEquals(
+                ref.get().getInvocation(),
+                outbox.fetchEntry(ref.get().getId(), cx1).orElseThrow().getInvocation()));
 
     // Should be fired after commit
     assertTrue(latch.await(2, TimeUnit.SECONDS));

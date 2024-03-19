@@ -2,7 +2,9 @@ package com.gruelbox.transactionoutbox;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import lombok.ToString;
 import org.slf4j.MDC;
@@ -134,6 +136,51 @@ public interface TransactionOutbox {
    */
   @SuppressWarnings("WeakerAccess")
   void processNow(TransactionOutboxEntry entry);
+
+  /**
+   * Loads the specified queued test. This can be used to check the status.
+   *
+   * <p>Requires the transaction manager in use to be a {@link
+   * ThreadLocalContextTransactionManager}.
+   *
+   * <p>Note that nothing may be returned for four distinct reasons:
+   *
+   * <ul>
+   *   <li>Such a task has never been created and is therefore unknown
+   *   <li>The task was created, and successfully completed, but had no {@code uniqueRequestId} so
+   *       was deleted.
+   *   <li>The task was created, and completed, and had a {@code uniqueRequestId}, but the {@code
+   *       retentionThreshold} has passed so the record has been deleted
+   *   <li>The task was created, and may have succeeded or failed but was deleted from the database
+   *       by a user for some reason.
+   * </ul>
+   *
+   * @param entryId The entry id.
+   * @return Empty if no such entry exists, otherwise the entry.
+   */
+  Optional<TransactionOutboxEntry> fetchEntry(String entryId);
+
+  /**
+   * Loads the specified queued request. This can be used to check the status of a request.
+   *
+   * <p>Note that nothing may be returned for four distinct reasons:
+   *
+   * <ul>
+   *   <li>Such a task has never been created and is therefore unknown
+   *   <li>The task was created, and successfully completed, but had no {@code uniqueRequestId} so
+   *       was deleted.
+   *   <li>The task was created, and completed, and had a {@code uniqueRequestId}, but the {@code
+   *       retentionThreshold} has passed so the record has been deleted
+   *   <li>The task was created, and may have succeeded or failed but was deleted from the database
+   *       by a user for some reason.
+   * </ul>
+   *
+   * @param entryId The entry id.
+   * @param transactionContext The transaction context (if using a {@link
+   *     ParameterContextTransactionManager}).
+   * @return Empty if no such entry exists, otherwise the entry.
+   */
+  Optional<TransactionOutboxEntry> fetchEntry(String entryId, Object transactionContext);
 
   /** Builder for {@link TransactionOutbox}. */
   @ToString
@@ -367,6 +414,22 @@ public interface TransactionOutbox {
      * @return Builder.
      */
     ParameterizedScheduleBuilder ordered(String topic);
+
+    /**
+     * If set, {@code callback} will be called in the current thread immediately after writing the
+     * entry to the database, so that the details of the record can be inspected or the {@code id}
+     * retained to be able to check the status with {@link TransactionOutbox#fetchEntry(String)}.
+     *
+     * <p>Note that a successful callback does not necessarily mean that the entry has, or will
+     * ever, be processed. The current transaction could be rolled back rather than committed. If
+     * this occurs, {@link TransactionOutbox#fetchEntry(String)} will simply return empty.
+     *
+     * @param callback Receives the {@link TransactionOutboxEntry} once it has been inserted into
+     *     the database (though this insert may be rolled back and will not be processed if this
+     *     happens).
+     * @return Builder.
+     */
+    ParameterizedScheduleBuilder entryCallback(Consumer<TransactionOutboxEntry> callback);
 
     /**
      * Equivalent to {@link TransactionOutbox#schedule(Class)}, but applying additional parameters

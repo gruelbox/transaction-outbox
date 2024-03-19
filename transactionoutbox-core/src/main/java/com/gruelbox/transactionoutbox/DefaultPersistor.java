@@ -427,4 +427,17 @@ public class DefaultPersistor implements Persistor, Validatable {
       return rs.next() && (rs.getInt(1) == 1);
     }
   }
+
+  @Override
+  public Optional<TransactionOutboxEntry> load(Transaction tx, String entryId) throws Exception {
+    //noinspection resource
+    try (PreparedStatement stmt =
+        tx.connection()
+            .prepareStatement("SELECT " + ALL_FIELDS + " FROM " + tableName + " WHERE id = ?")) {
+      stmt.setString(1, entryId);
+      List<TransactionOutboxEntry> results = new ArrayList<>(1);
+      gatherResults(stmt, results);
+      return results.stream().findFirst();
+    }
+  }
 }
