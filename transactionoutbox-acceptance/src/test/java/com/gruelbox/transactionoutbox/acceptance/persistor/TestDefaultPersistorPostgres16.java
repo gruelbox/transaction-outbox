@@ -17,7 +17,9 @@ class TestDefaultPersistorPostgres16 extends AbstractPersistorTest {
   @SuppressWarnings({"rawtypes", "resource"})
   private static final JdbcDatabaseContainer container =
       (JdbcDatabaseContainer)
-          new PostgreSQLContainer("postgres:16").withStartupTimeout(Duration.ofHours(1));
+          new PostgreSQLContainer("postgres:16")
+              .withStartupTimeout(Duration.ofHours(1))
+              .withReuse(true);
 
   private final DefaultPersistor persistor =
       DefaultPersistor.builder().dialect(Dialect.POSTGRESQL_9).build();

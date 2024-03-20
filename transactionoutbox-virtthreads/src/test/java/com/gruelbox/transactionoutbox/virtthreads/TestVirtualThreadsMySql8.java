@@ -20,6 +20,7 @@ class TestVirtualThreadsMySql8 extends AbstractVirtualThreadsTest {
   private static final JdbcDatabaseContainer container =
       new MySQLContainer<>("mysql:8")
           .withStartupTimeout(Duration.ofMinutes(5))
+          .withReuse(true)
           .withTmpFs(Map.of("/var/lib/mysql", "rw"));
 
   @Override
