@@ -23,7 +23,7 @@ public final class OrderedEntryListener implements TransactionOutboxListener {
   private final CopyOnWriteArrayList<TransactionOutboxEntry> successes =
       new CopyOnWriteArrayList<>();
 
-  OrderedEntryListener(CountDownLatch successLatch, CountDownLatch blockedLatch) {
+  public OrderedEntryListener(CountDownLatch successLatch, CountDownLatch blockedLatch) {
     this.successLatch = successLatch;
     this.blockedLatch = blockedLatch;
   }
