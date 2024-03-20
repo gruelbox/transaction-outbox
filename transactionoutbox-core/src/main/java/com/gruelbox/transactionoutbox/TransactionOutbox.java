@@ -384,17 +384,10 @@ public interface TransactionOutbox {
      * java.util.concurrent.ScheduledExecutorService} for processing after the specified delay.
      * However, if the delay is long enough that the work would likely get picked up by a {@link
      * #flush()} on this JVM or another, this is pointless and wasteful. Unfortunately, we don't
-     * know exactly how frequently {@link #flush()} will be called! To mitigate this, two measures
-     * are taken:
-     *
-     * <ul>
-     *   <li>Any call to {@link #flush()} or {@link #flush(Executor)} will immediately cancel any
-     *       pending scheduled processing on the local JVM. Those tasks will now get picked up in
-     *       due course by a flush.
-     *   <li>Any task submitted with a delay in access of {@link
-     *       TransactionOutboxBuilder#attemptFrequency(Duration)} will be assumed to get picked up
-     *       by a
-     * </ul>
+     * know exactly how frequently {@link #flush()} will be called! To mitigate this, Any task
+     * submitted with a delay in excess of {@link
+     * TransactionOutboxBuilder#attemptFrequency(Duration)} will be assumed to get picked up by a
+     * future flush.</p>
      *
      * @param duration The minimum delay duration.
      * @return Builder.
