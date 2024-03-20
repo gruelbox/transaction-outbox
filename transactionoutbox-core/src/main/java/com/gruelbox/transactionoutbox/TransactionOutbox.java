@@ -369,6 +369,39 @@ public interface TransactionOutbox {
     ParameterizedScheduleBuilder ordered(String topic);
 
     /**
+     * Instructs the scheduler to delay processing the task until after the specified duration. This
+     * can be used for simple job scheduling or to introduce an asynchronous delay into chains of
+     * tasks.
+     *
+     * <p>Note that any delay is <em>not precise</em> and accuracy is primarily determined by the
+     * frequency at which {@link #flush(Executor)} or {@link #flush()} are called. Do not use this
+     * for time-sensitive tasks, particularly if the duration exceeds {@link
+     * TransactionOutboxBuilder#attemptFrequency(Duration)} (see more on this below).
+     *
+     * <p>A note on implementation: tasks (when {@link #ordered(String)} is not used) are normally
+     * submitted for processing on the local JVM immediately after transaction commit. By default,
+     * when a delay is introduced, the work is instead submitted to a {@link
+     * java.util.concurrent.ScheduledExecutorService} for processing after the specified delay.
+     * However, if the delay is long enough that the work would likely get picked up by a {@link
+     * #flush()} on this JVM or another, this is pointless and wasteful. Unfortunately, we don't
+     * know exactly how frequently {@link #flush()} will be called! To mitigate this, two measures
+     * are taken:
+     *
+     * <ul>
+     *   <li>Any call to {@link #flush()} or {@link #flush(Executor)} will immediately cancel any
+     *       pending scheduled processing on the local JVM. Those tasks will now get picked up in
+     *       due course by a flush.
+     *   <li>Any task submitted with a delay in access of {@link
+     *       TransactionOutboxBuilder#attemptFrequency(Duration)} will be assumed to get picked up
+     *       by a
+     * </ul>
+     *
+     * @param duration The minimum delay duration.
+     * @return Builder.
+     */
+    ParameterizedScheduleBuilder delayForAtLeast(Duration duration);
+
+    /**
      * Equivalent to {@link TransactionOutbox#schedule(Class)}, but applying additional parameters
      * to the request as configured using {@link TransactionOutbox#with()}.
      *
