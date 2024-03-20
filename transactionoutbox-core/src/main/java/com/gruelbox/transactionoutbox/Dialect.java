@@ -20,6 +20,8 @@ public interface Dialect {
 
   String getFetchAndLockNextInTopic();
 
+  String getFetchCurrentVersion();
+
   String booleanValue(boolean criteriaValue);
 
   void createVersionTableIfNotExists(Connection connection) throws SQLException;
