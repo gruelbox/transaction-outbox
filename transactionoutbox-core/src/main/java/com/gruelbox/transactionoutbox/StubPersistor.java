@@ -65,6 +65,11 @@ public class StubPersistor implements Persistor {
   public void clear(Transaction tx) {}
 
   @Override
+  public Optional<TransactionOutboxEntry> load(Transaction tx, String entryId) {
+    return Optional.empty();
+  }
+
+  @Override
   public boolean checkConnection(Transaction tx) {
     return true;
   }

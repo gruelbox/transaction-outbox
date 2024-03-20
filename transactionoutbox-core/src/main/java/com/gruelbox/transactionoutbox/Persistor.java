@@ -150,4 +150,13 @@ public interface Persistor {
    * @param tx The current {@link Transaction}.
    */
   void clear(Transaction tx) throws Exception;
+
+  /**
+   * Loads the specified entry.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param entryId The entry id.
+   * @return The entry, or empty if it does not exist.
+   */
+  Optional<TransactionOutboxEntry> load(Transaction tx, String entryId) throws Exception;
 }

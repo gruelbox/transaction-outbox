@@ -3,7 +3,7 @@ package com.gruelbox.transactionoutbox;
 import java.time.Clock;
 import java.util.function.Supplier;
 
-class Validator {
+public final class Validator {
 
   private final String path;
   private final Supplier<Clock> clockProvider;

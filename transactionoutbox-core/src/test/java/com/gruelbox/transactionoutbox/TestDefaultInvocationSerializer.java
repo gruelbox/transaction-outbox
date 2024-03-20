@@ -25,16 +25,15 @@ class TestDefaultInvocationSerializer {
   Stream<DynamicNode> versions() {
     return TestingUtils.parameterizedClassTester(
         "serializedVersion={0}",
-        Inner.class,
+        TestInner.class,
         Stream.of(Arguments.of(1), Arguments.of(2), Arguments.of(new Object[] {null})));
   }
 
-  @SuppressWarnings("JUnitMalformedDeclaration")
-  static class Inner {
+  static class TestInner {
 
     private final DefaultInvocationSerializer serializer;
 
-    Inner(Integer version) {
+    TestInner(Integer version) {
       this.serializer =
           DefaultInvocationSerializer.builder()
               .serializableTypes(Set.of(ExampleCustomEnum.class, ExampleCustomClass.class))
@@ -223,7 +222,9 @@ class TestDefaultInvocationSerializer {
     }
 
     void check(Invocation invocation) {
+      log.info("Checking: {}", invocation);
       Invocation deserialized = serdeser(invocation);
+      log.info("Against: {}", deserialized);
       Assertions.assertEquals(deserialized, serdeser(invocation));
       Assertions.assertEquals(invocation, deserialized);
     }

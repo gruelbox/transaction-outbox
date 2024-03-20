@@ -177,6 +177,194 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
   }
 
   @Test
+  final void entryCallbackAndStatusCheck() throws Exception {
+
+    TransactionManager transactionManager = txManager();
+
+    CountDownLatch readyLatch = new CountDownLatch(1);
+    CountDownLatch releaseLatch = new CountDownLatch(1);
+    CountDownLatch doneLatch = new CountDownLatch(1);
+
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(
+                Instantiator.using(
+                    clazz ->
+                        (ThrowingProcessor)
+                            () -> {
+                              LOGGER.info("Ready");
+                              readyLatch.countDown();
+                              assertTrue(releaseLatch.await(10, TimeUnit.SECONDS));
+                            }))
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    doneLatch.countDown();
+                  }
+                })
+            .persistor(persistor())
+            .initializeImmediately(false)
+            .build();
+
+    outbox.initialize();
+    clearOutbox();
+
+    AtomicReference<TransactionOutboxEntry> callbackEntry = new AtomicReference<>();
+    transactionManager.inTransactionThrows(
+        tx -> {
+          assertTrue(outbox.fetchEntry("foo").isEmpty());
+
+          outbox
+              .with()
+              .entryCallback(callbackEntry::set)
+              .schedule(ThrowingProcessor.class)
+              .process();
+
+          assertNotNull(callbackEntry.get());
+          log.info("Entry created is id={}", callbackEntry.get().getId());
+        });
+
+    assertEquals(
+        ThrowingProcessor.class.getName(), callbackEntry.get().getInvocation().getClassName());
+    assertEquals("process", callbackEntry.get().getInvocation().getMethodName());
+    assertEquals(0, callbackEntry.get().getAttempts());
+    assertNull(callbackEntry.get().getLastAttemptTime());
+    assertFalse(callbackEntry.get().isBlocked());
+    assertFalse(callbackEntry.get().isProcessed());
+
+    assertTrue(readyLatch.await(20, TimeUnit.SECONDS));
+
+    TransactionOutboxEntry activeEntry =
+        transactionManager.inTransactionReturnsThrows(
+            tx -> outbox.fetchEntry(callbackEntry.get().getId()).orElseThrow());
+
+    assertEquals(callbackEntry.get().getId(), activeEntry.getId());
+    log.info("Checking invocations match: {}", callbackEntry.get().getInvocation());
+    assertEquals(callbackEntry.get().getInvocation(), activeEntry.getInvocation());
+    assertEquals(0, activeEntry.getAttempts());
+    assertNull(activeEntry.getLastAttemptTime());
+    assertFalse(activeEntry.isBlocked());
+    assertFalse(activeEntry.isProcessed());
+
+    releaseLatch.countDown();
+    assertTrue(doneLatch.await(20, TimeUnit.SECONDS));
+
+    boolean found =
+        transactionManager.inTransactionReturnsThrows(
+            tx -> outbox.fetchEntry(callbackEntry.get().getId()).isPresent());
+    assertFalse(found);
+  }
+
+  @Test
+  final void entryCallbackAndStatusCheckWithUniqueId() throws Exception {
+
+    TransactionManager transactionManager = txManager();
+    CountDownLatch doneLatch = new CountDownLatch(1);
+
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(Instantiator.using(clazz -> (ThrowingProcessor) () -> {}))
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    doneLatch.countDown();
+                  }
+                })
+            .persistor(persistor())
+            .initializeImmediately(false)
+            .build();
+
+    outbox.initialize();
+    clearOutbox();
+
+    AtomicReference<TransactionOutboxEntry> callbackEntry = new AtomicReference<>();
+    transactionManager.inTransactionThrows(
+        tx -> {
+          outbox
+              .with()
+              .entryCallback(callbackEntry::set)
+              .uniqueRequestId("foo")
+              .schedule(ThrowingProcessor.class)
+              .process();
+          assertNotNull(callbackEntry.get());
+          log.info("Entry created is id={}", callbackEntry.get().getId());
+        });
+
+    assertTrue(doneLatch.await(20, TimeUnit.SECONDS));
+
+    TransactionOutboxEntry foundEntry =
+        transactionManager.inTransactionReturnsThrows(
+            tx -> outbox.fetchEntry(callbackEntry.get().getId()).orElseThrow());
+
+    assertEquals(callbackEntry.get().getId(), foundEntry.getId());
+    assertEquals(callbackEntry.get().getInvocation(), foundEntry.getInvocation());
+    assertEquals("foo", foundEntry.getUniqueRequestId());
+    assertFalse(foundEntry.isBlocked());
+    assertTrue(foundEntry.isProcessed());
+    assertNotNull(foundEntry.getLastAttemptTime());
+    assertEquals(1, foundEntry.getAttempts());
+  }
+
+  @Test
+  final void entryCallbackAndStatusCheckFailed() throws Exception {
+    TransactionManager transactionManager = txManager();
+    CountDownLatch doneLatch = new CountDownLatch(1);
+
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(
+                Instantiator.using(
+                    clazz ->
+                        (ThrowingProcessor)
+                            () -> {
+                              throw new RuntimeException("Whatever");
+                            }))
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void failure(TransactionOutboxEntry entry, Throwable cause) {
+                    doneLatch.countDown();
+                  }
+                })
+            .persistor(persistor())
+            .initializeImmediately(false)
+            .build();
+
+    outbox.initialize();
+    clearOutbox();
+
+    AtomicReference<TransactionOutboxEntry> callbackEntry = new AtomicReference<>();
+    transactionManager.inTransactionThrows(
+        tx -> {
+          outbox
+              .with()
+              .entryCallback(callbackEntry::set)
+              .schedule(ThrowingProcessor.class)
+              .process();
+          assertNotNull(callbackEntry.get());
+          log.info("Entry created is id={}", callbackEntry.get().getId());
+        });
+
+    assertTrue(doneLatch.await(20, TimeUnit.SECONDS));
+
+    TransactionOutboxEntry foundEntry =
+        transactionManager.inTransactionReturnsThrows(
+            tx -> outbox.fetchEntry(callbackEntry.get().getId()).orElseThrow());
+
+    assertEquals(callbackEntry.get().getId(), foundEntry.getId());
+    assertEquals(callbackEntry.get().getInvocation(), foundEntry.getInvocation());
+    assertFalse(foundEntry.isBlocked());
+    assertFalse(foundEntry.isProcessed());
+    assertNotNull(foundEntry.getLastAttemptTime());
+    assertEquals(1, foundEntry.getAttempts());
+  }
+
+  @Test
   final void noAutomaticInitialization() {
 
     TransactionManager transactionManager = txManager();
