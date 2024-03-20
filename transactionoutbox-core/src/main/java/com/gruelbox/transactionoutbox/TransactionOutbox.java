@@ -387,7 +387,7 @@ public interface TransactionOutbox {
      * know exactly how frequently {@link #flush()} will be called! To mitigate this, Any task
      * submitted with a delay in excess of {@link
      * TransactionOutboxBuilder#attemptFrequency(Duration)} will be assumed to get picked up by a
-     * future flush.</p>
+     * future flush.
      *
      * @param duration The minimum delay duration.
      * @return Builder.
