@@ -138,7 +138,7 @@ public interface TransactionOutbox {
   void processNow(TransactionOutboxEntry entry);
 
   /**
-   * Loads the specified queued test. This can be used to check the status.
+   * Loads the specified queued task. This can be used to check the status.
    *
    * <p>Requires the transaction manager in use to be a {@link
    * ThreadLocalContextTransactionManager}.
@@ -161,7 +161,7 @@ public interface TransactionOutbox {
   Optional<TransactionOutboxEntry> fetchEntry(String entryId);
 
   /**
-   * Loads the specified queued request. This can be used to check the status of a request.
+   * Loads the specified queued task. This can be used to check the status.
    *
    * <p>Note that nothing may be returned for four distinct reasons:
    *
