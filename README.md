@@ -397,6 +397,21 @@ outbox.with()
 
 Where `context-clientid` is a globally-unique identifier derived from the incoming request. Such ids are usually available from queue middleware as message ids, or if not you can require as part of the incoming API (possibly with a tenant prefix to ensure global uniqueness across tenants).
 
+### Delayed/scheduled processing ###
+
+To delay execution of a task, use:
+
+```java
+outbox.with()
+  .delayForAtLeast(Duration.of(5, MINUTES))
+  .schedule(Service.class)
+  .process("Foo");
+```
+
+There are some caveats around how accurate timing is. See the JavaDoc on the `delayForAtLeast` method for more information.
+
+This is particularly useful when combined with the [nested outbox pattern](#the-nested-outbox-pattern) for creating polling/repeated or recursive tasks to throttle prcessing.
+
 ### Flexible serialization (beta)
 
 Most people will use the default persistor, `DefaultPersistor`, to persist tasks to a relational database. This uses `DefaultInvocationSerializer` by default, which in turn uses [GSON](https://github.com/google/gson) to serialize as JSON.  `DefaultInvocationSerializer` is extremely limited by design, with a small list of allowed classes in method arguments. 
