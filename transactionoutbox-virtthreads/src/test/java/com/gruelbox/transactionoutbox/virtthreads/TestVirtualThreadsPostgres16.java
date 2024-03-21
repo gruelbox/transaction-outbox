@@ -16,7 +16,9 @@ class TestVirtualThreadsPostgres16 extends AbstractVirtualThreadsTest {
   @SuppressWarnings({"rawtypes", "resource"})
   private static final JdbcDatabaseContainer container =
       (JdbcDatabaseContainer)
-          new PostgreSQLContainer("postgres:16").withStartupTimeout(Duration.ofHours(1));
+          new PostgreSQLContainer("postgres:16")
+              .withStartupTimeout(Duration.ofHours(1))
+              .withReuse(true);
 
   @Override
   protected ConnectionDetails connectionDetails() {

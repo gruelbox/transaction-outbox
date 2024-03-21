@@ -16,7 +16,9 @@ class TestPostgres13 extends AbstractAcceptanceTest {
   @SuppressWarnings({"rawtypes", "resource"})
   private static final JdbcDatabaseContainer container =
       (JdbcDatabaseContainer)
-          new PostgreSQLContainer("postgres:13").withStartupTimeout(Duration.ofHours(1));
+          new PostgreSQLContainer("postgres:13")
+              .withStartupTimeout(Duration.ofHours(1))
+              .withReuse(true);
 
   @Override
   protected ConnectionDetails connectionDetails() {
