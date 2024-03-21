@@ -28,6 +28,7 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
    1. [Topics and FIFO ordering](#topics-and-fifo-ordering)
    1. [The nested outbox pattern](#the-nested-outbox-pattern)
    1. [Idempotency protection](#idempotency-protection)
+   1. [Delayed/scheduled processing](#delayedscheduled-processing)
    1. [Flexible serialization](#flexible-serialization-beta)
    1. [Clustering](#clustering)
 1. [Configuration reference](#configuration-reference)
