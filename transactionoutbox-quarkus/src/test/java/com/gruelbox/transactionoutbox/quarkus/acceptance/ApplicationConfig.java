@@ -1,6 +1,8 @@
 package com.gruelbox.transactionoutbox.quarkus.acceptance;
 
 import com.gruelbox.transactionoutbox.*;
+import com.gruelbox.transactionoutbox.quarkus.CdiInstantiator;
+import com.gruelbox.transactionoutbox.quarkus.QuarkusTransactionManager;
 import jakarta.enterprise.inject.Produces;
 import jakarta.ws.rs.core.Application;
 import java.util.HashSet;

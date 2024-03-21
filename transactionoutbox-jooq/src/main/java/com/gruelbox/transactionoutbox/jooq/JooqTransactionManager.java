@@ -25,8 +25,7 @@ import org.jooq.DSLContext;
  * DSLContext dsl = DSL.using(configuration);
  * return JooqTransactionManager.create(dsl, listener);</pre>
  */
-public interface JooqTransactionManager
-    extends TransactionManager, com.gruelbox.transactionoutbox.JooqTransactionManager {
+public interface JooqTransactionManager extends TransactionManager {
 
   /**
    * Creates the {@link org.jooq.TransactionListener} to wire into the {@link DSLContext}. See
