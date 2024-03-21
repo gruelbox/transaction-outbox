@@ -39,7 +39,6 @@
     <module>transactionoutbox-core</module>
     <module>transactionoutbox-jackson</module>
     <module>transactionoutbox-guice</module>
-    <module>transactionoutbox-quarkus</module>
     <module>transactionoutbox-testing</module>
     <module>transactionoutbox-acceptance</module>
   </modules>
@@ -283,6 +282,7 @@
       </activation>
       <modules>
         <module>transactionoutbox-jooq</module>
+        <module>transactionoutbox-quarkus</module>
         <module>transactionoutbox-spring</module>
       </modules>
     </profile>
