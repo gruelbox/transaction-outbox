@@ -27,7 +27,8 @@ class EventuallyConsistentControllerTest {
   private TestRestTemplate template;
 
   @SuppressWarnings("unused")
-  @Inject private ExternalQueueService externalQueueService;
+  @Inject
+  private ExternalQueueService externalQueueService;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -46,14 +47,10 @@ class EventuallyConsistentControllerTest {
 
     var url = base.toString() + "/customer";
     assertTrue(template.postForEntity(url, joe, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template.postForEntity(url, dave, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template.postForEntity(url, neil, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, dave, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, neil, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
 
     await()
         .atMost(10, SECONDS)
@@ -75,14 +72,10 @@ class EventuallyConsistentControllerTest {
 
     var url = base.toString() + "/customer?ordered=true";
     assertTrue(template.postForEntity(url, joe, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template.postForEntity(url, dave, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template.postForEntity(url, neil, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, dave, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, neil, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
 
     await()
         .atMost(10, SECONDS)

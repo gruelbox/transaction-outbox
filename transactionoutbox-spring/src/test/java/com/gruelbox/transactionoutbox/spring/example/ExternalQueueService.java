@@ -1,12 +1,11 @@
 package com.gruelbox.transactionoutbox.spring.example;
 
-import lombok.Getter;
-import org.springframework.stereotype.Service;
-
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import lombok.Getter;
+import org.springframework.stereotype.Service;
 
 @Getter
 @Service
