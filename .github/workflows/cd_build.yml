@@ -24,6 +24,7 @@ jobs:
 
       - name: Build, publish to GPR and tag
         run: |
+          echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
           if [ "$GITHUB_REPOSITORY" == "gruelbox/transaction-outbox" ]; then
             revision="6.0.$GITHUB_RUN_NUMBER"
             echo "Building $revision at $GITHUB_SHA"

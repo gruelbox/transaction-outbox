@@ -23,4 +23,6 @@ jobs:
           java-version: ${{ matrix.jdk }}
           cache: 'maven'
       - name: Build with Maven
-        run: mvn -Pconcise -B fmt:check package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        run: |
+          echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
+          mvn -Pconcise -B fmt:check package -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
