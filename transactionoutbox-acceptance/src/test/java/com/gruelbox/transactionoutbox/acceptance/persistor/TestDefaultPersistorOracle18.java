@@ -16,7 +16,9 @@ class TestDefaultPersistorOracle18 extends AbstractPersistorTest {
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      new OracleContainer("gvenzl/oracle-xe:18-slim").withStartupTimeout(Duration.ofHours(1));
+      new OracleContainer("gvenzl/oracle-xe:18-slim-faststart")
+          .withStartupTimeout(Duration.ofHours(1))
+          .withReuse(true);
 
   private final DefaultPersistor persistor =
       DefaultPersistor.builder().dialect(Dialect.ORACLE).build();

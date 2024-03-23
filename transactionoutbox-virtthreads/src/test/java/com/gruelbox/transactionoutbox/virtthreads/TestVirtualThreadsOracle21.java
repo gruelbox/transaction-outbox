@@ -15,7 +15,9 @@ class TestVirtualThreadsOracle21 extends AbstractVirtualThreadsTest {
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      new OracleContainer("gvenzl/oracle-xe:21-slim").withStartupTimeout(Duration.ofHours(1));
+      new OracleContainer("gvenzl/oracle-xe:21-slim-faststart")
+          .withStartupTimeout(Duration.ofHours(1))
+          .withReuse(true);
 
   @Override
   protected ConnectionDetails connectionDetails() {
