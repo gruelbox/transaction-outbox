@@ -1,0 +1,88 @@
+package com.gruelbox.transactionoutbox.spring.example;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.net.URL;
+import javax.inject.Inject;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class EventuallyConsistentControllerTest {
+
+  @SuppressWarnings("unused")
+  @LocalServerPort
+  private int port;
+
+  private URL base;
+
+  @SuppressWarnings("unused")
+  @Inject
+  private TestRestTemplate template;
+
+  @SuppressWarnings("unused")
+  @Inject
+  private ExternalQueueService externalQueueService;
+
+  @BeforeEach
+  void setUp() throws Exception {
+    this.base = new URL("http://localhost:" + port + "/");
+    externalQueueService.clear();
+  }
+
+  @Test
+  void testCheckNormal() {
+
+    var joe = new Customer(1L, "Joe", "Strummer");
+    var dave = new Customer(2L, "Dave", "Grohl");
+    var neil = new Customer(3L, "Neil", "Diamond");
+    var tupac = new Customer(4L, "Tupac", "Shakur");
+    var jeff = new Customer(5L, "Jeff", "Mills");
+
+    var url = base.toString() + "/customer";
+    assertTrue(template.postForEntity(url, joe, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, dave, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, neil, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
+
+    await()
+        .atMost(10, SECONDS)
+        .pollDelay(1, SECONDS)
+        .untilAsserted(
+            () ->
+                assertThat(externalQueueService.getSent())
+                    .containsExactlyInAnyOrder(joe, dave, neil, tupac, jeff));
+  }
+
+  @Test
+  void testCheckOrdered() {
+
+    var joe = new Customer(1L, "Joe", "Strummer");
+    var dave = new Customer(2L, "Dave", "Grohl");
+    var neil = new Customer(3L, "Neil", "Diamond");
+    var tupac = new Customer(4L, "Tupac", "Shakur");
+    var jeff = new Customer(5L, "Jeff", "Mills");
+
+    var url = base.toString() + "/customer?ordered=true";
+    assertTrue(template.postForEntity(url, joe, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, dave, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, neil, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
+
+    await()
+        .atMost(10, SECONDS)
+        .pollDelay(1, SECONDS)
+        .untilAsserted(
+            () ->
+                assertThat(externalQueueService.getSent())
+                    .containsExactly(joe, dave, neil, tupac, jeff));
+  }
+}
