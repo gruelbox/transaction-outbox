@@ -1,22 +1,11 @@
 package com.gruelbox.transactionoutbox;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
-import com.google.gson.TypeAdapter;
+import com.google.gson.*;
+import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
-import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
+import java.io.*;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
@@ -25,15 +14,7 @@ import java.text.ParsePosition;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimeZone;
-import java.util.UUID;
+import java.util.*;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -92,6 +73,17 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
             .registerTypeAdapter(Period.class, new PeriodTypeAdapter())
             .registerTypeAdapter(Year.class, new YearTypeAdapter())
             .registerTypeAdapter(YearMonth.class, new YearMonthAdapter())
+            .registerTypeAdapterFactory(
+                new TypeAdapterFactory() {
+                  @SuppressWarnings("unchecked")
+                  @Override
+                  public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
+                    if (SerializableLambda.class.isAssignableFrom(type.getRawType())) {
+                      return (TypeAdapter<T>) new SerializableRunnerAdapter();
+                    }
+                    return null;
+                  }
+                })
             .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
             .create();
   }
@@ -298,6 +290,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
         JsonElement argType = arg.getAsJsonObject().get("t");
         if (argType != null) {
           JsonElement argValue = arg.getAsJsonObject().get("v");
+          log.info("arg = {}", arg);
           Class<?> argClass = classForName(argType.getAsString());
           try {
             args[i] = context.deserialize(argValue, argClass);
@@ -313,6 +306,9 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
     }
 
     private Class<?> classForName(String name) {
+      if (name.equals(SerializableLambda.class.getName()) || name.contains("$$Lambda")) {
+        return SerializableLambda.class;
+      }
       var clazz = nameToClass.get(name);
       if (clazz == null) {
         throw new IllegalArgumentException("Cannot deserialize class - not found: " + name);
@@ -321,6 +317,9 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
     }
 
     private String nameForClass(Class<?> clazz) {
+      if (SerializableLambda.class.isAssignableFrom(clazz)) {
+        return clazz.getName();
+      }
       var name = classToName.get(clazz);
       if (name == null) {
         throw new IllegalArgumentException(
@@ -694,6 +693,26 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
         result -= digit;
       }
       return -result;
+    }
+  }
+
+  private static class SerializableRunnerAdapter extends TypeAdapter<SerializableLambda> {
+    @Override
+    public void write(JsonWriter out, SerializableLambda value) throws IOException {
+      ByteArrayOutputStream bos = new ByteArrayOutputStream();
+      new ObjectOutputStream(bos).writeObject(value);
+      out.value(Base64.getEncoder().encodeToString(bos.toByteArray()));
+    }
+
+    @Override
+    public SerializableLambda read(JsonReader in) throws IOException {
+      byte[] bytes = Base64.getDecoder().decode(in.nextString());
+      ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes));
+      try {
+        return (SerializableLambda) ois.readObject();
+      } catch (ClassNotFoundException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 }

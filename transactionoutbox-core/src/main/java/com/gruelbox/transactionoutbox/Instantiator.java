@@ -65,4 +65,8 @@ public interface Instantiator {
    * @return An instance of the class.
    */
   Object getInstance(String name);
+
+  default <T> T getInstance(Class<T> clazz) {
+    throw new UnsupportedOperationException();
+  }
 }

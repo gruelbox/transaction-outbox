@@ -56,6 +56,45 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     assertTrue(singleThreadPool.awaitTermination(30, SECONDS));
   }
 
+  interface ResultPoster {
+    void post(List<Integer> result);
+  }
+
+  @Test
+  final void lambdaInvocations() throws InterruptedException {
+    TransactionManager transactionManager = txManager();
+    CountDownLatch successLatch = new CountDownLatch(1);
+    List<List<Integer>> results = new CopyOnWriteArrayList<>();
+
+    var outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(persistor())
+            .instantiator(
+                Instantiator.using(
+                    clazz -> {
+                      if (clazz == ResultPoster.class) {
+                        return (ResultPoster) results::add;
+                      }
+                      throw new UnsupportedOperationException();
+                    }))
+            .submitter(Submitter.withExecutor(unreliablePool))
+            .listener(new LatchListener(successLatch))
+            .build();
+
+    var i = 2;
+    var j = 3;
+    transactionManager.inTransaction(
+        () ->
+            outbox.schedule(
+                ctx -> {
+                  log.info("Received {}, {}", i, j);
+                  ctx.getInstance(ResultPoster.class).post(List.of(i, j));
+                }));
+    assertTrue(successLatch.await(2, SECONDS));
+    assertEquals(List.of(List.of(2, 3)), results);
+  }
+
   @Test
   final void sequencing() throws Exception {
     int countPerTopic = 50;

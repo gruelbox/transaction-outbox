@@ -79,7 +79,55 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public <T> T schedule(Class<T> clazz) {
-    return schedule(clazz, null, null, null);
+    return schedule(clazz, null);
+  }
+
+  @Override
+  public TransactionOutboxEntry schedule(SerializableLambda runnable) {
+    checkInitialized();
+    checkThreadLocalTransactionManager();
+    try {
+      var method = LambdaRunner.class.getDeclaredMethod("run", SerializableLambda.class);
+      var args = new SerializableLambda[] {runnable};
+      var txn = transactionManager.extractTransaction(method, args);
+      return scheduleLambda(txn.getTransaction(), runnable);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(e);
+    }
+  }
+
+  private TransactionOutboxEntry schedule(Transaction transaction, SerializableLambda runnable) {
+    checkInitialized();
+    return scheduleLambda(transaction, runnable);
+  }
+
+  private TransactionOutboxEntry scheduleLambda(
+      Transaction transaction, SerializableLambda runnable) {
+    try {
+      var clazz = LambdaRunner.class;
+      var method = LambdaRunner.class.getDeclaredMethod("run", SerializableLambda.class);
+      var args = new SerializableLambda[] {runnable};
+      TransactionOutboxEntry entry =
+          newEntry(
+              clazz,
+              "run",
+              method.getParameterTypes(),
+              args,
+              null,
+              null,
+              clockProvider.get().instant());
+      persistor.save(transaction, entry);
+      addPostExecutionHook(null, transaction, entry);
+      return entry;
+    } catch (Exception e) {
+      throw new IllegalArgumentException(e);
+    }
+  }
+
+  private void checkInitialized() {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
   }
 
   @Override
@@ -114,9 +162,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public boolean flush(Executor executor) {
-    if (!initialized.get()) {
-      throw new IllegalStateException("Not initialized");
-    }
+    checkInitialized();
     Instant now = clockProvider.get().instant();
     List<CompletableFuture<Boolean>> futures = new ArrayList<>();
 
@@ -168,13 +214,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public boolean unblock(String entryId) {
-    if (!initialized.get()) {
-      throw new IllegalStateException("Not initialized");
-    }
-    if (!(transactionManager instanceof ThreadLocalContextTransactionManager)) {
-      throw new UnsupportedOperationException(
-          "This method requires a ThreadLocalContextTransactionManager");
-    }
+    checkInitialized();
+    checkThreadLocalTransactionManager();
     log.info("Unblocking entry {} for retry.", entryId);
     try {
       return ((ThreadLocalContextTransactionManager) transactionManager)
@@ -184,12 +225,17 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
+  private void checkThreadLocalTransactionManager() {
+    if (!(transactionManager instanceof ThreadLocalContextTransactionManager)) {
+      throw new UnsupportedOperationException(
+          "This method requires a ThreadLocalContextTransactionManager");
+    }
+  }
+
   @Override
   @SuppressWarnings({"unchecked", "rawtypes"})
   public boolean unblock(String entryId, Object transactionContext) {
-    if (!initialized.get()) {
-      throw new IllegalStateException("Not initialized");
-    }
+    checkInitialized();
     if (!(transactionManager instanceof ParameterContextTransactionManager)) {
       throw new UnsupportedOperationException(
           "This method requires a ParameterContextTransactionManager");
@@ -208,11 +254,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private <T> T schedule(
-      Class<T> clazz, String uniqueRequestId, String topic, Duration delayForAtLeast) {
-    if (!initialized.get()) {
-      throw new IllegalStateException("Not initialized");
-    }
+  private <T> T schedule(Class<T> clazz, ParameterizedScheduleBuilderImpl params) {
+    checkInitialized();
     return proxyFactory.createProxy(
         clazz,
         (method, args) ->
@@ -225,42 +268,42 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                           extracted.getMethodName(),
                           extracted.getParameters(),
                           extracted.getArgs(),
-                          uniqueRequestId,
-                          topic);
-                  if (delayForAtLeast != null) {
-                    entry.setNextAttemptTime(entry.getNextAttemptTime().plus(delayForAtLeast));
-                  }
-                  validator.validate(entry);
-                  persistor.save(extracted.getTransaction(), entry);
-                  extracted
-                      .getTransaction()
-                      .addPostCommitHook(
-                          () -> {
-                            listener.scheduled(entry);
-                            if (entry.getTopic() != null) {
-                              log.debug("Queued {} in topic {}", entry.description(), topic);
-                            } else if (delayForAtLeast == null) {
-                              submitNow(entry);
-                              log.debug(
-                                  "Scheduled {} for post-commit execution", entry.description());
-                            } else if (delayForAtLeast.compareTo(attemptFrequency) < 0) {
-                              scheduler.schedule(
-                                  () -> submitNow(entry),
-                                  delayForAtLeast.toMillis(),
-                                  TimeUnit.MILLISECONDS);
-                              log.info(
-                                  "Scheduled {} for post-commit execution after at least {}",
-                                  entry.description(),
-                                  delayForAtLeast);
-                            } else {
-                              log.info(
-                                  "Queued {} for execution after at least {}",
-                                  entry.description(),
-                                  delayForAtLeast);
-                            }
-                          });
+                          params == null ? null : params.uniqueRequestId,
+                          params == null ? null : params.ordered,
+                          params == null
+                              ? clockProvider.get().instant()
+                              : clockProvider.get().instant().plus(params.delayForAtLeast));
+                  Transaction txn = extracted.getTransaction();
+                  persistor.save(txn, entry);
+                  addPostExecutionHook(params, txn, entry);
                   return null;
                 }));
+  }
+
+  private void addPostExecutionHook(
+      ParameterizedScheduleBuilderImpl params, Transaction txn, TransactionOutboxEntry entry) {
+    txn.addPostCommitHook(
+        () -> {
+          listener.scheduled(entry);
+          if (entry.getTopic() != null) {
+            log.debug("Queued {} in topic {}", entry.description(), entry.getTopic());
+          } else if (params == null || params.delayForAtLeast == null) {
+            submitNow(entry);
+            log.debug("Scheduled {} for post-commit execution", entry.description());
+          } else if (params.delayForAtLeast.compareTo(attemptFrequency) < 0) {
+            scheduler.schedule(
+                () -> submitNow(entry), params.delayForAtLeast.toMillis(), TimeUnit.MILLISECONDS);
+            log.info(
+                "Scheduled {} for post-commit execution after at least {}",
+                entry.description(),
+                params.delayForAtLeast);
+          } else {
+            log.info(
+                "Queued {} for execution after at least {}",
+                entry.description(),
+                params.delayForAtLeast);
+          }
+        });
   }
 
   private void submitNow(TransactionOutboxEntry entry) {
@@ -363,7 +406,10 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   private void invoke(TransactionOutboxEntry entry, Transaction transaction)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-    Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
+    Object instance =
+        entry.getInvocation().getClassName().equals(LambdaRunner.class.getName())
+            ? new LambdaRunner(new LambdaContext(instantiator))
+            : instantiator.getInstance(entry.getInvocation().getClassName());
     log.debug("Created instance {}", instance);
     transactionManager
         .injectTransaction(entry.getInvocation(), transaction)
@@ -376,21 +422,27 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       Class<?>[] params,
       Object[] args,
       String uniqueRequestId,
-      String topic) {
-    return TransactionOutboxEntry.builder()
-        .id(UUID.randomUUID().toString())
-        .invocation(
-            new Invocation(
-                instantiator.getName(clazz),
-                methodName,
-                params,
-                args,
-                serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null))
-        .lastAttemptTime(null)
-        .nextAttemptTime(clockProvider.get().instant())
-        .uniqueRequestId(uniqueRequestId)
-        .topic(topic)
-        .build();
+      String topic,
+      Instant nextAttemptTime) {
+    var entry =
+        TransactionOutboxEntry.builder()
+            .id(UUID.randomUUID().toString())
+            .invocation(
+                new Invocation(
+                    instantiator.getName(clazz),
+                    methodName,
+                    params,
+                    args,
+                    serializeMdc && (MDC.getMDCAdapter() != null)
+                        ? MDC.getCopyOfContextMap()
+                        : null))
+            .lastAttemptTime(null)
+            .nextAttemptTime(nextAttemptTime)
+            .uniqueRequestId(uniqueRequestId)
+            .topic(topic)
+            .build();
+    validator.validate(entry);
+    return entry;
   }
 
   private void pushBack(Transaction transaction, TransactionOutboxEntry entry)
@@ -488,7 +540,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
         throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
       }
-      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered, delayForAtLeast);
+      return TransactionOutboxImpl.this.schedule(clazz, this);
     }
   }
 }
