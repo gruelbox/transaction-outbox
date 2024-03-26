@@ -17,7 +17,7 @@ jobs:
           java-version: 21
           cache: maven
       - name: Build
-        run: mvn -Pconcise,delombok -B fmt:check package test-compile -DskipTests -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        run: mvn -Pdelombok -B fmt:check package test-compile -DskipTests -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
       - uses: actions/upload-artifact@v4
         with:
           name: build
@@ -30,7 +30,7 @@ jobs:
     strategy:
       matrix:
         jdk: [ 11,17,21 ]
-        db: [ nodb,mysql,postgres,oracle18,oracle21 ]
+        db: [ nodb,mysql5,mysql8,postgres,oracle18,oracle21 ]
       fail-fast: false
     steps:
       - uses: actions/download-artifact@v4
@@ -44,4 +44,4 @@ jobs:
           java-version: ${{ matrix.jdk }}
           cache: maven
       - name: test
-        run: mvn -Pconcise,delombox,only-${{ matrix.db }}-tests -B test -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        run: mvn -Pconcise,noformat,only-${{ matrix.db }}-tests -B test -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
