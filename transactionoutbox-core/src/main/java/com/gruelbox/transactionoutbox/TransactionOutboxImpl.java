@@ -7,7 +7,10 @@ import static java.time.temporal.ChronoUnit.MINUTES;
 
 import com.gruelbox.transactionoutbox.spi.ProxyFactory;
 import com.gruelbox.transactionoutbox.spi.Utils;
+
+import java.lang.invoke.MethodHandle;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +19,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+
+import jdk.dynalink.linker.support.Lookup;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -28,6 +33,16 @@ import org.slf4j.event.Level;
 @Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
+
+  private static final Method RUN_SERIALIZABLE_LAMBDA;
+
+  static {
+    try {
+      RUN_SERIALIZABLE_LAMBDA = LambdaRunner.class.getDeclaredMethod("run", SerializableLambda.class);
+    } catch (NoSuchMethodException e) {
+      throw new RuntimeException(e);
+    }
+  }
 
   private final TransactionManager transactionManager;
   private final Persistor persistor;
@@ -87,9 +102,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     checkInitialized();
     checkThreadLocalTransactionManager();
     try {
-      var method = LambdaRunner.class.getDeclaredMethod("run", SerializableLambda.class);
-      var args = new SerializableLambda[] {runnable};
-      var txn = transactionManager.extractTransaction(method, args);
+      var txn = transactionManager.extractTransaction(RUN_SERIALIZABLE_LAMBDA, new SerializableLambda[] {runnable});
       return scheduleLambda(txn.getTransaction(), runnable);
     } catch (Exception e) {
       throw new IllegalArgumentException(e);
@@ -101,18 +114,14 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     return scheduleLambda(transaction, runnable);
   }
 
-  private TransactionOutboxEntry scheduleLambda(
-      Transaction transaction, SerializableLambda runnable) {
+  private TransactionOutboxEntry scheduleLambda(Transaction transaction, SerializableLambda runnable) {
     try {
-      var clazz = LambdaRunner.class;
-      var method = LambdaRunner.class.getDeclaredMethod("run", SerializableLambda.class);
-      var args = new SerializableLambda[] {runnable};
       TransactionOutboxEntry entry =
           newEntry(
-              clazz,
+              LambdaRunner.class,
               "run",
-              method.getParameterTypes(),
-              args,
+              new Class<?>[] { SerializableLambda.class },
+              new SerializableLambda[] {runnable},
               null,
               null,
               clockProvider.get().instant());
