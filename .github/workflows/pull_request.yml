@@ -15,7 +15,6 @@ jobs:
           distribution: 'zulu'
           java-package: jdk
           java-version: 21
-          cache: false
       - uses: actions/cache/restore@v4
         with:
           path: ~/.m2/repository
@@ -47,7 +46,6 @@ jobs:
           distribution: 'zulu'
           java-package: jdk
           java-version: ${{ matrix.jdk }}
-          cache: false
       - uses: actions/cache/restore@v4
         with:
           path: ~/.m2/repository
