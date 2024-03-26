@@ -15,13 +15,13 @@ jobs:
           distribution: 'zulu'
           java-package: jdk
           java-version: 21
-          cache: 'maven'
+          cache: false
       - uses: actions/cache/restore@v4
         with:
           path: ~/.m2/repository
           key: maven
       - name: build
-        run: mvn -Pconcise,delombok -B fmt:check package test-compile -DskipTests -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        run: mvn -Pconcise,delombok -B fmt:check install test-compile -DskipTests -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
       - uses: actions/cache@v3
         with:
           path: ~/.m2/repository
@@ -47,7 +47,7 @@ jobs:
           distribution: 'zulu'
           java-package: jdk
           java-version: ${{ matrix.jdk }}
-          cache: 'maven'
+          cache: false
       - uses: actions/cache/restore@v4
         with:
           path: ~/.m2/repository
