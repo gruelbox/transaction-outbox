@@ -1,9 +1,8 @@
-package com.gruelbox.transactionoutbox.spring.acceptance;
+package com.gruelbox.transactionoutbox.spring.example;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,8 +11,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-class Event {
+class Customer {
   @Id private Long id;
-  @Column private String description;
-  @Column private LocalDateTime created;
+  @Column private String firstName;
+  @Column private String lastName;
 }

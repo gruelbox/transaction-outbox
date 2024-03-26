@@ -19,6 +19,7 @@ class TestDefaultPersistorMySql8 extends AbstractPersistorTest {
   private static final JdbcDatabaseContainer container =
       new MySQLContainer<>("mysql:8")
           .withStartupTimeout(Duration.ofMinutes(5))
+          .withReuse(true)
           .withTmpFs(Map.of("/var/lib/mysql", "rw"));
 
   private final DefaultPersistor persistor =

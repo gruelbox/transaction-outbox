@@ -12,8 +12,7 @@ import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -45,6 +44,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private final Duration retentionThreshold;
   private final AtomicBoolean initialized = new AtomicBoolean();
   private final ProxyFactory proxyFactory = new ProxyFactory();
+  private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
   @Override
   public void validate(Validator validator) {
@@ -79,7 +79,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public <T> T schedule(Class<T> clazz) {
-    return schedule(clazz, null, null);
+    return schedule(clazz, null, null, null);
   }
 
   @Override
@@ -208,7 +208,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private <T> T schedule(Class<T> clazz, String uniqueRequestId, String topic) {
+  private <T> T schedule(
+      Class<T> clazz, String uniqueRequestId, String topic, Duration delayForAtLeast) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
@@ -226,6 +227,9 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                           extracted.getArgs(),
                           uniqueRequestId,
                           topic);
+                  if (delayForAtLeast != null) {
+                    entry.setNextAttemptTime(entry.getNextAttemptTime().plus(delayForAtLeast));
+                  }
                   validator.validate(entry);
                   persistor.save(extracted.getTransaction(), entry);
                   extracted
@@ -233,12 +237,28 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                       .addPostCommitHook(
                           () -> {
                             listener.scheduled(entry);
-                            if (entry.getTopic() == null) {
+                            if (entry.getTopic() != null) {
+                              log.debug("Queued {} in topic {}", entry.description(), topic);
+                            } else if (delayForAtLeast == null) {
                               submitNow(entry);
+                              log.debug(
+                                  "Scheduled {} for post-commit execution", entry.description());
+                            } else if (delayForAtLeast.compareTo(attemptFrequency) < 0) {
+                              scheduler.schedule(
+                                  () -> submitNow(entry),
+                                  delayForAtLeast.toMillis(),
+                                  TimeUnit.MILLISECONDS);
+                              log.info(
+                                  "Scheduled {} for post-commit execution after at least {}",
+                                  entry.description(),
+                                  delayForAtLeast);
+                            } else {
+                              log.info(
+                                  "Queued {} for execution after at least {}",
+                                  entry.description(),
+                                  delayForAtLeast);
                             }
                           });
-                  log.debug(
-                      "Scheduled {} for running after transaction commit", entry.description());
                   return null;
                 }));
   }
@@ -461,13 +481,14 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
     private String uniqueRequestId;
     private String ordered;
+    private Duration delayForAtLeast;
 
     @Override
     public <T> T schedule(Class<T> clazz) {
       if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
         throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
       }
-      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered);
+      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered, delayForAtLeast);
     }
   }
 }

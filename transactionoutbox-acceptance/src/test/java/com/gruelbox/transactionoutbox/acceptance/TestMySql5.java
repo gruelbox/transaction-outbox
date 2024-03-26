@@ -18,6 +18,7 @@ class TestMySql5 extends AbstractAcceptanceTest {
   private static final JdbcDatabaseContainer container =
       new MySQLContainer<>("mysql:5")
           .withStartupTimeout(Duration.ofMinutes(5))
+          .withReuse(true)
           .withTmpFs(Map.of("/var/lib/mysql", "rw"));
 
   @Override

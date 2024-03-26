@@ -20,14 +20,14 @@ The latest stable release is available from Maven Central.
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-spring</artifactId>
-  <version>5.4.421</version>
+  <version>5.5.447</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-spring:5.4.421'
+implementation 'com.gruelbox:transactionoutbox-spring:5.5.447'
 ```
 
 ### Development snapshots
@@ -59,6 +59,9 @@ You will need to authenticate with Github to use Github Package Repository. Crea
 ```
 
 The above example uses environment variables, allowing you to keep the credentials out of source control, but you can hard-code them if you know what you're doing.
+
+## Example
+An example application can be found here: https://github.com/gruelbox/transaction-outbox/tree/better-spring-example/transactionoutbox-spring/src/test.
 
 ## Configuration
 

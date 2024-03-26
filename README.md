@@ -28,6 +28,7 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
    1. [Topics and FIFO ordering](#topics-and-fifo-ordering)
    1. [The nested outbox pattern](#the-nested-outbox-pattern)
    1. [Idempotency protection](#idempotency-protection)
+   1. [Delayed/scheduled processing](#delayedscheduled-processing)
    1. [Flexible serialization](#flexible-serialization-beta)
    1. [Clustering](#clustering)
 1. [Configuration reference](#configuration-reference)
@@ -124,14 +125,14 @@ The latest stable release is available from Maven Central. Stable releases are [
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
-  <version>5.4.421</version>
+  <version>5.5.447</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-core:5.4.421'
+implementation 'com.gruelbox:transactionoutbox-core:5.5.447'
 ```
 
 ### Development snapshots
@@ -396,6 +397,21 @@ outbox.with()
 ```
 
 Where `context-clientid` is a globally-unique identifier derived from the incoming request. Such ids are usually available from queue middleware as message ids, or if not you can require as part of the incoming API (possibly with a tenant prefix to ensure global uniqueness across tenants).
+
+### Delayed/scheduled processing ###
+
+To delay execution of a task, use:
+
+```java
+outbox.with()
+  .delayForAtLeast(Duration.of(5, MINUTES))
+  .schedule(Service.class)
+  .process("Foo");
+```
+
+There are some caveats around how accurate timing is. See the JavaDoc on the `delayForAtLeast` method for more information.
+
+This is particularly useful when combined with the [nested outbox pattern](#the-nested-outbox-pattern) for creating polling/repeated or recursive tasks to throttle prcessing.
 
 ### Flexible serialization (beta)
 

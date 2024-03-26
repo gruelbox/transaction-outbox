@@ -5,6 +5,8 @@ import static java.util.concurrent.CompletableFuture.runAsync;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.gruelbox.transactionoutbox.*;
+import com.gruelbox.transactionoutbox.jooq.JooqTransactionListener;
+import com.gruelbox.transactionoutbox.jooq.JooqTransactionManager;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.CompletableFuture;

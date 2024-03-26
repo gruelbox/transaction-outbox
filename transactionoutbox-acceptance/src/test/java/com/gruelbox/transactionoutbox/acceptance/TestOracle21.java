@@ -15,7 +15,8 @@ class TestOracle21 extends AbstractAcceptanceTest {
   @Container
   @SuppressWarnings("rawtypes")
   private static final JdbcDatabaseContainer container =
-      new OracleContainer("gvenzl/oracle-xe:21-slim").withStartupTimeout(Duration.ofHours(1));
+      new OracleContainer("gvenzl/oracle-xe:21-slim-faststart")
+          .withStartupTimeout(Duration.ofHours(1));
 
   @Override
   protected ConnectionDetails connectionDetails() {
