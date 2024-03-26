@@ -16,13 +16,8 @@ jobs:
           java-package: jdk
           java-version: 21
           cache: maven
-      - name: build
-        run: mvn -Pconcise,delombok -B fmt:check install test-compile -DskipTests -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
-      - uses: actions/cache@v3
-        with:
-          path: ~/.m2/repository
-          key: maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: maven
+      - name: Build
+        run: mvn -Pconcise,delombok -B fmt:check package test-compile -DskipTests -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
       - uses: actions/upload-artifact@v4
         with:
           name: build
@@ -49,4 +44,4 @@ jobs:
           java-version: ${{ matrix.jdk }}
           cache: maven
       - name: test
-        run: mvn -Pconcise,delombox,only-${{ matrix.db }}-tests -B surefire:test -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        run: mvn -Pconcise,delombox,only-${{ matrix.db }}-tests -B test -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
