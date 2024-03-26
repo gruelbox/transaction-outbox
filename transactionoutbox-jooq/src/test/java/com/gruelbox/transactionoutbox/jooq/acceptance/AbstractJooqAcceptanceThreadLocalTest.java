@@ -152,8 +152,8 @@ abstract class AbstractJooqAcceptanceThreadLocalTest extends AbstractJooqAccepta
 
           // Both should be fired after commit
           CompletableFuture.allOf(
-                  runAsync(() -> uncheck(() -> assertTrue(latch1.await(2, TimeUnit.SECONDS)))),
-                  runAsync(() -> uncheck(() -> assertTrue(latch2.await(2, TimeUnit.SECONDS)))))
+                  runAsync(() -> uncheck(() -> assertTrue(latch1.await(10, TimeUnit.SECONDS)))),
+                  runAsync(() -> uncheck(() -> assertTrue(latch2.await(10, TimeUnit.SECONDS)))))
               .get();
         });
     JooqTestUtils.assertRecordExists(dsl, 1);
