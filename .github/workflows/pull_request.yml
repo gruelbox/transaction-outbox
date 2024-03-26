@@ -15,10 +15,7 @@ jobs:
           distribution: 'zulu'
           java-package: jdk
           java-version: 21
-      - uses: actions/cache/restore@v4
-        with:
-          path: ~/.m2/repository
-          key: maven
+          cache: maven
       - name: build
         run: mvn -Pconcise,delombok -B fmt:check install test-compile -DskipTests -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
       - uses: actions/cache@v3
@@ -29,7 +26,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: build
-          path: "**/target"
+          path: "**/*"
+          compression-level: 9
   test:
     needs: build
     if: "!contains(github.event.head_commit.message, 'skip ci')"
@@ -40,19 +38,15 @@ jobs:
         db: [ nodb,mysql,postgres,oracle18,oracle21 ]
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: .
       - uses: actions/setup-java@v2
         with:
           distribution: 'zulu'
           java-package: jdk
           java-version: ${{ matrix.jdk }}
-      - uses: actions/cache/restore@v4
-        with:
-          path: ~/.m2/repository
-          key: maven
-      - uses: actions/download-artifact@v4
-        with:
-          name: build
-          path: .
+          cache: maven
       - name: test
         run: mvn -Pconcise,delombox,only-${{ matrix.db }}-tests -B surefire:test -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
