@@ -29,4 +29,10 @@ public abstract class AbstractFullyQualifiedNameInstantiator implements Instanti
   }
 
   protected abstract Object createInstance(Class<?> clazz);
+
+  @SuppressWarnings("unchecked")
+  @Override
+  public <T> T getInstance(Class<T> clazz) {
+    return (T) createInstance(clazz);
+  }
 }

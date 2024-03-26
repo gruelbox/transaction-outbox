@@ -59,6 +59,14 @@ public interface TransactionOutbox {
   <T> T schedule(Class<T> clazz);
 
   /**
+   * TODO
+   *
+   * @param runnable
+   * @return
+   */
+  TransactionOutboxEntry schedule(SerializableLambda runnable);
+
+  /**
    * Starts building a schedule request with parameterization. See {@link
    * ParameterizedScheduleBuilder#schedule(Class)} for more information.
    *

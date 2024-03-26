@@ -1,9 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
-import static java.util.stream.Collectors.joining;
 
 import java.time.Instant;
-import java.util.Arrays;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -122,39 +120,19 @@ public class TransactionOutboxEntry implements Validatable {
     if (!this.initialized) {
       synchronized (this) {
         if (!this.initialized) {
-          String description =
+          this.description =
               String.format(
-                  "%s.%s(%s) [%s]%s%s",
-                  invocation.getClassName(),
-                  invocation.getMethodName(),
-                  invocation.getArgs() == null
-                      ? null
-                      : Arrays.stream(invocation.getArgs())
-                          .map(this::stringify)
-                          .collect(joining(", ")),
+                  "%s [%s]%s%s",
+                  invocation.getDescription(),
                   id,
                   uniqueRequestId == null ? "" : " uid=[" + uniqueRequestId + "]",
                   topic == null ? "" : " seq=[" + topic + "/" + sequence + "]");
-          this.description = description;
           this.initialized = true;
-          return description;
+          return this.description;
         }
       }
     }
     return this.description;
-  }
-
-  private String stringify(Object o) {
-    if (o == null) {
-      return "null";
-    }
-    if (o.getClass().isArray()) {
-      return "[" + Arrays.stream((Object[]) o).map(this::stringify).collect(joining(", ")) + "]";
-    }
-    if (o instanceof String) {
-      return "\"" + o + "\"";
-    }
-    return o.toString();
   }
 
   @Override
