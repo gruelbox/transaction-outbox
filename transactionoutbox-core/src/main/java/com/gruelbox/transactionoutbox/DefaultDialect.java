@@ -6,7 +6,6 @@ import java.sql.Statement;
 import java.util.Collection;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import lombok.AccessLevel;
@@ -23,10 +22,11 @@ class DefaultDialect implements Dialect {
   }
 
   @Getter private final String name;
-  @Getter private final boolean supportsSkipLock;
   @Getter private final String deleteExpired;
-  @Getter private final String limitCriteria;
+  @Getter private final String selectBatch;
+  @Getter private final String lock;
   @Getter private final String checkSql;
+  @Getter private final String fetchAndLockNextInTopic;
   private final Collection<Migration> migrations;
 
   @Override
@@ -43,17 +43,6 @@ class DefaultDialect implements Dialect {
   }
 
   @Override
-  public String fetchAndLockNextInTopic(String fields, String table) {
-    return String.format(
-        "SELECT %s FROM %s"
-            + " WHERE topic = ?"
-            + " AND processed = %s"
-            + " ORDER BY seq ASC"
-            + " %s FOR UPDATE",
-        fields, table, booleanValue(false), limitCriteria.replace("?", "1"));
-  }
-
-  @Override
   public String toString() {
     return name;
   }
@@ -67,15 +56,21 @@ class DefaultDialect implements Dialect {
   @Accessors(fluent = true)
   static final class Builder {
     private final String name;
-    private boolean supportsSkipLock = false;
     private String deleteExpired =
-        "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT ?";
-    private String limitCriteria = " LIMIT ?";
+        "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false"
+            + " LIMIT {{batchSize}}";
+    private String selectBatch =
+        "SELECT {{allFields}} FROM {{table}} WHERE nextAttemptTime < ? "
+            + "AND blocked = false AND processed = false AND topic = '*' LIMIT {{batchSize}}";
+    private String lock =
+        "SELECT id, invocation FROM {{table}} WHERE id = ? AND version = ? FOR UPDATE";
     private String checkSql = "SELECT 1";
     private Map<Integer, Migration> migrations;
     private Function<Boolean, String> booleanValueFrom;
     private SQLAction createVersionTableBy;
-    private BiFunction<String, String, String> fetchAndLockNextInTopic;
+    private String fetchAndLockNextInTopic =
+        "SELECT {{allFields}} FROM {{table}} "
+            + "WHERE topic = ? AND processed = false ORDER BY seq ASC LIMIT 1 FOR UPDATE";
 
     Builder(String name) {
       this.name = name;
@@ -171,7 +166,13 @@ class DefaultDialect implements Dialect {
 
     Dialect build() {
       return new DefaultDialect(
-          name, supportsSkipLock, deleteExpired, limitCriteria, checkSql, migrations.values()) {
+          name,
+          deleteExpired,
+          selectBatch,
+          lock,
+          checkSql,
+          fetchAndLockNextInTopic,
+          migrations.values()) {
         @Override
         public String booleanValue(boolean criteriaValue) {
           if (booleanValueFrom != null) {
@@ -187,14 +188,6 @@ class DefaultDialect implements Dialect {
           } else {
             super.createVersionTableIfNotExists(connection);
           }
-        }
-
-        @Override
-        public String fetchAndLockNextInTopic(String fields, String table) {
-          if (fetchAndLockNextInTopic != null) {
-            return fetchAndLockNextInTopic.apply(fields, table);
-          }
-          return super.fetchAndLockNextInTopic(fields, table);
         }
       };
     }

@@ -45,4 +45,9 @@ class TestDefaultPersistorMySql5 extends AbstractPersistorTest {
   protected Dialect dialect() {
     return Dialect.MY_SQL_5;
   }
+
+  @Override
+  public void testSkipLocked() throws Exception {
+    // Not supported.
+  }
 }
