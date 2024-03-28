@@ -26,7 +26,7 @@ class DefaultDialect implements Dialect {
   @Getter private final String selectBatch;
   @Getter private final String lock;
   @Getter private final String checkSql;
-  @Getter private final String fetchAndLockNextInTopic;
+  @Getter private final String fetchNextInAllTopics;
   private final Collection<Migration> migrations;
 
   @Override
@@ -68,9 +68,12 @@ class DefaultDialect implements Dialect {
     private Map<Integer, Migration> migrations;
     private Function<Boolean, String> booleanValueFrom;
     private SQLAction createVersionTableBy;
-    private String fetchAndLockNextInTopic =
-        "SELECT {{allFields}} FROM {{table}} "
-            + "WHERE topic = ? AND processed = false ORDER BY seq ASC LIMIT 1 FOR UPDATE";
+    private String fetchNextInAllTopics =
+        "SELECT {{allFields}} FROM {{table}} a"
+            + " WHERE processed = false AND topic <> '*' AND nextAttemptTime < ?"
+            + " AND seq = ("
+            + "SELECT MIN(seq) FROM {{table}} b WHERE b.topic=a.topic AND b.processed = false"
+            + ") LIMIT {{batchSize}}";
 
     Builder(String name) {
       this.name = name;
@@ -171,7 +174,7 @@ class DefaultDialect implements Dialect {
           selectBatch,
           lock,
           checkSql,
-          fetchAndLockNextInTopic,
+          fetchNextInAllTopics,
           migrations.values()) {
         @Override
         public String booleanValue(boolean criteriaValue) {

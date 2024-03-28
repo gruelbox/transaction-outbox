@@ -18,7 +18,7 @@ public interface Dialect {
 
   String getCheckSql();
 
-  String getFetchAndLockNextInTopic();
+  String getFetchNextInAllTopics();
 
   String booleanValue(boolean criteriaValue);
 
@@ -29,10 +29,10 @@ public interface Dialect {
   Dialect MY_SQL_5 = DefaultDialect.builder("MY_SQL_5").build();
   Dialect MY_SQL_8 =
       DefaultDialect.builder("MY_SQL_8")
-          .fetchAndLockNextInTopic(
-              "SELECT {{allFields}} FROM {{table}} "
-                  + "WHERE topic = ? AND processed = false ORDER BY seq ASC LIMIT 1 FOR "
-                  + "UPDATE")
+          .fetchNextInAllTopics(
+              "WITH raw AS(SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
+                  + " FROM {{table}} WHERE processed = false AND topic <> '*')"
+                  + " SELECT * FROM raw WHERE rn = 1 AND nextAttemptTime < ? LIMIT {{batchSize}}")
           .deleteExpired(
               "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false"
                   + " LIMIT {{batchSize}}")
@@ -46,10 +46,10 @@ public interface Dialect {
           .build();
   Dialect POSTGRESQL_9 =
       DefaultDialect.builder("POSTGRESQL_9")
-          .fetchAndLockNextInTopic(
-              "SELECT {{allFields}} FROM {{table}} "
-                  + "WHERE topic = ? AND processed = false ORDER BY seq ASC LIMIT 1 FOR "
-                  + "UPDATE")
+          .fetchNextInAllTopics(
+              "WITH raw AS(SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
+                  + " FROM {{table}} WHERE processed = false AND topic <> '*')"
+                  + " SELECT * FROM raw WHERE rn = 1 AND nextAttemptTime < ? LIMIT {{batchSize}}")
           .deleteExpired(
               "DELETE FROM {{table}} WHERE id IN "
                   + "(SELECT id FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT {{batchSize}})")
@@ -75,13 +75,10 @@ public interface Dialect {
           .build();
   Dialect ORACLE =
       DefaultDialect.builder("ORACLE")
-          .fetchAndLockNextInTopic(
-              "SELECT {{allFields}} FROM {{table}} outer"
-                  + " WHERE outer.topic = ?"
-                  + " AND outer.processed = 0"
-                  + " AND outer.seq = ("
-                  + "SELECT MIN(seq) FROM {{table}} inner WHERE inner.topic=outer.topic AND inner"
-                  + ".processed = 0) FOR UPDATE")
+          .fetchNextInAllTopics(
+              "WITH cte1 AS (SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
+                  + " FROM {{table}} WHERE processed = 0 AND topic <> '*')"
+                  + " SELECT * FROM cte1 WHERE rn = 1 AND nextAttemptTime < ? AND ROWNUM <= {{batchSize}}")
           .deleteExpired(
               "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0 "
                   + "AND ROWNUM <= {{batchSize}}")

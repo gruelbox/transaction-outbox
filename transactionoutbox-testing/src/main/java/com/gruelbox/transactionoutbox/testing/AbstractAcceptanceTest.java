@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.LongStream;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
@@ -58,9 +57,10 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
 
   @Test
   final void sequencing() throws Exception {
-    int countPerTopic = 50;
+    int countPerTopic = 20;
+    int topicCount = 5;
 
-    CountDownLatch latch = new CountDownLatch(countPerTopic * 2);
+    CountDownLatch latch = new CountDownLatch(countPerTopic * topicCount);
     TransactionManager transactionManager = txManager();
     OrderedEntryListener orderedEntryListener =
         new OrderedEntryListener(latch, new CountDownLatch(1));
@@ -73,6 +73,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
             .persistor(persistor())
             .listener(orderedEntryListener)
             .initializeImmediately(false)
+            .flushBatchSize(4)
             .build();
 
     outbox.initialize();
@@ -81,36 +82,29 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     withRunningFlusher(
         outbox,
         () -> {
-          for (int ix = 1; ix <= countPerTopic; ix++) {
-            final int i = ix;
-            transactionManager.inTransaction(
-                () -> {
-                  outbox
-                      .with()
-                      .ordered("topic1")
-                      .schedule(InterfaceProcessor.class)
-                      .process(i, "topic1");
-                  outbox
-                      .with()
-                      .ordered("topic2")
-                      .schedule(InterfaceProcessor.class)
-                      .process(i, "topic2");
-                });
-          }
+          transactionManager.inTransaction(
+              () -> {
+                for (int i = 1; i <= countPerTopic; i++) {
+                  for (int j = 1; j <= topicCount; j++) {
+                    outbox
+                        .with()
+                        .ordered("topic" + j)
+                        .schedule(InterfaceProcessor.class)
+                        .process(i, "topic" + j);
+                  }
+                }
+              });
           assertTrue(latch.await(30, SECONDS));
-          var indexes = LongStream.range(1, countPerTopic + 1).boxed().collect(Collectors.toList());
-          assertEquals(
-              indexes,
-              orderedEntryListener.getSuccesses().stream()
-                  .filter(it -> "topic1".equals(it.getTopic()))
-                  .map(TransactionOutboxEntry::getSequence)
-                  .collect(Collectors.toList()));
-          assertEquals(
-              indexes,
-              orderedEntryListener.getSuccesses().stream()
-                  .filter(it -> "topic2".equals(it.getTopic()))
-                  .map(TransactionOutboxEntry::getSequence)
-                  .collect(Collectors.toList()));
+          var indexes = IntStream.range(1, countPerTopic + 1).boxed().collect(Collectors.toList());
+          for (int j = 1; j <= topicCount; j++) {
+            String topic = "topic" + j;
+            assertEquals(
+                indexes,
+                orderedEntryListener.getSuccesses().stream()
+                    .filter(it -> topic.equals(it.getTopic()))
+                    .map(entry -> (Integer) entry.getInvocation().getArgs()[0])
+                    .collect(Collectors.toList()));
+          }
         });
   }
 

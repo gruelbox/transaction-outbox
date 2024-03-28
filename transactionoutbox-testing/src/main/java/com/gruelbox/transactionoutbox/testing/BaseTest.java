@@ -85,8 +85,11 @@ public abstract class BaseTest {
               while (!Thread.interrupted()) {
                 try {
                   // Keep flushing work until there's nothing left to flush
-                  //noinspection StatementWithEmptyBody
-                  while (outbox.flush(executor)) {}
+                  log.info("Starting flush...");
+                  while (outbox.flush(executor)) {
+                    log.info("More work to do...");
+                  }
+                  log.info("Done!");
                 } catch (Exception e) {
                   log.error("Error flushing transaction outbox", e);
                 }

@@ -8,13 +8,16 @@ import static java.time.temporal.ChronoUnit.MINUTES;
 import com.gruelbox.transactionoutbox.spi.ProxyFactory;
 import com.gruelbox.transactionoutbox.spi.Utils;
 import java.lang.reflect.InvocationTargetException;
-import java.time.*;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -87,23 +90,21 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     return new ParameterizedScheduleBuilderImpl();
   }
 
-  private boolean flushStale(Instant now) {
-    log.debug("Flushing stale tasks");
+  private boolean doFlush(Function<Transaction, Collection<TransactionOutboxEntry>> batchSource) {
     var batch =
         transactionManager.inTransactionReturns(
             transaction -> {
-              List<TransactionOutboxEntry> result = new ArrayList<>(flushBatchSize);
-              uncheckedly(() -> persistor.selectBatch(transaction, flushBatchSize, now))
-                  .forEach(
-                      entry -> {
-                        log.debug("Reprocessing {}", entry.description());
-                        try {
-                          pushBack(transaction, entry);
-                          result.add(entry);
-                        } catch (OptimisticLockException e) {
-                          log.debug("Beaten to optimistic lock on {}", entry.description());
-                        }
-                      });
+              var entries = batchSource.apply(transaction);
+              List<TransactionOutboxEntry> result = new ArrayList<>(entries.size());
+              for (var entry : entries) {
+                log.debug("Triggering {}", entry.description());
+                try {
+                  pushBack(transaction, entry);
+                  result.add(entry);
+                } catch (OptimisticLockException e) {
+                  log.debug("Beaten to optimistic lock on {}", entry.description());
+                }
+              }
               return result;
             });
     log.debug("Got batch of {}", batch.size());
@@ -120,23 +121,32 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     Instant now = clockProvider.get().instant();
     List<CompletableFuture<Boolean>> futures = new ArrayList<>();
 
-    futures.add(CompletableFuture.supplyAsync(() -> flushStale(now), executor));
+    futures.add(
+        CompletableFuture.supplyAsync(
+            () -> {
+              log.debug("Flushing stale tasks");
+              return doFlush(
+                  tx -> uncheckedly(() -> persistor.selectBatch(tx, flushBatchSize, now)));
+            },
+            executor));
 
     futures.add(
         CompletableFuture.runAsync(() -> expireIdempotencyProtection(now), executor)
             .thenApply(it -> false));
 
-    var topics =
-        transactionManager.inTransactionReturns(
-            tx -> uncheckedly(() -> persistor.selectActiveTopics(tx)));
-    if (!topics.isEmpty()) {
-      topics.stream()
-          .map(topic -> CompletableFuture.supplyAsync(() -> processNextInTopic(topic), executor))
-          .forEach(futures::add);
-    }
+    futures.add(
+        CompletableFuture.supplyAsync(
+            () -> {
+              log.debug("Flushing topics");
+              return doFlush(
+                  tx -> uncheckedly(() -> persistor.selectNextInTopics(tx, flushBatchSize, now)));
+            },
+            executor));
 
-    var allResults = futures.stream().reduce((f1, f2) -> f1.thenCombine(f2, (d1, d2) -> d1 || d2));
-    return allResults.map(CompletableFuture::join).orElse(false);
+    return futures.stream()
+        .reduce((f1, f2) -> f1.thenCombine(f2, (d1, d2) -> d1 || d2))
+        .map(CompletableFuture::join)
+        .orElse(false);
   }
 
   private void expireIdempotencyProtection(Instant now) {
@@ -279,7 +289,26 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                 if (!persistor.lock(tx, entry)) {
                   return false;
                 }
-                processWithExistingLock(tx, entry);
+                entry
+                    .getInvocation()
+                    .withinMDC(
+                        () -> {
+                          log.info("Processing {}", entry.description());
+                          invoke(entry, tx);
+                          if (entry.getUniqueRequestId() == null) {
+                            persistor.delete(tx, entry);
+                          } else {
+                            log.debug(
+                                "Deferring deletion of {} by {}",
+                                entry.description(),
+                                retentionThreshold);
+                            entry.setProcessed(true);
+                            entry.setLastAttemptTime(Instant.now(clockProvider.get()));
+                            entry.setNextAttemptTime(after(retentionThreshold));
+                            persistor.update(tx, entry);
+                          }
+                          return true;
+                        });
                 return true;
               });
     } catch (InvocationTargetException e) {
@@ -295,70 +324,6 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
         log.debug("Skipped task {} - may be locked or already processed", entry.getId());
       }
     }
-  }
-
-  private boolean processNextInTopic(String topic) {
-    var attempted = new AtomicReference<TransactionOutboxEntry>();
-    var success = false;
-    try {
-      success =
-          transactionManager.inTransactionReturnsThrows(
-              tx -> {
-                var next = persistor.nextInTopic(tx, topic);
-                if (next.isPresent()) {
-                  if (next.get().getNextAttemptTime().isBefore(clockProvider.get().instant())) {
-                    log.info("Topic {}: processing seq {}", topic, next.get().getSequence());
-                    attempted.set(next.get());
-                    processWithExistingLock(tx, next.get());
-                    return true;
-                  } else {
-                    log.info(
-                        "Topic {}: ignoring until {}",
-                        topic,
-                        ZonedDateTime.ofInstant(next.get().getNextAttemptTime(), ZoneId.of("UTC")));
-                    return false;
-                  }
-                } else {
-                  return false;
-                }
-              });
-    } catch (InvocationTargetException e) {
-      if (attempted.get() != null) {
-        updateAttemptCount(attempted.get(), e.getCause());
-      }
-    } catch (Exception e) {
-      if (attempted.get() != null) {
-        updateAttemptCount(attempted.get(), e);
-      }
-    }
-    if (success) {
-      log.info("Processed {}", attempted.get().description());
-      listener.success(attempted.get());
-    }
-    return success;
-  }
-
-  private void processWithExistingLock(Transaction tx, TransactionOutboxEntry entry)
-      throws Exception {
-    initialize();
-    entry
-        .getInvocation()
-        .withinMDC(
-            () -> {
-              log.info("Processing {}", entry.description());
-              invoke(entry, tx);
-              if (entry.getUniqueRequestId() == null) {
-                persistor.delete(tx, entry);
-              } else {
-                log.debug(
-                    "Deferring deletion of {} by {}", entry.description(), retentionThreshold);
-                entry.setProcessed(true);
-                entry.setLastAttemptTime(Instant.now(clockProvider.get()));
-                entry.setNextAttemptTime(after(retentionThreshold));
-                persistor.update(tx, entry);
-              }
-              return true;
-            });
   }
 
   private void invoke(TransactionOutboxEntry entry, Transaction transaction)

@@ -1,8 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Saves and loads {@link TransactionOutboxEntry}s. For most use cases, just use {@link
@@ -107,29 +107,22 @@ public interface Persistor {
       throws Exception;
 
   /**
-   * Selects the list of topics with work awaiting processing.
+   * Selects the next items in all the open topics as a batch for processing. Does not lock.
    *
    * @param tx The current {@link Transaction}.
-   * @return The topics.
+   * @param batchSize The maximum number of records to select.
+   * @param now The time to use when selecting records.
+   * @return The records.
    * @throws Exception Any exception.
    */
-  List<String> selectActiveTopics(final Transaction tx) throws Exception;
-
-  /**
-   * Fetches and locks the next available piece of work on the specified topic.
-   *
-   * @param tx The current {@link Transaction}.
-   * @param topic The topic.
-   * @return The next available piece of work on the selected topic.
-   * @throws Exception ANy exception.
-   */
-  Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic) throws Exception;
+  Collection<TransactionOutboxEntry> selectNextInTopics(Transaction tx, int batchSize, Instant now)
+      throws Exception;
 
   /**
    * Deletes records which have processed and passed their expiry time, in specified batch sizes.
    *
    * @param tx The current {@link Transaction}.
-   * @param batchSize The number of records to select.
+   * @param batchSize The maximum number of records to select.
    * @param now The time to use when selecting records.
    * @return The number of records deleted.
    * @throws Exception Any exception.

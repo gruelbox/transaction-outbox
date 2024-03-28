@@ -315,37 +315,20 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   @Override
-  public List<String> selectActiveTopics(Transaction tx) throws Exception {
-    var sql = "SELECT DISTINCT topic FROM %s WHERE topic <> '*' AND processed = %s";
-    String falseStr = dialect.booleanValue(false);
+  public Collection<TransactionOutboxEntry> selectNextInTopics(
+      Transaction tx, int batchSize, Instant now) throws Exception {
+    var sql =
+        dialect
+            .getFetchNextInAllTopics()
+            .replace("{{table}}", tableName)
+            .replace("{{batchSize}}", Integer.toString(batchSize))
+            .replace("{{allFields}}", ALL_FIELDS);
     //noinspection resource
-    try (PreparedStatement stmt =
-        tx.connection().prepareStatement(String.format(sql, tableName, falseStr, falseStr))) {
-      var result = new ArrayList<String>();
-      try (ResultSet rs = stmt.executeQuery()) {
-        while (rs.next()) {
-          result.add(rs.getString(1));
-        }
-      }
-      return result;
-    }
-  }
-
-  @Override
-  public Optional<TransactionOutboxEntry> nextInTopic(Transaction tx, String topic)
-      throws Exception {
-    //noinspection resource
-    try (PreparedStatement stmt =
-        tx.connection()
-            .prepareStatement(
-                dialect
-                    .getFetchAndLockNextInTopic()
-                    .replace("{{table}}", tableName)
-                    .replace("{{allFields}}", ALL_FIELDS))) {
-      stmt.setString(1, topic);
-      var results = new ArrayList<TransactionOutboxEntry>(1);
+    try (PreparedStatement stmt = tx.connection().prepareStatement(sql)) {
+      stmt.setTimestamp(1, Timestamp.from(now));
+      var results = new ArrayList<TransactionOutboxEntry>();
       gatherResults(stmt, results);
-      return results.stream().findFirst();
+      return results;
     }
   }
 
