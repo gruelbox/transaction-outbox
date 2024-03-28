@@ -27,6 +27,7 @@ class DefaultDialect implements Dialect {
   @Getter private final String lock;
   @Getter private final String checkSql;
   @Getter private final String fetchAndLockNextInTopic;
+  @Getter private final String fetchCurrentVersion;
   private final Collection<Migration> migrations;
 
   @Override
@@ -71,6 +72,7 @@ class DefaultDialect implements Dialect {
     private String fetchAndLockNextInTopic =
         "SELECT {{allFields}} FROM {{table}} "
             + "WHERE topic = ? AND processed = false ORDER BY seq ASC LIMIT 1 FOR UPDATE";
+    private String fetchCurrentVersion = "SELECT version FROM TXNO_VERSION FOR UPDATE";
 
     Builder(String name) {
       this.name = name;
@@ -172,6 +174,7 @@ class DefaultDialect implements Dialect {
           lock,
           checkSql,
           fetchAndLockNextInTopic,
+          fetchCurrentVersion,
           migrations.values()) {
         @Override
         public String booleanValue(boolean criteriaValue) {

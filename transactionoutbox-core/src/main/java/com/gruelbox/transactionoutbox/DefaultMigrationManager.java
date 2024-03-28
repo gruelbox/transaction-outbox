@@ -111,7 +111,7 @@ class DefaultMigrationManager {
 
   private static int currentVersion(Connection connection, Dialect dialect) throws SQLException {
     dialect.createVersionTableIfNotExists(connection);
-    int version = fetchCurrentVersion(connection);
+    int version = fetchCurrentVersion(connection, dialect);
     if (version >= 0) {
       return version;
     }
@@ -129,13 +129,13 @@ class DefaultMigrationManager {
         s.executeUpdate();
       }
       log.info("Created version record.");
-      return fetchCurrentVersion(connection);
+      return fetchCurrentVersion(connection, dialect);
     } catch (Exception e) {
       log.info(
           "Error attempting to create ({} - {}). May have been beaten to it, attempting second fetch",
           e.getClass().getSimpleName(),
           e.getMessage());
-      version = fetchCurrentVersion(connection);
+      version = fetchCurrentVersion(connection, dialect);
       if (version >= 0) {
         return version;
       }
@@ -143,9 +143,9 @@ class DefaultMigrationManager {
     }
   }
 
-  private static int fetchCurrentVersion(Connection connection) throws SQLException {
-    try (PreparedStatement s =
-            connection.prepareStatement("SELECT version FROM TXNO_VERSION FOR UPDATE");
+  private static int fetchCurrentVersion(Connection connection, Dialect dialect)
+      throws SQLException {
+    try (PreparedStatement s = connection.prepareStatement(dialect.getFetchCurrentVersion());
         ResultSet rs = s.executeQuery()) {
       if (rs.next()) {
         var version = rs.getInt(1);
