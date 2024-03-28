@@ -143,9 +143,9 @@ class DefaultMigrationManager {
     }
   }
 
-  private static int fetchCurrentVersion(Connection connection, Dialect dialect) throws SQLException {
-    try (PreparedStatement s =
-            connection.prepareStatement(dialect.getFetchCurrentVersion());
+  private static int fetchCurrentVersion(Connection connection, Dialect dialect)
+      throws SQLException {
+    try (PreparedStatement s = connection.prepareStatement(dialect.getFetchCurrentVersion());
         ResultSet rs = s.executeQuery()) {
       if (rs.next()) {
         var version = rs.getInt(1);
