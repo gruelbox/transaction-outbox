@@ -1,6 +1,9 @@
 package com.gruelbox.transactionoutbox;
 
+import static java.util.stream.Collectors.joining;
+
 import com.google.gson.annotations.SerializedName;
+import com.gruelbox.transactionoutbox.spi.Utils;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -135,5 +138,19 @@ public class Invocation {
       log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
     }
     listener.wrapInvocation(() -> method.invoke(instance, args));
+  }
+
+  public String getDescription() {
+    if (getClassName().equals(LambdaRunner.class.getName())) {
+      return ((SerializableLambda) args[0]).getDescription();
+    } else {
+      return String.format(
+          "%s.%s(%s)",
+          className,
+          methodName,
+          args == null
+              ? null
+              : Arrays.stream(args).map(Utils::stringifyArg).collect(joining(", ")));
+    }
   }
 }

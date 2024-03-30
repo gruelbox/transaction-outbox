@@ -1,5 +1,7 @@
 package com.gruelbox.transactionoutbox.spi;
 
+import static java.util.stream.Collectors.joining;
+
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.UncheckedException;
 import java.util.Arrays;
@@ -105,5 +107,20 @@ public class Utils {
         logger.warn(message, args);
         break;
     }
+  }
+
+  public static String stringifyArg(Object o) {
+    if (o == null) {
+      return "null";
+    }
+    if (o.getClass().isArray()) {
+      return "["
+          + Arrays.stream((Object[]) o).map(Utils::stringifyArg).collect(joining(", "))
+          + "]";
+    }
+    if (o instanceof String) {
+      return "\"" + o + "\"";
+    }
+    return o.toString();
   }
 }
