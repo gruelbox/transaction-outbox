@@ -22,6 +22,8 @@ public interface Dialect {
 
   String getFetchCurrentVersion();
 
+  String getFetchCurrentVersion();
+
   String booleanValue(boolean criteriaValue);
 
   void createVersionTableIfNotExists(Connection connection) throws SQLException;
