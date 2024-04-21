@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox.testing;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toList;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
@@ -22,7 +23,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -95,7 +95,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                 }
               });
           assertTrue(latch.await(30, SECONDS));
-          var indexes = IntStream.range(1, countPerTopic + 1).boxed().collect(Collectors.toList());
+          var indexes = IntStream.range(1, countPerTopic + 1).boxed().collect(toList());
           for (int j = 1; j <= topicCount; j++) {
             String topic = "topic" + j;
             assertEquals(
@@ -103,7 +103,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                 orderedEntryListener.getSuccesses().stream()
                     .filter(it -> topic.equals(it.getTopic()))
                     .map(entry -> (Integer) entry.getInvocation().getArgs()[0])
-                    .collect(Collectors.toList()));
+                    .collect(toList()));
           }
         });
   }
@@ -611,9 +611,12 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                       duplicates.put(i, i);
                     }
                     latch.countDown();
+                    log.info("---- Latch dropped to {}", latch.getCount());
                   }
                 })
             .build();
+
+    List<Integer> expected = IntStream.range(0, count * 10).boxed().collect(toList());
 
     withRunningFlusher(
         outbox,
@@ -628,7 +631,10 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                               outbox.schedule(InterfaceProcessor.class).process(i * 10 + j, "Whee");
                             }
                           }));
-          assertTrue(latch.await(30, SECONDS), "Latch not opened in time");
+          assertTrue(
+              latch.await(30, SECONDS),
+              "Latch not opened in time. Still awaiting:\n"
+                  + expected.stream().filter(it -> !results.containsKey(it)).collect(toList()));
         });
 
     assertThat(
@@ -636,7 +642,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     assertThat(
         "Only got: " + results.keySet(),
         results.keySet(),
-        containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
+        containsInAnyOrder(expected.toArray(new Integer[0])));
   }
 
   private static class FailingInstantiator implements Instantiator {
