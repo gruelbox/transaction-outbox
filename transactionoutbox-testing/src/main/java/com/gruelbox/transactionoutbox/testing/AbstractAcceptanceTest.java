@@ -67,7 +67,11 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         tx -> {
           //noinspection resource
           try (var stmt = tx.connection().createStatement()) {
-            stmt.execute("DROP TABLE IF EXISTS TEST_TABLE");
+            try {
+              stmt.execute("DROP TABLE TEST_TABLE");
+            } catch (Exception e) {
+              // Ignore
+            }
             stmt.execute(createTestTable());
           } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -88,7 +92,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                             try (var stmt =
                                 tx.connection()
                                     .prepareStatement(
-                                        "INSERT INTO TEST_TABLE (topic, i, foo) VALUES(?, ?, ?)")) {
+                                        "INSERT INTO TEST_TABLE (topic, ix, foo) VALUES(?, ?, ?)")) {
                               stmt.setString(1, bar);
                               stmt.setInt(2, insertIndex.incrementAndGet());
                               stmt.setInt(3, foo);
@@ -130,7 +134,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         tx -> {
           //noinspection resource
           try (var stmt = tx.connection().createStatement();
-              var rs = stmt.executeQuery("SELECT topic, foo FROM TEST_TABLE ORDER BY i")) {
+              var rs = stmt.executeQuery("SELECT topic, foo FROM TEST_TABLE ORDER BY ix")) {
             while (rs.next()) {
               ArrayList<Integer> values =
                   output.computeIfAbsent(rs.getString(1), k -> new ArrayList<>());
@@ -681,7 +685,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
   }
 
   protected String createTestTable() {
-    return "CREATE TABLE TEST_TABLE (topic VARCHAR(50), i INTEGER, foo INTEGER, PRIMARY KEY (topic, i))";
+    return "CREATE TABLE TEST_TABLE (topic VARCHAR(50), ix INTEGER, foo INTEGER, PRIMARY KEY (topic, ix))";
   }
 
   private static class FailingInstantiator implements Instantiator {

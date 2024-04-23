@@ -31,6 +31,6 @@ class TestOracle18 extends AbstractAcceptanceTest {
 
   @Override
   protected String createTestTable() {
-    return "CREATE TABLE TEST_TABLE_sequencing (topic VARCHAR(50), i NUMBER, foo INTEGER, CONSTRAINT TEST_TABLE_sequencing_pk (topic, i))";
+    return "CREATE TABLE TEST_TABLE (topic VARCHAR(50), ix NUMBER, foo INTEGER, CONSTRAINT TEST_TABLE_sequencing_pk PRIMARY KEY (topic, ix))";
   }
 }
