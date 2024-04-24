@@ -64,14 +64,19 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         (ThreadLocalContextTransactionManager) txManager();
 
     transactionManager.inTransaction(
+      tx -> {
+        //noinspection resource
+        try (var stmt = tx.connection().createStatement()) {
+          stmt.execute("DROP TABLE TEST_TABLE");
+        } catch (SQLException e) {
+          // ignore
+        }
+      });
+
+    transactionManager.inTransaction(
         tx -> {
           //noinspection resource
           try (var stmt = tx.connection().createStatement()) {
-            try {
-              stmt.execute("DROP TABLE TEST_TABLE");
-            } catch (Exception e) {
-              // Ignore
-            }
             stmt.execute(createTestTable());
           } catch (SQLException e) {
             throw new RuntimeException(e);
