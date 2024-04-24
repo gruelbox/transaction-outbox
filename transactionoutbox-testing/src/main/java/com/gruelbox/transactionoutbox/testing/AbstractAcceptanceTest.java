@@ -1,6 +1,8 @@
 package com.gruelbox.transactionoutbox.testing;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
@@ -14,15 +16,11 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -60,18 +58,57 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     int countPerTopic = 20;
     int topicCount = 5;
 
+    AtomicInteger insertIndex = new AtomicInteger();
     CountDownLatch latch = new CountDownLatch(countPerTopic * topicCount);
-    TransactionManager transactionManager = txManager();
-    OrderedEntryListener orderedEntryListener =
-        new OrderedEntryListener(latch, new CountDownLatch(1));
+    ThreadLocalContextTransactionManager transactionManager =
+        (ThreadLocalContextTransactionManager) txManager();
+
+    transactionManager.inTransaction(
+        tx -> {
+          //noinspection resource
+          try (var stmt = tx.connection().createStatement()) {
+            stmt.execute("DROP TABLE TEST_TABLE");
+          } catch (SQLException e) {
+            // ignore
+          }
+        });
+
+    transactionManager.inTransaction(
+        tx -> {
+          //noinspection resource
+          try (var stmt = tx.connection().createStatement()) {
+            stmt.execute(createTestTable());
+          } catch (SQLException e) {
+            throw new RuntimeException(e);
+          }
+        });
+
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .submitter(Submitter.withExecutor(unreliablePool))
             .attemptFrequency(Duration.ofMillis(500))
-            .instantiator(new RandomFailingInstantiator())
+            .instantiator(
+                new RandomFailingInstantiator(
+                    (foo, bar) -> {
+                      transactionManager.requireTransaction(
+                          tx -> {
+                            //noinspection resource
+                            try (var stmt =
+                                tx.connection()
+                                    .prepareStatement(
+                                        "INSERT INTO TEST_TABLE (topic, ix, foo) VALUES(?, ?, ?)")) {
+                              stmt.setString(1, bar);
+                              stmt.setInt(2, insertIndex.incrementAndGet());
+                              stmt.setInt(3, foo);
+                              stmt.executeUpdate();
+                            } catch (SQLException e) {
+                              throw new RuntimeException(e);
+                            }
+                          });
+                    }))
             .persistor(persistor())
-            .listener(orderedEntryListener)
+            .listener(new LatchListener(latch))
             .initializeImmediately(false)
             .flushBatchSize(4)
             .build();
@@ -95,17 +132,30 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                 }
               });
           assertTrue(latch.await(30, SECONDS));
-          var indexes = IntStream.range(1, countPerTopic + 1).boxed().collect(Collectors.toList());
-          for (int j = 1; j <= topicCount; j++) {
-            String topic = "topic" + j;
-            assertEquals(
-                indexes,
-                orderedEntryListener.getSuccesses().stream()
-                    .filter(it -> topic.equals(it.getTopic()))
-                    .map(entry -> (Integer) entry.getInvocation().getArgs()[0])
-                    .collect(Collectors.toList()));
+        });
+
+    var output = new HashMap<String, ArrayList<Integer>>();
+    transactionManager.inTransaction(
+        tx -> {
+          //noinspection resource
+          try (var stmt = tx.connection().createStatement();
+              var rs = stmt.executeQuery("SELECT topic, foo FROM TEST_TABLE ORDER BY ix")) {
+            while (rs.next()) {
+              ArrayList<Integer> values =
+                  output.computeIfAbsent(rs.getString(1), k -> new ArrayList<>());
+              values.add(rs.getInt(2));
+            }
+          } catch (SQLException e) {
+            throw new RuntimeException(e);
           }
         });
+
+    var indexes = IntStream.range(1, countPerTopic + 1).boxed().collect(toList());
+    var expected =
+        IntStream.range(1, topicCount + 1)
+            .mapToObj(i -> "topic" + i)
+            .collect(toMap(it -> it, it -> indexes));
+    assertEquals(expected, output);
   }
 
   /**
@@ -639,6 +689,10 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
   }
 
+  protected String createTestTable() {
+    return "CREATE TABLE TEST_TABLE (topic VARCHAR(50), ix INTEGER, foo INTEGER, PRIMARY KEY (topic, ix))";
+  }
+
   private static class FailingInstantiator implements Instantiator {
 
     private final AtomicInteger attempts;
@@ -670,6 +724,16 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
 
   private static class RandomFailingInstantiator implements Instantiator {
 
+    private final InterfaceProcessor interfaceProcessor;
+
+    RandomFailingInstantiator() {
+      this.interfaceProcessor = (foo, bar) -> {};
+    }
+
+    RandomFailingInstantiator(InterfaceProcessor interfaceProcessor) {
+      this.interfaceProcessor = interfaceProcessor;
+    }
+
     @Override
     public String getName(Class<?> clazz) {
       return clazz.getName();
@@ -680,11 +744,10 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
       if (InterfaceProcessor.class.getName().equals(name)) {
         return (InterfaceProcessor)
             (foo, bar) -> {
-              LOGGER.info("Processing ({}, {})", foo, bar);
               if (random.nextInt(10) == 5) {
                 throw new RuntimeException("Temporary failure of InterfaceProcessor");
               }
-              LOGGER.info("Processed ({}, {})", foo, bar);
+              interfaceProcessor.process(foo, bar);
             };
       } else {
         throw new UnsupportedOperationException();
