@@ -28,4 +28,9 @@ class TestOracle21 extends AbstractAcceptanceTest {
         .password(container.getPassword())
         .build();
   }
+
+  @Override
+  protected String createTestTable() {
+    return "CREATE TABLE TEST_TABLE (topic VARCHAR(50), ix NUMBER, foo INTEGER, CONSTRAINT TEST_TABLE_sequencing_pk PRIMARY KEY (topic, ix))";
+  }
 }
