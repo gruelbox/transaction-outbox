@@ -1,5 +1,11 @@
 package com.gruelbox.transactionoutbox;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.experimental.Accessors;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -8,11 +14,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.experimental.Accessors;
 
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 class DefaultDialect implements Dialect {
@@ -28,6 +29,7 @@ class DefaultDialect implements Dialect {
   @Getter private final String checkSql;
   @Getter private final String fetchNextInAllTopics;
   @Getter private final String fetchCurrentVersion;
+  @Getter private final String fetchNextSequence;
   private final Collection<Migration> migrations;
 
   @Override
@@ -76,6 +78,7 @@ class DefaultDialect implements Dialect {
             + "SELECT MIN(seq) FROM {{table}} b WHERE b.topic=a.topic AND b.processed = false"
             + ") LIMIT {{batchSize}}";
     private String fetchCurrentVersion = "SELECT version FROM TXNO_VERSION FOR UPDATE";
+    private String fetchNextSequence = "SELECT seq FROM TXNO_SEQUENCE WHERE topic = ? FOR UPDATE";
 
     Builder(String name) {
       this.name = name;
@@ -178,6 +181,7 @@ class DefaultDialect implements Dialect {
           checkSql,
           fetchNextInAllTopics,
           fetchCurrentVersion,
+          fetchNextSequence,
           migrations.values()) {
         @Override
         public String booleanValue(boolean criteriaValue) {

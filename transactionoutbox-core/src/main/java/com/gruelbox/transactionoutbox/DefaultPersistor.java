@@ -4,9 +4,17 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.sql.*;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.SQLIntegrityConstraintViolationException;
+import java.sql.SQLTimeoutException;
+import java.sql.Statement;
+import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -135,8 +143,7 @@ public class DefaultPersistor implements Persistor, Validatable {
 
   private void setNextSequence(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
     //noinspection resource
-    var seqSelect =
-        tx.prepareBatchStatement("SELECT seq FROM TXNO_SEQUENCE WHERE topic = ? FOR UPDATE");
+    var seqSelect = tx.prepareBatchStatement(dialect.getFetchNextSequence());
     seqSelect.setString(1, entry.getTopic());
     try (ResultSet rs = seqSelect.executeQuery()) {
       if (rs.next()) {
