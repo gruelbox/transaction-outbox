@@ -10,12 +10,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SuppressWarnings("WeakerAccess")
 @Testcontainers
-class TestMSSqlServer2017 extends AbstractAcceptanceTest {
+class TestMSSqlServer2019 extends AbstractAcceptanceTest {
 
   @Container
   @SuppressWarnings({"rawtypes", "resource"})
   private static final JdbcDatabaseContainer container =
-      new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2017-latest")
+      new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
           .acceptLicense()
           .withStartupTimeout(Duration.ofMinutes(5))
           .withReuse(true);
