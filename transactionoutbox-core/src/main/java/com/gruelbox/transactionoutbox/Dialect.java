@@ -131,4 +131,54 @@ public interface Dialect {
                 }
               })
           .build();
+
+  Dialect MS_SQL_SERVER = DefaultDialect.builder("MS_SQL_SERVER")
+      .lock("SELECT id, invocation FROM {{table}} WITH (UPDLOCK, ROWLOCK, READPAST) WHERE id = ? AND version = ?")
+      .selectBatch("SELECT TOP ({{batchSize}}) {{allFields}} FROM {{table}} " +
+          "WITH (UPDLOCK, ROWLOCK, READPAST) WHERE nextAttemptTime < ? AND topic = '*' " +
+          "AND blocked = 0 AND processed = 0")
+      .deleteExpired("DELETE  TOP ({{batchSize}}) FROM {{table}} " +
+          "WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0")
+      .fetchCurrentVersion("SELECT version FROM TXNO_VERSION WITH (UPDLOCK, ROWLOCK, READPAST)")
+      .fetchNextInAllTopics("SELECT TOP {{batchSize}} {{allFields}} FROM {{table}} a"
+          + " WHERE processed = 0 AND topic <> '*' AND nextAttemptTime < ?"
+          + " AND seq = ("
+          + "SELECT MIN(seq) FROM {{table}} b WHERE b.topic=a.topic AND b.processed = 0"
+          + ")")
+      .booleanValueFrom(v -> v ? "1" : "0")
+      .changeMigration(
+          1,
+          "CREATE TABLE TXNO_OUTBOX (\n"
+              + "    id VARCHAR(36) PRIMARY KEY,\n"
+              + "    invocation NVARCHAR(MAX),\n"
+              + "    nextAttemptTime DATETIME2(6),\n"
+              + "    attempts INT,\n"
+              + "    blacklisted BIT,\n"
+              + "    version INT\n"
+              + ")")
+      .changeMigration(
+          2, "ALTER TABLE TXNO_OUTBOX ADD uniqueRequestId VARCHAR(100)")
+      .changeMigration(3, "ALTER TABLE TXNO_OUTBOX ADD processed BIT")
+      .changeMigration(5, "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")
+      .changeMigration(6, "EXEC sp_rename 'TXNO_OUTBOX.blacklisted', 'blocked', 'COLUMN'")
+      .changeMigration(7, "ALTER TABLE TXNO_OUTBOX ADD lastAttemptTime DATETIME2(6)")
+      .changeMigration(8, "CREATE UNIQUE INDEX UX_TXNO_OUTBOX_uniqueRequestId ON TXNO_OUTBOX (uniqueRequestId) WHERE uniqueRequestId IS NOT NULL")
+      .changeMigration(9, "ALTER TABLE TXNO_OUTBOX ADD topic VARCHAR(250) DEFAULT '*' NOT NULL")
+      .changeMigration(10, "ALTER TABLE TXNO_OUTBOX ADD seq INT")
+      .changeMigration(
+          11,
+          "CREATE TABLE TXNO_SEQUENCE (topic VARCHAR(250) NOT NULL, seq INT NOT NULL, CONSTRAINT " +
+              "PK_TXNO_SEQUENCE PRIMARY KEY (topic, seq))")
+      .createVersionTableBy(
+          connection -> {
+            try (Statement s = connection.createStatement()) {
+              s.execute("IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'TXNO_VERSION')\n"
+                  + "BEGIN\n"
+                  + "    CREATE TABLE TXNO_VERSION (\n"
+                  + "        version INT\n"
+                  + "    );"
+                  + "END");
+            }
+          })
+      .build();
 }

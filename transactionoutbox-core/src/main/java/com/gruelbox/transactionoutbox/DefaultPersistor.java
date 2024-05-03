@@ -175,9 +175,12 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   private boolean indexViolation(Exception e) {
+    System.out.println(e);
     return (e instanceof SQLIntegrityConstraintViolationException)
         || (e.getClass().getName().equals("org.postgresql.util.PSQLException")
-            && e.getMessage().contains("constraint"));
+            && e.getMessage().contains("constraint"))
+        || (e.getClass().getName().equals("com.microsoft.sqlserver.jdbc.SQLServerException")
+            && e.getMessage().contains("duplicate key"));
   }
 
   private void setupInsert(
@@ -374,9 +377,13 @@ public class DefaultPersistor implements Persistor, Validatable {
     try (Reader invocationStream = rs.getCharacterStream("invocation")) {
       TransactionOutboxEntry entry =
           TransactionOutboxEntry.builder()
+              // Reading invocationStream *must* occur first because some drivers (ex. SQL Server)
+              // implement true streams that are not buffered in memory. Calling any other getter
+              // on ResultSet before invocationStream is read will cause Reader to be closed
+              // prematurely.
+              .invocation(serializer.deserializeInvocation(invocationStream))
               .id(rs.getString("id"))
               .uniqueRequestId(rs.getString("uniqueRequestId"))
-              .invocation(serializer.deserializeInvocation(invocationStream))
               .topic("*".equals(topic) ? null : topic)
               .sequence(sequence)
               .lastAttemptTime(

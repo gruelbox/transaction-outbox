@@ -1,5 +1,11 @@
 package com.gruelbox.transactionoutbox;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.experimental.Accessors;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -8,11 +14,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.experimental.Accessors;
 
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 class DefaultDialect implements Dialect {
