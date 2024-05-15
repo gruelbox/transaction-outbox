@@ -175,7 +175,6 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   private boolean indexViolation(Exception e) {
-    System.out.println(e);
     return (e instanceof SQLIntegrityConstraintViolationException)
         || (e.getClass().getName().equals("org.postgresql.util.PSQLException")
             && e.getMessage().contains("constraint"))
@@ -208,9 +207,7 @@ public class DefaultPersistor implements Persistor, Validatable {
   public void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception {
     //noinspection resource
     try (PreparedStatement stmt =
-        // language=MySQL
-        tx.connection()
-            .prepareStatement("DELETE FROM " + tableName + " WHERE id = ? and version = ?")) {
+        tx.connection().prepareStatement(dialect.getDelete().replace("{{table}}", tableName))) {
       stmt.setString(1, entry.getId());
       stmt.setInt(2, entry.getVersion());
       if (stmt.executeUpdate() != 1) {

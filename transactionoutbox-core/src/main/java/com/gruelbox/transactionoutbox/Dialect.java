@@ -7,6 +7,8 @@ import java.util.stream.Stream;
 
 /** The SQL dialects supported by {@link DefaultPersistor}. */
 public interface Dialect {
+  String getDelete();
+
   /**
    * @return Format string for the SQL required to delete expired retained records.
    */
@@ -140,6 +142,7 @@ public interface Dialect {
               "SELECT TOP ({{batchSize}}) {{allFields}} FROM {{table}} "
                   + "WITH (UPDLOCK, ROWLOCK, READPAST) WHERE nextAttemptTime < ? AND topic = '*' "
                   + "AND blocked = 0 AND processed = 0")
+          .delete("DELETE FROM {{table}} WITH (ROWLOCK, READPAST) WHERE id = ? and version = ?")
           .deleteExpired(
               "DELETE  TOP ({{batchSize}}) FROM {{table}} "
                   + "WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0")
@@ -150,6 +153,8 @@ public interface Dialect {
                   + " AND seq = ("
                   + "SELECT MIN(seq) FROM {{table}} b WHERE b.topic=a.topic AND b.processed = 0"
                   + ")")
+          .fetchNextSequence(
+              "SELECT seq FROM TXNO_SEQUENCE WITH (UPDLOCK, ROWLOCK, READPAST) WHERE topic = ?")
           .booleanValueFrom(v -> v ? "1" : "0")
           .changeMigration(
               1,

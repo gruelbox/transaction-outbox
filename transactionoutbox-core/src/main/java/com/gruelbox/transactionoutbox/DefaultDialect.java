@@ -23,6 +23,7 @@ class DefaultDialect implements Dialect {
 
   @Getter private final String name;
   @Getter private final String deleteExpired;
+  @Getter private final String delete;
   @Getter private final String selectBatch;
   @Getter private final String lock;
   @Getter private final String checkSql;
@@ -58,6 +59,7 @@ class DefaultDialect implements Dialect {
   @Accessors(fluent = true)
   static final class Builder {
     private final String name;
+    private String delete = "DELETE FROM {{table}} WHERE id = ? and version = ?";
     private String deleteExpired =
         "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false"
             + " LIMIT {{batchSize}}";
@@ -175,6 +177,7 @@ class DefaultDialect implements Dialect {
       return new DefaultDialect(
           name,
           deleteExpired,
+          delete,
           selectBatch,
           lock,
           checkSql,
