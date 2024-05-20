@@ -446,6 +446,7 @@
                 <exclude>**/*Postgres*.java</exclude>
                 <exclude>**/*MySql5*.java</exclude>
                 <exclude>**/*MySql8*.java</exclude>
+                <exclude>**/*MSSqlServer*.java</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -521,6 +522,21 @@
             <configuration>
               <includes>
                 <include>**/*MySql8*.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>only-mssqlserver-tests</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>**/*MSSqlServer*.java</include>
               </includes>
             </configuration>
           </plugin>

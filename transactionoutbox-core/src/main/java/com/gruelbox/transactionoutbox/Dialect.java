@@ -163,19 +163,27 @@ public interface Dialect {
                   + "    invocation NVARCHAR(MAX),\n"
                   + "    nextAttemptTime DATETIME2(6),\n"
                   + "    attempts INT,\n"
-                  + "    blacklisted BIT,\n"
-                  + "    version INT\n"
+                  + "    blocked BIT,\n"
+                  + "    version INT,\n"
+                  + "    uniqueRequestId VARCHAR(250),\n"
+                  + "    processed BIT,\n"
+                  + "    lastAttemptTime DATETIME2(6),\n"
+                  + "    topic VARCHAR(250) DEFAULT '*' NOT NULL,\n"
+                  + "    seq INT\n"
                   + ")")
-          .changeMigration(2, "ALTER TABLE TXNO_OUTBOX ADD uniqueRequestId VARCHAR(100)")
-          .changeMigration(3, "ALTER TABLE TXNO_OUTBOX ADD processed BIT")
-          .changeMigration(5, "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId VARCHAR(250)")
-          .changeMigration(6, "EXEC sp_rename 'TXNO_OUTBOX.blacklisted', 'blocked', 'COLUMN'")
-          .changeMigration(7, "ALTER TABLE TXNO_OUTBOX ADD lastAttemptTime DATETIME2(6)")
+          .disableMigration(2)
+          .disableMigration(3)
+          .changeMigration(
+              4,
+              "CREATE INDEX IX_TXNO_OUTBOX_1 ON TXNO_OUTBOX (processed, blocked, nextAttemptTime)")
+          .disableMigration(5)
+          .disableMigration(6)
+          .disableMigration(7)
           .changeMigration(
               8,
               "CREATE UNIQUE INDEX UX_TXNO_OUTBOX_uniqueRequestId ON TXNO_OUTBOX (uniqueRequestId) WHERE uniqueRequestId IS NOT NULL")
-          .changeMigration(9, "ALTER TABLE TXNO_OUTBOX ADD topic VARCHAR(250) DEFAULT '*' NOT NULL")
-          .changeMigration(10, "ALTER TABLE TXNO_OUTBOX ADD seq INT")
+          .disableMigration(9)
+          .disableMigration(10)
           .changeMigration(
               11,
               "CREATE TABLE TXNO_SEQUENCE (topic VARCHAR(250) NOT NULL, seq INT NOT NULL, CONSTRAINT "
