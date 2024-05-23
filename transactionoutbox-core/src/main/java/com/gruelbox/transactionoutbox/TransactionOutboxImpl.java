@@ -5,6 +5,7 @@ import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.time.temporal.ChronoUnit.MINUTES;
 
+import com.gruelbox.transactionoutbox.spi.AbstractProxyFactory;
 import com.gruelbox.transactionoutbox.spi.ProxyFactory;
 import com.gruelbox.transactionoutbox.spi.Utils;
 import java.lang.reflect.InvocationTargetException;
@@ -46,7 +47,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private final Validator validator;
   private final Duration retentionThreshold;
   private final AtomicBoolean initialized = new AtomicBoolean();
-  private final ProxyFactory proxyFactory = new ProxyFactory();
+  private final AbstractProxyFactory proxyFactory;
   private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
   @Override
@@ -62,6 +63,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     validator.notNull("clockProvider", clockProvider);
     validator.notNull("listener", listener);
     validator.notNull("retentionThreshold", retentionThreshold);
+    validator.notNull("proxyFactory", proxyFactory);
   }
 
   static TransactionOutboxBuilder builder() {
@@ -431,7 +433,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
               Utils.firstNonNull(listener, () -> TransactionOutboxListener.EMPTY),
               serializeMdc == null || serializeMdc,
               validator,
-              retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold);
+              retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold,
+              Utils.firstNonNull(proxyFactory, ProxyFactory::new));
       validator.validate(impl);
       if (initializeImmediately == null || initializeImmediately) {
         impl.initialize();
