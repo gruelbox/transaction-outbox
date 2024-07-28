@@ -30,6 +30,7 @@ class TestComplexConfigurationExample {
 
     TransactionManager transactionManager = TransactionManager.fromDataSource(dataSource);
 
+    Dialect dialect = Dialect.POSTGRESQL_9;
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             // The most complex part to set up for most will be synchronizing with your existing
@@ -47,7 +48,8 @@ class TestComplexConfigurationExample {
                 DefaultPersistor.builder()
                     // Selecting the right SQL dialect ensures that features such as SKIP LOCKED are
                     // used correctly.
-                    .dialect(Dialect.POSTGRESQL_9)
+                    .dialect(dialect)
+                    .sequenceGenerator(DefaultSequenceGenerator.builder().dialect(dialect).build())
                     // Override the table name (defaults to "TXNO_OUTBOX")
                     .tableName("transactionOutbox")
                     // Shorten the time we will wait for write locks (defaults to 2)
