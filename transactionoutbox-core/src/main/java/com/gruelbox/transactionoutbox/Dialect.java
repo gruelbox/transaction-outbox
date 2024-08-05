@@ -3,10 +3,13 @@ package com.gruelbox.transactionoutbox;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.stream.Stream;
 
 /** The SQL dialects supported by {@link DefaultPersistor}. */
 public interface Dialect {
+  String getName();
+
   String getDelete();
 
   /**
@@ -201,4 +204,16 @@ public interface Dialect {
                 }
               })
           .build();
+
+  List<Dialect> dialects = List.of(MY_SQL_5, MY_SQL_8, POSTGRESQL_9, H2, ORACLE, MS_SQL_SERVER);
+
+  static Dialect getValueByName(String dialectName) {
+    for (Dialect item : dialects) {
+      if (item.getName().equals(dialectName)) {
+        return item;
+      }
+    }
+    throw new RuntimeException(
+        "Unknown dialect: " + dialectName + ". Valid dialects are: " + dialects + ".");
+  }
 }
