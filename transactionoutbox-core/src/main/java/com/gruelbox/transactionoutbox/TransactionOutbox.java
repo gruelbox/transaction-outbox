@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 import lombok.ToString;
 import org.slf4j.MDC;
@@ -152,6 +153,7 @@ public interface TransactionOutbox {
     protected Boolean serializeMdc;
     protected Duration retentionThreshold;
     protected Boolean initializeImmediately;
+    protected ThreadFactory schedulerThreadFactory;
 
     protected TransactionOutboxBuilder() {}
 
@@ -295,6 +297,15 @@ public interface TransactionOutbox {
      */
     public TransactionOutboxBuilder initializeImmediately(boolean initializeImmediately) {
       this.initializeImmediately = initializeImmediately;
+      return this;
+    }
+
+    /**
+     * @param schedulerThreadFactory The {@link ThreadFactory} that will be used to build the scheduler executor.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder schedulerThreadFactory(ThreadFactory schedulerThreadFactory) {
+      this.schedulerThreadFactory = schedulerThreadFactory;
       return this;
     }
 
