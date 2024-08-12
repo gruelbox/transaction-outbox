@@ -1,14 +1,12 @@
 package com.gruelbox.transactionoutbox;
 
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /** Called by {@link TransactionOutbox} to submit work for background processing. */
-public interface Submitter {
+public interface Submitter extends AutoCloseable {
 
   /**
    * Schedules background work using a local {@link Executor} implementation.
@@ -30,15 +28,7 @@ public interface Submitter {
    * @return The submitter.
    */
   static Submitter withDefaultExecutor() {
-    // JDK bug means this warning can't be fixed
-    //noinspection Convert2Diamond
-    return withExecutor(
-        new ThreadPoolExecutor(
-            1,
-            Math.max(1, ForkJoinPool.commonPool().getParallelism()),
-            0L,
-            TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<Runnable>(16384)));
+    return ExecutorSubmitter.builder().build();
   }
 
   /**
@@ -72,4 +62,10 @@ public interface Submitter {
    *     just a call to {@link TransactionOutbox#processNow(TransactionOutboxEntry)}).
    */
   void submit(TransactionOutboxEntry entry, Consumer<TransactionOutboxEntry> localExecutor);
+
+  /**
+   * Releases any releasable resource. The instance will become unusable after calling this method.
+   */
+  @Override
+  default void close() {}
 }
