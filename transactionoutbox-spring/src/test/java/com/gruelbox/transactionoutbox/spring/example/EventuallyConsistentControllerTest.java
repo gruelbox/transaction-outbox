@@ -6,9 +6,9 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URL;
-import javax.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -23,11 +23,11 @@ class EventuallyConsistentControllerTest {
   private URL base;
 
   @SuppressWarnings("unused")
-  @Inject
+  @Autowired
   private TestRestTemplate template;
 
   @SuppressWarnings("unused")
-  @Inject
+  @Autowired
   private ExternalQueueService externalQueueService;
 
   @BeforeEach
