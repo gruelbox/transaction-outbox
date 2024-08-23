@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.Utils;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
@@ -7,7 +8,6 @@ import java.io.Writer;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.SQLTimeoutException;
 import java.sql.Statement;
 import java.sql.Timestamp;
@@ -57,6 +57,12 @@ public class DefaultPersistor implements Persistor, Validatable {
   private final Dialect dialect;
 
   /**
+   * @param sequenceGenerator The sequence generator used for ordered tasks. Required
+   */
+  @SuppressWarnings("JavaDoc")
+  private final SequenceGenerator sequenceGenerator;
+
+  /**
    * @param tableName The database table name. The default is {@code TXNO_OUTBOX}.
    */
   @SuppressWarnings("JavaDoc")
@@ -88,6 +94,7 @@ public class DefaultPersistor implements Persistor, Validatable {
   public void validate(Validator validator) {
     validator.notNull("dialect", dialect);
     validator.notNull("tableName", tableName);
+    validator.notNull("sequenceGenerator", sequenceGenerator);
   }
 
   @Override
@@ -119,8 +126,12 @@ public class DefaultPersistor implements Persistor, Validatable {
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
     if (entry.getTopic() != null) {
-      setNextSequence(tx, entry);
-      log.info("Assigned sequence number {} to topic {}", entry.getSequence(), entry.getTopic());
+      try {
+        entry.setSequence(sequenceGenerator.generate(tx, entry.getTopic()));
+        log.info("Assigned sequence number {} to topic {}", entry.getSequence(), entry.getTopic());
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to assign sequence number", e);
+      }
     }
     PreparedStatement stmt = tx.prepareBatchStatement(insertSql);
     setupInsert(entry, writer, stmt);
@@ -132,54 +143,13 @@ public class DefaultPersistor implements Persistor, Validatable {
         stmt.executeUpdate();
         log.debug("Inserted {} immediately", entry.description());
       } catch (Exception e) {
-        if (indexViolation(e)) {
+        if (Utils.indexViolation(e)) {
           throw new AlreadyScheduledException(
               "Request " + entry.description() + " already exists", e);
         }
         throw e;
       }
     }
-  }
-
-  private void setNextSequence(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
-    //noinspection resource
-    var seqSelect = tx.prepareBatchStatement(dialect.getFetchNextSequence());
-    seqSelect.setString(1, entry.getTopic());
-    try (ResultSet rs = seqSelect.executeQuery()) {
-      if (rs.next()) {
-        entry.setSequence(rs.getLong(1) + 1L);
-        //noinspection resource
-        var seqUpdate =
-            tx.prepareBatchStatement("UPDATE TXNO_SEQUENCE SET seq = ? WHERE topic = ?");
-        seqUpdate.setLong(1, entry.getSequence());
-        seqUpdate.setString(2, entry.getTopic());
-        seqUpdate.executeUpdate();
-      } else {
-        try {
-          entry.setSequence(1L);
-          //noinspection resource
-          var seqInsert =
-              tx.prepareBatchStatement("INSERT INTO TXNO_SEQUENCE (topic, seq) VALUES (?, ?)");
-          seqInsert.setString(1, entry.getTopic());
-          seqInsert.setLong(2, entry.getSequence());
-          seqInsert.executeUpdate();
-        } catch (Exception e) {
-          if (indexViolation(e)) {
-            setNextSequence(tx, entry);
-          } else {
-            throw e;
-          }
-        }
-      }
-    }
-  }
-
-  private boolean indexViolation(Exception e) {
-    return (e instanceof SQLIntegrityConstraintViolationException)
-        || (e.getClass().getName().equals("org.postgresql.util.PSQLException")
-            && e.getMessage().contains("constraint"))
-        || (e.getClass().getName().equals("com.microsoft.sqlserver.jdbc.SQLServerException")
-            && e.getMessage().contains("duplicate key"));
   }
 
   private void setupInsert(
