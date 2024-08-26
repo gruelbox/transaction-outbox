@@ -33,7 +33,7 @@
     <testcontainers.version>1.20.1</testcontainers.version>
     <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
     <nexus.staging.plugin.version>1.7.0</nexus.staging.plugin.version>
-    <maven.gpg.plugin.version>3.2.4</maven.gpg.plugin.version>
+    <maven.gpg.plugin.version>3.2.5</maven.gpg.plugin.version>
   </properties>
   <modules>
     <module>transactionoutbox-core</module>
