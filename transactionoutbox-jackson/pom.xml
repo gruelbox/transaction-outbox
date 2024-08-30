@@ -14,7 +14,7 @@
   </description>
   <properties>
     <jackson.version>2.17.2</jackson.version>
-    <commons.lang.version>3.16.0</commons.lang.version>
+    <commons.lang.version>3.17.0</commons.lang.version>
   </properties>
   <dependencies>
     <!-- Run time -->
