@@ -4,6 +4,7 @@ import static com.gruelbox.transactionoutbox.spi.Utils.logAtLevel;
 import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static java.time.temporal.ChronoUnit.MINUTES;
+import static java.util.Objects.requireNonNullElse;
 
 import com.gruelbox.transactionoutbox.spi.ProxyFactory;
 import com.gruelbox.transactionoutbox.spi.Utils;
@@ -86,7 +87,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public <T> T schedule(Class<T> clazz) {
-    return schedule(clazz, null, null, null);
+    return schedule(clazz, null, null, null, null, null);
   }
 
   @Override
@@ -223,7 +224,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   }
 
   private <T> T schedule(
-      Class<T> clazz, String uniqueRequestId, String topic, Duration delayForAtLeast) {
+      Class<T> clazz, String uniqueRequestId, String topic, Duration delayForAtLeast,
+      Duration attemptFrequencyOverride, Integer blockAfterAttemptsOverride) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
@@ -244,6 +246,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                   if (delayForAtLeast != null) {
                     entry.setNextAttemptTime(entry.getNextAttemptTime().plus(delayForAtLeast));
                   }
+                  entry.setAttemptFrequency(requireNonNullElse(attemptFrequencyOverride, attemptFrequency));
+                  entry.setBlockAfterAttempts(requireNonNullElse(blockAfterAttemptsOverride, blockAfterAttempts));
                   validator.validate(entry);
                   persistor.save(extracted.getTransaction(), entry);
                   extracted
@@ -257,7 +261,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                               submitNow(entry);
                               log.debug(
                                   "Scheduled {} for post-commit execution", entry.description());
-                            } else if (delayForAtLeast.compareTo(attemptFrequency) < 0) {
+                            } else if (delayForAtLeast.compareTo(entry.getAttemptFrequency()) < 0) {
                               scheduler.schedule(
                                   () -> submitNow(entry),
                                   delayForAtLeast.toMillis(),
@@ -366,7 +370,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       throws OptimisticLockException {
     try {
       entry.setLastAttemptTime(clockProvider.get().instant());
-      entry.setNextAttemptTime(after(attemptFrequency));
+      entry.setNextAttemptTime(after(requireNonNullElse(entry.getAttemptFrequency(), attemptFrequency)));
       validator.validate(entry);
       persistor.update(transaction, entry);
     } catch (OptimisticLockException e) {
@@ -383,7 +387,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
-      var blocked = (entry.getTopic() == null) && (entry.getAttempts() >= blockAfterAttempts);
+      var blocked = (entry.getTopic() == null) && (entry.getAttempts() >= requireNonNullElse(entry.getBlockAfterAttempts(), blockAfterAttempts));
       entry.setBlocked(blocked);
       transactionManager.inTransactionThrows(tx -> pushBack(tx, entry));
       listener.failure(entry, cause);
@@ -451,13 +455,16 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     private String uniqueRequestId;
     private String ordered;
     private Duration delayForAtLeast;
+    private Duration attemptFrequency;
+    private Integer blockAfterAttempts;
 
     @Override
     public <T> T schedule(Class<T> clazz) {
       if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
         throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
       }
-      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered, delayForAtLeast);
+      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered, delayForAtLeast,
+              attemptFrequency, blockAfterAttempts);
     }
   }
 }
