@@ -10,7 +10,7 @@ import java.util.stream.Stream;
 public abstract class BaseDialect implements Dialect {
   private final Map<Integer, Migration> migrations = new TreeMap<>();
 
-  BaseDialect() {
+  public BaseDialect() {
     migrations.put(
         1,
         new Migration(

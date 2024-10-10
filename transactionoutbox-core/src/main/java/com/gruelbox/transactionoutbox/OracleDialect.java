@@ -5,7 +5,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 public class OracleDialect extends BaseDialect {
-  OracleDialect() {
+  public OracleDialect() {
     super();
     changeMigration(
         1,
@@ -57,6 +57,13 @@ public class OracleDialect extends BaseDialect {
   public String getDeleteExpired() {
     return "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0 "
         + "AND ROWNUM <= {{batchSize}}";
+  }
+
+  @Override
+  public String getSelectBatch() {
+    return "SELECT {{allFields}} FROM {{table}} WHERE nextAttemptTime < ? "
+        + "AND blocked = 0 AND processed = 0 AND topic = '*' AND ROWNUM <= {{batchSize}} FOR UPDATE "
+        + "SKIP LOCKED";
   }
 
   @Override

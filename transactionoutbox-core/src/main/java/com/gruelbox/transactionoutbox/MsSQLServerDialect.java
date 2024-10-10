@@ -5,7 +5,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 public class MsSQLServerDialect extends BaseDialect {
-  MsSQLServerDialect() {
+  public MsSQLServerDialect() {
     super();
     changeMigration(
         1,

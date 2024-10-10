@@ -1,7 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
 public class Postgresql9Dialect extends BaseDialect {
-  Postgresql9Dialect() {
+  public Postgresql9Dialect() {
     super();
     changeMigration(5, "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)");
     changeMigration(6, "ALTER TABLE TXNO_OUTBOX RENAME COLUMN blacklisted TO blocked");
