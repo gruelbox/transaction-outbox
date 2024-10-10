@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox.spring.example;
 
+import com.gruelbox.transactionoutbox.Dialect;
 import java.time.Duration;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -13,4 +14,5 @@ class TransactionOutboxProperties {
   private boolean useJackson;
   private Duration attemptFrequency;
   private int blockAfterAttempts;
+  private Dialect dialect;
 }
