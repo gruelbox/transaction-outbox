@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
-import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.PrintWriter;
 import java.io.Writer;
@@ -13,7 +13,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import lombok.extern.slf4j.Slf4j;
+
+import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 
 /**
  * Simple database migration manager. Inspired by Flyway, Liquibase, Morf etc, just trimmed down for
@@ -70,7 +71,7 @@ class DefaultMigrationManager {
               printWriter.print(": ");
               printWriter.println(migration.getName());
               if (migration.getSql() == null || migration.getSql().isEmpty()) {
-                printWriter.println("-- Nothing for " + dialect);
+                printWriter.println("-- Nothing for " + dialect.getName());
               } else {
                 printWriter.println(migration.getSql());
               }
