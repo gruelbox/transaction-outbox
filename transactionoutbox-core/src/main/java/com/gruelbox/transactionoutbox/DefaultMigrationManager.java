@@ -70,7 +70,7 @@ class DefaultMigrationManager {
               printWriter.print(": ");
               printWriter.println(migration.getName());
               if (migration.getSql() == null || migration.getSql().isEmpty()) {
-                printWriter.println("-- Nothing for " + dialect);
+                printWriter.println("-- Nothing for " + dialect.getName());
               } else {
                 printWriter.println(migration.getSql());
               }
