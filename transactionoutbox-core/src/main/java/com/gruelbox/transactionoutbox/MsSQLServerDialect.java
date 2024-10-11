@@ -94,7 +94,6 @@ public class MsSQLServerDialect extends BaseDialect {
               + "    );"
               + "END");
     }
-    ;
   }
 
   @Override
