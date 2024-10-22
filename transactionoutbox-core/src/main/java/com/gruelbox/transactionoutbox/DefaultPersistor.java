@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -30,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
  * equally esoteric, you may prefer to implement {@link Persistor} from the ground up.
  */
 @Slf4j
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class DefaultPersistor implements Persistor, Validatable {
 
   private static final int DEFAULT_WRITE_LOCK_TIMEOUT_SECONDS = 2;
@@ -92,21 +95,6 @@ public class DefaultPersistor implements Persistor, Validatable {
         DEFAULT_TABLE_NAME,
         true,
         InvocationSerializer.createDefaultJsonSerializer());
-  }
-
-  protected DefaultPersistor(
-      int writeLockTimeoutSeconds,
-      Dialect dialect,
-      SequenceGenerator sequenceGenerator,
-      String tableName,
-      boolean migrate,
-      InvocationSerializer serializer) {
-    this.writeLockTimeoutSeconds = writeLockTimeoutSeconds;
-    this.dialect = dialect;
-    this.sequenceGenerator = sequenceGenerator;
-    this.tableName = tableName;
-    this.migrate = migrate;
-    this.serializer = serializer;
   }
 
   public static DefaultPersistorBuilder builder() {
