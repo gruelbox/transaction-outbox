@@ -2,14 +2,11 @@ package com.gruelbox.transactionoutbox;
 
 import com.gruelbox.transactionoutbox.spi.Utils;
 import java.sql.ResultSet;
-
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 
-/**
- * Generates a sequence number based on the <i>TXNO_SEQUENCE</i> table in a relational database.
- */
+/** Generates a sequence number based on the <i>TXNO_SEQUENCE</i> table in a relational database. */
 @Builder
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 public class DefaultSequenceGenerator implements SequenceGenerator, Validatable {

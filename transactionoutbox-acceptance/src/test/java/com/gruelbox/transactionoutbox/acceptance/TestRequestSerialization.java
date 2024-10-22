@@ -30,9 +30,6 @@ public class TestRequestSerialization {
             .persistor(
                 DefaultPersistor.builder()
                     .dialect(connectionDetails().dialect())
-                    .sequenceGenerator(DefaultSequenceGenerator.builder()
-                            .dialect(connectionDetails().dialect())
-                            .build())
                     .serializer(
                         DefaultInvocationSerializer.builder()
                             .serializableTypes(Set.of(Arg.class))

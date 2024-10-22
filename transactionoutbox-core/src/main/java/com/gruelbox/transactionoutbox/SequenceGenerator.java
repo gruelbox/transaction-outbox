@@ -1,8 +1,8 @@
 package com.gruelbox.transactionoutbox;
 
 /**
- * Generates sequences for a topic that is used in ordered tasks.
- * For most use cases, just use {@link DefaultSequenceGenerator}.
+ * Generates sequences for a topic that is used in ordered tasks. For most use cases, just use
+ * {@link DefaultSequenceGenerator}.
  */
 public interface SequenceGenerator {
   /**
