@@ -25,7 +25,7 @@ public class Utils {
     }
   }
 
-  public static boolean indexViolation(Exception e) {
+  public static boolean indexViolation(Throwable e) {
     return (e instanceof SQLIntegrityConstraintViolationException)
         || (e.getClass().getName().equals("org.postgresql.util.PSQLException")
             && e.getMessage().contains("constraint"))
