@@ -41,6 +41,7 @@
     <module>transactionoutbox-guice</module>
     <module>transactionoutbox-testing</module>
     <module>transactionoutbox-acceptance</module>
+<!--    <module>transactionoutbox-performance</module>-->
   </modules>
   <dependencyManagement>
     <dependencies>
@@ -88,6 +89,12 @@
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter-params</artifactId>
         <version>${junit.jupiter.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>4.13</version>
         <scope>test</scope>
       </dependency>
       <dependency>

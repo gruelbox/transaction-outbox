@@ -1,0 +1,42 @@
+package com.gruelbox.transactionoutbox.performance;
+
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.TransactionManager;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.testcontainers.containers.JdbcDatabaseContainer;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+@Testcontainers
+public class TestDefaultPerformancePostgresql16 extends AbstractPerformanceTest {
+
+  @SuppressWarnings({"rawtypes"})
+  private static final JdbcDatabaseContainer container = ContainerUtils.getPostgres16Container();
+
+  private final TransactionManager txManager =
+      TransactionManager.fromConnectionDetails(
+          "com.mysql.cj.jdbc.Driver",
+          container.getJdbcUrl(),
+          container.getUsername(),
+          container.getPassword());
+
+  @Override
+  protected TransactionManager txManager() {
+    return txManager;
+  }
+
+  @Override
+  protected Dialect dialect() {
+    return Dialect.POSTGRESQL_9;
+  }
+
+  @BeforeAll
+  public static void beforeAll() {
+    container.start();
+  }
+
+  @AfterAll
+  public static void afterAll() {
+    container.stop();
+  }
+}
