@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import static java.util.stream.Collectors.joining;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import lombok.*;
@@ -82,6 +83,26 @@ public class TransactionOutboxEntry implements Validatable {
   @Getter
   @Setter
   private int attempts;
+
+  /**
+   * @param attemptFrequency How often tasks should be re-attempted.
+   * If null, the default configured on TransactionOutbox will apply.
+   * @return How often tasks should be re-attempted.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  @Setter
+  private Duration attemptFrequency;
+
+  /**
+   * @param blockAfterAttempts How many attempts a task should be retried before it is permanently blocked.
+   * If null, the default configured on TransactionOutbox will apply.
+   * @return How many attempts a task should be retried before it is permanently blocked.
+   */
+  @SuppressWarnings("JavaDoc")
+  @Getter
+  @Setter
+  private Integer blockAfterAttempts;
 
   /**
    * @param blocked True if the task has exceeded the configured maximum number of attempts.
