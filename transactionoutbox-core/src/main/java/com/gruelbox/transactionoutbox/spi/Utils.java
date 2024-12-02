@@ -4,6 +4,8 @@ import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.UncheckedException;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -105,5 +107,24 @@ public class Utils {
         logger.warn(message, args);
         break;
     }
+  }
+
+  public static void shutdown(ExecutorService executorService) {
+    executorService.shutdownNow();
+    boolean terminated;
+    try {
+      terminated = executorService.awaitTermination(5, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    }
+    if (terminated) {
+      return;
+    }
+    logAtLevel(
+        log,
+        Level.WARN,
+        "At least one task didn't stop within 5 seconds following the shutdown signal sent to {}",
+        executorService);
   }
 }
