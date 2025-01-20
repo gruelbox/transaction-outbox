@@ -11,7 +11,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-class TestDefaultPersistorMSSqlServer2017 extends AbstractPersistorTest {
+class TestDefaultPersistorMSSqlServer2019 extends AbstractPersistorTest {
 
   @Container
   @SuppressWarnings({"rawtypes", "resource"})
