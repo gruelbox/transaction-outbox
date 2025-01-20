@@ -11,12 +11,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Slf4j
 @Testcontainers
-class TestJooqThreadLocalMSSqlServer2017 extends AbstractJooqAcceptanceThreadLocalTest {
+class TestJooqThreadLocalMSSqlServer2019 extends AbstractJooqAcceptanceThreadLocalTest {
 
   @Container
   @SuppressWarnings({"rawtypes", "resource", "unchecked"})
   private static final JdbcDatabaseContainer<?> container =
-      new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2017-latest")
+      new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
           .acceptLicense()
           .withStartupTimeout(Duration.ofMinutes(5))
           .withReuse(true);
