@@ -16,7 +16,7 @@ class TestDefaultPersistorMSSqlServer2017 extends AbstractPersistorTest {
   @Container
   @SuppressWarnings({"rawtypes", "resource"})
   private static final JdbcDatabaseContainer container =
-      new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2017-latest")
+      new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
           .acceptLicense()
           .withStartupTimeout(Duration.ofMinutes(5))
           .withReuse(true);
