@@ -426,6 +426,48 @@ However, if you completely trust your serialized data (for example, your develop
 
 See [transaction-outbox-jackson](transactionoutbox-jackson/README.md), which uses a specially-configured Jackson `ObjectMapper` to achieve this.
 
+### Flexible retry policy
+
+The default retry policy for tasks is configured using:
+```
+TransactionOutbox outbox = TransactionOutbox.builder()
+    ...
+    // 10 attempts at a task before blocking it.
+    .blockAfterAttempts(10)
+    // Flush once every 15 minutes only
+    .attemptFrequency(Duration.ofMinutes(15))
+    .build();
+```
+and suitable for most use cases. 
+
+If you need to override the default retry policy on a per-task basis, you can do so by implementing the `RetryPolicyAware` interface in the class you pass to `outbox.schedule()`:
+```
+public class RetryPolicyAwareService implements RetryPolicyAware {
+   @Override
+   public Duration waitDuration(int attempt, Throwable throwable) {
+      Duration initialInterval = Duration.ofMillis(100);
+      // Exponential backoff using IntervalFunction from resilience4j-core
+      long waitDurationMillis = IntervalFunction.ofExponentialBackoff(initialInterval).apply(attempt);
+      return Duration.ofMillis(waitDurationMillis);
+   }
+
+   @Override
+   public int blockAfterAttempts(int attempt, Throwable throwable) {
+      // Stop retrying and block outbox entry immediately on ServerError
+      if (throwable instanceof ServerError) {
+         return 0;
+      }
+      return 3;
+   }
+
+   public void callExternalService() {
+      // ...
+   }
+}
+
+outbox.schedule(RetryPolicyAwareService.class).callExternalService();
+```
+
 ### Clustering
 
 The default mechanism for _running_ tasks (either immediately, or when they are picked up by background processing) is via a `java.concurrent.Executor`, which effectively does the following:
