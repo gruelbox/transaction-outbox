@@ -389,16 +389,18 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   }
 
   private void updateAttemptCount(
-      TransactionOutboxEntry entry, Throwable cause, RetryPolicyAware work) {
+      TransactionOutboxEntry entry, Throwable cause, RetryPolicyAware retryPolicyAware) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
 
       int blockAfterAttempts =
-          work == null
+          retryPolicyAware == null
               ? this.blockAfterAttempts
-              : work.blockAfterAttempts(entry.getAttempts(), cause);
+              : retryPolicyAware.blockAfterAttempts(entry.getAttempts(), cause);
       Duration waitDuration =
-          work == null ? this.attemptFrequency : work.waitDuration(entry.getAttempts(), cause);
+          retryPolicyAware == null
+              ? this.attemptFrequency
+              : retryPolicyAware.waitDuration(entry.getAttempts(), cause);
 
       var blocked = (entry.getTopic() == null) && (entry.getAttempts() >= blockAfterAttempts);
       entry.setBlocked(blocked);
