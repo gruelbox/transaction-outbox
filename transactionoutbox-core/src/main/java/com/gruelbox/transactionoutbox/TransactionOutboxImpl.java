@@ -103,7 +103,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
               for (var entry : entries) {
                 log.debug("Triggering {}", entry.description());
                 try {
-                  pushBack(transaction, entry);
+                  pushBack(transaction, entry, attemptFrequency);
                   result.add(entry);
                 } catch (OptimisticLockException e) {
                   log.debug("Beaten to optimistic lock on {}", entry.description());
@@ -286,6 +286,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   public void processNow(TransactionOutboxEntry entry) {
     initialize();
     Boolean success = null;
+    InvocationInstanceHolder invocationInstanceHolder = new InvocationInstanceHolder();
     try {
       success =
           transactionManager.inTransactionReturnsThrows(
@@ -298,7 +299,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                     .withinMDC(
                         () -> {
                           log.info("Processing {}", entry.description());
-                          invoke(entry, tx);
+                          invocationInstanceHolder.instance = getInvocationInstance(entry);
+                          invoke(invocationInstanceHolder.instance, entry, tx);
                           if (entry.getUniqueRequestId() == null) {
                             persistor.delete(tx, entry);
                           } else {
@@ -316,9 +318,9 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                 return true;
               });
     } catch (InvocationTargetException e) {
-      updateAttemptCount(entry, e.getCause());
+      updateAttemptCount(entry, e.getCause(), invocationInstanceHolder.getAsRetryPolicyAware());
     } catch (Exception e) {
-      updateAttemptCount(entry, e);
+      updateAttemptCount(entry, e, invocationInstanceHolder.getAsRetryPolicyAware());
     }
     if (success != null) {
       if (success) {
@@ -330,13 +332,18 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private void invoke(TransactionOutboxEntry entry, Transaction transaction)
+  private Object getInvocationInstance(TransactionOutboxEntry entry) {
+    Object invocationInstance = instantiator.getInstance(entry.getInvocation().getClassName());
+    log.debug("Created instance {}", invocationInstance);
+    return invocationInstance;
+  }
+
+  private void invoke(
+      Object invocationInstance, TransactionOutboxEntry entry, Transaction transaction)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-    Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
-    log.debug("Created instance {}", instance);
     transactionManager
         .injectTransaction(entry.getInvocation(), transaction)
-        .invoke(instance, listener);
+        .invoke(invocationInstance, listener);
   }
 
   private TransactionOutboxEntry newEntry(
@@ -362,11 +369,12 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
         .build();
   }
 
-  private void pushBack(Transaction transaction, TransactionOutboxEntry entry)
+  private void pushBack(
+      Transaction transaction, TransactionOutboxEntry entry, Duration waitDuration)
       throws OptimisticLockException {
     try {
       entry.setLastAttemptTime(clockProvider.get().instant());
-      entry.setNextAttemptTime(after(attemptFrequency));
+      entry.setNextAttemptTime(after(waitDuration));
       validator.validate(entry);
       persistor.update(transaction, entry);
     } catch (OptimisticLockException e) {
@@ -380,12 +388,23 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     return clockProvider.get().instant().plus(duration).truncatedTo(MILLIS);
   }
 
-  private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
+  private void updateAttemptCount(
+      TransactionOutboxEntry entry, Throwable cause, RetryPolicyAware retryPolicyAware) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
+
+      int blockAfterAttempts =
+          retryPolicyAware == null
+              ? this.blockAfterAttempts
+              : retryPolicyAware.blockAfterAttempts(entry.getAttempts(), cause);
+      Duration waitDuration =
+          retryPolicyAware == null
+              ? this.attemptFrequency
+              : retryPolicyAware.waitDuration(entry.getAttempts(), cause);
+
       var blocked = (entry.getTopic() == null) && (entry.getAttempts() >= blockAfterAttempts);
       entry.setBlocked(blocked);
-      transactionManager.inTransactionThrows(tx -> pushBack(tx, entry));
+      transactionManager.inTransactionThrows(tx -> pushBack(tx, entry, waitDuration));
       listener.failure(entry, cause);
       if (blocked) {
         log.error(
@@ -458,6 +477,18 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
         throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
       }
       return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered, delayForAtLeast);
+    }
+  }
+
+  private static class InvocationInstanceHolder {
+    Object instance;
+
+    RetryPolicyAware getAsRetryPolicyAware() {
+      if (instance instanceof RetryPolicyAware) {
+        return (RetryPolicyAware) instance;
+      } else {
+        return null;
+      }
     }
   }
 }

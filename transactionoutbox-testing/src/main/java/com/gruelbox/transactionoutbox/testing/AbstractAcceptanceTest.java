@@ -476,16 +476,31 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
    */
   @Test
   final void retryBehaviour() throws Exception {
+    retryBehaviour(new FailingInstantiator(3), Duration.ofMillis(500));
+  }
+
+  /**
+   * Runs a piece of work which will fail several times before working successfully. Ensures that
+   * the work runs eventually. Uses RetryPolicyAware to configure retry policy.
+   */
+  @Test
+  final void retryPolicyAwareRetryBehaviour() throws Exception {
+    retryBehaviour(
+        new FailingRetryPolicyAwareInstantiator(3, 3), Duration.ofHours(1) // should be ignored
+        );
+  }
+
+  private void retryBehaviour(FailingInstantiator instantiator, Duration attemptFrequency)
+      throws Exception {
     TransactionManager transactionManager = txManager();
     CountDownLatch latch = new CountDownLatch(1);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(instantiator)
             .submitter(Submitter.withExecutor(singleThreadPool))
-            .attemptFrequency(Duration.ofMillis(500))
+            .attemptFrequency(attemptFrequency)
             .listener(new LatchListener(latch))
             .build();
 
@@ -549,13 +564,12 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     TransactionManager transactionManager = txManager();
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blockLatch = new CountDownLatch(1);
-    AtomicInteger attempts = new AtomicInteger();
     var orderedEntryListener = new OrderedEntryListener(successLatch, blockLatch);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(new FailingInstantiator(3))
             .submitter(Submitter.withExecutor(singleThreadPool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(orderedEntryListener)
@@ -601,20 +615,36 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
    */
   @Test
   final void blockAndThenUnblockForRetry() throws Exception {
+    blockAndThenUnblockForRetry(new FailingInstantiator(3), 2);
+  }
+
+  /**
+   * Runs a piece of work which will fail enough times to enter a blocked state but will then pass
+   * when re-tried after it is unblocked. Uses RetryPolicyAware to configure the number of max
+   * attempts.
+   */
+  @Test
+  final void retryPolicyAwareBlockAndThenUnblockForRetry() throws Exception {
+    blockAndThenUnblockForRetry(
+        new FailingRetryPolicyAwareInstantiator(3, 2), 100 // should be ignored
+        );
+  }
+
+  private void blockAndThenUnblockForRetry(FailingInstantiator instantiator, int blockAfterAttempts)
+      throws Exception {
     TransactionManager transactionManager = txManager();
     CountDownLatch successLatch = new CountDownLatch(1);
     CountDownLatch blockLatch = new CountDownLatch(1);
     LatchListener latchListener = new LatchListener(successLatch, blockLatch);
-    AtomicInteger attempts = new AtomicInteger();
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(instantiator)
             .submitter(Submitter.withExecutor(singleThreadPool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(latchListener)
-            .blockAfterAttempts(2)
+            .blockAfterAttempts(blockAfterAttempts)
             .build();
 
     clearOutbox();
@@ -695,10 +725,12 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
 
   private static class FailingInstantiator implements Instantiator {
 
-    private final AtomicInteger attempts;
+    protected final int attemptsBeforeSuccess;
 
-    FailingInstantiator(AtomicInteger attempts) {
-      this.attempts = attempts;
+    protected final AtomicInteger attempts = new AtomicInteger();
+
+    private FailingInstantiator(int attemptsBeforeSuccess) {
+      this.attemptsBeforeSuccess = attemptsBeforeSuccess;
     }
 
     @Override
@@ -707,18 +739,60 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     }
 
     @Override
-    public Object getInstance(String name) {
+    public InterfaceProcessor getInstance(String name) {
       if (!"BEEF".equals(name)) {
         throw new UnsupportedOperationException();
       }
-      return (InterfaceProcessor)
-          (foo, bar) -> {
-            LOGGER.info("Processing ({}, {})", foo, bar);
-            if (attempts.incrementAndGet() < 3) {
-              throw new RuntimeException("Temporary failure");
-            }
-            LOGGER.info("Processed ({}, {})", foo, bar);
-          };
+      return (foo, bar) -> {
+        LOGGER.info("Processing ({}, {})", foo, bar);
+        if (attempts.incrementAndGet() < attemptsBeforeSuccess) {
+          throw new RuntimeException("Temporary failure");
+        }
+        LOGGER.info("Processed ({}, {})", foo, bar);
+      };
+    }
+  }
+
+  private static class FailingRetryPolicyAwareInstantiator extends FailingInstantiator
+      implements Instantiator {
+
+    private final int blockAfterAttempts;
+
+    private FailingRetryPolicyAwareInstantiator(int attemptsBeforeSuccess, int blockAfterAttempts) {
+      super(attemptsBeforeSuccess);
+      this.blockAfterAttempts = blockAfterAttempts;
+    }
+
+    @Override
+    public InterfaceProcessor getInstance(String name) {
+      return new RetryPolicyAwareInterfaceProcessor(super.getInstance(name));
+    }
+
+    private class RetryPolicyAwareInterfaceProcessor
+        implements InterfaceProcessor, RetryPolicyAware {
+
+      private final InterfaceProcessor processor;
+
+      RetryPolicyAwareInterfaceProcessor(InterfaceProcessor processor) {
+        this.processor = processor;
+      }
+
+      @Override
+      public Duration waitDuration(int attempt, Throwable throwable) {
+        Duration waitDuration = Duration.ofMillis(100L * attempt);
+        LOGGER.info("Waiting {} for attempt {}", waitDuration, attempt);
+        return waitDuration;
+      }
+
+      @Override
+      public int blockAfterAttempts(int attempt, Throwable throwable) {
+        return blockAfterAttempts;
+      }
+
+      @Override
+      public void process(int foo, String bar) {
+        processor.process(foo, bar);
+      }
     }
   }
 
