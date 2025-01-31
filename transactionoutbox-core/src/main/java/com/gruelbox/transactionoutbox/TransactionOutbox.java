@@ -395,6 +395,20 @@ public interface TransactionOutbox {
     ParameterizedScheduleBuilder delayForAtLeast(Duration duration);
 
     /**
+     * Use an attemptFrequency that is different from the default set on the {@link TransactionOutbox}.
+     * @param attemptFrequency How often tasks should be re-attempted.
+     * @return Builder.
+     */
+    ParameterizedScheduleBuilder attemptFrequency(Duration attemptFrequency);
+
+    /**
+     * Use a blockAfterAttempts that is different from the default set on the {@link TransactionOutbox}.
+     * @param blockAfterAttempts How many attempts a task should be retried before it is permanently blocked.
+     * @return Builder.
+     */
+    ParameterizedScheduleBuilder blockAfterAttempts(Integer blockAfterAttempts);
+
+    /**
      * Equivalent to {@link TransactionOutbox#schedule(Class)}, but applying additional parameters
      * to the request as configured using {@link TransactionOutbox#with()}.
      *
