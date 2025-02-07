@@ -1,21 +1,22 @@
-package com.gruelbox.transactionoutbox.acceptance;
+package com.gruelbox.transactionoutbox.jooq.acceptance;
 
 import com.gruelbox.transactionoutbox.Dialect;
-import com.gruelbox.transactionoutbox.testing.AbstractAcceptanceTest;
 import java.time.Duration;
+import lombok.extern.slf4j.Slf4j;
+import org.jooq.SQLDialect;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@SuppressWarnings("WeakerAccess")
+@Slf4j
 @Testcontainers
-class TestMSSqlServer2017 extends AbstractAcceptanceTest {
+class TestJooqThreadLocalMSSqlServer2019 extends AbstractJooqAcceptanceThreadLocalTest {
 
   @Container
-  @SuppressWarnings({"rawtypes", "resource"})
-  private static final JdbcDatabaseContainer container =
-      new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2017-latest")
+  @SuppressWarnings({"rawtypes", "resource", "unchecked"})
+  private static final JdbcDatabaseContainer<?> container =
+      new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
           .acceptLicense()
           .withStartupTimeout(Duration.ofMinutes(5))
           .withReuse(true);
@@ -29,5 +30,10 @@ class TestMSSqlServer2017 extends AbstractAcceptanceTest {
         .user(container.getUsername())
         .password(container.getPassword())
         .build();
+  }
+
+  @Override
+  protected SQLDialect jooqDialect() {
+    return SQLDialect.DEFAULT;
   }
 }
