@@ -15,7 +15,7 @@
   <properties>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
-    <spring.boot.version>3.4.2</spring.boot.version>
+    <spring.boot.version>3.4.3</spring.boot.version>
     <spring.version>6.2.3</spring.version>
   </properties>
   <dependencies>
