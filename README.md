@@ -419,7 +419,7 @@ Most people will use the default persistor, `DefaultPersistor`, to persist tasks
 You can extend the list of support types by calling `serializableTypes` in its builder, but it will always be restricted to this global list. This is by design, to avoid building a [deserialization of untrusted data](https://owasp.org/www-community/vulnerabilities/Deserialization_of_untrusted_data) vulnerability into the library.
 
 Furthermore, there is no support for the case where run-time and compile-time types differ, such as in polymorphic collections. The following will always fail with `DefaultInvocationSerializer`:
-```
+```java
 outbox.schedule(Service.class).processList(List.of(1, "2", 3L));
 ```
 However, if you completely trust your serialized data (for example, your developers don't have write access to your production database, and the access credentials are well guarded) then you may prefer to have 100% flexibility, with no need to declare the types used and the ability to use any combination of run-time and compile-time types.
@@ -429,7 +429,7 @@ See [transaction-outbox-jackson](transactionoutbox-jackson/README.md), which use
 ### Clustering
 
 The default mechanism for _running_ tasks (either immediately, or when they are picked up by background processing) is via a `java.concurrent.Executor`, which effectively does the following:
-```
+```java
 executor.execute(() -> outbox.processNow(transactionOutboxEntry));
 ```
 This offloads processing to a background thread _on the application instance_ on which the task was picked up. Under high load, this can mean thousands of tasks being picked up from the database queue and submitted at the same time on the same application instance, even if there are 20 instances of the application, effectively limiting the total rate of processing to what a single instance can handle.
@@ -443,11 +443,11 @@ If you want to instead push the work for processing by _any_ of your application
 All of these can be implemented as follows:
 
 When defining the `TransactionOutbox`, replace `ExecutorSubmitter` with something which serializes a `TransactionOutboxEntry` and ships it to the remote queue/address. Here's what configuration might look for a `RestApiSubmitter` which ships the request to a load-balanced endpoint hosted on Nomad/Consul:
-```
+```java
 TransactionOutbox outbox = TransactionOutbox.builder().submitter(restApiSubmitter)
 ```
 It is strongly advised that you use a local executor in-line, to ensure that if there are communications issues with your endpoint or queue, it doesn't fail the calling thread.  Here is an example using [Feign](https://github.com/OpenFeign/feign):
-```
+```java
 @Slf4j
 class RestApiSubmitter implements Submitter {
 
@@ -498,7 +498,7 @@ class RestApiSubmitter implements Submitter {
 }
 ```
 Then listen on your communication mechanism for incoming serialized `TransactionOutboxEntry`s, and push them to a normal local `ExecutorSubmitter`.  Here's what a JAX-RS example might look like:
-```
+```java
 @POST
 @Path("/outbox/process")
 void processOutboxEntry(String entry) {
@@ -508,7 +508,7 @@ void processOutboxEntry(String entry) {
 }
 ```
 This whole approach is complicated a little by the inherent difficulty in serializing and deserializing a `TransactionOutboxEntry`, which is extremely polymorphic in nature. A reference approach is provided by [transaction-outbox-jackson](transactionoutbox-jackson/README.md), which provides the features necessary to make a Jackson `ObjectMapper` able to handle the work.  With that on the classpath you can use an `ObjectMapper` as follows:
-```
+```java
 // Add support for TransactionOutboxEntry to your normal application ObjectMapper
 yourNormalSharedObjectMapper.registerModule(new TransactionOutboxJacksonModule());
 
