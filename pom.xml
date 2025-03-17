@@ -257,7 +257,7 @@
       <plugin>
         <groupId>au.com.acegi</groupId>
         <artifactId>xml-format-maven-plugin</artifactId>
-        <version>4.0.1</version>
+        <version>4.1.0</version>
       </plugin>
     </plugins>
   </build>
