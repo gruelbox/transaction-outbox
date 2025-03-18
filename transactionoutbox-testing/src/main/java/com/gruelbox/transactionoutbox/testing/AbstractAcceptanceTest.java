@@ -501,6 +501,40 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         singleThreadPool);
   }
 
+  /**
+   * Overrides the default attemptFrequency and blockAfterAttempts, which was set on the TransactionOutbox.
+   */
+  @Test
+  final void retryBehaviour_overrideAttempts() throws Exception {
+      TransactionManager transactionManager = txManager();
+      CountDownLatch latch = new CountDownLatch(1);
+      AtomicInteger attempts = new AtomicInteger();
+      TransactionOutbox outbox =
+              TransactionOutbox.builder()
+                      .transactionManager(transactionManager)
+                      .persistor(Persistor.forDialect(connectionDetails().dialect()))
+                      .instantiator(new FailingInstantiator(attempts))
+                      .submitter(Submitter.withExecutor(singleThreadPool))
+                      .attemptFrequency(Duration.ofSeconds(20)) // will be overridden
+                      .blockAfterAttempts(2) // will be overridden
+                      .listener(new LatchListener(latch))
+                      .build();
+
+      clearOutbox();
+
+      withRunningFlusher(
+              outbox,
+              () -> {
+                  transactionManager.inTransaction(
+                          () -> outbox.with()
+                                  .attemptFrequency(Duration.ofMillis(500)) // overrides the 20s above
+                                  .blockAfterAttempts(3) // overrides the 2 attempts from above (3 attempts necessary for success)
+                                  .schedule(InterfaceProcessor.class).process(3, "Whee"));
+                  assertTrue(latch.await(15, SECONDS)); // will time out if the overrides do not work
+              },
+              singleThreadPool);
+  }
+
   @Test
   final void onSchedulingFailure_BubbleExceptionsUp() throws Exception {
     Assumptions.assumeTrue(
