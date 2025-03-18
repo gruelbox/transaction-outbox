@@ -3,9 +3,12 @@ package com.gruelbox.transactionoutbox;
 import com.gruelbox.transactionoutbox.spi.Utils;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.event.Level;
 
@@ -37,23 +40,38 @@ import org.slf4j.event.Level;
  * </ul>
  */
 @Slf4j
-@Builder
 public class ExecutorSubmitter implements Submitter, Validatable {
 
-  /**
-   * @param executor The executor to use.
-   */
   @SuppressWarnings("JavaDoc")
   private final Executor executor;
 
-  /**
-   * @param logLevelWorkQueueSaturation The log level to use when work submission hits the executor
-   *     queue limit. This usually indicates saturation and may be of greater interest than the
-   *     default {@code DEBUG} level.
-   */
+  private final boolean shutdownExecutorOnClose;
+
   @SuppressWarnings("JavaDoc")
-  @Builder.Default
-  private final Level logLevelWorkQueueSaturation = Level.DEBUG;
+  private final Level logLevelWorkQueueSaturation;
+
+  ExecutorSubmitter(Executor executor, Level logLevelWorkQueueSaturation) {
+    if (executor != null) {
+      this.executor = executor;
+      shutdownExecutorOnClose = false;
+    } else {
+      // JDK bug means this warning can't be fixed
+      //noinspection Convert2Diamond
+      this.executor =
+          new ThreadPoolExecutor(
+              1,
+              Math.max(1, ForkJoinPool.commonPool().getParallelism()),
+              0L,
+              TimeUnit.MILLISECONDS,
+              new ArrayBlockingQueue<>(16384));
+      shutdownExecutorOnClose = true;
+    }
+    this.logLevelWorkQueueSaturation = logLevelWorkQueueSaturation;
+  }
+
+  public static ExecutorSubmitterBuilder builder() {
+    return new ExecutorSubmitterBuilder();
+  }
 
   @Override
   public void submit(TransactionOutboxEntry entry, Consumer<TransactionOutboxEntry> localExecutor) {
@@ -78,5 +96,61 @@ public class ExecutorSubmitter implements Submitter, Validatable {
   public void validate(Validator validator) {
     validator.notNull("executor", executor);
     validator.notNull("logLevelWorkQueueSaturation", logLevelWorkQueueSaturation);
+  }
+
+  @Override
+  public void close() {
+    if (!shutdownExecutorOnClose) {
+      return;
+    }
+    if (!(executor instanceof ExecutorService)) {
+      return;
+    }
+    Utils.shutdown((ExecutorService) executor);
+  }
+
+  public static class ExecutorSubmitterBuilder {
+    private Executor executor;
+    private Level logLevelWorkQueueSaturation;
+    private boolean logLevelWorkQueueSaturationSet;
+
+    ExecutorSubmitterBuilder() {}
+
+    /**
+     * @param executor The executor to use. If not provided, a {@link ThreadPoolExecutor}, sized to
+     *     match {@link * ForkJoinPool#commonPool()} (or one thread, whichever is the larger), with
+     *     a maximum queue size * of 16384 will be used.
+     */
+    public ExecutorSubmitterBuilder executor(Executor executor) {
+      this.executor = executor;
+      return this;
+    }
+
+    /**
+     * @param logLevelWorkQueueSaturation The log level to use when work submission hits the
+     *     executor queue limit. This usually indicates saturation and may be of greater interest
+     *     than the default {@code DEBUG} level.
+     */
+    public ExecutorSubmitterBuilder logLevelWorkQueueSaturation(Level logLevelWorkQueueSaturation) {
+      this.logLevelWorkQueueSaturation = logLevelWorkQueueSaturation;
+      logLevelWorkQueueSaturationSet = true;
+      return this;
+    }
+
+    public ExecutorSubmitter build() {
+      Level logLevelWorkQueueSaturationToUse = logLevelWorkQueueSaturation;
+      if (!logLevelWorkQueueSaturationSet) {
+        logLevelWorkQueueSaturationToUse = Level.DEBUG;
+      }
+      return new ExecutorSubmitter(this.executor, logLevelWorkQueueSaturationToUse);
+    }
+
+    public String toString() {
+      return "ExecutorSubmitter.ExecutorSubmitterBuilder(executor="
+          + this.executor
+          + ", logLevelWorkQueueSaturation$value="
+          + logLevelWorkQueueSaturation
+          + ")";
+    }
   }
 }
