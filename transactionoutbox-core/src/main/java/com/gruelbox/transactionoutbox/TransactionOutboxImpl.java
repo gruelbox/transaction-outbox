@@ -15,11 +15,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -288,33 +284,31 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     Boolean success = null;
     try {
       success =
-          transactionManager.inTransactionReturnsThrows(
-              tx -> {
-                if (!persistor.lock(tx, entry)) {
-                  return false;
-                }
-                entry
-                    .getInvocation()
-                    .withinMDC(
-                        () -> {
-                          log.info("Processing {}", entry.description());
-                          invoke(entry, tx);
-                          if (entry.getUniqueRequestId() == null) {
-                            persistor.delete(tx, entry);
-                          } else {
-                            log.debug(
-                                "Deferring deletion of {} by {}",
-                                entry.description(),
-                                retentionThreshold);
-                            entry.setProcessed(true);
-                            entry.setLastAttemptTime(Instant.now(clockProvider.get()));
-                            entry.setNextAttemptTime(after(retentionThreshold));
-                            persistor.update(tx, entry);
-                          }
-                          return true;
-                        });
-                return true;
-              });
+          entry
+              .getInvocation()
+              .withinMDC(
+                  () ->
+                      transactionManager.inTransactionReturnsThrows(
+                          tx -> {
+                            if (!persistor.lock(tx, entry)) {
+                              return false;
+                            }
+                            log.info("Processing {}", entry.description());
+                            invoke(entry, tx);
+                            if (entry.getUniqueRequestId() == null) {
+                              persistor.delete(tx, entry);
+                            } else {
+                              log.debug(
+                                  "Deferring deletion of {} by {}",
+                                  entry.description(),
+                                  retentionThreshold);
+                              entry.setProcessed(true);
+                              entry.setLastAttemptTime(Instant.now(clockProvider.get()));
+                              entry.setNextAttemptTime(after(retentionThreshold));
+                              persistor.update(tx, entry);
+                            }
+                            return true;
+                          }));
     } catch (InvocationTargetException e) {
       updateAttemptCount(entry, e.getCause());
     } catch (Exception e) {
