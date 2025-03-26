@@ -11,6 +11,7 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.SQLTimeoutException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -38,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultPersistor implements Persistor, Validatable {
 
   private static final String ALL_FIELDS =
-      "id, uniqueRequestId, invocation, topic, seq, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
+      "id, uniqueRequestId, invocation, topic, seq, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version, attemptFrequency, blockAfterAttempts";
 
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
@@ -115,7 +116,7 @@ public class DefaultPersistor implements Persistor, Validatable {
             + tableName
             + " ("
             + ALL_FIELDS
-            + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
     if (entry.getTopic() != null) {
@@ -201,6 +202,8 @@ public class DefaultPersistor implements Persistor, Validatable {
     stmt.setBoolean(9, entry.isBlocked());
     stmt.setBoolean(10, entry.isProcessed());
     stmt.setInt(11, entry.getVersion());
+    stmt.setObject(12, entry.getAttemptFrequency() == null ? null : entry.getAttemptFrequency().toMillis());
+    stmt.setObject(13, entry.getBlockAfterAttempts());
   }
 
   @Override
@@ -392,6 +395,12 @@ public class DefaultPersistor implements Persistor, Validatable {
               .blocked(rs.getBoolean("blocked"))
               .processed(rs.getBoolean("processed"))
               .version(rs.getInt("version"))
+              .attemptFrequency(rs.getObject("attemptFrequency") == null
+                      ? null
+                      : Duration.ofMillis(rs.getInt("attemptFrequency")))
+              .blockAfterAttempts(rs.getObject("blockAfterAttempts") == null
+                      ? null
+                      : rs.getInt("blockAfterAttempts"))
               .build();
       log.debug("Found {}", entry);
       return entry;
