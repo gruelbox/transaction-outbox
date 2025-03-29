@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox.spi;
 
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import com.gruelbox.transactionoutbox.UncheckedException;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
@@ -22,6 +23,14 @@ public class Utils {
       log.error("Error when {}", gerund, e);
       return false;
     }
+  }
+
+  public static boolean indexViolation(Throwable e) {
+    return (e instanceof SQLIntegrityConstraintViolationException)
+        || (e.getClass().getName().equals("org.postgresql.util.PSQLException")
+            && e.getMessage().contains("constraint"))
+        || (e.getClass().getName().equals("com.microsoft.sqlserver.jdbc.SQLServerException")
+            && e.getMessage().contains("duplicate key"));
   }
 
   @SuppressWarnings("unused")
