@@ -356,10 +356,14 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   private void gatherResults(PreparedStatement stmt, Collection<TransactionOutboxEntry> output)
-      throws SQLException, IOException {
+      throws SQLException {
     try (ResultSet rs = stmt.executeQuery()) {
       while (rs.next()) {
-        output.add(map(rs));
+        try {
+          output.add(map(rs));
+        } catch (IOException e) {
+          log.error("Failed to read entry. Ignoring for now.", e);
+        }
       }
       log.debug("Found {} results", output.size());
     }
