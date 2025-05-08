@@ -13,7 +13,7 @@
   <description>A safe implementation of the transactional outbox pattern for Java (Quarkus extension library)
   </description>
   <properties>
-    <quarkus.version>3.21.1</quarkus.version>
+    <quarkus.version>3.22.2</quarkus.version>
   </properties>
   <dependencies>
     <!-- Runtime -->
