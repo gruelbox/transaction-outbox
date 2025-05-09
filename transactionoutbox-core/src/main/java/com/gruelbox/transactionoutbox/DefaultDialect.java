@@ -158,6 +158,18 @@ class DefaultDialect implements Dialect {
               12,
               "Add flush index to support ordering",
               "CREATE INDEX IX_TXNO_OUTBOX_2 ON TXNO_OUTBOX (topic, processed, seq)"));
+      migrations.put(
+              13,
+              new Migration(
+                      13,
+                      "Add attemptFrequency",
+                      "ALTER TABLE TXNO_OUTBOX ADD COLUMN attemptFrequency INT"));
+      migrations.put(
+              14,
+              new Migration(
+                      14,
+                      "Add blockAfterAttempts",
+                      "ALTER TABLE TXNO_OUTBOX ADD COLUMN blockAfterAttempts INT"));
     }
 
     Builder setMigration(Migration migration) {
