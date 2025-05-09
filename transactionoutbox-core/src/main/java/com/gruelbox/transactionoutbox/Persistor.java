@@ -20,7 +20,10 @@ public interface Persistor {
    * @return The persistor.
    */
   static DefaultPersistor forDialect(Dialect dialect) {
-    return DefaultPersistor.builder().dialect(dialect).build();
+    return DefaultPersistor.builder()
+        .dialect(dialect)
+        .sequenceGenerator(DefaultSequenceGenerator.builder().dialect(dialect).build())
+        .build();
   }
 
   /**

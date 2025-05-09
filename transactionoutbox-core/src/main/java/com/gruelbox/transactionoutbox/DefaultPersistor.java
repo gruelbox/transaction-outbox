@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import com.gruelbox.transactionoutbox.spi.Utils;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
@@ -7,7 +8,6 @@ import java.io.Writer;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.SQLTimeoutException;
 import java.sql.Statement;
 import java.sql.Timestamp;
@@ -15,10 +15,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -33,9 +32,11 @@ import lombok.extern.slf4j.Slf4j;
  * equally esoteric, you may prefer to implement {@link Persistor} from the ground up.
  */
 @Slf4j
-@SuperBuilder
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 public class DefaultPersistor implements Persistor, Validatable {
+
+  private static final int DEFAULT_WRITE_LOCK_TIMEOUT_SECONDS = 2;
+  private static final String DEFAULT_TABLE_NAME = "TXNO_OUTBOX";
 
   private static final String ALL_FIELDS =
       "id, uniqueRequestId, invocation, topic, seq, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
@@ -47,8 +48,7 @@ public class DefaultPersistor implements Persistor, Validatable {
    *     does not support skip locking.
    */
   @SuppressWarnings("JavaDoc")
-  @Builder.Default
-  private final int writeLockTimeoutSeconds = 2;
+  private final int writeLockTimeoutSeconds;
 
   /**
    * @param dialect The database dialect to use. Required.
@@ -57,11 +57,16 @@ public class DefaultPersistor implements Persistor, Validatable {
   private final Dialect dialect;
 
   /**
+   * @param sequenceGenerator The sequence generator used for ordered tasks. Required
+   */
+  @SuppressWarnings("JavaDoc")
+  private final SequenceGenerator sequenceGenerator;
+
+  /**
    * @param tableName The database table name. The default is {@code TXNO_OUTBOX}.
    */
   @SuppressWarnings("JavaDoc")
-  @Builder.Default
-  private final String tableName = "TXNO_OUTBOX";
+  private final String tableName;
 
   /**
    * @param migrate Set to false to disable automatic database migrations. This may be preferred if
@@ -71,8 +76,7 @@ public class DefaultPersistor implements Persistor, Validatable {
    *     the migrations.
    */
   @SuppressWarnings("JavaDoc")
-  @Builder.Default
-  private final boolean migrate = true;
+  private final boolean migrate;
 
   /**
    * @param serializer The serializer to use for {@link Invocation}s. See {@link
@@ -80,14 +84,28 @@ public class DefaultPersistor implements Persistor, Validatable {
    *     InvocationSerializer#createDefaultJsonSerializer()} with no custom serializable classes.
    */
   @SuppressWarnings("JavaDoc")
-  @Builder.Default
-  private final InvocationSerializer serializer =
-      InvocationSerializer.createDefaultJsonSerializer();
+  private final InvocationSerializer serializer;
+
+  // for backward compatibility
+  protected DefaultPersistor(Dialect dialect) {
+    this(
+        DEFAULT_WRITE_LOCK_TIMEOUT_SECONDS,
+        dialect,
+        DefaultSequenceGenerator.builder().dialect(dialect).build(),
+        DEFAULT_TABLE_NAME,
+        true,
+        InvocationSerializer.createDefaultJsonSerializer());
+  }
+
+  public static DefaultPersistorBuilder builder() {
+    return new DefaultPersistorBuilder();
+  }
 
   @Override
   public void validate(Validator validator) {
     validator.notNull("dialect", dialect);
     validator.notNull("tableName", tableName);
+    validator.notNull("sequenceGenerator", sequenceGenerator);
   }
 
   @Override
@@ -119,8 +137,12 @@ public class DefaultPersistor implements Persistor, Validatable {
     var writer = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), writer);
     if (entry.getTopic() != null) {
-      setNextSequence(tx, entry);
-      log.info("Assigned sequence number {} to topic {}", entry.getSequence(), entry.getTopic());
+      try {
+        entry.setSequence(sequenceGenerator.generate(tx, entry.getTopic()));
+        log.info("Assigned sequence number {} to topic {}", entry.getSequence(), entry.getTopic());
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to assign sequence number", e);
+      }
     }
     PreparedStatement stmt = tx.prepareBatchStatement(insertSql);
     setupInsert(entry, writer, stmt);
@@ -132,54 +154,13 @@ public class DefaultPersistor implements Persistor, Validatable {
         stmt.executeUpdate();
         log.debug("Inserted {} immediately", entry.description());
       } catch (Exception e) {
-        if (indexViolation(e)) {
+        if (Utils.indexViolation(e)) {
           throw new AlreadyScheduledException(
               "Request " + entry.description() + " already exists", e);
         }
         throw e;
       }
     }
-  }
-
-  private void setNextSequence(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
-    //noinspection resource
-    var seqSelect = tx.prepareBatchStatement(dialect.getFetchNextSequence());
-    seqSelect.setString(1, entry.getTopic());
-    try (ResultSet rs = seqSelect.executeQuery()) {
-      if (rs.next()) {
-        entry.setSequence(rs.getLong(1) + 1L);
-        //noinspection resource
-        var seqUpdate =
-            tx.prepareBatchStatement("UPDATE TXNO_SEQUENCE SET seq = ? WHERE topic = ?");
-        seqUpdate.setLong(1, entry.getSequence());
-        seqUpdate.setString(2, entry.getTopic());
-        seqUpdate.executeUpdate();
-      } else {
-        try {
-          entry.setSequence(1L);
-          //noinspection resource
-          var seqInsert =
-              tx.prepareBatchStatement("INSERT INTO TXNO_SEQUENCE (topic, seq) VALUES (?, ?)");
-          seqInsert.setString(1, entry.getTopic());
-          seqInsert.setLong(2, entry.getSequence());
-          seqInsert.executeUpdate();
-        } catch (Exception e) {
-          if (indexViolation(e)) {
-            setNextSequence(tx, entry);
-          } else {
-            throw e;
-          }
-        }
-      }
-    }
-  }
-
-  private boolean indexViolation(Exception e) {
-    return (e instanceof SQLIntegrityConstraintViolationException)
-        || (e.getClass().getName().equals("org.postgresql.util.PSQLException")
-            && e.getMessage().contains("constraint"))
-        || (e.getClass().getName().equals("com.microsoft.sqlserver.jdbc.SQLServerException")
-            && e.getMessage().contains("duplicate key"));
   }
 
   private void setupInsert(
@@ -413,6 +394,60 @@ public class DefaultPersistor implements Persistor, Validatable {
     try (Statement stmt = tx.connection().createStatement();
         ResultSet rs = stmt.executeQuery(dialect.getCheckSql())) {
       return rs.next() && (rs.getInt(1) == 1);
+    }
+  }
+
+  public static class DefaultPersistorBuilder {
+    private Integer writeLockTimeoutSeconds;
+    private Dialect dialect;
+    private SequenceGenerator sequenceGenerator;
+    private String tableName;
+    private Boolean migrate;
+    private InvocationSerializer serializer;
+
+    DefaultPersistorBuilder() {}
+
+    public DefaultPersistorBuilder writeLockTimeoutSeconds(int writeLockTimeoutSeconds) {
+      this.writeLockTimeoutSeconds = writeLockTimeoutSeconds;
+      return this;
+    }
+
+    public DefaultPersistorBuilder dialect(Dialect dialect) {
+      this.dialect = dialect;
+      return this;
+    }
+
+    public DefaultPersistorBuilder sequenceGenerator(SequenceGenerator sequenceGenerator) {
+      this.sequenceGenerator = sequenceGenerator;
+      return this;
+    }
+
+    public DefaultPersistorBuilder tableName(String tableName) {
+      this.tableName = tableName;
+      return this;
+    }
+
+    public DefaultPersistorBuilder migrate(boolean migrate) {
+      this.migrate = migrate;
+      return this;
+    }
+
+    public DefaultPersistorBuilder serializer(InvocationSerializer serializer) {
+      this.serializer = serializer;
+      return this;
+    }
+
+    public DefaultPersistor build() {
+
+      return new DefaultPersistor(
+          Objects.requireNonNullElse(writeLockTimeoutSeconds, 2),
+          this.dialect,
+          Objects.requireNonNullElseGet(
+              sequenceGenerator, () -> DefaultSequenceGenerator.builder().dialect(dialect).build()),
+          Objects.requireNonNullElse(tableName, DEFAULT_TABLE_NAME),
+          Objects.requireNonNullElse(migrate, true),
+          Objects.requireNonNullElseGet(
+              serializer, InvocationSerializer::createDefaultJsonSerializer));
     }
   }
 }
