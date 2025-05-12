@@ -163,7 +163,7 @@ class DefaultDialect implements Dialect {
           new Migration(
               12,
               "Enforce UTF8 collation",
-              null"));
+              null));
     }
 
     Builder setMigration(Migration migration) {
