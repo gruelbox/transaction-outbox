@@ -34,7 +34,9 @@ public interface Dialect {
 
   Dialect MY_SQL_5 =
       DefaultDialect.builder("MY_SQL_5")
-          .changeMigration(13, "ALTER TABLE TXNO_OUTBOX CONVERT TO CHARACTER SET utf8 COLLATE utf8mb4_unicode_ci")
+          .changeMigration(
+              13,
+              "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
           .build();
   Dialect MY_SQL_8 =
       DefaultDialect.builder("MY_SQL_8")
@@ -52,7 +54,9 @@ public interface Dialect {
           .lock(
               "SELECT id, invocation FROM {{table}} WHERE id = ? AND version = ? FOR "
                   + "UPDATE SKIP LOCKED")
-          .changeMigration(13, "ALTER TABLE TXNO_OUTBOX CONVERT TO CHARACTER SET utf8 COLLATE utf8mb4_unicode_ci")
+          .changeMigration(
+              13,
+              "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
           .build();
   Dialect POSTGRESQL_9 =
       DefaultDialect.builder("POSTGRESQL_9")
