@@ -158,6 +158,12 @@ class DefaultDialect implements Dialect {
               12,
               "Add flush index to support ordering",
               "CREATE INDEX IX_TXNO_OUTBOX_2 ON TXNO_OUTBOX (topic, processed, seq)"));
+      migrations.put(
+          13,
+          new Migration(
+              12,
+              "Enforce UTF8 collation",
+              null"));
     }
 
     Builder setMigration(Migration migration) {
