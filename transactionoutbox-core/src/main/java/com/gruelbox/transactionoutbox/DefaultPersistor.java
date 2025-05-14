@@ -356,14 +356,10 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   private void gatherResults(PreparedStatement stmt, Collection<TransactionOutboxEntry> output)
-      throws SQLException {
+      throws SQLException, IOException {
     try (ResultSet rs = stmt.executeQuery()) {
       while (rs.next()) {
-        try {
-          output.add(map(rs));
-        } catch (IOException e) {
-          log.error("Failed to read entry. Ignoring for now.", e);
-        }
+        output.add(map(rs));
       }
       log.debug("Found {} results", output.size());
     }
@@ -375,14 +371,20 @@ public class DefaultPersistor implements Persistor, Validatable {
     if (rs.wasNull()) {
       sequence = null;
     }
+    // Reading invocationStream *must* occur first because some drivers (ex. SQL Server)
+    // implement true streams that are not buffered in memory. Calling any other getter
+    // on ResultSet before invocationStream is read will cause Reader to be closed
+    // prematurely.
     try (Reader invocationStream = rs.getCharacterStream("invocation")) {
+      Invocation invocation;
+      try {
+        invocation = serializer.deserializeInvocation(invocationStream);
+      } catch (IOException e) {
+        invocation = new Invocation(e);
+      }
       TransactionOutboxEntry entry =
           TransactionOutboxEntry.builder()
-              // Reading invocationStream *must* occur first because some drivers (ex. SQL Server)
-              // implement true streams that are not buffered in memory. Calling any other getter
-              // on ResultSet before invocationStream is read will cause Reader to be closed
-              // prematurely.
-              .invocation(serializer.deserializeInvocation(invocationStream))
+              .invocation(invocation)
               .id(rs.getString("id"))
               .uniqueRequestId(rs.getString("uniqueRequestId"))
               .topic("*".equals(topic) ? null : topic)

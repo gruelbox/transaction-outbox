@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class EventuallyConsistentControllerTest {
@@ -29,6 +30,8 @@ class EventuallyConsistentControllerTest {
   @SuppressWarnings("unused")
   @Autowired
   private ExternalQueueService externalQueueService;
+
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -52,13 +55,18 @@ class EventuallyConsistentControllerTest {
     assertTrue(template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
     assertTrue(template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
 
+    jdbcTemplate.execute(
+        "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
+            + neil.getLastName()
+            + "%'");
+
     await()
         .atMost(10, SECONDS)
         .pollDelay(1, SECONDS)
         .untilAsserted(
             () ->
                 assertThat(externalQueueService.getSent())
-                    .containsExactlyInAnyOrder(joe, dave, neil, tupac, jeff));
+                    .containsExactlyInAnyOrder(joe, dave, tupac, jeff));
   }
 
   @Test
@@ -77,12 +85,14 @@ class EventuallyConsistentControllerTest {
     assertTrue(template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
     assertTrue(template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
 
+    jdbcTemplate.execute(
+        "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
+            + neil.getLastName()
+            + "%'");
+
     await()
         .atMost(10, SECONDS)
         .pollDelay(1, SECONDS)
-        .untilAsserted(
-            () ->
-                assertThat(externalQueueService.getSent())
-                    .containsExactly(joe, dave, neil, tupac, jeff));
+        .untilAsserted(() -> assertThat(externalQueueService.getSent()).containsExactly(joe, dave));
   }
 }
