@@ -380,7 +380,7 @@ public class DefaultPersistor implements Persistor, Validatable {
       try {
         invocation = serializer.deserializeInvocation(invocationStream);
       } catch (IOException e) {
-        invocation = new Invocation(e);
+        invocation = new FailedDeserializingInvocation(e);
       }
       TransactionOutboxEntry entry =
           TransactionOutboxEntry.builder()

@@ -453,7 +453,7 @@ public abstract class AbstractPersistorTest {
   }
 
   private Invocation createUnparseableInvocation() {
-    return new Invocation(new IOException());
+    return new FailedDeserializingInvocation(new IOException());
   }
 
   private void expectTobeInterrupted() {

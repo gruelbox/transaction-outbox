@@ -1,14 +1,13 @@
 package com.gruelbox.transactionoutbox;
 
 import com.google.gson.annotations.SerializedName;
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.Callable;
-import lombok.Value;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 
@@ -19,7 +18,10 @@ import org.slf4j.MDC;
  * <p>Optimized for safe serialization via GSON.
  */
 @SuppressWarnings("WeakerAccess")
-@Value
+@ToString
+@EqualsAndHashCode
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@Getter
 @Slf4j
 public class Invocation {
 
@@ -60,11 +62,6 @@ public class Invocation {
   Map<String, String> mdc;
 
   /**
-   * @return Indicates an Exception during De-Serialization, that is not persisted.
-   */
-  transient Optional<Exception> exceptionDuringDeserialization;
-
-  /**
    * @param className The class name (as provided/expected by an {@link Instantiator}).
    * @param methodName The method name. Combined with {@link #parameterTypes}, uniquely identifies
    *     the method.
@@ -96,19 +93,6 @@ public class Invocation {
     this.parameterTypes = parameterTypes;
     this.args = args;
     this.mdc = mdc;
-    this.exceptionDuringDeserialization = Optional.empty();
-  }
-
-  /**
-   * @param exception The exception that occured during de-serialization.
-   */
-  public Invocation(IOException exception) {
-    this.className = "";
-    this.methodName = "";
-    this.parameterTypes = new Class<?>[] {};
-    this.args = new Object[] {};
-    this.mdc = null;
-    this.exceptionDuringDeserialization = Optional.of(exception);
   }
 
   void withinMDC(Runnable runnable) {
@@ -149,16 +133,12 @@ public class Invocation {
 
   void invoke(Object instance, TransactionOutboxListener listener)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-    if (exceptionDuringDeserialization.isEmpty()) {
-      Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
-      method.setAccessible(true);
-      if (log.isDebugEnabled()) {
-        log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
-      }
-      listener.wrapInvocation(() -> method.invoke(instance, args));
-    } else {
-      throw new DeserializationFailedException(
-          "Invocation could not be de-serialized", exceptionDuringDeserialization.get());
+
+    Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
+    method.setAccessible(true);
+    if (log.isDebugEnabled()) {
+      log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
     }
+    listener.wrapInvocation(() -> method.invoke(instance, args));
   }
 }
