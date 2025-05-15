@@ -19,7 +19,6 @@ public class FailedDeserializingInvocation extends Invocation {
   @Override
   void invoke(Object instance, TransactionOutboxListener listener)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-    throw new DeserializationFailedException(
-        "Invocation could not be deserialized", exceptionDuringDeserialization);
+    throw new UncheckedException(exceptionDuringDeserialization);
   }
 }
