@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.gruelbox.transactionoutbox.*;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -164,6 +165,21 @@ public abstract class AbstractPersistorTest {
     txManager()
         .inTransactionThrows(
             tx -> assertThat(persistor().selectBatch(tx, 3, now.plusMillis(1)), hasSize(2)));
+  }
+
+  @Test
+  public void testUnparseableEntriesExcluded() throws Exception {
+
+    txManager()
+        .inTransactionThrows(
+            tx -> {
+              persistor().save(tx, createEntry("FOO1", now, false));
+              persistor().save(tx, createEntry("FOO2", now, createUnparseableInvocation()));
+              persistor().save(tx, createEntry("FOO3", now, false));
+            });
+    txManager()
+        .inTransactionThrows(
+            tx -> assertThat(persistor().selectBatch(tx, 3, now.plusMillis(1)), hasSize(3)));
   }
 
   static class TransactionOutboxEntryMatcher extends TypeSafeMatcher<TransactionOutboxEntry> {
@@ -417,12 +433,27 @@ public abstract class AbstractPersistorTest {
         .build();
   }
 
+  private TransactionOutboxEntry createEntry(
+      String id, Instant nextAttemptTime, Invocation invocation) {
+    return TransactionOutboxEntry.builder()
+        .id(id)
+        .invocation(invocation)
+        .blocked(false)
+        .lastAttemptTime(null)
+        .nextAttemptTime(nextAttemptTime.truncatedTo(MILLIS))
+        .build();
+  }
+
   private Invocation createInvocation() {
     return new Invocation(
         "Foo",
         "Bar",
         new Class<?>[] {int.class, BigDecimal.class, String.class},
         new Object[] {1, BigDecimal.TEN, null});
+  }
+
+  private Invocation createUnparseableInvocation() {
+    return new FailedDeserializingInvocation(new IOException());
   }
 
   private void expectTobeInterrupted() {

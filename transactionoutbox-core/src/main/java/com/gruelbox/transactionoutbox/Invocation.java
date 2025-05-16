@@ -6,7 +6,8 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import lombok.Value;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 
@@ -17,7 +18,10 @@ import org.slf4j.MDC;
  * <p>Optimized for safe serialization via GSON.
  */
 @SuppressWarnings("WeakerAccess")
-@Value
+@ToString
+@EqualsAndHashCode
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@Getter
 @Slf4j
 public class Invocation {
 
@@ -129,6 +133,7 @@ public class Invocation {
 
   void invoke(Object instance, TransactionOutboxListener listener)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+
     Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
     method.setAccessible(true);
     if (log.isDebugEnabled()) {

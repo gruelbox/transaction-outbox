@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
+import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 
@@ -40,5 +41,5 @@ public interface InvocationSerializer {
    * @param reader The reader.
    * @return The deserialized invocation.
    */
-  Invocation deserializeInvocation(Reader reader);
+  Invocation deserializeInvocation(Reader reader) throws IOException;
 }

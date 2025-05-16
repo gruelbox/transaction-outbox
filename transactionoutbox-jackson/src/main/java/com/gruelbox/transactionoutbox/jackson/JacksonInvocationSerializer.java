@@ -43,24 +43,20 @@ public final class JacksonInvocationSerializer implements InvocationSerializer {
   }
 
   @Override
-  public Invocation deserializeInvocation(Reader reader) {
-    try {
-      // read ahead to check if old style
-      BufferedReader br = new BufferedReader(reader);
-      if (checkForOldSerialization(br)) {
-        if (defaultInvocationSerializer == null) {
-          throw new UnsupportedOperationException(
-              "Can't deserialize GSON-format tasks without a "
-                  + DefaultInvocationSerializer.class.getSimpleName()
-                  + ". Supply one when building "
-                  + getClass().getSimpleName());
-        }
-        return defaultInvocationSerializer.deserializeInvocation(br);
+  public Invocation deserializeInvocation(Reader reader) throws IOException {
+    // read ahead to check if old style
+    BufferedReader br = new BufferedReader(reader);
+    if (checkForOldSerialization(br)) {
+      if (defaultInvocationSerializer == null) {
+        throw new UnsupportedOperationException(
+            "Can't deserialize GSON-format tasks without a "
+                + DefaultInvocationSerializer.class.getSimpleName()
+                + ". Supply one when building "
+                + getClass().getSimpleName());
       }
-      return mapper.readValue(br, Invocation.class);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+      return defaultInvocationSerializer.deserializeInvocation(br);
     }
+    return mapper.readValue(br, Invocation.class);
   }
 
   private boolean checkForOldSerialization(BufferedReader reader) throws IOException {

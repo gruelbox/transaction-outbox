@@ -1,16 +1,6 @@
 package com.gruelbox.transactionoutbox;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
-import com.google.gson.TypeAdapter;
+import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
@@ -106,8 +96,12 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
   }
 
   @Override
-  public Invocation deserializeInvocation(Reader reader) {
-    return gson.fromJson(reader, Invocation.class);
+  public Invocation deserializeInvocation(Reader reader) throws IOException {
+    try {
+      return gson.fromJson(reader, Invocation.class);
+    } catch (JsonIOException | JsonSyntaxException exception) {
+      throw new IOException(exception);
+    }
   }
 
   private static final class InvocationJsonSerializer

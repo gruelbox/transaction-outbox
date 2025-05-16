@@ -9,8 +9,10 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.gruelbox.transactionoutbox.DefaultInvocationSerializer;
 import com.gruelbox.transactionoutbox.Invocation;
+import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -50,9 +52,13 @@ class TestJacksonInvocationSerializer {
   }
 
   Invocation serdeser(Invocation invocation) {
-    var writer = new StringWriter();
-    underTest.serializeInvocation(invocation, writer);
-    return underTest.deserializeInvocation(new StringReader(writer.toString()));
+    try {
+      var writer = new StringWriter();
+      underTest.serializeInvocation(invocation, writer);
+      return underTest.deserializeInvocation(new StringReader(writer.toString()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   @Test
@@ -148,7 +154,7 @@ class TestJacksonInvocationSerializer {
   }
 
   @Test
-  void deserializes_old_representation_correctly() {
+  void deserializes_old_representation_correctly() throws IOException {
     StringReader reader =
         new StringReader(
             "{\"c\":\"com.gruelbox.transactionoutbox.jackson.Service\",\"m\":\"parseDate\",\"p\":[\"String\"],\"a\":[{\"t\":\"String\",\"v\":\"2021-05-11\"}],\"x\":{\"REQUEST-ID\":\"someRequestId\"}}");

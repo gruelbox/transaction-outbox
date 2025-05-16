@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.gruelbox.transactionoutbox.Invocation;
 import java.io.IOException;
@@ -29,6 +30,13 @@ class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
 
   CustomInvocationDeserializer() {
     this(Invocation.class);
+  }
+
+  @Override
+  public Invocation deserializeWithType(
+      JsonParser p, DeserializationContext ctxt, TypeDeserializer typeDeserializer)
+      throws IOException {
+    return deserialize(p, ctxt);
   }
 
   @Override

@@ -1,7 +1,11 @@
 package com.gruelbox.transactionoutbox;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -206,6 +210,12 @@ abstract class AbstractTestDefaultInvocationSerializer {
     check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values));
   }
 
+  @Test
+  void testDeserializationException() {
+    assertThrows(
+        IOException.class, () -> serializer.deserializeInvocation(new StringReader("unparseable")));
+  }
+
   void check(Invocation invocation) {
     Invocation deserialized = serdeser(invocation);
     Assertions.assertEquals(deserialized, serdeser(invocation));
@@ -213,10 +223,14 @@ abstract class AbstractTestDefaultInvocationSerializer {
   }
 
   Invocation serdeser(Invocation invocation) {
-    var writer = new StringWriter();
-    serializer.serializeInvocation(invocation, writer);
-    log.info("Serialised as: {}", writer);
-    return serializer.deserializeInvocation(new StringReader(writer.toString()));
+    try {
+      var writer = new StringWriter();
+      serializer.serializeInvocation(invocation, writer);
+      log.info("Serialised as: {}", writer);
+      return serializer.deserializeInvocation(new StringReader(writer.toString()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   enum ExampleCustomEnum {
