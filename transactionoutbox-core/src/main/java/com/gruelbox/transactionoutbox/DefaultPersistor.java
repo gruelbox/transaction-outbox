@@ -340,6 +340,30 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   @Override
+  public Collection<TransactionOutboxEntry> selectNextInSelectedTopics(
+      Transaction tx, List<String> topicNames, int batchSize, Instant now) throws Exception {
+    var sql =
+        dialect
+            .getFetchNextInSelectedTopics()
+            .replace("{{table}}", tableName)
+            .replace(
+                "{{topicNames}}",
+                topicNames.stream()
+                    .map(it -> "'%s'".replace("%s", it))
+                    .reduce((a, b) -> a.concat(",").concat(b))
+                    .orElse("''"))
+            .replace("{{batchSize}}", Integer.toString(batchSize))
+            .replace("{{allFields}}", ALL_FIELDS);
+    //noinspection resource
+    try (PreparedStatement stmt = tx.connection().prepareStatement(sql)) {
+      stmt.setTimestamp(1, Timestamp.from(now));
+      var results = new ArrayList<TransactionOutboxEntry>();
+      gatherResults(stmt, results);
+      return results;
+    }
+  }
+
+  @Override
   public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now)
       throws Exception {
     //noinspection resource

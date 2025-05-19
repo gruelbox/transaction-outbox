@@ -53,6 +53,12 @@ public class StubPersistor implements Persistor {
   }
 
   @Override
+  public Collection<TransactionOutboxEntry> selectNextInSelectedTopics(
+      Transaction tx, List<String> topicNames, int batchSize, Instant now) throws Exception {
+    return List.of();
+  }
+
+  @Override
   public int deleteProcessedAndExpired(Transaction tx, int batchSize, Instant now) {
     return 0;
   }

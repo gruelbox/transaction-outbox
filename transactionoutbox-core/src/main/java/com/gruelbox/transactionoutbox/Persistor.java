@@ -119,6 +119,19 @@ public interface Persistor {
       throws Exception;
 
   /**
+   * Selects the next items in all selected topics as a batch for processing. Does not lock.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param topicNames The topics to select records from.
+   * @param batchSize The maximum number of records to select.
+   * @param now The time to use when selecting records.
+   * @return The records.
+   * @throws Exception Any exception.
+   */
+  Collection<TransactionOutboxEntry> selectNextInSelectedTopics(
+      Transaction tx, List<String> topicNames, int batchSize, Instant now) throws Exception;
+
+  /**
    * Deletes records which have processed and passed their expiry time, in specified batch sizes.
    *
    * @param tx The current {@link Transaction}.

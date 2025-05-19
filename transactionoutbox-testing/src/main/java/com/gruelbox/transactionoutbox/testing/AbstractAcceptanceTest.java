@@ -502,6 +502,63 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
   }
 
   @Test
+  final void flushOnlyASpecifiedTopic() throws Exception {
+    TransactionManager transactionManager = txManager();
+    CountDownLatch successLatch = new CountDownLatch(1);
+    AtomicInteger attempts = new AtomicInteger(-1);
+    var processedEntryListener = new ProcessedEntryListener(successLatch);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .instantiator(new FailingInstantiator(attempts))
+            .submitter(Submitter.withExecutor(singleThreadPool))
+            .attemptFrequency(Duration.ofMillis(500))
+            .listener(processedEntryListener)
+            .blockAfterAttempts(5)
+            .build();
+
+    clearOutbox();
+
+    var selectedTopic = "SELECTED_TOPIC";
+    withRunningFlusher(
+        outbox,
+        () -> {
+          transactionManager.inTransaction(
+              () -> {
+                outbox.with().schedule(InterfaceProcessor.class).process(2, "Whee");
+                outbox
+                    .with()
+                    .ordered(selectedTopic)
+                    .schedule(InterfaceProcessor.class)
+                    .process(3, "Whoo");
+                outbox
+                    .with()
+                    .ordered("IGNORED_TOPIC")
+                    .schedule(InterfaceProcessor.class)
+                    .process(2, "Wheeeee");
+              });
+
+          assertTrue(successLatch.await(20, SECONDS), "Timeout waiting for success");
+          var successes = processedEntryListener.getSuccessfulEntries();
+          var failures = processedEntryListener.getFailingEntries();
+
+          // then we only expect the selected topic we're flushing to have had eventually succeeded
+          // as the other work would not have been picked up for a retry
+          assertEquals(1, successes.stream().map(TransactionOutboxEntry::getId).distinct().count());
+
+          // a single failure is expected; from the unordered submission (as these run automatically
+          assertEquals(1, failures.stream().filter(it -> it.getTopic() == null).count());
+
+          // all other failures accounted for belong to the selected topic
+          assertEquals(
+              2, failures.stream().filter(it -> selectedTopic.equals(it.getTopic())).count());
+        },
+        singleThreadPool,
+        selectedTopic);
+  }
+
+  @Test
   final void onSchedulingFailure_BubbleExceptionsUp() throws Exception {
     Assumptions.assumeTrue(
         Dialect.MY_SQL_8.equals(connectionDetails().dialect())

@@ -103,6 +103,15 @@ public interface TransactionOutbox {
   boolean flush(Executor executor);
 
   /**
+   * Flushes a specific topic
+   *
+   * @param executor
+   * @param topicName
+   * @return
+   */
+  boolean flushTopic(Executor executor, String topicName);
+
+  /**
    * Unblocks a blocked entry and resets the attempt count so that it will be retried again.
    * Requires an active transaction and a transaction manager that supports thread local context.
    *

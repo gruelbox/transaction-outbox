@@ -22,6 +22,8 @@ public interface Dialect {
 
   String getFetchNextInAllTopics();
 
+  String getFetchNextInSelectedTopics();
+
   String getFetchCurrentVersion();
 
   String getFetchNextSequence();
@@ -44,6 +46,10 @@ public interface Dialect {
               "WITH raw AS(SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
                   + " FROM {{table}} WHERE processed = false AND topic <> '*')"
                   + " SELECT * FROM raw WHERE rn = 1 AND nextAttemptTime < ? LIMIT {{batchSize}}")
+          .fetchNextInSelectedTopics(
+              "WITH raw AS(SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
+                  + " FROM {{table}} WHERE processed = false AND topic IN ({{topicNames}}))"
+                  + " SELECT * FROM raw WHERE rn = 1 AND nextAttemptTime < ? LIMIT {{batchSize}}")
           .deleteExpired(
               "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false"
                   + " LIMIT {{batchSize}}")
@@ -63,6 +69,10 @@ public interface Dialect {
           .fetchNextInAllTopics(
               "WITH raw AS(SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
                   + " FROM {{table}} WHERE processed = false AND topic <> '*')"
+                  + " SELECT * FROM raw WHERE rn = 1 AND nextAttemptTime < ? LIMIT {{batchSize}}")
+          .fetchNextInSelectedTopics(
+              "WITH raw AS(SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
+                  + " FROM {{table}} WHERE processed = false AND topic IN ({{topicNames}}))"
                   + " SELECT * FROM raw WHERE rn = 1 AND nextAttemptTime < ? LIMIT {{batchSize}}")
           .deleteExpired(
               "DELETE FROM {{table}} WHERE id IN "
@@ -92,6 +102,10 @@ public interface Dialect {
           .fetchNextInAllTopics(
               "WITH cte1 AS (SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
                   + " FROM {{table}} WHERE processed = 0 AND topic <> '*')"
+                  + " SELECT * FROM cte1 WHERE rn = 1 AND nextAttemptTime < ? AND ROWNUM <= {{batchSize}}")
+          .fetchNextInSelectedTopics(
+              "WITH cte1 AS (SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
+                  + " FROM {{table}} WHERE processed = 0 AND topic IN ({{topicNames}}))"
                   + " SELECT * FROM cte1 WHERE rn = 1 AND nextAttemptTime < ? AND ROWNUM <= {{batchSize}}")
           .deleteExpired(
               "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = 1 AND blocked = 0 "
@@ -158,6 +172,12 @@ public interface Dialect {
           .fetchNextInAllTopics(
               "SELECT TOP {{batchSize}} {{allFields}} FROM {{table}} a"
                   + " WHERE processed = 0 AND topic <> '*' AND nextAttemptTime < ?"
+                  + " AND seq = ("
+                  + "SELECT MIN(seq) FROM {{table}} b WHERE b.topic=a.topic AND b.processed = 0"
+                  + ")")
+          .fetchNextInSelectedTopics(
+              "SELECT TOP {{batchSize}} {{allFields}} FROM {{table}} a"
+                  + " WHERE processed = 0 AND topic IN ({{topicNames}}) AND nextAttemptTime < ?"
                   + " AND seq = ("
                   + "SELECT MIN(seq) FROM {{table}} b WHERE b.topic=a.topic AND b.processed = 0"
                   + ")")
