@@ -158,6 +158,112 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     assertEquals(expected, output);
   }
 
+    @Test
+    final void batchSequencing() throws Exception {
+        int countPerTopic = 20;
+        int topicCount = 5;
+
+        AtomicInteger insertIndex = new AtomicInteger();
+        CountDownLatch latch = new CountDownLatch(countPerTopic * topicCount);
+        ThreadLocalContextTransactionManager transactionManager =
+                (ThreadLocalContextTransactionManager) txManager();
+
+        transactionManager.inTransaction(
+                tx -> {
+                    //noinspection resource
+                    try (var stmt = tx.connection().createStatement()) {
+                        stmt.execute("DROP TABLE TEST_TABLE");
+                    } catch (SQLException e) {
+                        // ignore
+                    }
+                });
+
+        transactionManager.inTransaction(
+                tx -> {
+                    //noinspection resource
+                    try (var stmt = tx.connection().createStatement()) {
+                        stmt.execute(createTestTable());
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+
+        TransactionOutbox outbox =
+                TransactionOutbox.builder()
+                        .transactionManager(transactionManager)
+                        .submitter(Submitter.withExecutor(unreliablePool))
+                        .attemptFrequency(Duration.ofMillis(500))
+                        .instantiator(
+                                new RandomFailingInstantiator(
+                                        (foo, bar) -> {
+                                            transactionManager.requireTransaction(
+                                                    tx -> {
+                                                        //noinspection resource
+                                                        try (var stmt =
+                                                                     tx.connection()
+                                                                             .prepareStatement(
+                                                                                     "INSERT INTO TEST_TABLE (topic, ix, foo) VALUES(?, ?, ?)")) {
+                                                            stmt.setString(1, bar);
+                                                            stmt.setInt(2, insertIndex.incrementAndGet());
+                                                            stmt.setInt(3, foo);
+                                                            stmt.executeUpdate();
+                                                        } catch (SQLException e) {
+                                                            throw new RuntimeException(e);
+                                                        }
+                                                    });
+                                        }))
+                        .persistor(persistor())
+                        .listener(new LatchListener(latch))
+                        .initializeImmediately(false)
+                        .flushBatchSize(4)
+                        .enableOrderedBatchProcessing(true)
+                        .build();
+
+        outbox.initialize();
+        clearOutbox();
+
+        withRunningFlusher(
+                outbox,
+                () -> {
+                    transactionManager.inTransaction(
+                            () -> {
+                                for (int i = 1; i <= countPerTopic; i++) {
+                                    for (int j = 1; j <= topicCount; j++) {
+                                        outbox
+                                                .with()
+                                                .ordered("topic" + j)
+                                                .schedule(InterfaceProcessor.class)
+                                                .process(i, "topic" + j);
+                                    }
+                                }
+                            });
+                    assertTrue(latch.await(30, SECONDS));
+                });
+
+        var output = new HashMap<String, ArrayList<Integer>>();
+        transactionManager.inTransaction(
+                tx -> {
+                    //noinspection resource
+                    try (var stmt = tx.connection().createStatement();
+                         var rs = stmt.executeQuery("SELECT topic, foo FROM TEST_TABLE ORDER BY ix")) {
+                        while (rs.next()) {
+                            ArrayList<Integer> values =
+                                    output.computeIfAbsent(rs.getString(1), k -> new ArrayList<>());
+                            values.add(rs.getInt(2));
+                        }
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+
+        var indexes = IntStream.range(1, countPerTopic + 1).boxed().collect(toList());
+        var expected =
+                IntStream.range(1, topicCount + 1)
+                        .mapToObj(i -> "topic" + i)
+                        .collect(toMap(it -> it, it -> indexes));
+        assertEquals(expected, output);
+    }
+
   /**
    * Uses a simple direct transaction manager and connection manager and attempts to fire an
    * interface using a custom instantiator.

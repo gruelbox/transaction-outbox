@@ -159,6 +159,8 @@ public interface TransactionOutbox {
   @SuppressWarnings("WeakerAccess")
   void processNow(TransactionOutboxEntry entry);
 
+  void processBatchNow(List<TransactionOutboxEntry> entries);
+
   /** Builder for {@link TransactionOutbox}. */
   @ToString
   abstract class TransactionOutboxBuilder {
@@ -176,6 +178,7 @@ public interface TransactionOutbox {
     protected Boolean serializeMdc;
     protected Duration retentionThreshold;
     protected Boolean initializeImmediately;
+    protected Boolean enableOrderedBatchProcessing;
 
     protected TransactionOutboxBuilder() {}
 
@@ -319,6 +322,18 @@ public interface TransactionOutbox {
      */
     public TransactionOutboxBuilder initializeImmediately(boolean initializeImmediately) {
       this.initializeImmediately = initializeImmediately;
+      return this;
+    }
+
+    /**
+     * @param enableOrderedBatchProcessing If true, enables batch processing of ordered items within
+     *     topics. This allows for more efficient processing of ordered items by processing them in
+     *     batches while still maintaining order within each topic. Defaults to false.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder enableOrderedBatchProcessing(
+        boolean enableOrderedBatchProcessing) {
+      this.enableOrderedBatchProcessing = enableOrderedBatchProcessing;
       return this;
     }
 

@@ -26,9 +26,11 @@ class DefaultDialect implements Dialect {
   @Getter private final String delete;
   @Getter private final String selectBatch;
   @Getter private final String lock;
+  @Getter private final String lockBatch;
   @Getter private final String checkSql;
   @Getter private final String fetchNextInAllTopics;
   @Getter private final String fetchNextInSelectedTopics;
+  @Getter private final String fetchNextBatchInTopics;
   @Getter private final String fetchCurrentVersion;
   @Getter private final String fetchNextSequence;
   private final Collection<Migration> migrations;
@@ -69,6 +71,8 @@ class DefaultDialect implements Dialect {
             + "AND blocked = false AND processed = false AND topic = '*' LIMIT {{batchSize}}";
     private String lock =
         "SELECT id, invocation FROM {{table}} WHERE id = ? AND version = ? FOR UPDATE";
+    private String lockBatch =
+        "SELECT id, version, invocation FROM {{table}} WHERE (id, version) IN ({{placeholders}}) FOR UPDATE";
     private String checkSql = "SELECT 1";
     private Map<Integer, Migration> migrations;
     private Function<Boolean, String> booleanValueFrom;
@@ -85,6 +89,13 @@ class DefaultDialect implements Dialect {
             + " AND seq = ("
             + "SELECT MIN(seq) FROM {{table}} b WHERE b.topic=a.topic AND b.processed = false"
             + ") LIMIT {{batchSize}}";
+    private String fetchNextBatchInTopics =
+            "WITH raw AS ("
+                    + " SELECT {{allFields}}, ROW_NUMBER() OVER (PARTITION BY topic ORDER BY seq) as rn"
+                    + " FROM {{table}}"
+                    + " WHERE processed = false AND topic <> '*'"
+                    + ")"
+                    + " SELECT * FROM raw WHERE rn <= {{batchSize}} AND nextAttemptTime < ?";
     private String fetchCurrentVersion = "SELECT version FROM TXNO_VERSION FOR UPDATE";
     private String fetchNextSequence = "SELECT seq FROM TXNO_SEQUENCE WHERE topic = ? FOR UPDATE";
 
@@ -188,9 +199,11 @@ class DefaultDialect implements Dialect {
           delete,
           selectBatch,
           lock,
+          lockBatch,
           checkSql,
           fetchNextInAllTopics,
           fetchNextInSelectedTopics,
+          fetchNextBatchInTopics,
           fetchCurrentVersion,
           fetchNextSequence,
           migrations.values()) {

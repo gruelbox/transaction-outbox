@@ -14,8 +14,10 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -249,6 +251,45 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   @Override
+  public void updateBatch(Transaction tx, List<TransactionOutboxEntry> entries) throws Exception {
+    try (PreparedStatement stmt =
+        tx.connection()
+            .prepareStatement(
+                "UPDATE "
+                    + tableName
+                    + " SET "
+                    + "lastAttemptTime = ?, nextAttemptTime = ?, attempts = ?, "
+                    + "blocked = ?, processed = ?, version = ? "
+                    + "WHERE id = ? AND version = ?")) {
+
+      for (TransactionOutboxEntry entry : entries) {
+        stmt.setTimestamp(
+            1,
+            entry.getLastAttemptTime() == null ? null : Timestamp.from(entry.getLastAttemptTime()));
+        stmt.setTimestamp(2, Timestamp.from(entry.getNextAttemptTime()));
+        stmt.setInt(3, entry.getAttempts());
+        stmt.setBoolean(4, entry.isBlocked());
+        stmt.setBoolean(5, entry.isProcessed());
+        stmt.setInt(6, entry.getVersion() + 1);
+        stmt.setString(7, entry.getId());
+        stmt.setInt(8, entry.getVersion());
+        stmt.addBatch();
+      }
+
+      int[] results = stmt.executeBatch();
+
+      for (int i = 0; i < results.length; i++) {
+        if (results[i] != 1) {
+          throw new OptimisticLockException();
+        }
+        entries.get(i).setVersion(entries.get(i).getVersion() + 1);
+        log.debug("Batch updated {}", entries.get(i).description());
+      }
+      log.debug("Batch updated {} entries", results.length);
+    }
+  }
+
+  @Override
   public boolean lock(Transaction tx, TransactionOutboxEntry entry) throws Exception {
     //noinspection resource
     try (PreparedStatement stmt =
@@ -276,6 +317,69 @@ public class DefaultPersistor implements Persistor, Validatable {
         }
       } catch (SQLTimeoutException e) {
         log.debug("Lock attempt timed out on {}", entry.description());
+        return false;
+      }
+    }
+  }
+
+  @Override
+  public boolean lockBatch(Transaction tx, List<TransactionOutboxEntry> entries) throws Exception {
+    if (entries == null || entries.isEmpty()) {
+      return true;  // Nothing to lock is considered success
+    }
+
+    // Create placeholders for each entry
+    String placeholders = entries.stream()
+        .map(e -> "(?, ?)")
+        .collect(Collectors.joining(", "));
+    
+    // Get the SQL from the dialect, replacing the placeholders
+    String sql = dialect.getLockBatch().replace("{{table}}", tableName)
+                                      .replace("{{placeholders}}", placeholders);
+    
+    try (PreparedStatement stmt = tx.connection().prepareStatement(sql)) {
+      // Set parameters for each entry
+      int paramIndex = 1;
+      for (TransactionOutboxEntry entry : entries) {
+        stmt.setString(paramIndex++, entry.getId());
+        stmt.setInt(paramIndex++, entry.getVersion());
+      }
+      
+      stmt.setQueryTimeout(writeLockTimeoutSeconds);
+      
+      try {
+        try (ResultSet rs = stmt.executeQuery()) {
+          // Build a map of id -> deserialized invocation
+          Map<String, Invocation> invocationsById = new HashMap<>();
+          
+          while (rs.next()) {
+            String id = rs.getString("id");
+            try (Reader invocationStream = rs.getCharacterStream("invocation")) {
+              Invocation invocation = serializer.deserializeInvocation(invocationStream);
+              invocationsById.put(id, invocation);
+            }
+          }
+          
+          // If we didn't get all entries, return false
+          if (invocationsById.size() != entries.size()) {
+            log.debug("Could only lock {} out of {} entries", invocationsById.size(), entries.size());
+            return false;
+          }
+          
+          // Update each entry with its deserialized invocation
+          for (TransactionOutboxEntry entry : entries) {
+            Invocation invocation = invocationsById.get(entry.getId());
+            if (invocation == null) {
+              log.error("Could not find result for entry {}", entry.getId());
+              return false;
+            }
+            entry.setInvocation(invocation);
+          }
+          
+          return true;
+        }
+      } catch (SQLTimeoutException e) {
+        log.debug("Lock attempt timed out on batch of {} entries", entries.size());
         return false;
       }
     }
@@ -360,6 +464,35 @@ public class DefaultPersistor implements Persistor, Validatable {
         counter++;
       }
       stmt.setTimestamp(counter, Timestamp.from(now));
+      var results = new ArrayList<TransactionOutboxEntry>();
+      gatherResults(stmt, results);
+      return results;
+    }
+  }
+
+  /**
+   * Selects the next batch of entries in topics, maintaining order within each topic. This method
+   * is used for ordered batch processing and returns multiple entries per topic up to the batch
+   * size limit.
+   *
+   * @param tx The current transaction
+   * @param batchSize The maximum number of entries to return per topic
+   * @param now The current time
+   * @return A collection of entries ordered by topic and sequence
+   * @throws Exception If an error occurs during selection
+   */
+  public Collection<TransactionOutboxEntry> selectNextBatchInTopics(
+      Transaction tx, int batchSize, Instant now) throws Exception {
+    var sql =
+        dialect
+            .getFetchNextBatchInTopics()
+            .replace("{{table}}", tableName)
+            .replace("{{batchSize}}", Integer.toString(batchSize))
+            .replace("{{allFields}}", ALL_FIELDS);
+    log.debug("SQL: {}", sql);
+    //noinspection resource
+    try (PreparedStatement stmt = tx.connection().prepareStatement(sql)) {
+      stmt.setTimestamp(1, Timestamp.from(now));
       var results = new ArrayList<TransactionOutboxEntry>();
       gatherResults(stmt, results);
       return results;

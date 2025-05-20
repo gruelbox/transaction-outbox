@@ -32,7 +32,17 @@ public class StubPersistor implements Persistor {
   }
 
   @Override
+  public void updateBatch(Transaction tx, List<TransactionOutboxEntry> entries) throws Exception {
+    // No-op
+  }
+
+  @Override
   public boolean lock(Transaction tx, TransactionOutboxEntry entry) {
+    return true;
+  }
+
+  @Override
+  public boolean lockBatch(Transaction tx, List<TransactionOutboxEntry> entries) {
     return true;
   }
 
@@ -49,6 +59,12 @@ public class StubPersistor implements Persistor {
   @Override
   public Collection<TransactionOutboxEntry> selectNextInTopics(
       Transaction tx, int flushBatchSize, Instant now) {
+    return List.of();
+  }
+
+  @Override
+  public Collection<TransactionOutboxEntry> selectNextBatchInTopics(
+      Transaction tx, int batchSize, Instant now) throws Exception {
     return List.of();
   }
 

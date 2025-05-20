@@ -14,11 +14,13 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -45,6 +47,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private final boolean serializeMdc;
   private final Validator validator;
   private final Duration retentionThreshold;
+  private final boolean enableOrderedBatchProcessing;
   private final AtomicBoolean initialized = new AtomicBoolean();
   private final ProxyFactory proxyFactory = new ProxyFactory();
   private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -113,6 +116,56 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     return !batch.isEmpty();
   }
 
+  private boolean doBatchFlush(
+      Function<Transaction, Collection<TransactionOutboxEntry>> batchSource,
+      Executor executor) {
+    var batch =
+        transactionManager.inTransactionReturns(
+            transaction -> {
+              var entries = batchSource.apply(transaction);
+              List<TransactionOutboxEntry> result = new ArrayList<>(entries.size());
+              for (var entry : entries) {
+                log.debug("Triggering {}", entry.description());
+                entry.setLastAttemptTime(clockProvider.get().instant());
+                entry.setNextAttemptTime(after(attemptFrequency));
+                validator.validate(entry);
+                result.add(entry);
+              }
+
+              try {
+                persistor.updateBatch(transaction, result);
+              } catch (OptimisticLockException e) {
+                log.debug("Beaten to optimistic lock");
+              } catch (Exception e) {
+                Utils.uncheckAndThrow(e);
+              }
+
+              return result;
+            });
+    
+    log.debug("Got batch of {}", batch.size());
+    if (!batch.isEmpty()) {
+      // Group items by topic
+      Map<String, List<TransactionOutboxEntry>> groupedByTopic = batch.stream()
+          .collect(Collectors.groupingBy(entry -> entry.getTopic() != null ? entry.getTopic() : ""));
+      
+      // Process each topic group in parallel
+      List<CompletableFuture<Void>> futures = new ArrayList<>();
+      groupedByTopic.forEach((topic, entries) -> {
+        log.debug("Submitting {} entries for topic {}", entries.size(), topic);
+        futures.add(CompletableFuture.runAsync(() -> processBatchNow(entries), executor));
+      });
+      
+      // Wait for all batches to complete
+      if (!futures.isEmpty()) {
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+      }
+      
+      log.debug("Processed all batch groups");
+    }
+    return !batch.isEmpty();
+  }
+
   @Override
   public boolean flush(Executor executor) {
     if (!initialized.get()) {
@@ -134,14 +187,28 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
         CompletableFuture.runAsync(() -> expireIdempotencyProtection(now), executor)
             .thenApply(it -> false));
 
-    futures.add(
-        CompletableFuture.supplyAsync(
-            () -> {
-              log.debug("Flushing topics");
-              return doFlush(
-                  tx -> uncheckedly(() -> persistor.selectNextInTopics(tx, flushBatchSize, now)));
-            },
-            executor));
+    if (enableOrderedBatchProcessing) {
+      futures.add(
+          CompletableFuture.supplyAsync(
+              () -> {
+                log.debug("Flushing topics in batches");
+                return doBatchFlush(
+                    tx ->
+                        uncheckedly(
+                            () -> persistor.selectNextBatchInTopics(tx, flushBatchSize, now)),
+                    executor);
+              },
+              executor));
+    } else {
+      futures.add(
+          CompletableFuture.supplyAsync(
+              () -> {
+                log.debug("Flushing topics without batching");
+                return doFlush(
+                    tx -> uncheckedly(() -> persistor.selectNextInTopics(tx, flushBatchSize, now)));
+              },
+              executor));
+    }
 
     return futures.stream()
         .reduce((f1, f2) -> f1.thenCombine(f2, (d1, d2) -> d1 || d2))
@@ -338,6 +405,58 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
+  @Override
+  public void processBatchNow(List<TransactionOutboxEntry> entries) {
+    if (entries == null || entries.isEmpty()) {
+      return;
+    }
+    initialize();
+    try {
+      transactionManager.inTransactionThrows(tx -> {
+        // 1. Lock all entries in a batch
+        if (!persistor.lockBatch(tx, entries)) {
+          log.debug("Could not lock all entries in batch, skipping processing.");
+          return;
+        }
+        // 2. Process each entry
+        try {
+          for (TransactionOutboxEntry entry : entries) {
+            log.info("Processing item in batch: {}", entry.description());
+            invoke(entry, tx);
+            log.info("Processed item in batch: {}", entry.description());
+            entry.setProcessed(true);
+            entry.setLastAttemptTime(Instant.now(clockProvider.get()));
+            entry.setNextAttemptTime(after(retentionThreshold));
+          }
+          // 3. Batch update all processed entries
+          persistor.updateBatch(tx, entries);
+          for (TransactionOutboxEntry entry : entries) {
+            listener.success(entry);
+          }
+        } catch (InvocationTargetException e) {
+          handleBatchInvocationException(entries, tx, e.getCause());
+        } catch (Exception e) {
+          handleBatchInvocationException(entries, tx, e);
+        }
+      });
+    } catch (Exception e) {
+      log.warn("Failed to process batch", e);
+    }
+  }
+
+  private void handleBatchInvocationException(List<TransactionOutboxEntry> entries, Transaction tx, Throwable e) {
+    log.warn("Failed to process batch, updating attempt count and notifying listeners. Error: {}", e.getMessage());
+    try {
+      updateAttemptCountForBatch(entries);
+      persistor.updateBatch(tx, entries);
+    } catch (Exception ex) {
+      log.error("Failed to update attempt count for batch. Entries may be retried more times than expected.", ex);
+    }
+
+    notifyListenersOfBatchFailure(entries, e);
+    throw (RuntimeException) Utils.uncheckAndThrow(e);  // to rollback the transaction
+  }
+
   private void invoke(TransactionOutboxEntry entry, Transaction transaction)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     Object instance = instantiator.getInstance(entry.getInvocation().getClassName());
@@ -420,6 +539,44 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
+  private void updateAttemptCountForBatch(List<TransactionOutboxEntry> entries) {
+    for (TransactionOutboxEntry entry : entries) {
+      entry.setAttempts(entry.getAttempts() + 1);
+      entry.setBlocked(isEntryBlocked(entry));
+    }
+  }
+
+  private void notifyListenersOfBatchFailure(List<TransactionOutboxEntry> entries, Throwable cause) {
+    for (TransactionOutboxEntry entry : entries) {
+        try {
+            listener.failure(entry, cause);
+            if (isEntryBlocked(entry)) {
+              log.error(
+                      "Blocking failing entry {} after {} attempts: {}",
+                      entry.getId(),
+                      entry.getAttempts(),
+                      entry.description(),
+                      cause);
+              listener.blocked(entry, cause);
+            } else {
+              logAtLevel(
+                      log,
+                      logLevelTemporaryFailure,
+                      "Temporarily failed to process entry {} : {}",
+                      entry.getId(),
+                      entry.description(),
+                      cause);
+            }
+        } catch (Exception e) {
+            log.error("Failed to notify listener of failure for {}", entry.description(), e);
+        }
+    }
+  }
+
+  private boolean isEntryBlocked(TransactionOutboxEntry entry) {
+    return entry.getTopic() == null && entry.getAttempts() >= blockAfterAttempts;
+  }
+
   @ToString
   static class TransactionOutboxBuilderImpl extends TransactionOutboxBuilder {
 
@@ -443,7 +600,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
               Utils.firstNonNull(listener, () -> TransactionOutboxListener.EMPTY),
               serializeMdc == null || serializeMdc,
               validator,
-              retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold);
+              retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold,
+              enableOrderedBatchProcessing != null && enableOrderedBatchProcessing);
       validator.validate(impl);
       if (initializeImmediately == null || initializeImmediately) {
         impl.initialize();
