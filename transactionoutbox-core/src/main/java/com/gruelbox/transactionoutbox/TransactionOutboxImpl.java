@@ -150,33 +150,17 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   }
 
   @Override
-  public boolean flushTopic(Executor executor, String topicName) {
+  public boolean flushTopics(Executor executor, List<String> topicNames) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
     Instant now = clockProvider.get().instant();
-    List<CompletableFuture<Boolean>> futures = new ArrayList<>();
-    futures.add(
-        CompletableFuture.runAsync(() -> expireIdempotencyProtection(now), executor)
-            .thenApply(it -> false));
 
-    futures.add(
-        CompletableFuture.supplyAsync(
-            () -> {
-              log.debug("Flushing selected topic {}", topicName);
-              return doFlush(
-                  tx ->
-                      uncheckedly(
-                          () ->
-                              persistor.selectNextInSelectedTopics(
-                                  tx, List.of(topicName), flushBatchSize, now)));
-            },
-            executor));
-
-    return futures.stream()
-        .reduce((f1, f2) -> f1.thenCombine(f2, (d1, d2) -> d1 || d2))
-        .map(CompletableFuture::join)
-        .orElse(false);
+    log.debug("Flushing selected topics {}", topicNames);
+    return doFlush(
+        tx ->
+            uncheckedly(
+                () -> persistor.selectNextInSelectedTopics(tx, topicNames, flushBatchSize, now)));
   }
 
   private void expireIdempotencyProtection(Instant now) {

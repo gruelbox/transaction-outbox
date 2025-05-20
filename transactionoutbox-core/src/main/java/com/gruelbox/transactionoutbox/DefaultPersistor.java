@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -342,21 +343,23 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Override
   public Collection<TransactionOutboxEntry> selectNextInSelectedTopics(
       Transaction tx, List<String> topicNames, int batchSize, Instant now) throws Exception {
+
+    var topicsInParameterList = topicNames.stream().map(it -> "?").collect(Collectors.joining(","));
     var sql =
         dialect
             .getFetchNextInSelectedTopics()
             .replace("{{table}}", tableName)
-            .replace(
-                "{{topicNames}}",
-                topicNames.stream()
-                    .map(it -> "'%s'".replace("%s", it))
-                    .reduce((a, b) -> a.concat(",").concat(b))
-                    .orElse("''"))
+            .replace("{{topicNames}}", topicsInParameterList)
             .replace("{{batchSize}}", Integer.toString(batchSize))
             .replace("{{allFields}}", ALL_FIELDS);
     //noinspection resource
     try (PreparedStatement stmt = tx.connection().prepareStatement(sql)) {
-      stmt.setTimestamp(1, Timestamp.from(now));
+      var counter = 1;
+      for (var topicName : topicNames) {
+        stmt.setString(counter, topicName);
+        counter++;
+      }
+      stmt.setTimestamp(counter, Timestamp.from(now));
       var results = new ArrayList<TransactionOutboxEntry>();
       gatherResults(stmt, results);
       return results;

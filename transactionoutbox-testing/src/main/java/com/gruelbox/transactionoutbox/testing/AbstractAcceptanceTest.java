@@ -505,57 +505,59 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
   final void flushOnlyASpecifiedTopic() throws Exception {
     TransactionManager transactionManager = txManager();
     CountDownLatch successLatch = new CountDownLatch(1);
-    AtomicInteger attempts = new AtomicInteger(-1);
     var processedEntryListener = new ProcessedEntryListener(successLatch);
     TransactionOutbox outbox =
         TransactionOutbox.builder()
             .transactionManager(transactionManager)
             .persistor(Persistor.forDialect(connectionDetails().dialect()))
-            .instantiator(new FailingInstantiator(attempts))
+            .instantiator(
+                Instantiator.using(
+                    clazz ->
+                        (InterfaceProcessor)
+                            (foo, bar) ->
+                                LOGGER.info(
+                                    "Entered the method to process successfully. Processing ({}, {})",
+                                    foo,
+                                    bar)))
             .submitter(Submitter.withExecutor(singleThreadPool))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(processedEntryListener)
-            .blockAfterAttempts(5)
             .build();
 
     clearOutbox();
 
     var selectedTopic = "SELECTED_TOPIC";
-    withRunningFlusher(
-        outbox,
+    transactionManager.inTransaction(
         () -> {
-          transactionManager.inTransaction(
-              () -> {
-                outbox.with().schedule(InterfaceProcessor.class).process(2, "Whee");
-                outbox
-                    .with()
-                    .ordered(selectedTopic)
-                    .schedule(InterfaceProcessor.class)
-                    .process(3, "Whoo");
-                outbox
-                    .with()
-                    .ordered("IGNORED_TOPIC")
-                    .schedule(InterfaceProcessor.class)
-                    .process(2, "Wheeeee");
-              });
+          outbox
+              .with()
+              .ordered(selectedTopic)
+              .schedule(InterfaceProcessor.class)
+              .process(1, "Whoo");
+          outbox
+              .with()
+              .ordered("IGNORED_TOPIC")
+              .schedule(InterfaceProcessor.class)
+              .process(2, "Wheeeee");
+        });
+    assertFalse(
+        successLatch.await(5, SECONDS),
+        "At this point, nothing should have been picked up for processing");
 
-          assertTrue(successLatch.await(20, SECONDS), "Timeout waiting for success");
-          var successes = processedEntryListener.getSuccessfulEntries();
-          var failures = processedEntryListener.getFailingEntries();
+    outbox.flushTopics(singleThreadPool, selectedTopic);
 
-          // then we only expect the selected topic we're flushing to have had eventually succeeded
-          // as the other work would not have been picked up for a retry
-          assertEquals(1, successes.stream().map(TransactionOutboxEntry::getId).distinct().count());
+    assertTrue(successLatch.await(5, SECONDS), "Should have successfully processed something");
 
-          // a single failure is expected; from the unordered submission (as these run automatically
-          assertEquals(1, failures.stream().filter(it -> it.getTopic() == null).count());
+    var successes = processedEntryListener.getSuccessfulEntries();
+    var failures = processedEntryListener.getFailingEntries();
 
-          // all other failures accounted for belong to the selected topic
-          assertEquals(
-              2, failures.stream().filter(it -> selectedTopic.equals(it.getTopic())).count());
-        },
-        singleThreadPool,
-        selectedTopic);
+    // then we only expect the selected topic we're flushing to have had eventually succeeded
+    // as the other work would not have been picked up for a retry
+    assertEquals(1, successes.stream().map(TransactionOutboxEntry::getTopic).distinct().count());
+    assertEquals(selectedTopic, successes.get(0).getTopic());
+
+    // no failures expected
+    assertEquals(0, failures.size());
   }
 
   @Test

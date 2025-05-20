@@ -94,7 +94,7 @@ public abstract class BaseTest {
                   log.info("Starting flush...");
                   while (topicName == null
                       ? outbox.flush(executor)
-                      : outbox.flushTopic(executor, topicName)) {
+                      : outbox.flushTopics(executor, topicName)) {
                     log.info("More work to do...");
                   }
                   log.info("Done!");
