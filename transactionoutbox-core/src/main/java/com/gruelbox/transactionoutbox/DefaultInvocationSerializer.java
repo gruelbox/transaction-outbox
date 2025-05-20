@@ -104,6 +104,24 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
     }
   }
 
+//  @Override
+//  public void serializeRetryOptions(NextRetryStrategy.Options retryOptions, Writer writer) {
+//    try {
+//      gson.toJson(retryOptions, writer);
+//    } catch (Exception e) {
+//      throw new IllegalArgumentException("Cannot serialize " + retryOptions, e);
+//    }
+//  }
+//
+//  @Override
+//  public Invocation deserializeInvocation(Reader reader) throws IOException {
+//    try {
+//      return gson.fromJson(reader, Invocation.class);
+//    } catch (JsonIOException | JsonSyntaxException exception) {
+//      throw new IOException(exception);
+//    }
+//  }
+
   private static final class InvocationJsonSerializer
       implements JsonSerializer<Invocation>, JsonDeserializer<Invocation> {
 

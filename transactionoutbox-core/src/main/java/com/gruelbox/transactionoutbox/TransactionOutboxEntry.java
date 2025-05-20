@@ -56,6 +56,12 @@ public class TransactionOutboxEntry implements Validatable {
   @Setter(AccessLevel.PACKAGE)
   private Invocation invocation;
 
+
+  @Getter
+  @Setter(AccessLevel.PACKAGE)
+  private NextRetryStrategy.Options retryOptions;
+
+
   /**
    * @param lastAttemptTime The timestamp at which the task was last processed.
    * @return The timestamp at which the task was last processed.

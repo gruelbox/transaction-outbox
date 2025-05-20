@@ -3,7 +3,6 @@ package com.gruelbox.transactionoutbox;
 import static com.gruelbox.transactionoutbox.spi.Utils.logAtLevel;
 import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 import static java.time.temporal.ChronoUnit.MILLIS;
-import static java.time.temporal.ChronoUnit.MINUTES;
 
 import com.gruelbox.transactionoutbox.spi.ProxyFactory;
 import com.gruelbox.transactionoutbox.spi.Utils;
@@ -36,7 +35,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private final Persistor persistor;
   private final Instantiator instantiator;
   private final Submitter submitter;
-  private final Duration attemptFrequency;
+  private final NextRetryStrategy.Options retryOptions;
   private final Level logLevelTemporaryFailure;
   private final int blockAfterAttempts;
   private final int flushBatchSize;
@@ -55,7 +54,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     validator.valid("persistor", persistor);
     validator.valid("instantiator", instantiator);
     validator.valid("submitter", submitter);
-    validator.notNull("attemptFrequency", attemptFrequency);
+    validator.notNull("retryOptions", retryOptions);
     validator.notNull("logLevelTemporaryFailure", logLevelTemporaryFailure);
     validator.min("blockAfterAttempts", blockAfterAttempts, 1);
     validator.min("flushBatchSize", flushBatchSize, 1);
@@ -82,7 +81,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @Override
   public <T> T schedule(Class<T> clazz) {
-    return schedule(clazz, null, null, null);
+    return schedule(clazz, null, null, null, null);
   }
 
   @Override
@@ -233,7 +232,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   }
 
   private <T> T schedule(
-      Class<T> clazz, String uniqueRequestId, String topic, Duration delayForAtLeast) {
+      Class<T> clazz, String uniqueRequestId, String topic, Duration delayForAtLeast, NextRetryStrategy.Options retryOptions) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
@@ -267,7 +266,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                               submitNow(entry);
                               log.debug(
                                   "Scheduled {} for post-commit execution", entry.description());
-                            } else if (delayForAtLeast.compareTo(attemptFrequency) < 0) {
+                            } else if (delayForAtLeast.compareTo(getNextAttemptDelayFrom(entry)) < 0) {
                               scheduler.schedule(
                                   () -> submitNow(entry),
                                   delayForAtLeast.toMillis(),
@@ -373,8 +372,9 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private void pushBack(Transaction transaction, TransactionOutboxEntry entry)
       throws OptimisticLockException {
     try {
+      var nextAttemptDelay = getNextAttemptDelayFrom(entry);
       entry.setLastAttemptTime(clockProvider.get().instant());
-      entry.setNextAttemptTime(after(attemptFrequency));
+      entry.setNextAttemptTime(after(nextAttemptDelay));
       validator.validate(entry);
       persistor.update(transaction, entry);
     } catch (OptimisticLockException e) {
@@ -382,6 +382,18 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     } catch (Exception e) {
       Utils.uncheckAndThrow(e);
     }
+  }
+
+  @SuppressWarnings("rawtypes,unchecked")
+  private Duration getNextAttemptDelayFrom(TransactionOutboxEntry entry) {
+    NextRetryStrategy.Options options = Utils.firstNonNull(entry.getRetryOptions(),() -> this.retryOptions);
+    NextRetryStrategy retryStrategy;
+    if(options instanceof DefaultRetryOptions){
+      retryStrategy = new DefaultRetryStrategy();
+    } else {
+      retryStrategy = (NextRetryStrategy) instantiator.getInstance(options.strategyClassName());
+    }
+    return retryStrategy.nextAttemptDelay(options, entry);
   }
 
   private Instant after(Duration duration) {
@@ -429,13 +441,18 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
     public TransactionOutboxImpl build() {
       Validator validator = new Validator(this.clockProvider);
+      NextRetryStrategy.Options retryOptions = this.retryOptions;
+      if(retryOptions == null){
+          retryOptions = new DefaultRetryOptions(Utils.firstNonNull(attemptFrequency, () -> Duration.ofMinutes(2)));
+      }
+
       TransactionOutboxImpl impl =
           new TransactionOutboxImpl(
               transactionManager,
               persistor,
               Utils.firstNonNull(instantiator, Instantiator::usingReflection),
               Utils.firstNonNull(submitter, Submitter::withDefaultExecutor),
-              Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES)),
+              retryOptions,
               Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN),
               blockAfterAttempts < 1 ? 5 : blockAfterAttempts,
               flushBatchSize < 1 ? 4096 : flushBatchSize,
@@ -459,13 +476,14 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     private String uniqueRequestId;
     private String ordered;
     private Duration delayForAtLeast;
+    private NextRetryStrategy.Options retryOptions;
 
     @Override
     public <T> T schedule(Class<T> clazz) {
       if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
         throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
       }
-      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered, delayForAtLeast);
+      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered, delayForAtLeast, retryOptions);
     }
   }
 }

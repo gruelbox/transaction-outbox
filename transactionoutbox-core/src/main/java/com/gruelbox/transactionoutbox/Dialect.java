@@ -140,6 +140,7 @@ public interface Dialect {
           .changeMigration(
               11,
               "CREATE TABLE TXNO_SEQUENCE (topic VARCHAR(250) NOT NULL, seq NUMBER NOT NULL, CONSTRAINT PK_TXNO_SEQUENCE PRIMARY KEY (topic, seq))")
+          .changeMigration(14, "ALTER TABLE TXNO_OUTBOX ADD retryOptions CLOB NULL")
           .booleanValueFrom(v -> v ? "1" : "0")
           .createVersionTableBy(
               connection -> {
@@ -216,6 +217,9 @@ public interface Dialect {
               11,
               "CREATE TABLE TXNO_SEQUENCE (topic VARCHAR(250) NOT NULL, seq INT NOT NULL, CONSTRAINT "
                   + "PK_TXNO_SEQUENCE PRIMARY KEY (topic, seq))")
+          .changeMigration(
+              14,
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN retryOptions NVARCHAR(MAX) NULL")
           .createVersionTableBy(
               connection -> {
                 try (Statement s = connection.createStatement()) {

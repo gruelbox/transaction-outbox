@@ -166,6 +166,7 @@ public interface TransactionOutbox {
     protected TransactionManager transactionManager;
     protected Instantiator instantiator;
     protected Submitter submitter;
+    protected NextRetryStrategy.Options retryOptions;
     protected Duration attemptFrequency;
     protected int blockAfterAttempts;
     protected int flushBatchSize;
@@ -210,6 +211,11 @@ public interface TransactionOutbox {
      */
     public TransactionOutboxBuilder submitter(Submitter submitter) {
       this.submitter = submitter;
+      return this;
+    }
+
+    public TransactionOutboxBuilder retryOptions(NextRetryStrategy.Options options) {
+      this.retryOptions = options;
       return this;
     }
 
@@ -347,6 +353,12 @@ public interface TransactionOutbox {
      * @return Builder.
      */
     ParameterizedScheduleBuilder uniqueRequestId(String uniqueRequestId);
+
+    ParameterizedScheduleBuilder retryOptions(NextRetryStrategy.Options options);
+
+    default ParameterizedScheduleBuilder attemptFrequency(Duration attemptFrequency){
+      return retryOptions(DefaultRetryOptions.withFrequency(attemptFrequency));
+    }
 
     /**
      * Specifies that the request should be applied in a strictly-ordered fashion within the

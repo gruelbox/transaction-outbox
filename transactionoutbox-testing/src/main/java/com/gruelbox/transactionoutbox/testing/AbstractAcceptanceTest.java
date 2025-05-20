@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox.testing;
 
+import static com.gruelbox.transactionoutbox.testing.ExponentialBackOffOptions.exponential;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
@@ -499,6 +500,17 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
           assertTrue(latch.await(15, SECONDS));
         },
         singleThreadPool);
+//
+//      withRunningFlusher(
+//          outbox,
+//          () -> {
+//              transactionManager.inTransaction(
+//                  () -> outbox.with()
+//                      .retryOptions(exponential(1,2))
+//                      .schedule(InterfaceProcessor.class).process(3, "Whee"));
+//              assertTrue(latch.await(15, SECONDS));
+//          },
+//          singleThreadPool);
   }
 
   @Test
