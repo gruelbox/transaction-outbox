@@ -79,6 +79,12 @@ public abstract class BaseTest {
 
   protected void withRunningFlusher(
       TransactionOutbox outbox, ThrowingRunnable runnable, Executor executor) throws Exception {
+    withRunningFlusher(outbox, runnable, executor, null);
+  }
+
+  protected void withRunningFlusher(
+      TransactionOutbox outbox, ThrowingRunnable runnable, Executor executor, String topicName)
+      throws Exception {
     Thread backgroundThread =
         new Thread(
             () -> {
@@ -86,7 +92,9 @@ public abstract class BaseTest {
                 try {
                   // Keep flushing work until there's nothing left to flush
                   log.info("Starting flush...");
-                  while (outbox.flush(executor)) {
+                  while (topicName == null
+                      ? outbox.flush(executor)
+                      : outbox.flushTopics(executor, topicName)) {
                     log.info("More work to do...");
                   }
                   log.info("Done!");

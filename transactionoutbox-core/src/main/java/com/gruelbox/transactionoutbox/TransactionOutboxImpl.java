@@ -149,6 +149,20 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
         .orElse(false);
   }
 
+  @Override
+  public boolean flushTopics(Executor executor, List<String> topicNames) {
+    if (!initialized.get()) {
+      throw new IllegalStateException("Not initialized");
+    }
+    Instant now = clockProvider.get().instant();
+
+    log.debug("Flushing selected topics {}", topicNames);
+    return doFlush(
+        tx ->
+            uncheckedly(
+                () -> persistor.selectNextInSelectedTopics(tx, topicNames, flushBatchSize, now)));
+  }
+
   private void expireIdempotencyProtection(Instant now) {
     long totalRecordsDeleted = 0;
     int recordsDeleted;

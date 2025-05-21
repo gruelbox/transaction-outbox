@@ -2,6 +2,8 @@ package com.gruelbox.transactionoutbox;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import lombok.ToString;
@@ -101,6 +103,28 @@ public interface TransactionOutbox {
    * @return true if any work was flushed.
    */
   boolean flush(Executor executor);
+
+  /**
+   * Flushes a specific topic (or set of topics)
+   *
+   * @param executor to be used for parallelising work (note that the method overall is blocking and
+   *     this is solely ued for fork-join semantics).
+   * @param topicNames the list of specific topics to flush
+   * @return true if any work was flushed
+   */
+  default boolean flushTopics(Executor executor, String... topicNames) {
+    return flushTopics(executor, Arrays.asList(topicNames));
+  }
+
+  /**
+   * Flushes a specific topic (or set of topics)
+   *
+   * @param executor to be used for parallelising work (note that the method overall is blocking and
+   *     this is solely ued for fork-join semantics).
+   * @param topicNames the list of specific topics to flush
+   * @return true if any work was flushed
+   */
+  boolean flushTopics(Executor executor, List<String> topicNames);
 
   /**
    * Unblocks a blocked entry and resets the attempt count so that it will be retried again.

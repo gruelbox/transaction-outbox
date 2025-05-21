@@ -28,6 +28,7 @@ class DefaultDialect implements Dialect {
   @Getter private final String lock;
   @Getter private final String checkSql;
   @Getter private final String fetchNextInAllTopics;
+  @Getter private final String fetchNextInSelectedTopics;
   @Getter private final String fetchCurrentVersion;
   @Getter private final String fetchNextSequence;
   private final Collection<Migration> migrations;
@@ -75,6 +76,12 @@ class DefaultDialect implements Dialect {
     private String fetchNextInAllTopics =
         "SELECT {{allFields}} FROM {{table}} a"
             + " WHERE processed = false AND topic <> '*' AND nextAttemptTime < ?"
+            + " AND seq = ("
+            + "SELECT MIN(seq) FROM {{table}} b WHERE b.topic=a.topic AND b.processed = false"
+            + ") LIMIT {{batchSize}}";
+    private String fetchNextInSelectedTopics =
+        "SELECT {{allFields}} FROM {{table}} a"
+            + " WHERE processed = false AND topic IN ({{topicNames}}) AND nextAttemptTime < ?"
             + " AND seq = ("
             + "SELECT MIN(seq) FROM {{table}} b WHERE b.topic=a.topic AND b.processed = false"
             + ") LIMIT {{batchSize}}";
@@ -183,6 +190,7 @@ class DefaultDialect implements Dialect {
           lock,
           checkSql,
           fetchNextInAllTopics,
+          fetchNextInSelectedTopics,
           fetchCurrentVersion,
           fetchNextSequence,
           migrations.values()) {
