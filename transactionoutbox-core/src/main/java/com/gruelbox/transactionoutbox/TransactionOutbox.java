@@ -356,7 +356,7 @@ public interface TransactionOutbox {
 
     ParameterizedScheduleBuilder retryOptions(NextRetryStrategy.Options options);
 
-    default ParameterizedScheduleBuilder attemptFrequency(Duration attemptFrequency){
+    default ParameterizedScheduleBuilder attemptFrequency(Duration attemptFrequency) {
       return retryOptions(DefaultRetryOptions.withFrequency(attemptFrequency));
     }
 

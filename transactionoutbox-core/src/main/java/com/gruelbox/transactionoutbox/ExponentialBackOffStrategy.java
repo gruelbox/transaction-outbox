@@ -4,9 +4,11 @@ import java.time.Duration;
 
 public class ExponentialBackOffStrategy implements NextRetryStrategy<ExponentialBackOffOptions> {
 
-    @Override
-    public Duration nextAttemptDelay(ExponentialBackOffOptions parameters, TransactionOutboxEntry entry) {
-
-        return null;
-    }
+  @Override
+  public Duration nextAttemptDelay(
+      ExponentialBackOffOptions parameters, TransactionOutboxEntry entry) {
+    return parameters
+        .getAttemptFrequency()
+        .multipliedBy(parameters.getBackOff() ^ entry.getAttempts());
+  }
 }

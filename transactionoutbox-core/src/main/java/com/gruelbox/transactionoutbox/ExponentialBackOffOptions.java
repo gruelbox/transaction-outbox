@@ -1,22 +1,23 @@
 package com.gruelbox.transactionoutbox;
 
+import java.time.Duration;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.Value;
 
+@Value
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class ExponentialBackOffOptions implements NextRetryStrategy.Options {
 
-    private final int attemptFrequency;
-    private  final int backOff;
+  Duration attemptFrequency;
+  int backOff;
 
-    private ExponentialBackOffOptions(int attemptFrequency, int backOff) {
-        this.attemptFrequency = attemptFrequency;
-        this.backOff = backOff;
-    }
+  public static ExponentialBackOffOptions exponential(Duration attemptFrequency, int backOff) {
+    return new ExponentialBackOffOptions(attemptFrequency, backOff);
+  }
 
-    public static ExponentialBackOffOptions exponential(int attemptFrequency, int backOff){
-        return new ExponentialBackOffOptions(attemptFrequency, backOff);
-    }
-
-    @Override
-    public String strategyClassName() {
-        return com.gruelbox.transactionoutbox.testing.ExponentialBackOffStrategy.class.getName();
-    }
+  @Override
+  public String strategyClassName() {
+    return ExponentialBackOffStrategy.class.getName();
+  }
 }

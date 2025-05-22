@@ -111,8 +111,8 @@ public class DefaultPersistor implements Persistor, Validatable {
     var invocationWriter = new StringWriter();
     serializer.serializeInvocation(entry.getInvocation(), invocationWriter);
     StringWriter retryWriter = null;
-    if(entry.getRetryOptions() != null) {
-      retryWriter  = new StringWriter();
+    if (entry.getRetryOptions() != null) {
+      retryWriter = new StringWriter();
       serializer.serializeRetryOptions(entry.getRetryOptions(), retryWriter);
     }
     if (entry.getTopic() != null) {
@@ -198,7 +198,7 @@ public class DefaultPersistor implements Persistor, Validatable {
     stmt.setBoolean(9, entry.isBlocked());
     stmt.setBoolean(10, entry.isProcessed());
     stmt.setInt(11, entry.getVersion());
-    if(retryWriter == null){
+    if (retryWriter == null) {
       stmt.setNull(12, Types.VARCHAR);
     } else {
       stmt.setString(12, retryWriter.toString());
@@ -412,7 +412,7 @@ public class DefaultPersistor implements Persistor, Validatable {
       }
       var retryOptionsString = rs.getString("retryOptions");
       NextRetryStrategy.Options options = null;
-      if(retryOptionsString != null){
+      if (retryOptionsString != null) {
         options = serializer.deserializeRetryOptions(new StringReader(retryOptionsString));
       }
       TransactionOutboxEntry entry =

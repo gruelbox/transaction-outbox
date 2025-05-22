@@ -232,7 +232,11 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   }
 
   private <T> T schedule(
-      Class<T> clazz, String uniqueRequestId, String topic, Duration delayForAtLeast, NextRetryStrategy.Options retryOptions) {
+      Class<T> clazz,
+      String uniqueRequestId,
+      String topic,
+      Duration delayForAtLeast,
+      NextRetryStrategy.Options retryOptions) {
     if (!initialized.get()) {
       throw new IllegalStateException("Not initialized");
     }
@@ -249,6 +253,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                           extracted.getParameters(),
                           extracted.getArgs(),
                           uniqueRequestId,
+                          retryOptions,
                           topic);
                   if (delayForAtLeast != null) {
                     entry.setNextAttemptTime(entry.getNextAttemptTime().plus(delayForAtLeast));
@@ -266,7 +271,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                               submitNow(entry);
                               log.debug(
                                   "Scheduled {} for post-commit execution", entry.description());
-                            } else if (delayForAtLeast.compareTo(getNextAttemptDelayFrom(entry)) < 0) {
+                            } else if (delayForAtLeast.compareTo(getNextAttemptDelayFrom(entry))
+                                < 0) {
                               scheduler.schedule(
                                   () -> submitNow(entry),
                                   delayForAtLeast.toMillis(),
@@ -352,6 +358,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       Class<?>[] params,
       Object[] args,
       String uniqueRequestId,
+      NextRetryStrategy.Options retryOptions,
       String topic) {
     return TransactionOutboxEntry.builder()
         .id(UUID.randomUUID().toString())
@@ -362,6 +369,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                 params,
                 args,
                 serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null))
+        .retryOptions(retryOptions)
         .lastAttemptTime(null)
         .nextAttemptTime(clockProvider.get().instant())
         .uniqueRequestId(uniqueRequestId)
@@ -386,9 +394,10 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   @SuppressWarnings("rawtypes,unchecked")
   private Duration getNextAttemptDelayFrom(TransactionOutboxEntry entry) {
-    NextRetryStrategy.Options options = Utils.firstNonNull(entry.getRetryOptions(),() -> this.retryOptions);
+    NextRetryStrategy.Options options =
+        Utils.firstNonNull(entry.getRetryOptions(), () -> this.retryOptions);
     NextRetryStrategy retryStrategy;
-    if(options instanceof DefaultRetryOptions){
+    if (options instanceof DefaultRetryOptions) {
       retryStrategy = new DefaultRetryStrategy();
     } else {
       retryStrategy = (NextRetryStrategy) instantiator.getInstance(options.strategyClassName());
@@ -442,8 +451,10 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     public TransactionOutboxImpl build() {
       Validator validator = new Validator(this.clockProvider);
       NextRetryStrategy.Options retryOptions = this.retryOptions;
-      if(retryOptions == null){
-          retryOptions = new DefaultRetryOptions(Utils.firstNonNull(attemptFrequency, () -> Duration.ofMinutes(2)));
+      if (retryOptions == null) {
+        retryOptions =
+            DefaultRetryOptions.withFrequency(
+                Utils.firstNonNull(attemptFrequency, () -> Duration.ofMinutes(2)));
       }
 
       TransactionOutboxImpl impl =
@@ -483,7 +494,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       if (uniqueRequestId != null && uniqueRequestId.length() > 250) {
         throw new IllegalArgumentException("uniqueRequestId may be up to 250 characters");
       }
-      return TransactionOutboxImpl.this.schedule(clazz, uniqueRequestId, ordered, delayForAtLeast, retryOptions);
+      return TransactionOutboxImpl.this.schedule(
+          clazz, uniqueRequestId, ordered, delayForAtLeast, retryOptions);
     }
   }
 }

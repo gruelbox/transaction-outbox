@@ -19,7 +19,7 @@ import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-//TODO - test serialisation for jackson
+// TODO - test serialisation for jackson
 @SuppressWarnings("RedundantCast")
 class TestJacksonInvocationSerializer {
 

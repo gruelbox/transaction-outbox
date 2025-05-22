@@ -10,15 +10,14 @@ import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import lombok.Getter;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-
-//TODO; add tests.
-//confirm default options work as expected (can serialise/ deserialise)
-//also a custom impl.
-
+// TODO; add tests.
+// confirm default options work as expected (can serialise/ deserialise)
+// also a custom impl.
 
 @SuppressWarnings("RedundantCast")
 @Slf4j
@@ -222,6 +221,28 @@ abstract class AbstractTestDefaultInvocationSerializer {
         IOException.class, () -> serializer.deserializeInvocation(new StringReader("unparseable")));
   }
 
+  @Test
+  void testRetryOptions() {
+    check(DefaultRetryOptions.withFrequency(Duration.ofSeconds(5)));
+    check(new RandomRetryOptions());
+  }
+
+  void check(NextRetryStrategy.Options options) {
+    var deserialized = serdeser(options);
+    Assertions.assertEquals(options, deserialized);
+  }
+
+  NextRetryStrategy.Options serdeser(NextRetryStrategy.Options options) {
+    try {
+      var writer = new StringWriter();
+      serializer.serializeRetryOptions(options, writer);
+      log.info("Serialised as: {}", writer);
+      return serializer.deserializeRetryOptions(new StringReader(writer.toString()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
   void check(Invocation invocation) {
     Invocation deserialized = serdeser(invocation);
     Assertions.assertEquals(deserialized, serdeser(invocation));
@@ -271,6 +292,17 @@ abstract class AbstractTestDefaultInvocationSerializer {
     @Override
     public int hashCode() {
       return Objects.hash(arg1, arg2);
+    }
+  }
+
+  @Value
+  static class RandomRetryOptions implements NextRetryStrategy.Options {
+    String testing = "here";
+    Map<String, Duration> testMap = new HashMap<>(Map.of("A", Duration.ZERO));
+
+    @Override
+    public String strategyClassName() {
+      return "RANDOM_RETRY_OPT";
     }
   }
 }

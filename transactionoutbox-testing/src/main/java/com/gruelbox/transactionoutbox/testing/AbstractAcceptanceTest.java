@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.testing;
 
-import static com.gruelbox.transactionoutbox.testing.ExponentialBackOffOptions.exponential;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
@@ -22,7 +22,10 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
@@ -500,17 +503,71 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
           assertTrue(latch.await(15, SECONDS));
         },
         singleThreadPool);
-//
-//      withRunningFlusher(
-//          outbox,
-//          () -> {
-//              transactionManager.inTransaction(
-//                  () -> outbox.with()
-//                      .retryOptions(exponential(1,2))
-//                      .schedule(InterfaceProcessor.class).process(3, "Whee"));
-//              assertTrue(latch.await(15, SECONDS));
-//          },
-//          singleThreadPool);
+  }
+
+  @Test
+  final void customDefaultRetryOptionsBehaviour() throws Exception {
+    TransactionManager transactionManager = txManager();
+    CountDownLatch latch = new CountDownLatch(1);
+    AtomicInteger attempts = new AtomicInteger();
+
+    var listener = new ProcessedEntryListener(latch);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .instantiator(Instantiator.usingReflection())
+            .instantiator(
+                RegisteredFuncInstantiator.register(
+                    Map.entry(
+                        DefaultRetryOptions.class,
+                        clazz -> Instantiator.usingReflection().getInstance(clazz.getName())),
+                    Map.entry(
+                        DefaultRetryStrategy.class,
+                        clazz -> Instantiator.usingReflection().getInstance(clazz.getName())),
+                    Map.entry(
+                        InterfaceProcessor.class,
+                        clazz ->
+                            (InterfaceProcessor)
+                                (foo, bar) -> {
+                                  LOGGER.info("Processing ({}, {})", foo, bar);
+                                  if (attempts.incrementAndGet() < foo) {
+                                    throw new RuntimeException("Temporary failure");
+                                  }
+                                  LOGGER.info("Processed ({}, {})", foo, bar);
+                                })))
+            .submitter(Submitter.withExecutor(singleThreadPool))
+            .attemptFrequency(Duration.ofMillis(500)) // the og default
+            .listener(listener)
+            .blockAfterAttempts(10)
+            .build();
+
+    clearOutbox();
+
+    withRunningFlusher(
+        outbox,
+        () -> {
+          transactionManager.inTransaction(
+              () ->
+                  outbox
+                      .with()
+                      .retryOptions(DefaultRetryOptions.withFrequency(Duration.ofSeconds(5)))
+                      .schedule(InterfaceProcessor.class)
+                      .process(5, "Whee"));
+          assertTrue(latch.await(1, MINUTES));
+        },
+        singleThreadPool);
+
+    var failingEntries = listener.getFailingEntries();
+    var nextAttemptAt =
+        failingEntries.stream().map(TransactionOutboxEntry::getLastAttemptTime).collect(toList());
+    var firstNextAttemptTime = nextAttemptAt.get(0);
+    var counter = 1;
+    for (var attempt : nextAttemptAt.stream().skip(1).collect(toList())) {
+      assertTrue(
+          attempt.isAfter(firstNextAttemptTime.plus(Duration.ofSeconds(5).multipliedBy(counter))));
+      counter++;
+    }
   }
 
   @Test
@@ -822,6 +879,41 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
             };
       } else {
         throw new UnsupportedOperationException();
+      }
+    }
+  }
+
+  @AllArgsConstructor
+  private static class RegisteredFuncInstantiator implements Instantiator {
+    Map<Class<?>, Function<Class<?>, Object>> registeredItems;
+
+    @Override
+    public String getName(Class<?> clazz) {
+      return clazz.getName();
+    }
+
+    @Override
+    public Object getInstance(String name) {
+      var clazz = getClass(name);
+      if (!registeredItems.containsKey(clazz)) {
+        throw new UnsupportedOperationException();
+      }
+      var item = registeredItems.get(clazz);
+      return item.apply(clazz);
+    }
+
+    static RegisteredFuncInstantiator register(
+        Map.Entry<Class<?>, Function<Class<?>, Object>>... clazzFns) {
+      Map<Class<?>, Function<Class<?>, Object>> map =
+          Arrays.stream(clazzFns).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+      return new RegisteredFuncInstantiator(map);
+    }
+
+    private Class<?> getClass(String name) {
+      try {
+        return Class.forName(name);
+      } catch (ClassNotFoundException e) {
+        throw new RuntimeException(e);
       }
     }
   }
