@@ -25,5 +25,4 @@
       </properties>
     </profile>
   </profiles>
-  <localRepository>/workspace/.m2</localRepository>
 </settings>
