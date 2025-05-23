@@ -424,12 +424,35 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
             log.info("Processing item in batch: {}", entry.description());
             invoke(entry, tx);
             log.info("Processed item in batch: {}", entry.description());
-            entry.setProcessed(true);
-            entry.setLastAttemptTime(Instant.now(clockProvider.get()));
-            entry.setNextAttemptTime(after(retentionThreshold));
           }
-          // 3. Batch update all processed entries
-          persistor.updateBatch(tx, entries);
+          
+          // 3. Separate entries that should be deleted from those that should be updated
+          List<TransactionOutboxEntry> entriesToUpdate = new ArrayList<>();
+          List<TransactionOutboxEntry> entriesToDelete = new ArrayList<>();
+          
+          for (TransactionOutboxEntry entry : entries) {
+            if (entry.getUniqueRequestId() == null) {
+              entriesToDelete.add(entry);
+            } else {
+              log.debug("Deferring deletion of {} by {}", entry.description(), retentionThreshold);
+              entry.setProcessed(true);
+              entry.setLastAttemptTime(Instant.now(clockProvider.get()));
+              entry.setNextAttemptTime(after(retentionThreshold));
+              entriesToUpdate.add(entry);
+            }
+          }
+          
+          // 4. Batch delete entries without uniqueRequestId
+          if (!entriesToDelete.isEmpty()) {
+            persistor.deleteBatch(tx, entriesToDelete);
+          }
+          
+          // 5. Batch update entries with uniqueRequestId
+          if (!entriesToUpdate.isEmpty()) {
+            persistor.updateBatch(tx, entriesToUpdate);
+          }
+          
+          // 6. Notify listeners about success
           for (TransactionOutboxEntry entry : entries) {
             listener.success(entry);
           }

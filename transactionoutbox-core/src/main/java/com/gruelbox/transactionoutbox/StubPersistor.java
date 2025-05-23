@@ -83,7 +83,12 @@ public class StubPersistor implements Persistor {
   public void clear(Transaction tx) {}
 
   @Override
-  public boolean checkConnection(Transaction tx) {
+  public void deleteBatch(Transaction tx, List<TransactionOutboxEntry> entries) throws Exception {
+    // No-op
+  }
+
+  @Override
+  public boolean checkConnection(Transaction tx) throws Exception {
     return true;
   }
 }

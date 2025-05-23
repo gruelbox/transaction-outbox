@@ -221,6 +221,33 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   @Override
+  public void deleteBatch(Transaction tx, List<TransactionOutboxEntry> entries) throws Exception {
+    if (entries == null || entries.isEmpty()) {
+      return;
+    }
+    
+    try (PreparedStatement stmt =
+        tx.connection().prepareStatement(dialect.getDelete().replace("{{table}}", tableName))) {
+      
+      for (TransactionOutboxEntry entry : entries) {
+        stmt.setString(1, entry.getId());
+        stmt.setInt(2, entry.getVersion());
+        stmt.addBatch();
+      }
+      
+      int[] results = stmt.executeBatch();
+      
+      for (int i = 0; i < results.length; i++) {
+        if (results[i] != 1) {
+          throw new OptimisticLockException();
+        }
+        log.debug("Batch deleted {}", entries.get(i).description());
+      }
+      log.debug("Batch deleted {} entries", results.length);
+    }
+  }
+
+  @Override
   public void update(Transaction tx, TransactionOutboxEntry entry) throws Exception {
     //noinspection resource
     try (PreparedStatement stmt =

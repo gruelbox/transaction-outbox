@@ -57,6 +57,20 @@ public interface Persistor {
   void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
   /**
+   * Deletes a batch of {@link TransactionOutboxEntry}s.
+   *
+   * <p>Records should only be deleted if <em>both</em> the {@code id} and {@code version} on the
+   * database match those on the objects. If any record is not found, {@link OptimisticLockException}
+   * should be thrown.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param entries The entries to be deleted.
+   * @throws OptimisticLockException If any record with matching id and version is not found.
+   * @throws Exception Any other exception.
+   */
+  void deleteBatch(Transaction tx, List<TransactionOutboxEntry> entries) throws Exception;
+
+  /**
    * Modifies an existing {@link TransactionOutboxEntry}. Performs an optimistic lock check on any
    * existing record via a compare-and-swap operation and throws {@link OptimisticLockException} if
    * the lock is failed. {@link TransactionOutboxEntry#setVersion(int)} is called before returning
