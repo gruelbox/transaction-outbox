@@ -60,8 +60,8 @@ public interface Persistor {
    * Deletes a batch of {@link TransactionOutboxEntry}s.
    *
    * <p>Records should only be deleted if <em>both</em> the {@code id} and {@code version} on the
-   * database match those on the objects. If any record is not found, {@link OptimisticLockException}
-   * should be thrown.
+   * database match those on the objects. If any record is not found, {@link
+   * OptimisticLockException} should be thrown.
    *
    * @param tx The current {@link Transaction}.
    * @param entries The entries to be deleted.
@@ -108,8 +108,8 @@ public interface Persistor {
   boolean lock(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
   /**
-   * Attempts to pessimistically lock all the entries in a batch using a single SQL statement where possible.
-   * This is used for efficient batch processing.
+   * Attempts to pessimistically lock all the entries in a batch using a single SQL statement where
+   * possible. This is used for efficient batch processing.
    *
    * @param tx The current {@link Transaction}.
    * @param entries The list of entries to be locked.

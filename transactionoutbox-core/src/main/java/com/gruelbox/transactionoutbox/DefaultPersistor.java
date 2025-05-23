@@ -16,8 +16,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -225,18 +225,18 @@ public class DefaultPersistor implements Persistor, Validatable {
     if (entries == null || entries.isEmpty()) {
       return;
     }
-    
+
     try (PreparedStatement stmt =
         tx.connection().prepareStatement(dialect.getDelete().replace("{{table}}", tableName))) {
-      
+
       for (TransactionOutboxEntry entry : entries) {
         stmt.setString(1, entry.getId());
         stmt.setInt(2, entry.getVersion());
         stmt.addBatch();
       }
-      
+
       int[] results = stmt.executeBatch();
-      
+
       for (int i = 0; i < results.length; i++) {
         if (results[i] != 1) {
           throw new OptimisticLockException();
@@ -352,18 +352,19 @@ public class DefaultPersistor implements Persistor, Validatable {
   @Override
   public boolean lockBatch(Transaction tx, List<TransactionOutboxEntry> entries) throws Exception {
     if (entries == null || entries.isEmpty()) {
-      return true;  // Nothing to lock is considered success
+      return true; // Nothing to lock is considered success
     }
 
     // Create placeholders for each entry
-    String placeholders = entries.stream()
-        .map(e -> "(?, ?)")
-        .collect(Collectors.joining(", "));
-    
+    String placeholders = entries.stream().map(e -> "(?, ?)").collect(Collectors.joining(", "));
+
     // Get the SQL from the dialect, replacing the placeholders
-    String sql = dialect.getLockBatch().replace("{{table}}", tableName)
-                                      .replace("{{placeholders}}", placeholders);
-    
+    String sql =
+        dialect
+            .getLockBatch()
+            .replace("{{table}}", tableName)
+            .replace("{{placeholders}}", placeholders);
+
     try (PreparedStatement stmt = tx.connection().prepareStatement(sql)) {
       // Set parameters for each entry
       int paramIndex = 1;
@@ -371,14 +372,14 @@ public class DefaultPersistor implements Persistor, Validatable {
         stmt.setString(paramIndex++, entry.getId());
         stmt.setInt(paramIndex++, entry.getVersion());
       }
-      
+
       stmt.setQueryTimeout(writeLockTimeoutSeconds);
-      
+
       try {
         try (ResultSet rs = stmt.executeQuery()) {
           // Build a map of id -> deserialized invocation
           Map<String, Invocation> invocationsById = new HashMap<>();
-          
+
           while (rs.next()) {
             String id = rs.getString("id");
             try (Reader invocationStream = rs.getCharacterStream("invocation")) {
@@ -386,13 +387,14 @@ public class DefaultPersistor implements Persistor, Validatable {
               invocationsById.put(id, invocation);
             }
           }
-          
+
           // If we didn't get all entries, return false
           if (invocationsById.size() != entries.size()) {
-            log.debug("Could only lock {} out of {} entries", invocationsById.size(), entries.size());
+            log.debug(
+                "Could only lock {} out of {} entries", invocationsById.size(), entries.size());
             return false;
           }
-          
+
           // Update each entry with its deserialized invocation
           for (TransactionOutboxEntry entry : entries) {
             Invocation invocation = invocationsById.get(entry.getId());
@@ -402,7 +404,7 @@ public class DefaultPersistor implements Persistor, Validatable {
             }
             entry.setInvocation(invocation);
           }
-          
+
           return true;
         }
       } catch (SQLTimeoutException e) {

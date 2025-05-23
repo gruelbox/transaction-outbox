@@ -117,8 +117,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   }
 
   private boolean doBatchFlush(
-      Function<Transaction, Collection<TransactionOutboxEntry>> batchSource,
-      Executor executor) {
+      Function<Transaction, Collection<TransactionOutboxEntry>> batchSource, Executor executor) {
     var batch =
         transactionManager.inTransactionReturns(
             transaction -> {
@@ -142,25 +141,28 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
               return result;
             });
-    
+
     log.debug("Got batch of {}", batch.size());
     if (!batch.isEmpty()) {
       // Group items by topic
-      Map<String, List<TransactionOutboxEntry>> groupedByTopic = batch.stream()
-          .collect(Collectors.groupingBy(entry -> entry.getTopic() != null ? entry.getTopic() : ""));
-      
+      Map<String, List<TransactionOutboxEntry>> groupedByTopic =
+          batch.stream()
+              .collect(
+                  Collectors.groupingBy(entry -> entry.getTopic() != null ? entry.getTopic() : ""));
+
       // Process each topic group in parallel
       List<CompletableFuture<Void>> futures = new ArrayList<>();
-      groupedByTopic.forEach((topic, entries) -> {
-        log.debug("Submitting {} entries for topic {}", entries.size(), topic);
-        futures.add(CompletableFuture.runAsync(() -> processBatchNow(entries), executor));
-      });
-      
+      groupedByTopic.forEach(
+          (topic, entries) -> {
+            log.debug("Submitting {} entries for topic {}", entries.size(), topic);
+            futures.add(CompletableFuture.runAsync(() -> processBatchNow(entries), executor));
+          });
+
       // Wait for all batches to complete
       if (!futures.isEmpty()) {
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
       }
-      
+
       log.debug("Processed all batch groups");
     }
     return !batch.isEmpty();
@@ -412,23 +414,23 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
     initialize();
     try {
-      transactionManager.inTransactionThrows(tx -> {
+      transactionManager.inTransactionThrows(
+          tx -> {
+            if (!persistor.lockBatch(tx, entries)) {
+              log.debug("Could not lock all entries in batch, skipping processing.");
+              return;
+            }
 
-        if (!persistor.lockBatch(tx, entries)) {
-          log.debug("Could not lock all entries in batch, skipping processing.");
-          return;
-        }
-
-        try {
-          invokeBatchEntries(entries, tx);
-          markExecutedBatchEntries(entries, tx);
-          notifyListeners(entries);
-        } catch (InvocationTargetException e) {
-          handleBatchInvocationException(entries, tx, e.getCause());
-        } catch (Exception e) {
-          handleBatchInvocationException(entries, tx, e);
-        }
-      });
+            try {
+              invokeBatchEntries(entries, tx);
+              markExecutedBatchEntries(entries, tx);
+              notifyListeners(entries);
+            } catch (InvocationTargetException e) {
+              handleBatchInvocationException(entries, tx, e.getCause());
+            } catch (Exception e) {
+              handleBatchInvocationException(entries, tx, e);
+            }
+          });
     } catch (Exception e) {
       log.warn("Failed to process batch", e);
     }
@@ -440,7 +442,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private void markExecutedBatchEntries(List<TransactionOutboxEntry> entries, Transaction tx) throws Exception {
+  private void markExecutedBatchEntries(List<TransactionOutboxEntry> entries, Transaction tx)
+      throws Exception {
     List<TransactionOutboxEntry> entriesToUpdate = new ArrayList<>();
     List<TransactionOutboxEntry> entriesToDelete = new ArrayList<>();
 
@@ -465,7 +468,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private void invokeBatchEntries(List<TransactionOutboxEntry> entries, Transaction tx) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+  private void invokeBatchEntries(List<TransactionOutboxEntry> entries, Transaction tx)
+      throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
     for (TransactionOutboxEntry entry : entries) {
       log.info("Processing item in batch: {}", entry.description());
       invoke(entry, tx);
@@ -473,17 +477,22 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private void handleBatchInvocationException(List<TransactionOutboxEntry> entries, Transaction tx, Throwable e) {
-    log.warn("Failed to process batch, updating attempt count and notifying listeners. Error: {}", e.getMessage());
+  private void handleBatchInvocationException(
+      List<TransactionOutboxEntry> entries, Transaction tx, Throwable e) {
+    log.warn(
+        "Failed to process batch, updating attempt count and notifying listeners. Error: {}",
+        e.getMessage());
     try {
       updateAttemptCountForBatch(entries);
       persistor.updateBatch(tx, entries);
     } catch (Exception ex) {
-      log.error("Failed to update attempt count for batch. Entries may be retried more times than expected.", ex);
+      log.error(
+          "Failed to update attempt count for batch. Entries may be retried more times than expected.",
+          ex);
     }
 
     notifyListenersOfBatchFailure(entries, e);
-    throw (RuntimeException) Utils.uncheckAndThrow(e);  // to rollback the transaction
+    throw (RuntimeException) Utils.uncheckAndThrow(e); // to rollback the transaction
   }
 
   private void invoke(TransactionOutboxEntry entry, Transaction transaction)
@@ -575,30 +584,31 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     }
   }
 
-  private void notifyListenersOfBatchFailure(List<TransactionOutboxEntry> entries, Throwable cause) {
+  private void notifyListenersOfBatchFailure(
+      List<TransactionOutboxEntry> entries, Throwable cause) {
     for (TransactionOutboxEntry entry : entries) {
-        try {
-            listener.failure(entry, cause);
-            if (isEntryBlocked(entry)) {
-              log.error(
-                      "Blocking failing entry {} after {} attempts: {}",
-                      entry.getId(),
-                      entry.getAttempts(),
-                      entry.description(),
-                      cause);
-              listener.blocked(entry, cause);
-            } else {
-              logAtLevel(
-                      log,
-                      logLevelTemporaryFailure,
-                      "Temporarily failed to process entry {} : {}",
-                      entry.getId(),
-                      entry.description(),
-                      cause);
-            }
-        } catch (Exception e) {
-            log.error("Failed to notify listener of failure for {}", entry.description(), e);
+      try {
+        listener.failure(entry, cause);
+        if (isEntryBlocked(entry)) {
+          log.error(
+              "Blocking failing entry {} after {} attempts: {}",
+              entry.getId(),
+              entry.getAttempts(),
+              entry.description(),
+              cause);
+          listener.blocked(entry, cause);
+        } else {
+          logAtLevel(
+              log,
+              logLevelTemporaryFailure,
+              "Temporarily failed to process entry {} : {}",
+              entry.getId(),
+              entry.description(),
+              cause);
         }
+      } catch (Exception e) {
+        log.error("Failed to notify listener of failure for {}", entry.description(), e);
+      }
     }
   }
 

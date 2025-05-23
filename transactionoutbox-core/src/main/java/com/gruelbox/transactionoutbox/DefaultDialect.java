@@ -90,12 +90,12 @@ class DefaultDialect implements Dialect {
             + "SELECT MIN(seq) FROM {{table}} b WHERE b.topic=a.topic AND b.processed = false"
             + ") LIMIT {{batchSize}}";
     private String fetchNextBatchInTopics =
-            "WITH raw AS ("
-                    + " SELECT {{allFields}}, ROW_NUMBER() OVER (PARTITION BY topic ORDER BY seq) as rn"
-                    + " FROM {{table}}"
-                    + " WHERE processed = false AND topic <> '*'"
-                    + ")"
-                    + " SELECT * FROM raw WHERE rn <= {{batchSize}} AND nextAttemptTime < ?";
+        "WITH raw AS ("
+            + " SELECT {{allFields}}, ROW_NUMBER() OVER (PARTITION BY topic ORDER BY seq) as rn"
+            + " FROM {{table}}"
+            + " WHERE processed = false AND topic <> '*'"
+            + ")"
+            + " SELECT * FROM raw WHERE rn <= {{batchSize}} AND nextAttemptTime < ?";
     private String fetchCurrentVersion = "SELECT version FROM TXNO_VERSION FOR UPDATE";
     private String fetchNextSequence = "SELECT seq FROM TXNO_SEQUENCE WHERE topic = ? FOR UPDATE";
 
