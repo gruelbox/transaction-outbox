@@ -640,7 +640,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
               serializeMdc == null || serializeMdc,
               validator,
               retentionThreshold == null ? Duration.ofDays(7) : retentionThreshold,
-              enableOrderedBatchProcessing != null && enableOrderedBatchProcessing);
+              useOrderedBatchProcessing != null && useOrderedBatchProcessing);
       validator.validate(impl);
       if (initializeImmediately == null || initializeImmediately) {
         impl.initialize();

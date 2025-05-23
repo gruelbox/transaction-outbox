@@ -216,7 +216,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                         .listener(new LatchListener(latch))
                         .initializeImmediately(false)
                         .flushBatchSize(4)
-                        .enableOrderedBatchProcessing(true)
+                        .useOrderedBatchProcessing(true)
                         .build();
 
         outbox.initialize();

@@ -178,7 +178,7 @@ public interface TransactionOutbox {
     protected Boolean serializeMdc;
     protected Duration retentionThreshold;
     protected Boolean initializeImmediately;
-    protected Boolean enableOrderedBatchProcessing;
+    protected Boolean useOrderedBatchProcessing;
 
     protected TransactionOutboxBuilder() {}
 
@@ -326,14 +326,14 @@ public interface TransactionOutbox {
     }
 
     /**
-     * @param enableOrderedBatchProcessing If true, enables batch processing of ordered items within
+     * @param useOrderedBatchProcessing If true, enables batch processing of ordered items within
      *     topics. This allows for more efficient processing of ordered items by processing them in
      *     batches while still maintaining order within each topic. Defaults to false.
      * @return Builder.
      */
-    public TransactionOutboxBuilder enableOrderedBatchProcessing(
-        boolean enableOrderedBatchProcessing) {
-      this.enableOrderedBatchProcessing = enableOrderedBatchProcessing;
+    public TransactionOutboxBuilder useOrderedBatchProcessing(
+        boolean useOrderedBatchProcessing) {
+      this.useOrderedBatchProcessing = useOrderedBatchProcessing;
       return this;
     }
 
