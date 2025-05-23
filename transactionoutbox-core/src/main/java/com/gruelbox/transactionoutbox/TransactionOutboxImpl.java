@@ -413,49 +413,16 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     initialize();
     try {
       transactionManager.inTransactionThrows(tx -> {
-        // 1. Lock all entries in a batch
+
         if (!persistor.lockBatch(tx, entries)) {
           log.debug("Could not lock all entries in batch, skipping processing.");
           return;
         }
-        // 2. Process each entry
+
         try {
-          for (TransactionOutboxEntry entry : entries) {
-            log.info("Processing item in batch: {}", entry.description());
-            invoke(entry, tx);
-            log.info("Processed item in batch: {}", entry.description());
-          }
-          
-          // 3. Separate entries that should be deleted from those that should be updated
-          List<TransactionOutboxEntry> entriesToUpdate = new ArrayList<>();
-          List<TransactionOutboxEntry> entriesToDelete = new ArrayList<>();
-          
-          for (TransactionOutboxEntry entry : entries) {
-            if (entry.getUniqueRequestId() == null) {
-              entriesToDelete.add(entry);
-            } else {
-              log.debug("Deferring deletion of {} by {}", entry.description(), retentionThreshold);
-              entry.setProcessed(true);
-              entry.setLastAttemptTime(Instant.now(clockProvider.get()));
-              entry.setNextAttemptTime(after(retentionThreshold));
-              entriesToUpdate.add(entry);
-            }
-          }
-          
-          // 4. Batch delete entries without uniqueRequestId
-          if (!entriesToDelete.isEmpty()) {
-            persistor.deleteBatch(tx, entriesToDelete);
-          }
-          
-          // 5. Batch update entries with uniqueRequestId
-          if (!entriesToUpdate.isEmpty()) {
-            persistor.updateBatch(tx, entriesToUpdate);
-          }
-          
-          // 6. Notify listeners about success
-          for (TransactionOutboxEntry entry : entries) {
-            listener.success(entry);
-          }
+          invokeBatchEntries(entries, tx);
+          markExecutedBatchEntries(entries, tx);
+          notifyListeners(entries);
         } catch (InvocationTargetException e) {
           handleBatchInvocationException(entries, tx, e.getCause());
         } catch (Exception e) {
@@ -464,6 +431,45 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       });
     } catch (Exception e) {
       log.warn("Failed to process batch", e);
+    }
+  }
+
+  private void notifyListeners(List<TransactionOutboxEntry> entries) {
+    for (TransactionOutboxEntry entry : entries) {
+      listener.success(entry);
+    }
+  }
+
+  private void markExecutedBatchEntries(List<TransactionOutboxEntry> entries, Transaction tx) throws Exception {
+    List<TransactionOutboxEntry> entriesToUpdate = new ArrayList<>();
+    List<TransactionOutboxEntry> entriesToDelete = new ArrayList<>();
+
+    for (TransactionOutboxEntry entry : entries) {
+      if (entry.getUniqueRequestId() == null) {
+        entriesToDelete.add(entry);
+      } else {
+        log.debug("Deferring deletion of {} by {}", entry.description(), retentionThreshold);
+        entry.setProcessed(true);
+        entry.setLastAttemptTime(Instant.now(clockProvider.get()));
+        entry.setNextAttemptTime(after(retentionThreshold));
+        entriesToUpdate.add(entry);
+      }
+    }
+
+    if (!entriesToDelete.isEmpty()) {
+      persistor.deleteBatch(tx, entriesToDelete);
+    }
+
+    if (!entriesToUpdate.isEmpty()) {
+      persistor.updateBatch(tx, entriesToUpdate);
+    }
+  }
+
+  private void invokeBatchEntries(List<TransactionOutboxEntry> entries, Transaction tx) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+    for (TransactionOutboxEntry entry : entries) {
+      log.info("Processing item in batch: {}", entry.description());
+      invoke(entry, tx);
+      log.info("Processed item in batch: {}", entry.description());
     }
   }
 
