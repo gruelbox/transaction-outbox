@@ -293,7 +293,6 @@
         <jdk>[17,)</jdk>
       </activation>
       <modules>
-        <module>transactionoutbox-jooq</module>
         <module>transactionoutbox-quarkus</module>
         <module>transactionoutbox-spring</module>
       </modules>
@@ -304,6 +303,7 @@
         <jdk>[21,)</jdk>
       </activation>
       <modules>
+        <module>transactionoutbox-jooq</module>
         <module>transactionoutbox-virtthreads</module>
       </modules>
     </profile>
