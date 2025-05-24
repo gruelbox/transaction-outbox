@@ -166,6 +166,12 @@ class DefaultDialect implements Dialect {
               "Add flush index to support ordering",
               "CREATE INDEX IX_TXNO_OUTBOX_2 ON TXNO_OUTBOX (topic, processed, seq)"));
       migrations.put(13, new Migration(13, "Enforce UTF8 collation for outbox messages", null));
+      migrations.put(
+          14,
+          new Migration(
+              14,
+              "Add retryOptions column to outbox",
+              "ALTER TABLE TXNO_OUTBOX ADD COLUMN retryOptions TEXT NULL AFTER invocation"));
     }
 
     Builder setMigration(Migration migration) {
