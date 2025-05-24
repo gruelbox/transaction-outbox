@@ -57,6 +57,20 @@ public interface Persistor {
   void delete(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
   /**
+   * Deletes a batch of {@link TransactionOutboxEntry}s.
+   *
+   * <p>Records should only be deleted if <em>both</em> the {@code id} and {@code version} on the
+   * database match those on the objects. If any record is not found, {@link
+   * OptimisticLockException} should be thrown.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param entries The entries to be deleted.
+   * @throws OptimisticLockException If any record with matching id and version is not found.
+   * @throws Exception Any other exception.
+   */
+  void deleteBatch(Transaction tx, List<TransactionOutboxEntry> entries) throws Exception;
+
+  /**
    * Modifies an existing {@link TransactionOutboxEntry}. Performs an optimistic lock check on any
    * existing record via a compare-and-swap operation and throws {@link OptimisticLockException} if
    * the lock is failed. {@link TransactionOutboxEntry#setVersion(int)} is called before returning
@@ -70,6 +84,19 @@ public interface Persistor {
   void update(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
   /**
+   * Modifies a batch of existing {@link TransactionOutboxEntry}s. Performs an optimistic lock check
+   * on any existing record via a compare-and-swap operation and throws {@link
+   * OptimisticLockException} if the lock is failed. {@link TransactionOutboxEntry#setVersion(int)}
+   * is called before returning containing the new version of the entry.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param entries The entries to be updated.
+   * @throws OptimisticLockException If no record with same id and version is found.
+   * @throws Exception Any other exception.
+   */
+  void updateBatch(Transaction tx, List<TransactionOutboxEntry> entries) throws Exception;
+
+  /**
    * Attempts to pessimistically lock an existing {@link TransactionOutboxEntry}.
    *
    * @param tx The current {@link Transaction}.
@@ -79,6 +106,17 @@ public interface Persistor {
    * @throws Exception Any other exception.
    */
   boolean lock(Transaction tx, TransactionOutboxEntry entry) throws Exception;
+
+  /**
+   * Attempts to pessimistically lock all the entries in a batch using a single SQL statement where
+   * possible. This is used for efficient batch processing.
+   *
+   * @param tx The current {@link Transaction}.
+   * @param entries The list of entries to be locked.
+   * @return true if all entries were successfully locked, false otherwise.
+   * @throws Exception Any exception.
+   */
+  boolean lockBatch(Transaction tx, List<TransactionOutboxEntry> entries) throws Exception;
 
   /**
    * Clears the blocked flag and resets the attempt count to zero.
@@ -130,6 +168,20 @@ public interface Persistor {
    */
   Collection<TransactionOutboxEntry> selectNextInSelectedTopics(
       Transaction tx, List<String> topicNames, int batchSize, Instant now) throws Exception;
+
+  /**
+   * Selects the next batch of entries in topics, maintaining order within each topic. This method
+   * is used for ordered batch processing and returns multiple entries per topic up to the batch
+   * size limit.
+   *
+   * @param tx The current transaction
+   * @param batchSize The maximum number of entries to return per topic
+   * @param now The current time
+   * @return A collection of entries ordered by topic and sequence
+   * @throws Exception If an error occurs during selection
+   */
+  Collection<TransactionOutboxEntry> selectNextBatchInTopics(
+      Transaction tx, int batchSize, Instant now) throws Exception;
 
   /**
    * Deletes records which have processed and passed their expiry time, in specified batch sizes.
