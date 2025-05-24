@@ -16,14 +16,14 @@ Extension for [transaction-outbox-core](../README.md) which integrates with Guic
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-guice</artifactId>
-  <version>6.0.585</version>
+  <version>6.0.609</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-guice:6.0.585'
+implementation 'com.gruelbox:transactionoutbox-guice:6.0.609'
 ```
 
 ### Development snapshots

@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<toolchains xmlns="http://maven.apache.org/TOOLCHAINS/1.1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/TOOLCHAINS/1.1.0 https://maven.apache.org/xsd/toolchains-1.1.0.xsd">
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <version>21</version>
+      <vendor>zulu</vendor>
+      <id>zulu_21</id>
+    </provides>
+    <configuration>
+      <jdkHome>/opt/hostedtoolcache/Java_Zulu_jdk/21.0.7-6/x64</jdkHome>
+    </configuration>
+  </toolchain>
+</toolchains>

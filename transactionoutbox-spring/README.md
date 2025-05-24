@@ -20,14 +20,14 @@ The latest stable release is available from Maven Central.
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-spring</artifactId>
-  <version>6.0.585</version>
+  <version>6.0.609</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-spring:6.0.585'
+implementation 'com.gruelbox:transactionoutbox-spring:6.0.609'
 ```
 
 ### Development snapshots
