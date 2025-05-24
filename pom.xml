@@ -32,7 +32,6 @@
     <junit.jupiter.version>5.12.2</junit.jupiter.version>
     <testcontainers.version>1.21.0</testcontainers.version>
     <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
-    <nexus.staging.plugin.version>1.7.0</nexus.staging.plugin.version>
     <maven.gpg.plugin.version>3.2.7</maven.gpg.plugin.version>
   </properties>
   <modules>
@@ -328,14 +327,14 @@
             </executions>
           </plugin>
           <plugin>
-            <groupId>org.sonatype.plugins</groupId>
-            <artifactId>nexus-staging-maven-plugin</artifactId>
-            <version>${nexus.staging.plugin.version}</version>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.7.0</version>
             <extensions>true</extensions>
             <configuration>
-              <serverId>ossrh</serverId>
-              <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-              <autoReleaseAfterClose>true</autoReleaseAfterClose>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
             </configuration>
           </plugin>
           <plugin>
