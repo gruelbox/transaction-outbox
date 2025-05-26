@@ -2,12 +2,8 @@
 # https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
 
 [versions]
-ch-qos-logback-logback-classic = "1.5.18"
-ch-qos-logback-logback-core = "1.5.18"
-com-fasterxml-jackson-core-jackson-databind = "2.19.0"
-com-fasterxml-jackson-datatype-jackson-datatype-guava = "2.19.0"
-com-fasterxml-jackson-datatype-jackson-datatype-jdk8 = "2.19.0"
-com-fasterxml-jackson-datatype-jackson-datatype-jsr310 = "2.19.0"
+ch-qos-logback = "1.5.18"
+com-fasterxml-jackson-bom = "2.19.0"
 com-google-code-gson-gson = "2.13.1"
 com-google-guava-guava = "33.4.8-jre"
 com-google-inject-guice = "7.0.0"
@@ -16,53 +12,33 @@ com-microsoft-sqlserver-mssql-jdbc = "12.10.0.jre11"
 com-mysql-mysql-connector-j = "9.3.0"
 com-oracle-database-jdbc-ojdbc11 = "23.8.0.25.04"
 com-zaxxer-hikaricp = "6.3.0"
-io-quarkus-quarkus-agroal = "3.21.1"
-io-quarkus-quarkus-arc = "3.21.1"
-io-quarkus-quarkus-jdbc-h2 = "3.21.1"
-io-quarkus-quarkus-junit5 = "3.21.1"
-io-quarkus-quarkus-resteasy = "3.21.1"
-io-quarkus-quarkus-undertow = "3.21.1"
-jakarta-enterprise-jakarta-enterprise-cdi-api = "4.1.0"
-jakarta-transaction-jakarta-transaction-api = "2.0.1"
+io-quarkus-bom = "3.22.3"
+jakarta-platform-bom = "11.0.0"
+lombok = "8.4"
+me-escoffier-loom-loom-unit = "0.3.0"
 net-bytebuddy-byte-buddy = "1.17.5"
 org-apache-commons-commons-lang3 = "3.17.0"
 org-awaitility-awaitility = "4.3.0"
 org-hamcrest-hamcrest-core = "3.0"
 org-jooq-jooq = "3.20.4"
-org-junit-jupiter-junit-jupiter-api = "5.12.2"
-org-junit-jupiter-junit-jupiter-engine = "5.12.2"
-org-junit-jupiter-junit-jupiter-params = "5.12.2"
+org-junit-bom = "5.12.2"
 org-mockito-mockito-core = "1.10.19"
 org-objenesis-objenesis = "3.4"
 org-postgresql-postgresql = "42.7.5"
 org-projectlombok-lombok = "1.18.30"
 org-slf4j-slf4j-api = "2.0.17"
-org-springframework-boot-spring-boot-starter-data-jpa = "3.4.4"
-org-springframework-boot-spring-boot-starter-test = "3.4.4"
-org-springframework-boot-spring-boot-starter-web = "3.4.4"
-org-springframework-spring-context = "6.2.7"
-org-springframework-spring-jdbc = "6.2.7"
-org-springframework-spring-tx = "6.2.7"
-org-testcontainers-junit-jupiter = "1.21.0"
-org-testcontainers-mssqlserver = "1.21.0"
-org-testcontainers-mysql = "1.21.0"
-org-testcontainers-oracle-xe = "1.21.0"
-org-testcontainers-postgresql = "1.21.0"
-org-testcontainers-testcontainers = "1.21.0"
-lombok = "8.4"
-me-escoffier-loom-loom-unit = "0.3.0"
+org-springframework-bom = "6.2.7"
 org-springframework-boot = "3.5.0"
-org-springframework = "6.2.7"
-io-quarkus = "3.22.3"
-com-fasterxml-jackson = "2.19.0"
+org-testcontainers-bom = "1.21.0"
 
 [libraries]
-ch-qos-logback-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "ch-qos-logback-logback-classic" }
-ch-qos-logback-logback-core = { module = "ch.qos.logback:logback-core", version.ref = "ch-qos-logback-logback-core" }
-com-fasterxml-jackson-core-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "com-fasterxml-jackson-core-jackson-databind" }
-com-fasterxml-jackson-datatype-jackson-datatype-guava = { module = "com.fasterxml.jackson.datatype:jackson-datatype-guava", version.ref = "com-fasterxml-jackson-datatype-jackson-datatype-guava" }
-com-fasterxml-jackson-datatype-jackson-datatype-jdk8 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jdk8", version.ref = "com-fasterxml-jackson-datatype-jackson-datatype-jdk8" }
-com-fasterxml-jackson-datatype-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "com-fasterxml-jackson-datatype-jackson-datatype-jsr310" }
+ch-qos-logback-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "ch-qos-logback" }
+ch-qos-logback-logback-core = { module = "ch.qos.logback:logback-core", version.ref = "ch-qos-logback" }
+com-fasterxml-jackson-core-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
+com-fasterxml-jackson-datatype-jackson-datatype-guava = { module = "com.fasterxml.jackson.datatype:jackson-datatype-guava" }
+com-fasterxml-jackson-datatype-jackson-datatype-jdk8 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jdk8" }
+com-fasterxml-jackson-datatype-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" }
+com-fasterxml-jackson-jackson-bom = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "com-fasterxml-jackson-bom" }
 com-google-code-gson-gson = { module = "com.google.code.gson:gson", version.ref = "com-google-code-gson-gson" }
 com-google-guava-guava = { module = "com.google.guava:guava", version.ref = "com-google-guava-guava" }
 com-google-inject-guice = { module = "com.google.inject:guice", version.ref = "com-google-inject-guice" }
@@ -71,40 +47,49 @@ com-microsoft-sqlserver-mssql-jdbc = { module = "com.microsoft.sqlserver:mssql-j
 com-mysql-mysql-connector-j = { module = "com.mysql:mysql-connector-j", version.ref = "com-mysql-mysql-connector-j" }
 com-oracle-database-jdbc-ojdbc11 = { module = "com.oracle.database.jdbc:ojdbc11", version.ref = "com-oracle-database-jdbc-ojdbc11" }
 com-zaxxer-hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "com-zaxxer-hikaricp" }
-io-quarkus-quarkus-agroal = { module = "io.quarkus:quarkus-agroal", version.ref = "io-quarkus-quarkus-agroal" }
-io-quarkus-quarkus-arc = { module = "io.quarkus:quarkus-arc", version.ref = "io-quarkus-quarkus-arc" }
-io-quarkus-quarkus-jdbc-h2 = { module = "io.quarkus:quarkus-jdbc-h2", version.ref = "io-quarkus-quarkus-jdbc-h2" }
-io-quarkus-quarkus-junit5 = { module = "io.quarkus:quarkus-junit5", version.ref = "io-quarkus-quarkus-junit5" }
-io-quarkus-quarkus-resteasy = { module = "io.quarkus:quarkus-resteasy", version.ref = "io-quarkus-quarkus-resteasy" }
-io-quarkus-quarkus-undertow = { module = "io.quarkus:quarkus-undertow", version.ref = "io-quarkus-quarkus-undertow" }
-jakarta-enterprise-jakarta-enterprise-cdi-api = { module = "jakarta.enterprise:jakarta.enterprise.cdi-api", version.ref = "jakarta-enterprise-jakarta-enterprise-cdi-api" }
-jakarta-transaction-jakarta-transaction-api = { module = "jakarta.transaction:jakarta.transaction-api", version.ref = "jakarta-transaction-jakarta-transaction-api" }
+io-quarkus-quarkus-bom = { module = "io.quarkus:quarkus-bom", version.ref = "io-quarkus-bom" }
+io-quarkus-quarkus-agroal = { module = "io.quarkus:quarkus-agroal" }
+io-quarkus-quarkus-arc = { module = "io.quarkus:quarkus-arc" }
+io-quarkus-quarkus-jdbc-h2 = { module = "io.quarkus:quarkus-jdbc-h2" }
+io-quarkus-quarkus-junit5 = { module = "io.quarkus:quarkus-junit5" }
+io-quarkus-quarkus-resteasy = { module = "io.quarkus:quarkus-resteasy" }
+io-quarkus-quarkus-undertow = { module = "io.quarkus:quarkus-undertow" }
+jakarta-platform-jakarta-jakartaee-bom = { module = "jakarta.platform:jakarta.jakartaee-bom", version.ref = "jakarta-platform-bom" }
+jakarta-enterprise-jakarta-enterprise-cdi-api = { module = "jakarta.enterprise:jakarta.enterprise.cdi-api" }
+jakarta-transaction-jakarta-transaction-api = { module = "jakarta.transaction:jakarta.transaction-api" }
+me-escoffier-loom-loom-unit = { module = "me.escoffier.loom:loom-unit", version.ref = "me-escoffier-loom-loom-unit" }
 net-bytebuddy-byte-buddy = { module = "net.bytebuddy:byte-buddy", version.ref = "net-bytebuddy-byte-buddy" }
 org-apache-commons-commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "org-apache-commons-commons-lang3" }
 org-awaitility-awaitility = { module = "org.awaitility:awaitility", version.ref = "org-awaitility-awaitility" }
 org-hamcrest-hamcrest-core = { module = "org.hamcrest:hamcrest-core", version.ref = "org-hamcrest-hamcrest-core" }
 org-jooq-jooq = { module = "org.jooq:jooq", version.ref = "org-jooq-jooq" }
-org-junit-jupiter-junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "org-junit-jupiter-junit-jupiter-api" }
-org-junit-jupiter-junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "org-junit-jupiter-junit-jupiter-engine" }
-org-junit-jupiter-junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "org-junit-jupiter-junit-jupiter-params" }
+org-junit-bom = { module = "org.junit:junit-bom", version.ref = "org-junit-bom" }
+org-junit-jupiter-junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api" }
+org-junit-jupiter-junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine" }
+org-junit-jupiter-junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params" }
+org-junit-platform-junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 org-mockito-mockito-core = { module = "org.mockito:mockito-core", version.ref = "org-mockito-mockito-core" }
 org-objenesis-objenesis = { module = "org.objenesis:objenesis", version.ref = "org-objenesis-objenesis" }
 org-postgresql-postgresql = { module = "org.postgresql:postgresql", version.ref = "org-postgresql-postgresql" }
 org-projectlombok-lombok = { module = "org.projectlombok:lombok", version.ref = "org-projectlombok-lombok" }
 org-slf4j-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "org-slf4j-slf4j-api" }
-org-springframework-boot-spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa", version.ref = "org-springframework-boot-spring-boot-starter-data-jpa" }
-org-springframework-boot-spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test", version.ref = "org-springframework-boot-spring-boot-starter-test" }
-org-springframework-boot-spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web", version.ref = "org-springframework-boot-spring-boot-starter-web" }
-org-springframework-spring-context = { module = "org.springframework:spring-context", version.ref = "org-springframework-spring-context" }
-org-springframework-spring-jdbc = { module = "org.springframework:spring-jdbc", version.ref = "org-springframework-spring-jdbc" }
-org-springframework-spring-tx = { module = "org.springframework:spring-tx", version.ref = "org-springframework-spring-tx" }
-org-testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "org-testcontainers-junit-jupiter" }
-org-testcontainers-mssqlserver = { module = "org.testcontainers:mssqlserver", version.ref = "org-testcontainers-mssqlserver" }
-org-testcontainers-mysql = { module = "org.testcontainers:mysql", version.ref = "org-testcontainers-mysql" }
-org-testcontainers-oracle-xe = { module = "org.testcontainers:oracle-xe", version.ref = "org-testcontainers-oracle-xe" }
-org-testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "org-testcontainers-postgresql" }
-org-testcontainers-testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "org-testcontainers-testcontainers" }
-me-escoffier-loom-loom-unit = { module = "me.escoffier.loom:loom-unit", version.ref = "me-escoffier-loom-loom-unit" }
+org-springframework-boot-spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+org-springframework-boot-spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
+org-springframework-boot-spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+org-springframework-boot-spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+org-springframework-spring-context = { module = "org.springframework:spring-context" }
+org-springframework-spring-framework-bom = { module = "org.springframework:spring-framework-bom", version.ref = "org-springframework-bom" }
+org-springframework-spring-jdbc = { module = "org.springframework:spring-jdbc" }
+org-springframework-spring-tx = { module = "org.springframework:spring-tx" }
+org-testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter" }
+org-testcontainers-mssqlserver = { module = "org.testcontainers:mssqlserver" }
+org-testcontainers-mysql = { module = "org.testcontainers:mysql" }
+org-testcontainers-oracle-xe = { module = "org.testcontainers:oracle-xe" }
+org-testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
+org-testcontainers-testcontainers = { module = "org.testcontainers:testcontainers" }
+org-testcontainers-testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "org-testcontainers-bom" }
+org-springframework-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "org-springframework-boot" }
 
 [plugins]
 lombok = { id = "io.freefair.lombok", version.ref = "lombok" }
+quarkus = { id = "io.quarkus", version.ref = "io-quarkus-bom" }

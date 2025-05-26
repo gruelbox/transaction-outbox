@@ -4,7 +4,7 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 plugins {
     `java-library`
     `maven-publish`
-    id("io.freefair.lombok") version "8.4"
+    alias(libs.plugins.lombok)
 }
 
 allprojects {
@@ -18,6 +18,10 @@ allprojects {
     version = providers.gradleProperty("customVersion").getOrElse("1.3.99999-SNAPSHOT")
 }
 
+val testFixturesModules = listOf(
+    "transactionoutbox-testing"
+)
+
 val java21Modules = listOf(
     "transactionoutbox-jooq",
     "transactionoutbox-virtthreads",
@@ -30,8 +34,10 @@ val java17Modules = listOf(
 
 subprojects {
     apply(plugin = "java-library")
+    if (testFixturesModules.contains(project.name)) {
+        apply(plugin = "java-test-fixtures")
+    }
     apply(plugin = "maven-publish")
-    apply(plugin = "io.freefair.lombok")
 
     val javaVersion = when {
         project.name in java21Modules -> JavaVersion.VERSION_21
@@ -45,9 +51,18 @@ subprojects {
         }
     }
 
-    publishing {
-        publications.create<MavenPublication>("maven") {
-            from(components["java"])
+    afterEvaluate {
+        publishing {
+            publications.create<MavenPublication>(project.name) {
+                from(project.components["java"])
+                pom.withXml {}
+
+                versionMapping {
+                    allVariants {
+                        fromResolutionResult()
+                    }
+                }
+            }
         }
     }
 
@@ -61,12 +76,16 @@ subprojects {
 
     tasks.withType<Test> {
         useJUnitPlatform()
+
         testLogging {
             displayGranularity = 1
             showCauses = true
             showStackTraces = true
             exceptionFormat = TestExceptionFormat.FULL
-            events(TestLogEvent.PASSED, TestLogEvent.SKIPPED, TestLogEvent.FAILED)
+            events(TestLogEvent.PASSED, TestLogEvent.SKIPPED, TestLogEvent.FAILED, TestLogEvent.STANDARD_ERROR)
         }
+
+        outputs.upToDateWhen { false }
+        outputs.cacheIf { false }
     }
 } 
