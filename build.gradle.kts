@@ -18,14 +18,14 @@ allprojects {
     version = providers.gradleProperty("customVersion").getOrElse("1.3.99999-SNAPSHOT")
 }
 
-val java17Modules = listOf(
+val java21Modules = listOf(
     "transactionoutbox-jooq",
-    "transactionoutbox-quarkus",
-    "transactionoutbox-spring",
+    "transactionoutbox-virtthreads",
 )
 
-val java21Modules = listOf(
-    "transactionoutbox-virtthreads"
+val java17Modules = listOf(
+    "transactionoutbox-quarkus",
+    "transactionoutbox-spring",
 )
 
 subprojects {
