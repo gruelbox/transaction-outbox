@@ -7,3 +7,7 @@
 **/target/**
 *.iml
 **/.flattened-pom.xml
+
+.gradle
+build
+gradlew.bat
