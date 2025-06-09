@@ -65,7 +65,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
 
   @Builder
   DefaultInvocationSerializer(Set<Class<?>> serializableTypes, Integer version) {
-    this.gson =
+    var gsonBuilder =
         new GsonBuilder()
             .registerTypeAdapter(
                 Invocation.class,
@@ -82,7 +82,14 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
             .registerTypeAdapter(Period.class, new PeriodTypeAdapter())
             .registerTypeAdapter(Year.class, new YearTypeAdapter())
             .registerTypeAdapter(YearMonth.class, new YearMonthAdapter())
-            .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC)
+            .excludeFieldsWithModifiers(Modifier.TRANSIENT, Modifier.STATIC);
+    this.gson =
+        gsonBuilder
+            .create()
+            .newBuilder()
+            .registerTypeHierarchyAdapter(
+                NextRetryStrategy.Options.class,
+                new NextRetryStrategyOptionsAdapter<>(gsonBuilder.create()))
             .create();
   }
 
@@ -99,6 +106,24 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
   public Invocation deserializeInvocation(Reader reader) throws IOException {
     try {
       return gson.fromJson(reader, Invocation.class);
+    } catch (JsonIOException | JsonSyntaxException exception) {
+      throw new IOException(exception);
+    }
+  }
+
+  @Override
+  public void serializeRetryOptions(NextRetryStrategy.Options retryOptions, Writer writer) {
+    try {
+      gson.toJson(retryOptions, writer);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Cannot serialize " + retryOptions, e);
+    }
+  }
+
+  @Override
+  public NextRetryStrategy.Options deserializeRetryOptions(Reader reader) throws IOException {
+    try {
+      return gson.fromJson(reader, NextRetryStrategy.Options.class);
     } catch (JsonIOException | JsonSyntaxException exception) {
       throw new IOException(exception);
     }
@@ -688,6 +713,44 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
         result -= digit;
       }
       return -result;
+    }
+  }
+
+  private static class NextRetryStrategyOptionsAdapter<T extends NextRetryStrategy.Options>
+      extends TypeAdapter<T> {
+
+    private static final String CLASS_NAME = "cn";
+    private static final String INSTANCE_FIELDS_VALUES = "ifv";
+    private final Gson parentGson;
+
+    NextRetryStrategyOptionsAdapter(Gson parentGson) {
+      this.parentGson = parentGson;
+    }
+
+    @Override
+    public void write(JsonWriter out, T options) throws IOException {
+      out.beginObject();
+      out.name(CLASS_NAME).value(options.getClass().getName());
+      out.name(INSTANCE_FIELDS_VALUES).value(parentGson.toJson(options, options.getClass()));
+      out.endObject();
+    }
+
+    @Override
+    public T read(JsonReader in) {
+      var json = parentGson.fromJson(in, JsonObject.class);
+      var jsonData = ((JsonObject) json).get(INSTANCE_FIELDS_VALUES).getAsString();
+      var jsonClazz = ((JsonObject) json).get(CLASS_NAME).getAsString();
+      var clazz = getObjectClass(jsonClazz);
+      return (T) parentGson.fromJson(jsonData, clazz);
+    }
+
+    /****** Helper method to get the className of the object to be deserialized *****/
+    Class<?> getObjectClass(String className) {
+      try {
+        return Class.forName(className);
+      } catch (ClassNotFoundException e) {
+        throw new JsonParseException(e.getMessage());
+      }
     }
   }
 }
