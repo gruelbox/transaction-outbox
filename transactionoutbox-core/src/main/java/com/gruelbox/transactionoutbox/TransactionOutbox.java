@@ -16,7 +16,7 @@ import org.slf4j.event.Level;
  * pattern for Java. See <a href="https://github.com/gruelbox/transaction-outbox">README</a> for
  * usage instructions.
  */
-public interface TransactionOutbox {
+public interface TransactionOutbox extends AutoCloseable {
 
   /**
    * @return A builder for creating a new instance of {@link TransactionOutbox}.
@@ -158,6 +158,10 @@ public interface TransactionOutbox {
    */
   @SuppressWarnings("WeakerAccess")
   void processNow(TransactionOutboxEntry entry);
+
+  /** Releases any releasable resource. The instance is unusable after calling this method. */
+  @Override
+  default void close() {}
 
   /** Builder for {@link TransactionOutbox}. */
   @ToString

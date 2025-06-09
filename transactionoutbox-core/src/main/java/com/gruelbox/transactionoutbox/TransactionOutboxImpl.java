@@ -19,8 +19,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.Accessors;
@@ -29,13 +27,13 @@ import org.slf4j.MDC;
 import org.slf4j.event.Level;
 
 @Slf4j
-@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
   private final TransactionManager transactionManager;
   private final Persistor persistor;
   private final Instantiator instantiator;
   private final Submitter submitter;
+  private final boolean closeSubmitterOnClose;
   private final Duration attemptFrequency;
   private final Level logLevelTemporaryFailure;
   private final int blockAfterAttempts;
@@ -48,6 +46,41 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private final AtomicBoolean initialized = new AtomicBoolean();
   private final ProxyFactory proxyFactory = new ProxyFactory();
   private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
+  private TransactionOutboxImpl(
+      TransactionManager transactionManager,
+      Persistor persistor,
+      Instantiator instantiator,
+      Submitter submitter,
+      Duration attemptFrequency,
+      Level logLevelTemporaryFailure,
+      int blockAfterAttempts,
+      int flushBatchSize,
+      Supplier<Clock> clockProvider,
+      TransactionOutboxListener listener,
+      boolean serializeMdc,
+      Validator validator,
+      Duration retentionThreshold) {
+    this.transactionManager = transactionManager;
+    this.persistor = persistor;
+    this.instantiator = instantiator;
+    if (submitter != null) {
+      this.submitter = submitter;
+      closeSubmitterOnClose = false;
+    } else {
+      this.submitter = Submitter.withDefaultExecutor();
+      closeSubmitterOnClose = true;
+    }
+    this.attemptFrequency = attemptFrequency;
+    this.logLevelTemporaryFailure = logLevelTemporaryFailure;
+    this.blockAfterAttempts = blockAfterAttempts;
+    this.flushBatchSize = flushBatchSize;
+    this.clockProvider = clockProvider;
+    this.listener = listener;
+    this.serializeMdc = serializeMdc;
+    this.validator = validator;
+    this.retentionThreshold = retentionThreshold;
+  }
 
   @Override
   public void validate(Validator validator) {
@@ -418,6 +451,14 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
           entry.description(),
           e);
     }
+  }
+
+  @Override
+  public void close() {
+    if (closeSubmitterOnClose) {
+      submitter.close();
+    }
+    Utils.shutdown(scheduler);
   }
 
   @ToString
