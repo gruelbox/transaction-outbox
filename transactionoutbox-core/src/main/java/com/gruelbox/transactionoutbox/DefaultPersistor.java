@@ -1,16 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
-import java.io.IOException;
-import java.io.Reader;
-import java.io.StringWriter;
-import java.io.Writer;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.SQLIntegrityConstraintViolationException;
-import java.sql.SQLTimeoutException;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.io.*;
+import java.sql.*;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -39,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultPersistor implements Persistor, Validatable {
 
   private static final String ALL_FIELDS =
-      "id, uniqueRequestId, invocation, topic, seq, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version";
+      "id, uniqueRequestId, invocation, topic, seq, lastAttemptTime, nextAttemptTime, attempts, blocked, processed, version, retryOptions";
 
   /**
    * @param writeLockTimeoutSeconds How many seconds to wait before timing out on obtaining a write
@@ -116,15 +107,20 @@ public class DefaultPersistor implements Persistor, Validatable {
             + tableName
             + " ("
             + ALL_FIELDS
-            + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    var writer = new StringWriter();
-    serializer.serializeInvocation(entry.getInvocation(), writer);
+            + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    var invocationWriter = new StringWriter();
+    serializer.serializeInvocation(entry.getInvocation(), invocationWriter);
+    StringWriter retryWriter = null;
+    if (entry.getRetryOptions() != null) {
+      retryWriter = new StringWriter();
+      serializer.serializeRetryOptions(entry.getRetryOptions(), retryWriter);
+    }
     if (entry.getTopic() != null) {
       setNextSequence(tx, entry);
       log.info("Assigned sequence number {} to topic {}", entry.getSequence(), entry.getTopic());
     }
     PreparedStatement stmt = tx.prepareBatchStatement(insertSql);
-    setupInsert(entry, writer, stmt);
+    setupInsert(entry, invocationWriter, retryWriter, stmt);
     if (entry.getUniqueRequestId() == null) {
       stmt.addBatch();
       log.debug("Inserted {} in batch", entry.description());
@@ -184,7 +180,7 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   private void setupInsert(
-      TransactionOutboxEntry entry, StringWriter writer, PreparedStatement stmt)
+      TransactionOutboxEntry entry, StringWriter writer, StringWriter retryWriter, PreparedStatement stmt)
       throws SQLException {
     stmt.setString(1, entry.getId());
     stmt.setString(2, entry.getUniqueRequestId());
@@ -202,6 +198,11 @@ public class DefaultPersistor implements Persistor, Validatable {
     stmt.setBoolean(9, entry.isBlocked());
     stmt.setBoolean(10, entry.isProcessed());
     stmt.setInt(11, entry.getVersion());
+    if (retryWriter == null) {
+      stmt.setNull(12, Types.VARCHAR);
+    } else {
+      stmt.setString(12, retryWriter.toString());
+    }
   }
 
   @Override
@@ -409,6 +410,11 @@ public class DefaultPersistor implements Persistor, Validatable {
       } catch (IOException e) {
         invocation = new FailedDeserializingInvocation(e);
       }
+      var retryOptionsString = rs.getString("retryOptions");
+      NextRetryStrategy.Options options = null;
+      if (retryOptionsString != null) {
+        options = serializer.deserializeRetryOptions(new StringReader(retryOptionsString));
+      }
       TransactionOutboxEntry entry =
           TransactionOutboxEntry.builder()
               .invocation(invocation)
@@ -416,6 +422,7 @@ public class DefaultPersistor implements Persistor, Validatable {
               .uniqueRequestId(rs.getString("uniqueRequestId"))
               .topic("*".equals(topic) ? null : topic)
               .sequence(sequence)
+              .retryOptions(options)
               .lastAttemptTime(
                   rs.getTimestamp("lastAttemptTime") == null
                       ? null

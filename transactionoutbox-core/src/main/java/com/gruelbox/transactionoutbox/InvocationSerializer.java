@@ -42,4 +42,12 @@ public interface InvocationSerializer {
    * @return The deserialized invocation.
    */
   Invocation deserializeInvocation(Reader reader) throws IOException;
+
+  default void serializeRetryOptions(NextRetryStrategy.Options retryOptions, Writer writer) {
+    throw new UnsupportedOperationException("Serialize retry options not implemented");
+  }
+
+  default NextRetryStrategy.Options deserializeRetryOptions(Reader reader) throws IOException {
+    throw new UnsupportedOperationException("Deserialize retry options not implemented");
+  }
 }
