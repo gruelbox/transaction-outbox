@@ -533,44 +533,51 @@ A common request is to propagate [OTEL](https://opentelemetry.io/) traces from t
 ```java
 static class OtelListener implements TransactionOutboxListener {
 
-    /** Serialises the current context into {@link Invocation#getSession()}. */
-    @Override
-    public Map<String, String> extractSession() {
+   /** Serialises the current context into {@link Invocation#getSession()}. */
+   @Override
+   public Map<String, String> extractSession() {
       var result = new HashMap<String, String>();
-      TextMapSetter<HashMap<String, String>> setter = (carrier, k, v) -> carrier.put(k, v);
-      otel.getPropagators().getTextMapPropagator().inject(Context.current(), result, setter);
+      SpanContext spanContext = Span.current().getSpanContext();
+      if (!spanContext.isValid()) {
+         return null;
+      }
+      result.put("traceId", spanContext.getTraceId());
+      result.put("spanId", spanContext.getSpanId());
+      log.info("Extracted: {}", result);
       return result;
-    }
+   }
 
-    /**
-     * Deserialises {@link Invocation#getSession()} and sets it as the current context so that any
-     * new span started by the method we invoke will treat it as the parent span
-     */
-    @Override
-    public void wrapInvocationAndInit(Invocator invocator) {
-      try (Scope scope = deserializeRemoteContext(invocator.getInvocation()).makeCurrent()) {
-        invocator.runUnchecked();
+   /**
+    * Deserialises {@link Invocation#getSession()} and sets it as the current context so that any
+    * new span started by the method we invoke will treat it as the parent span
+    */
+   @Override
+   public void wrapInvocationAndInit(Invocator invocator) {
+      Invocation inv = invocator.getInvocation();
+      var spanBuilder =
+              otel.getTracer("transaction-outbox")
+                      .spanBuilder(String.format("%s.%s", inv.getClassName(), inv.getMethodName()))
+                      .setNoParent();
+      for (var i = 0; i < inv.getArgs().length; i++) {
+         spanBuilder.setAttribute("arg" + i, Utils.stringify(inv.getArgs()[i]));
       }
-    }
-
-    private Context deserializeRemoteContext(Invocation invocation) {
-      if (invocation.getSession() == null) {
-        return Context.current();
+      if (inv.getSession() != null) {
+         var traceId = inv.getSession().get("traceId");
+         var spanId = inv.getSession().get("spanId");
+         if (traceId != null && spanId != null) {
+            spanBuilder.addLink(
+                    SpanContext.createFromRemoteParent(
+                            traceId, spanId, TraceFlags.getSampled(), TraceState.getDefault()));
+         }
       }
-      return otel.getPropagators().getTextMapPropagator().extract(Context.root(), invocation.getSession(),
-          new TextMapGetter<>() {
-            @Override
-            public Iterable<String> keys(Map<String, String> carrier) {
-              return carrier.keySet();
-            }
-
-            @Override
-            public String get(Map<String, String> carrier, String key) {
-              return carrier.get(key);
-            }
-          });
-    }
-  }
+      var span = spanBuilder.startSpan();
+      try (Scope scope = span.makeCurrent()) {
+         invocator.runUnchecked();
+      } finally {
+         span.end();
+      }
+   }
+}
 ```
 Check out `TestOTEL` for an example of this in use.
 
