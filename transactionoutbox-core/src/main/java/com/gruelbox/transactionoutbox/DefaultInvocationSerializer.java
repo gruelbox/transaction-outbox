@@ -238,6 +238,7 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
       obj.add("p", params);
       obj.add("a", args);
       obj.add("x", context.serialize(src.getMdc()));
+      obj.add("s", context.serialize(src.getSession()));
       return obj;
     }
 
@@ -302,8 +303,9 @@ public final class DefaultInvocationSerializer implements InvocationSerializer {
         }
       }
       Map<String, String> mdc = context.deserialize(jsonObject.get("x"), Map.class);
+      Map<String, String> session = context.deserialize(jsonObject.get("s"), Map.class);
 
-      return new Invocation(className, methodName, params, args, mdc);
+      return new Invocation(className, methodName, params, args, mdc, session);
     }
 
     private Class<?> classForName(String name) {

@@ -11,6 +11,11 @@ class TestDefaultInvocationSerializer {
     public Version1() {
       super(1);
     }
+
+    @Override
+    void testSession() {
+      // Not supported
+    }
   }
 
   @Nested

@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
@@ -33,9 +34,10 @@ public class TestOTEL extends BaseTest {
   private static final OpenTelemetry otel = otelTesting.getOpenTelemetry();
 
   @Test
-  void blah() throws InterruptedException {
+  void blah() throws Exception {
     var latch = new CountDownLatch(1);
     AtomicReference<String> childTraceId = new AtomicReference<>();
+    AtomicBoolean failedOnce = new AtomicBoolean();
     String parentTraceId = null;
 
     var txManager = TransactionManager.fromDataSource(dataSource);
@@ -46,22 +48,24 @@ public class TestOTEL extends BaseTest {
             .instantiator(
                 Instantiator.using(
                     clazz ->
-                        new InterfaceProcessor() {
-                          @Override
-                          public void process(int foo, String bar) {
-                            // We should be running in the parent trace. We'll record the trace id
-                            // and check afterwards
-                            var span =
-                                otel.getTracer("child-tracer")
-                                    .spanBuilder("child-span")
-                                    .startSpan();
-                            try (Scope scope = span.makeCurrent()) {
-                              childTraceId.set(span.getSpanContext().getTraceId());
-                            } finally {
-                              span.end();
-                            }
-                          }
-                        }))
+                        (InterfaceProcessor)
+                            (foo, bar) -> {
+                              if (failedOnce.compareAndSet(false, true)) {
+                                throw new RuntimeException("Temporary failure");
+                              }
+
+                              // We should be running in the parent trace. We'll record the trace id
+                              // and check afterwards
+                              var span =
+                                  otel.getTracer("child-tracer")
+                                      .spanBuilder("child-span")
+                                      .startSpan();
+                              try (Scope scope = span.makeCurrent()) {
+                                childTraceId.set(span.getSpanContext().getTraceId());
+                              } finally {
+                                span.end();
+                              }
+                            }))
             .attemptFrequency(Duration.ofMillis(500))
             .listener(new LatchListener(latch).andThen(new OtelListener()))
             .blockAfterAttempts(2)
@@ -76,8 +80,14 @@ public class TestOTEL extends BaseTest {
       parentSpan.end();
     }
 
-    // Wait for the job to complete and check they ran in the same trace
-    assertTrue(latch.await(10, TimeUnit.SECONDS));
+    // Wait for the job to complete
+    withRunningFlusher(
+        outbox,
+        () -> {
+          assertTrue(latch.await(10, TimeUnit.SECONDS));
+        });
+
+    // Check they ran in the same trace
     log.info("Child trace is {}", childTraceId.get());
     log.info("Parent trace is {}", parentTraceId);
     assertTrue(parentTraceId.equals(childTraceId.get()));
@@ -111,6 +121,9 @@ public class TestOTEL extends BaseTest {
     private Context deserializeRemoteContext(Invocation invocation) {
       var propagator = otel.getPropagators().getTextMapPropagator();
       var carrier = invocation.getSession();
+      if (carrier == null) {
+        return Context.current();
+      }
       log.info("Received: {}", carrier);
       return propagator.extract(
           Context.root(),
