@@ -294,6 +294,21 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   @Override
   @SuppressWarnings("WeakerAccess")
   public void processNow(TransactionOutboxEntry entry) {
+    listener.wrapInvocationAndInit(
+        new TransactionOutboxListener.Invocator() {
+          @Override
+          public void run() {
+            processNowInternal(entry);
+          }
+
+          @Override
+          public Invocation getInvocation() {
+            return entry.getInvocation();
+          }
+        });
+  }
+
+  private void processNowInternal(TransactionOutboxEntry entry) {
     initialize();
     Boolean success = null;
     try {
@@ -362,7 +377,8 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
                 methodName,
                 params,
                 args,
-                serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null))
+                serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null,
+                listener.extractSession()))
         .lastAttemptTime(null)
         .nextAttemptTime(clockProvider.get().instant())
         .uniqueRequestId(uniqueRequestId)
