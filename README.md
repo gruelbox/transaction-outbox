@@ -31,6 +31,8 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
    1. [Delayed/scheduled processing](#delayedscheduled-processing)
    1. [Flexible serialization](#flexible-serialization-beta)
    1. [Clustering](#clustering)
+   1. [OpenTelemetry](#opentelemetry)
+   1. [Encryption](#encryption)
 1. [Configuration reference](#configuration-reference)
 1. [Stubbing in tests](#stubbing-in-tests)
 
@@ -524,6 +526,65 @@ String message = objectMapper.writeValueAsString(entry);
 TransactionOutboxEntry entry = objectMapper.readValue(message, TransactionOutboxEntry.class);
 ```
 Armed with the above, happy clustering!
+
+### OpenTelemetry
+
+A common request is to propagate [OTEL](https://opentelemetry.io/) traces from the calling code to an outboxed task. This can be achieved using `TransactionOutboxListener` to record the details of the parent `Span` as session variables, then restore them on invocation. Example:
+```java
+static class OtelListener implements TransactionOutboxListener {
+
+   /** Serialises the current context into {@link Invocation#getSession()}. */
+   @Override
+   public Map<String, String> extractSession() {
+      var result = new HashMap<String, String>();
+      SpanContext spanContext = Span.current().getSpanContext();
+      if (!spanContext.isValid()) {
+         return null;
+      }
+      result.put("traceId", spanContext.getTraceId());
+      result.put("spanId", spanContext.getSpanId());
+      log.info("Extracted: {}", result);
+      return result;
+   }
+
+   /**
+    * Deserialises {@link Invocation#getSession()} and sets it as the current context so that any
+    * new span started by the method we invoke will treat it as the parent span
+    */
+   @Override
+   public void wrapInvocationAndInit(Invocator invocator) {
+      Invocation inv = invocator.getInvocation();
+      var spanBuilder =
+              otel.getTracer("transaction-outbox")
+                      .spanBuilder(String.format("%s.%s", inv.getClassName(), inv.getMethodName()))
+                      .setNoParent();
+      for (var i = 0; i < inv.getArgs().length; i++) {
+         spanBuilder.setAttribute("arg" + i, Utils.stringify(inv.getArgs()[i]));
+      }
+      if (inv.getSession() != null) {
+         var traceId = inv.getSession().get("traceId");
+         var spanId = inv.getSession().get("spanId");
+         if (traceId != null && spanId != null) {
+            spanBuilder.addLink(
+                    SpanContext.createFromRemoteParent(
+                            traceId, spanId, TraceFlags.getSampled(), TraceState.getDefault()));
+         }
+      }
+      var span = spanBuilder.startSpan();
+      try (Scope scope = span.makeCurrent()) {
+         invocator.runUnchecked();
+      } finally {
+         span.end();
+      }
+   }
+}
+```
+Check out `TestOTEL` for an example of this in use.
+
+`extractSession` can be used for other things too, such as authentication state, HTTP session variables or anything else that might be in static context at the time of a call and you want to be inherited by the task.
+
+### Encryption
+Be warned that all data written to disk is written unencrypted by default (including MDC, session variables, method arguments...). If you may be writing sensitive data, particularly authentication-related data, you are advised to create your own `InvocationSerializer` by decorating an existing implementation, and use an efficient stream encryptor to write the data in encrupted form.
 
 ## Configuration reference
 
