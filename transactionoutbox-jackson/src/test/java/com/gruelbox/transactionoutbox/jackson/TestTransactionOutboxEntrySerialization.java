@@ -35,6 +35,7 @@ public class TestTransactionOutboxEntrySerialization {
                           "y", 3,
                           "z", List.of(1, 2, 3))
                     },
+                    null,
                     null))
             .attempts(1)
             .blocked(true)

@@ -122,6 +122,11 @@ public interface ParameterContextTransactionManager<T> extends TransactionManage
       }
     }
     return new Invocation(
-        invocation.getClassName(), invocation.getMethodName(), params, args, invocation.getMdc());
+        invocation.getClassName(),
+        invocation.getMethodName(),
+        params,
+        args,
+        invocation.getMdc(),
+        invocation.getSession());
   }
 }

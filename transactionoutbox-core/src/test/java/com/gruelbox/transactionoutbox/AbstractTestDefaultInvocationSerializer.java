@@ -193,7 +193,8 @@ abstract class AbstractTestDefaultInvocationSerializer {
   void testMDC() {
     Class<?>[] primitives = {Integer.class};
     Object[] values = {1};
-    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values, Map.of("A", "1", "B", "2")));
+    check(new Invocation(
+            CLASS_NAME, METHOD_NAME, primitives, values, Map.of("A", "1", "B", "2"), null));
   }
 
   @Test

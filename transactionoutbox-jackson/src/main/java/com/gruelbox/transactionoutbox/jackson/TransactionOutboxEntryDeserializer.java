@@ -21,6 +21,7 @@ class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOut
     JsonNode node = oc.readTree(p);
     var i = node.get("invocation");
     var mdc = i.get("mdc");
+    var session = i.get("session");
     return TransactionOutboxEntry.builder()
         .id(node.get("id").asText())
         .lastAttemptTime(mapJsonInstant(node, "lastAttemptTime", c))
@@ -40,6 +41,12 @@ class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOut
                     ? null
                     : c.readTreeAsValue(
                         mdc,
+                        c.getTypeFactory()
+                            .constructType(new TypeReference<Map<String, String>>() {})),
+                session.isNull()
+                    ? null
+                    : c.readTreeAsValue(
+                        session,
                         c.getTypeFactory()
                             .constructType(new TypeReference<Map<String, String>>() {}))))
         .build();
