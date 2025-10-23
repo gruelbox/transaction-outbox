@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -176,11 +178,37 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   private boolean indexViolation(Exception e) {
-    return (e instanceof SQLIntegrityConstraintViolationException)
-        || (e.getClass().getName().equals("org.postgresql.util.PSQLException")
-            && e.getMessage().contains("constraint"))
-        || (e.getClass().getName().equals("com.microsoft.sqlserver.jdbc.SQLServerException")
-            && e.getMessage().contains("duplicate key"));
+
+    Throwable cause = e;
+    // Unwrap UndeclaredThrowableException (used in proxies or AOP)
+    if (cause instanceof UndeclaredThrowableException) {
+      cause = cause.getCause();
+    }
+
+    // Unwrap InvocationTargetException (used when reflection is involved)
+    if (cause instanceof InvocationTargetException) {
+      cause = ((InvocationTargetException) cause).getTargetException();
+    }
+
+    // Check for standard JDBC constraint violation
+    if (cause instanceof SQLIntegrityConstraintViolationException) {
+      return true;
+    }
+
+    // PostgreSQL-specific check
+    String causeClass = cause.getClass().getName();
+    String message = cause.getMessage() != null ? cause.getMessage() : "";
+    if ("org.postgresql.util.PSQLException".equals(causeClass) && message.contains("constraint")) {
+      return true;
+    }
+
+    // SQL Server-specific check
+    if ("com.microsoft.sqlserver.jdbc.SQLServerException".equals(causeClass)
+        && message.contains("duplicate key")) {
+      return true;
+    }
+
+    return false;
   }
 
   private void setupInsert(
