@@ -154,6 +154,23 @@ class TestJacksonInvocationSerializer {
   }
 
   @Test
+  void deserializes_new_representation_correctly() throws IOException {
+    StringReader reader =
+        new StringReader(
+            "{\"c\":\"com.gruelbox.transactionoutbox.jackson.Service\",\"m\":\"parseDate\",\"p\":[\"String\"],\"a\":[{\"t\":\"String\",\"v\":\"2021-05-11\"}],\"x\":{\"REQUEST-ID\":\"someRequestId\"},\"s\":{\"SESSION-ID\":\"someSessionId\"}}");
+    Invocation invocation = underTest.deserializeInvocation(reader);
+    assertEquals(
+        new Invocation(
+            "com.gruelbox.transactionoutbox.jackson.Service",
+            "parseDate",
+            new Class<?>[] {String.class},
+            new Object[] {"2021-05-11"},
+            Map.of("REQUEST-ID", "someRequestId"),
+            Map.of("SESSION-ID", "someSessionId")),
+        invocation);
+  }
+
+  @Test
   void deserializes_old_representation_correctly() throws IOException {
     StringReader reader =
         new StringReader(
@@ -174,27 +191,27 @@ class TestJacksonInvocationSerializer {
     Class<?>[] parameterTypes = new Class<?>[] {SerializationStressTestInput.class};
     Object[] args = new Object[] {new SerializationStressTestInput()};
 
-    check(new Invocation(CLASS_NAME, METHOD_NAME, parameterTypes, args, null, null));
+    check(new Invocation(CLASS_NAME, METHOD_NAME, parameterTypes, args, null));
   }
 
   @Test
   void serializes_new_representation_list() {
     Class<?>[] parameterTypes = new Class<?>[] {List.class};
     Object[] args = new Object[] {List.of(MonetaryAmount.ofGbp("200"))};
-    check(new Invocation(CLASS_NAME, METHOD_NAME, parameterTypes, args, null, null));
+    check(new Invocation(CLASS_NAME, METHOD_NAME, parameterTypes, args, null));
   }
 
   @Test
   void serializes_new_representation_set() {
     Class<?>[] parameterTypes = new Class<?>[] {Set.class};
     Object[] args = new Object[] {Set.of(MonetaryAmount.ofGbp("200"))};
-    check(new Invocation(CLASS_NAME, METHOD_NAME, parameterTypes, args, null, null));
+    check(new Invocation(CLASS_NAME, METHOD_NAME, parameterTypes, args, null));
   }
 
   @Test
   void serializes_new_representation_map() {
     Class<?>[] parameterTypes = new Class<?>[] {Set.class};
     Object[] args = new Object[] {Map.of("investmentValue", MonetaryAmount.ofGbp("200"))};
-    check(new Invocation(CLASS_NAME, METHOD_NAME, parameterTypes, args, null, null));
+    check(new Invocation(CLASS_NAME, METHOD_NAME, parameterTypes, args, null));
   }
 }
