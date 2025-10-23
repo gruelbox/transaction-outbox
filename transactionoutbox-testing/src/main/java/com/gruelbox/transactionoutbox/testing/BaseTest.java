@@ -31,10 +31,12 @@ public abstract class BaseTest {
     config.addDataSourceProperty("cachePrepStmts", "true");
     dataSource = new HikariDataSource(config);
     flushExecutor = Executors.newFixedThreadPool(4);
+    TestingMode.enable();
   }
 
   @AfterEach
   final void baseAfterEach() throws InterruptedException {
+    TestingMode.disable();
     flushExecutor.shutdown();
     Assertions.assertTrue(flushExecutor.awaitTermination(30, TimeUnit.SECONDS));
     dataSource.close();

@@ -579,7 +579,7 @@ static class OtelListener implements TransactionOutboxListener {
    }
 }
 ```
-Check out `TestOTEL` for an example of this in use.
+Check out `AbstractAcceptanceTest.OtelListener` for an example of this in use.
 
 `extractSession` can be used for other things too, such as authentication state, HTTP session variables or anything else that might be in static context at the time of a call and you want to be inherited by the task.
 

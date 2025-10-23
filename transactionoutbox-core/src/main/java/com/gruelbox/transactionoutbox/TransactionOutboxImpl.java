@@ -32,6 +32,13 @@ import org.slf4j.event.Level;
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
 
+  /**
+   * Used in tests to ensure that the full serialization/deserialization loop is done every time
+   * work is processed. This prevents tests passing which would fail if the work were delayed and
+   * handled after being loaded from disk.
+   */
+  static final AtomicBoolean FORCE_SERIALIZE_AND_DESERIALIZE_BEFORE_USE = new AtomicBoolean();
+
   private final TransactionManager transactionManager;
   private final Persistor persistor;
   private final Instantiator instantiator;
@@ -369,16 +376,22 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
       Object[] args,
       String uniqueRequestId,
       String topic) {
+
+    var invocation =
+        new Invocation(
+            instantiator.getName(clazz),
+            methodName,
+            params,
+            args,
+            serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null,
+            listener.extractSession());
+    if (FORCE_SERIALIZE_AND_DESERIALIZE_BEFORE_USE.get()) {
+      invocation = persistor.serializeAndDeserialize(invocation);
+    }
+
     return TransactionOutboxEntry.builder()
         .id(UUID.randomUUID().toString())
-        .invocation(
-            new Invocation(
-                instantiator.getName(clazz),
-                methodName,
-                params,
-                args,
-                serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null,
-                listener.extractSession()))
+        .invocation(invocation)
         .lastAttemptTime(null)
         .nextAttemptTime(clockProvider.get().instant())
         .uniqueRequestId(uniqueRequestId)
