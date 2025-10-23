@@ -157,7 +157,7 @@ class TestJacksonInvocationSerializer {
   void deserializes_old_representation_correctly() throws IOException {
     StringReader reader =
         new StringReader(
-            "{\"c\":\"com.gruelbox.transactionoutbox.jackson.Service\",\"m\":\"parseDate\",\"p\":[\"String\"],\"a\":[{\"t\":\"String\",\"v\":\"2021-05-11\"}],\"x\":{\"REQUEST-ID\":\"someRequestId\"},\"s\":{\"SESSION-ID\":\"someSessionId\"}}");
+            "{\"c\":\"com.gruelbox.transactionoutbox.jackson.Service\",\"m\":\"parseDate\",\"p\":[\"String\"],\"a\":[{\"t\":\"String\",\"v\":\"2021-05-11\"}],\"x\":{\"REQUEST-ID\":\"someRequestId\"}}");
     Invocation invocation = underTest.deserializeInvocation(reader);
     assertEquals(
         new Invocation(
@@ -165,8 +165,7 @@ class TestJacksonInvocationSerializer {
             "parseDate",
             new Class<?>[] {String.class},
             new Object[] {"2021-05-11"},
-            Map.of("REQUEST-ID", "someRequestId"),
-            Map.of("SESSION-ID", "someSessionId")),
+            Map.of("REQUEST-ID", "someRequestId")),
         invocation);
   }
 

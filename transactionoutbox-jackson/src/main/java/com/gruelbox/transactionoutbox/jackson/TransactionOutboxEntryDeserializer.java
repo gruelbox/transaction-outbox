@@ -43,7 +43,7 @@ class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOut
                         mdc,
                         c.getTypeFactory()
                             .constructType(new TypeReference<Map<String, String>>() {})),
-                session.isNull()
+                session == null || session.isNull()
                     ? null
                     : c.readTreeAsValue(
                         session,

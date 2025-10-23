@@ -60,8 +60,9 @@ class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
     Map<String, String> mdc =
         p.getCodec()
             .readValue(p.getCodec().treeAsTokens(node.get("mdc")), new TypeReference<>() {});
-    Map<String, String> session =
-        p.getCodec()
+    Map<String, String> session = node.get("session") == null
+        ? null
+        : p.getCodec()
             .readValue(p.getCodec().treeAsTokens(node.get("session")), new TypeReference<>() {});
 
     return new Invocation(className, methodName, types, args, mdc, session);
