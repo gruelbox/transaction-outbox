@@ -8,10 +8,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.jooq.JooqTransactionManager;
+import com.gruelbox.transactionoutbox.testing.LatchListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.*;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Configuration;
@@ -27,9 +30,11 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
 
   private HikariDataSource dataSource;
   private DSLContext dsl;
+  private static ThreadLocal<String> sessionVar = new ThreadLocal<>();
 
   @BeforeEach
   void beforeEach() {
+    TestingMode.enable();
     dataSource = pooledDataSource();
     dsl = createDsl();
     createTestTable(dsl);
@@ -37,6 +42,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
 
   @AfterEach
   void afterEach() {
+    TestingMode.disable();
     dataSource.close();
   }
 
@@ -67,13 +73,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
         TransactionOutbox.builder()
             .transactionManager(createTransactionManager())
             .persistor(Persistor.forDialect(Dialect.H2))
-            .listener(
-                new TransactionOutboxListener() {
-                  @Override
-                  public void success(TransactionOutboxEntry entry) {
-                    latch.countDown();
-                  }
-                })
+            .listener(new LatchListener(latch))
             .build();
 
     clearOutbox(createTransactionManager());
@@ -102,13 +102,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
         TransactionOutbox.builder()
             .transactionManager(createTransactionManager())
             .persistor(Persistor.forDialect(Dialect.H2))
-            .listener(
-                new TransactionOutboxListener() {
-                  @Override
-                  public void success(TransactionOutboxEntry entry) {
-                    latch.countDown();
-                  }
-                })
+            .listener(new LatchListener(latch))
             .build();
 
     clearOutbox(createTransactionManager());
@@ -297,6 +291,45 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
     JooqTestUtils.assertRecordNotExists(dsl, 2);
   }
 
+  @Test
+  void testSessionVariables() throws InterruptedException {
+    CountDownLatch latch = new CountDownLatch(1);
+    var sessionVarLocal = UUID.randomUUID().toString();
+
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(createTransactionManager())
+            .persistor(Persistor.forDialect(Dialect.H2))
+            .listener(
+                new LatchListener(latch)
+                    .andThen(
+                        new TransactionOutboxListener() {
+                          @Override
+                          public Map<String, String> extractSession() {
+                            return Map.of("sesvar", sessionVarLocal);
+                          }
+
+                          @Override
+                          public void wrapInvocationAndInit(Invocator invocator) {
+                            sessionVar.set(invocator.getInvocation().getSession().get("sesvar"));
+                            try {
+                              invocator.runUnchecked();
+                            } finally {
+                              sessionVar.remove();
+                            }
+                          }
+                        }))
+            .build();
+
+    clearOutbox(createTransactionManager());
+    createTransactionManager()
+        .inTransaction(
+            tx -> outbox.schedule(Worker.class).checkSessionPresent(sessionVarLocal, tx));
+
+    // Should be fired after commit
+    assertTrue(latch.await(2, TimeUnit.SECONDS));
+  }
+
   private void clearOutbox(TransactionManager transactionManager) {
     runSql(transactionManager, "DELETE FROM TXNO_OUTBOX");
   }
@@ -328,6 +361,10 @@ class TestJooqTransactionManagerWithDefaultProviderAndExplicitlyPassedContext {
     @SuppressWarnings("SameParameterValue")
     void process(int i, Transaction transaction) {
       JooqTestUtils.writeRecord(transaction, i);
+    }
+
+    void checkSessionPresent(String expected, Transaction transaction) {
+      assertEquals(expected, sessionVar.get());
     }
 
     void process(int i, Configuration configuration) {

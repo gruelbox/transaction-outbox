@@ -14,7 +14,12 @@ class TestDefaultInvocationSerializer {
 
     @Override
     void testSession() {
-      // Not supported
+      // no-op
+    }
+
+    @Override
+    void testMDCAndSession() {
+      // no-op
     }
   }
 

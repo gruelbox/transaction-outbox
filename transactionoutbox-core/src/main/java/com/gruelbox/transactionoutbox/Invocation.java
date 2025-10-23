@@ -87,7 +87,9 @@ public class Invocation {
    *     identifies the method.
    * @param args The arguments to call. Must match {@link #parameterTypes}.
    * @param mdc Thread-local context to recreate when running the task.
+   * @deprecated Use another constructor.
    */
+  @Deprecated(forRemoval = true)
   public Invocation(
       String className,
       String methodName,

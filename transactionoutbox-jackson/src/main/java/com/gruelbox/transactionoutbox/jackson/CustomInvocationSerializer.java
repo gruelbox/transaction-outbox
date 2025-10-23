@@ -37,6 +37,7 @@ class CustomInvocationSerializer extends StdSerializer<Invocation> {
     gen.writeEndArray();
     gen.writeObjectField("args", value.getArgs());
     gen.writeObjectField("mdc", value.getMdc());
+    gen.writeObjectField("session", value.getSession());
     gen.writeEndObject();
   }
 }

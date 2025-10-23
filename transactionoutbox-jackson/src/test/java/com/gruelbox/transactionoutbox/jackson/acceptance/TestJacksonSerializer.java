@@ -11,8 +11,10 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.jackson.JacksonInvocationSerializer;
 import com.gruelbox.transactionoutbox.testing.AbstractAcceptanceTest;
+import com.gruelbox.transactionoutbox.testing.LatchListener;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.Test;
 class TestJacksonSerializer extends AbstractAcceptanceTest {
 
   private final CountDownLatch latch = new CountDownLatch(1);
+  private final ThreadLocal<Map<String, String>> sessionVariable = new ThreadLocal<>();
 
   @Override
   protected Persistor persistor() {
@@ -41,10 +44,11 @@ class TestJacksonSerializer extends AbstractAcceptanceTest {
 
   void process(List<Object> difficultDataStructure) {
     assertEquals(List.of(LocalDate.of(2000, 1, 1), "a", "b", 2), difficultDataStructure);
+    assertEquals(Map.of("sessionVar", "foobar"), sessionVariable.get());
   }
 
   @Test
-  void testPolymorphicDeserialization() throws InterruptedException {
+  void testPolymorphicDeserialization() throws Exception {
     var transactionManager = txManager();
     var outbox =
         TransactionOutbox.builder()
@@ -52,12 +56,24 @@ class TestJacksonSerializer extends AbstractAcceptanceTest {
             .persistor(persistor())
             .instantiator(Instantiator.using(clazz -> TestJacksonSerializer.this))
             .listener(
-                new TransactionOutboxListener() {
-                  @Override
-                  public void success(TransactionOutboxEntry entry) {
-                    latch.countDown();
-                  }
-                })
+                new LatchListener(latch)
+                    .andThen(
+                        new TransactionOutboxListener() {
+                          @Override
+                          public Map<String, String> extractSession() {
+                            return Map.of("sessionVar", "foobar");
+                          }
+
+                          @Override
+                          public void wrapInvocationAndInit(Invocator invocator) {
+                            sessionVariable.set(invocator.getInvocation().getSession());
+                            try {
+                              invocator.runUnchecked();
+                            } finally {
+                              sessionVariable.remove();
+                            }
+                          }
+                        }))
             .build();
     transactionManager.inTransaction(
         () -> outbox.schedule(getClass()).process(List.of(LocalDate.of(2000, 1, 1), "a", "b", 2)));

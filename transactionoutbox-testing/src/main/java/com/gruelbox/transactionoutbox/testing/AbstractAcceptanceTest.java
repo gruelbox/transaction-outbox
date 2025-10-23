@@ -9,7 +9,18 @@ import static org.hamcrest.Matchers.empty;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.gruelbox.transactionoutbox.*;
+import com.gruelbox.transactionoutbox.spi.Utils;
 import com.zaxxer.hikari.HikariDataSource;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.TraceFlags;
+import io.opentelemetry.api.trace.TraceState;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.sdk.testing.junit5.OpenTelemetryExtension;
+import io.opentelemetry.sdk.trace.data.SpanData;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -27,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 @Slf4j
 public abstract class AbstractAcceptanceTest extends BaseTest {
@@ -51,6 +63,36 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     singleThreadPool.shutdown();
     assertTrue(unreliablePool.awaitTermination(30, SECONDS));
     assertTrue(singleThreadPool.awaitTermination(30, SECONDS));
+  }
+
+  @Test
+  final void testMDCPassedToTask() throws InterruptedException {
+    CountDownLatch latch = new CountDownLatch(1);
+    var transactionManager = txManager();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(
+                Instantiator.using(
+                    clazz ->
+                        (InterfaceProcessor)
+                            (foo, bar) -> {
+                              log.info("Processing ({}, {})", foo, bar);
+                              assertEquals("Foo", MDC.get("SESSION-KEY"));
+                            }))
+            .listener(new LatchListener(latch))
+            .persistor(StubPersistor.builder().build())
+            .build();
+
+    MDC.put("SESSION-KEY", "Foo");
+    try {
+      transactionManager.inTransaction(
+          () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee"));
+    } finally {
+      MDC.clear();
+    }
+
+    assertTrue(latch.await(2, TimeUnit.SECONDS));
   }
 
   @Test
@@ -810,6 +852,196 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
             };
       } else {
         throw new UnsupportedOperationException();
+      }
+    }
+  }
+
+  @Test
+  void runWithParentOtelSpan() throws Exception {
+    OpenTelemetryExtension otelTesting = OpenTelemetryExtension.create();
+    OpenTelemetry otel = otelTesting.getOpenTelemetry();
+    otelTesting.beforeAll(null);
+    try {
+      otelTesting.beforeEach(null);
+
+      var latch = new CountDownLatch(1);
+      AtomicReference<SpanContext> remotedSpan = new AtomicReference<>();
+
+      var txManager = txManager();
+      var outbox =
+          TransactionOutbox.builder()
+              .transactionManager(txManager)
+              .persistor(Persistor.forDialect(connectionDetails().dialect()))
+              .instantiator(
+                  Instantiator.using(
+                      clazz ->
+                          (InterfaceProcessor)
+                              (foo, bar) -> {
+                                remotedSpan.set(Span.current().getSpanContext());
+                              }))
+              .attemptFrequency(Duration.ofMillis(500))
+              .listener(new OtelListener().andThen(new LatchListener(latch)))
+              .blockAfterAttempts(2)
+              .build();
+
+      // Start a parent span, which should be propagated to the instantiator above
+      Span parentSpan = otel.getTracer("parent-tracer").spanBuilder("parent-span").startSpan();
+      String parentTraceId = null;
+      try (Scope scope = parentSpan.makeCurrent()) {
+        parentTraceId = Span.current().getSpanContext().getTraceId();
+        txManager.inTransaction(() -> outbox.schedule(InterfaceProcessor.class).process(1, "1"));
+      } finally {
+        parentSpan.end();
+      }
+
+      // Wait for the job to complete
+      assertTrue(latch.await(10, TimeUnit.SECONDS));
+
+      SpanData remotedSpanData = null;
+      for (int i = 0; i < 5; i++) {
+        remotedSpanData =
+            otelTesting.getSpans().stream()
+                .filter(it -> it.getSpanId().equals(remotedSpan.get().getSpanId()))
+                .findFirst()
+                .orElse(null);
+        if (remotedSpanData == null) {
+          if (i == 4) {
+            throw new RuntimeException("No matching span");
+          } else {
+            Thread.sleep(500);
+          }
+        }
+      }
+
+      // Check they ran with linked traces and the correct class/method/args
+      assertTrue(
+          remotedSpanData.getLinks().stream()
+              .findFirst()
+              .orElseThrow(() -> new RuntimeException("No linked trace"))
+              .getSpanContext()
+              .getTraceId()
+              .equals(parentTraceId));
+      assertTrue(
+          remotedSpanData
+              .getName()
+              .equals("com.gruelbox.transactionoutbox.testing.InterfaceProcessor.process"));
+      assertTrue(remotedSpanData.getAttributes().get(AttributeKey.stringKey("arg0")).equals("1"));
+      assertTrue(
+          remotedSpanData.getAttributes().get(AttributeKey.stringKey("arg1")).equals("\"1\""));
+    } finally {
+      otelTesting.afterAll(null);
+    }
+  }
+
+  @Test
+  void runWithoutParentOtelSpan() throws Exception {
+    OpenTelemetryExtension otelTesting = OpenTelemetryExtension.create();
+    OpenTelemetry otel = otelTesting.getOpenTelemetry();
+    otelTesting.beforeAll(null);
+    try {
+      otelTesting.beforeEach(null);
+
+      var latch = new CountDownLatch(1);
+      AtomicReference<SpanContext> remotedSpan = new AtomicReference<>();
+
+      var txManager = txManager();
+      var outbox =
+          TransactionOutbox.builder()
+              .transactionManager(txManager)
+              .persistor(Persistor.forDialect(connectionDetails().dialect()))
+              .instantiator(
+                  Instantiator.using(
+                      clazz ->
+                          (InterfaceProcessor)
+                              (foo, bar) -> remotedSpan.set(Span.current().getSpanContext())))
+              .attemptFrequency(Duration.ofMillis(500))
+              .listener(new OtelListener().andThen(new LatchListener(latch)))
+              .blockAfterAttempts(2)
+              .build();
+
+      // Run with no parent span
+      txManager.inTransaction(() -> outbox.schedule(InterfaceProcessor.class).process(1, "1"));
+
+      // Wait for the job to complete
+      assertTrue(latch.await(10, TimeUnit.SECONDS));
+
+      SpanData remotedSpanData = null;
+      for (int i = 0; i < 5; i++) {
+        remotedSpanData =
+            otelTesting.getSpans().stream()
+                .filter(it -> it.getSpanId().equals(remotedSpan.get().getSpanId()))
+                .findFirst()
+                .orElse(null);
+        if (remotedSpanData == null) {
+          if (i == 4) {
+            throw new RuntimeException("No matching span");
+          } else {
+            Thread.sleep(500);
+          }
+        }
+      }
+
+      // Check they ran with linked traces and the correct class/method/args
+      assertFalse(remotedSpanData.getLinks().stream().findFirst().isPresent());
+      assertTrue(
+          remotedSpanData
+              .getName()
+              .equals("com.gruelbox.transactionoutbox.testing.InterfaceProcessor.process"));
+      assertTrue(remotedSpanData.getAttributes().get(AttributeKey.stringKey("arg0")).equals("1"));
+      assertTrue(
+          remotedSpanData.getAttributes().get(AttributeKey.stringKey("arg1")).equals("\"1\""));
+
+    } finally {
+      otelTesting.afterAll(null);
+    }
+  }
+
+  /** Example {@link TransactionOutboxListener} to propagate traces */
+  static class OtelListener implements TransactionOutboxListener {
+
+    /** Serialises the current context into {@link Invocation#getSession()}. */
+    @Override
+    public Map<String, String> extractSession() {
+      var result = new HashMap<String, String>();
+      SpanContext spanContext = Span.current().getSpanContext();
+      if (!spanContext.isValid()) {
+        return null;
+      }
+      result.put("traceId", spanContext.getTraceId());
+      result.put("spanId", spanContext.getSpanId());
+      log.info("Extracted: {}", result);
+      return result;
+    }
+
+    /**
+     * Deserialises {@link Invocation#getSession()} and sets it as the current context so that any
+     * new span started by the method we invoke will treat it as the parent span
+     */
+    @Override
+    public void wrapInvocationAndInit(Invocator invocator) {
+      Invocation inv = invocator.getInvocation();
+      var spanBuilder =
+          GlobalOpenTelemetry.get()
+              .getTracer("transaction-outbox")
+              .spanBuilder(String.format("%s.%s", inv.getClassName(), inv.getMethodName()))
+              .setNoParent();
+      for (var i = 0; i < inv.getArgs().length; i++) {
+        spanBuilder.setAttribute("arg" + i, Utils.stringify(inv.getArgs()[i]));
+      }
+      if (inv.getSession() != null) {
+        var traceId = inv.getSession().get("traceId");
+        var spanId = inv.getSession().get("spanId");
+        if (traceId != null && spanId != null) {
+          spanBuilder.addLink(
+              SpanContext.createFromRemoteParent(
+                  traceId, spanId, TraceFlags.getSampled(), TraceState.getDefault()));
+        }
+      }
+      var span = spanBuilder.startSpan();
+      try (Scope scope = span.makeCurrent()) {
+        invocator.runUnchecked();
+      } finally {
+        span.end();
       }
     }
   }

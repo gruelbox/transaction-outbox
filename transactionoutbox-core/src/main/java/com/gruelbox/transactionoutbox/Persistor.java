@@ -43,6 +43,16 @@ public interface Persistor {
   void save(Transaction tx, TransactionOutboxEntry entry) throws Exception;
 
   /**
+   * Used in tests to simulate a database reload.
+   *
+   * @param invocation An invocation.
+   * @return The same invocation passed through a serialize/deserialize loop.
+   */
+  default Invocation serializeAndDeserialize(Invocation invocation) {
+    return invocation;
+  }
+
+  /**
    * Deletes a {@link TransactionOutboxEntry}.
    *
    * <p>A record should only be deleted if <em>both</em> the {@code id} and {@code version} on the
