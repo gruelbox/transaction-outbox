@@ -210,7 +210,7 @@
       </plugin>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.5.3</version>
+        <version>3.5.4</version>
         <configuration>
           <argLine>-Doracle.jdbc.javaNetNio=false -XX:+EnableDynamicAgentLoading</argLine>
         </configuration>
