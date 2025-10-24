@@ -644,7 +644,7 @@ TransactionOutbox outbox = TransactionOutbox.builder()
     // Sets how long we should keep records of requests with a unique request id so duplicate requests
     // can be rejected. Defaults to 7 days.
     .retentionThreshold(Duration.ofDays(1))
-    // We can intercept task successes, single failures and blocked tasks. The most common use is to catch blocked tasks
+    // We can intercept and modify numerous events. The most common use is to catch blocked tasks
     // and raise alerts for these to be investigated. A Slack interactive message is particularly effective here
     // since it can be wired up to call unblock() automatically.
     .listener(new TransactionOutboxListener() {
@@ -659,6 +659,20 @@ TransactionOutbox outbox = TransactionOutbox.builder()
         eventPublisher.publish(new BlockedOutboxTaskEvent(entry.getId()));
       }
 
+      @Override
+      public Map<String, String> extractSession() {
+        return Map.of();
+      }
+
+      @Override
+      public void wrapInvocationAndInit(Invocator invocator) {
+        invocator.runUnchecked();
+      }
+
+      @Override
+      public void wrapInvocation(Invocator invocator) throws Exception {
+        invocator.run();
+      }
     })
     .build();
 
