@@ -17,14 +17,14 @@ The latest stable release is available from Maven Central.
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-quarkus</artifactId>
-  <version>6.1.645</version>
+  <version>6.1.653</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-quarkus:6.1.645'
+implementation 'com.gruelbox:transactionoutbox-quarkus:6.1.653'
 ```
 
 ### Development snapshots
