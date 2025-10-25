@@ -188,6 +188,31 @@ class TestJacksonInvocationSerializer {
   }
 
   @Test
+  void serializes_new_representation_stress_test_with_hash_map() {
+    Class<?>[] parameterTypes = new Class<?>[] {SerializationStressTestInput.class};
+    Object[] args = new Object[] {new SerializationStressTestInput()};
+
+    var mdc = new HashMap<String, String>();
+    mdc.put("REQUEST-ID", "someRequestId");
+
+    var session = new HashMap<String, String>();
+    session.put("SESSION-ID", "someSessionId");
+
+    check(new Invocation(CLASS_NAME, METHOD_NAME, parameterTypes, args, mdc, session));
+  }
+
+  @Test
+  void serializes_new_representation_stress_test_with_immutable_map() {
+    Class<?>[] parameterTypes = new Class<?>[] {SerializationStressTestInput.class};
+    Object[] args = new Object[] {new SerializationStressTestInput()};
+
+    var mdc = Map.of("REQUEST-ID", "someRequestId");
+    var session = Map.of("SESSION-ID", "someSessionId");
+
+    check(new Invocation(CLASS_NAME, METHOD_NAME, parameterTypes, args, mdc, session));
+  }
+
+  @Test
   void serializes_new_representation_stress_test() {
     Class<?>[] parameterTypes = new Class<?>[] {SerializationStressTestInput.class};
     Object[] args = new Object[] {new SerializationStressTestInput()};
