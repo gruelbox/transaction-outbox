@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox.spring.example.multipledatasources;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
+import com.gruelbox.transactionoutbox.TransactionOutbox;
 import com.gruelbox.transactionoutbox.spring.example.multipledatasources.computer.Computer;
 import com.gruelbox.transactionoutbox.spring.example.multipledatasources.computer.ComputerRepository;
 import com.gruelbox.transactionoutbox.spring.example.multipledatasources.employee.Employee;
@@ -23,7 +24,13 @@ public class EventuallyConsistentController {
   private ComputerRepository computerRepository;
 
   @Autowired
+  private TransactionOutbox computerTransactionOutbox;
+
+  @Autowired
   private EmployeeRepository employeeRepository;
+
+  @Autowired
+  private TransactionOutbox employeeTransactionOutbox;
 
   @SuppressWarnings("SameReturnValue")
   @PostMapping("/computer")
