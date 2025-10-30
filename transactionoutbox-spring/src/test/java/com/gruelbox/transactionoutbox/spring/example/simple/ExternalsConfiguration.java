@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.spring.example;
+package com.gruelbox.transactionoutbox.spring.example.simple;
 
 import com.gruelbox.transactionoutbox.spring.SpringInstantiator;
 import com.gruelbox.transactionoutbox.spring.SpringTransactionManager;

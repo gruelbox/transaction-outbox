@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.spring.example;
+package com.gruelbox.transactionoutbox.spring.example.simple;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
