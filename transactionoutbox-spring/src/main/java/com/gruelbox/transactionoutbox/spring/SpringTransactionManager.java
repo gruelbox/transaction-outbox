@@ -70,10 +70,10 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
             try {
               return work.doWork(transactionInstance);
             } catch (Exception e) {
-              throw new TransactionWrapperException(e);
+              throw new UncheckedException(e);
             }
           });
-    } catch (TransactionWrapperException e) {
+    } catch (UncheckedException e) {
       @SuppressWarnings("unchecked")
       E cause = (E) e.getCause();
       throw cause;
