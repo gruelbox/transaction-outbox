@@ -64,8 +64,20 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
       ThrowingTransactionalSupplier<T, E> work) throws E {
     TransactionTemplate transactionTemplate = new TransactionTemplate(platformTransactionManager);
     transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-    return transactionTemplate.execute(
-        status -> uncheckedly(() -> work.doWork(transactionInstance)));
+    try {
+      return transactionTemplate.execute(
+          status -> {
+            try {
+              return work.doWork(transactionInstance);
+            } catch (Exception e) {
+              throw new TransactionWrapperException(e);
+            }
+          });
+    } catch (TransactionWrapperException e) {
+      @SuppressWarnings("unchecked")
+      E cause = (E) e.getCause();
+      throw cause;
+    }
   }
 
   @Override
@@ -77,6 +89,13 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
     }
 
     return work.doWork(transactionInstance);
+  }
+
+  private static final class TransactionWrapperException extends RuntimeException {
+
+    public TransactionWrapperException(Exception e) {
+      super(e);
+    }
   }
 
   private final class SpringTransaction implements Transaction {
