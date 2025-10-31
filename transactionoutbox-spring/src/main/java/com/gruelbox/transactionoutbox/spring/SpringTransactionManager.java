@@ -91,13 +91,6 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
     return work.doWork(transactionInstance);
   }
 
-  private static final class TransactionWrapperException extends RuntimeException {
-
-    public TransactionWrapperException(Exception e) {
-      super(e);
-    }
-  }
-
   private final class SpringTransaction implements Transaction {
 
     @Override
