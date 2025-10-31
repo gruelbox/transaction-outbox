@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.spring.example;
+package com.gruelbox.transactionoutbox.spring.example.simple;
 
 import com.gruelbox.transactionoutbox.ThrowingRunnable;
 import java.util.Arrays;
