@@ -19,8 +19,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 @EnableJpaRepositories(
     basePackageClasses = Employee.class,
     entityManagerFactoryRef = "employeeEntityManager",
-    transactionManagerRef = "employeeTransactionManager"
-)
+    transactionManagerRef = "employeeTransactionManager")
 public class EmployeesDbConfiguration {
 
   @Bean
@@ -50,9 +49,10 @@ public class EmployeesDbConfiguration {
     emf.setDataSource(employeeDataSource());
     emf.setPackagesToScan(Employee.class.getPackage().getName());
     emf.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
-    emf.setJpaPropertyMap(Map.of(
-        "hibernate.hbm2ddl.auto", "update",
-        "hibernate.show_sql", "true"));
+    emf.setJpaPropertyMap(
+        Map.of(
+            "hibernate.hbm2ddl.auto", "update",
+            "hibernate.show_sql", "true"));
     emf.setPersistenceUnitName("employee");
     return emf;
   }

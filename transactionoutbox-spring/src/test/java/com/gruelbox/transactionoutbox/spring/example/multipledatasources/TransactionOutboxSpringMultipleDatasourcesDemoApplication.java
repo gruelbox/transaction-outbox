@@ -42,8 +42,7 @@ public class TransactionOutboxSpringMultipleDatasourcesDemoApplication {
   @Lazy
   TransactionOutbox computerTransactionOutbox(
       SpringInstantiator instantiator,
-      @Qualifier("computerSpringTransactionManager")
-      SpringTransactionManager transactionManager,
+      @Qualifier("computerSpringTransactionManager") SpringTransactionManager transactionManager,
       TransactionOutboxProperties properties,
       Persistor persistor) {
     return TransactionOutbox.builder()
@@ -59,8 +58,7 @@ public class TransactionOutboxSpringMultipleDatasourcesDemoApplication {
   @Lazy
   TransactionOutbox employeeTransactionOutbox(
       SpringInstantiator instantiator,
-      @Qualifier("employeeSpringTransactionManager")
-      SpringTransactionManager transactionManager,
+      @Qualifier("employeeSpringTransactionManager") SpringTransactionManager transactionManager,
       TransactionOutboxProperties properties,
       Persistor persistor) {
     return TransactionOutbox.builder()
@@ -74,19 +72,15 @@ public class TransactionOutboxSpringMultipleDatasourcesDemoApplication {
 
   @Bean
   public SpringTransactionManager computerSpringTransactionManager(
-      @Qualifier("computerTransactionManager")
-      PlatformTransactionManager transactionManager,
-      @Qualifier("computerDataSource")
-      DataSource dataSource) {
+      @Qualifier("computerTransactionManager") PlatformTransactionManager transactionManager,
+      @Qualifier("computerDataSource") DataSource dataSource) {
     return new SpringTransactionManager(transactionManager, dataSource);
   }
 
   @Bean
   public SpringTransactionManager employeeSpringTransactionManager(
-      @Qualifier("employeeTransactionManager")
-      PlatformTransactionManager transactionManager,
-      @Qualifier("employeeDataSource")
-      DataSource dataSource) {
+      @Qualifier("employeeTransactionManager") PlatformTransactionManager transactionManager,
+      @Qualifier("employeeDataSource") DataSource dataSource) {
     return new SpringTransactionManager(transactionManager, dataSource);
   }
 }

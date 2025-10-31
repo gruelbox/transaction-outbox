@@ -32,16 +32,12 @@ class EventuallyConsistentControllerTest {
   @Autowired
   private TestRestTemplate template;
 
-  @Autowired
-  private JdbcTemplate employeeJdbcTemplate;
+  @Autowired private JdbcTemplate employeeJdbcTemplate;
 
-  @Autowired
-  private JdbcTemplate computerJdbcTemplate;
+  @Autowired private JdbcTemplate computerJdbcTemplate;
 
-  @Autowired
-  private EmployeeExternalQueueService employeeExternalQueueService;
-  @Autowired
-  private ComputerExternalQueueService computerExternalQueueService;
+  @Autowired private EmployeeExternalQueueService employeeExternalQueueService;
+  @Autowired private ComputerExternalQueueService computerExternalQueueService;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -88,11 +84,31 @@ class EventuallyConsistentControllerTest {
     var computerWebserver2 = new Computer(5L, "webserver-002", Type.SERVER);
 
     var computerUrl = base.toString() + "/computer";
-    assertTrue(template.postForEntity(computerUrl, computerPc1, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(computerUrl, computerPc2, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(computerUrl, computerPc3, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(computerUrl, computerWebserver1, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(computerUrl, computerWebserver2, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(
+        template
+            .postForEntity(computerUrl, computerPc1, Void.class)
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        template
+            .postForEntity(computerUrl, computerPc2, Void.class)
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        template
+            .postForEntity(computerUrl, computerPc3, Void.class)
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        template
+            .postForEntity(computerUrl, computerWebserver1, Void.class)
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        template
+            .postForEntity(computerUrl, computerWebserver2, Void.class)
+            .getStatusCode()
+            .is2xxSuccessful());
 
     computerJdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
@@ -105,7 +121,8 @@ class EventuallyConsistentControllerTest {
         .untilAsserted(
             () ->
                 assertThat(computerExternalQueueService.getSent())
-                    .containsExactlyInAnyOrder(computerPc1, computerPc2, computerWebserver1, computerWebserver2));
+                    .containsExactlyInAnyOrder(
+                        computerPc1, computerPc2, computerWebserver1, computerWebserver2));
   }
 
   @Test
@@ -132,7 +149,8 @@ class EventuallyConsistentControllerTest {
     await()
         .atMost(10, SECONDS)
         .pollDelay(1, SECONDS)
-        .untilAsserted(() -> assertThat(employeeExternalQueueService.getSent()).containsExactly(joe, dave));
+        .untilAsserted(
+            () -> assertThat(employeeExternalQueueService.getSent()).containsExactly(joe, dave));
   }
 
   @Test
@@ -145,11 +163,22 @@ class EventuallyConsistentControllerTest {
     var computerWebserver2 = new Computer(5L, "webserver-002", Type.SERVER);
 
     var url = base.toString() + "/computer?ordered=true";
-    assertTrue(template.postForEntity(url, computerPc1, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, computerPc2, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, computerPc3, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, computerWebserver1, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, computerWebserver2, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(
+        template.postForEntity(url, computerPc1, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(
+        template.postForEntity(url, computerPc2, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(
+        template.postForEntity(url, computerPc3, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(
+        template
+            .postForEntity(url, computerWebserver1, Void.class)
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        template
+            .postForEntity(url, computerWebserver2, Void.class)
+            .getStatusCode()
+            .is2xxSuccessful());
 
     employeeJdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
@@ -159,6 +188,9 @@ class EventuallyConsistentControllerTest {
     await()
         .atMost(10, SECONDS)
         .pollDelay(1, SECONDS)
-        .untilAsserted(() -> assertThat(computerExternalQueueService.getSent()).containsExactly(computerPc1, computerPc2));
+        .untilAsserted(
+            () ->
+                assertThat(computerExternalQueueService.getSent())
+                    .containsExactly(computerPc1, computerPc2));
   }
 }

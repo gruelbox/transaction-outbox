@@ -14,13 +14,12 @@ import lombok.NoArgsConstructor;
 public class Computer {
 
   public enum Type {
-    LAPTOP, SERVER, DESKTOP;
+    LAPTOP,
+    SERVER,
+    DESKTOP;
   }
 
-  @Id
-  private Long id;
-  @Column
-  private String name;
-  @Column
-  private Type type;
+  @Id private Long id;
+  @Column private String name;
+  @Column private Type type;
 }

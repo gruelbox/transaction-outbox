@@ -12,9 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Employee {
-  @Id
-  private Long id;
-  @Column
-  private String firstName;
+  @Id private Long id;
+  @Column private String firstName;
   @Column private String lastName;
 }

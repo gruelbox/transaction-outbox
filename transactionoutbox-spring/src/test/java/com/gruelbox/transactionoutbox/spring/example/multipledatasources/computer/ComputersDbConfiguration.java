@@ -18,8 +18,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 @EnableJpaRepositories(
     basePackageClasses = Computer.class,
     entityManagerFactoryRef = "computerEntityManager",
-    transactionManagerRef = "computerTransactionManager"
-)
+    transactionManagerRef = "computerTransactionManager")
 public class ComputersDbConfiguration {
 
   @Bean
@@ -48,9 +47,10 @@ public class ComputersDbConfiguration {
     emf.setDataSource(computerDataSource());
     emf.setPackagesToScan(Computer.class.getPackage().getName());
     emf.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
-    emf.setJpaPropertyMap(Map.of(
-        "hibernate.hbm2ddl.auto", "update",
-        "hibernate.show_sql", "true"));
+    emf.setJpaPropertyMap(
+        Map.of(
+            "hibernate.hbm2ddl.auto", "update",
+            "hibernate.show_sql", "true"));
     emf.setPersistenceUnitName("computer");
     return emf;
   }

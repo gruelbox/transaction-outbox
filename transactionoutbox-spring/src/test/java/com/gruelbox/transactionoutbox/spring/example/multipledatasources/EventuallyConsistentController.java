@@ -23,17 +23,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 public class EventuallyConsistentController {
 
-  @Autowired
-  private ComputerRepository computerRepository;
+  @Autowired private ComputerRepository computerRepository;
 
-  @Autowired
-  private TransactionOutbox computerTransactionOutbox;
+  @Autowired private TransactionOutbox computerTransactionOutbox;
 
-  @Autowired
-  private EmployeeRepository employeeRepository;
+  @Autowired private EmployeeRepository employeeRepository;
 
-  @Autowired
-  private TransactionOutbox employeeTransactionOutbox;
+  @Autowired private TransactionOutbox employeeTransactionOutbox;
 
   @SuppressWarnings("SameReturnValue")
   @PostMapping("/computer")
@@ -50,7 +46,9 @@ public class EventuallyConsistentController {
           .schedule(ComputerExternalQueueService.class)
           .sendComputerCreatedEvent(computer);
     } else {
-      computerTransactionOutbox.schedule(ComputerExternalQueueService.class).sendComputerCreatedEvent(computer);
+      computerTransactionOutbox
+          .schedule(ComputerExternalQueueService.class)
+          .sendComputerCreatedEvent(computer);
     }
   }
 
@@ -76,7 +74,9 @@ public class EventuallyConsistentController {
           .schedule(EmployeeExternalQueueService.class)
           .sendEmployeeCreatedEvent(employee);
     } else {
-      employeeTransactionOutbox.schedule(EmployeeExternalQueueService.class).sendEmployeeCreatedEvent(employee);
+      employeeTransactionOutbox
+          .schedule(EmployeeExternalQueueService.class)
+          .sendEmployeeCreatedEvent(employee);
     }
   }
 

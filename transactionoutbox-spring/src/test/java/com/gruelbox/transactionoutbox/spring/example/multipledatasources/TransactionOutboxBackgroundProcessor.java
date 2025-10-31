@@ -9,7 +9,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Simple implementation of a background processor for {@link TransactionOutbox}. You don't need to use this if you need different semantics, but this is a good start for most purposes.
+ * Simple implementation of a background processor for {@link TransactionOutbox}. You don't need to
+ * use this if you need different semantics, but this is a good start for most purposes.
  */
 @Component
 @Slf4j
@@ -20,14 +21,15 @@ class TransactionOutboxBackgroundProcessor {
 
   @Scheduled(fixedRateString = "${outbox.repeatEvery}")
   void poll() {
-    outboxes.forEach(outbox -> {
-      try {
-        do {
-          log.info("Flushing");
-        } while (outbox.flush());
-      } catch (Exception e) {
-        log.error("Error flushing transaction outbox. Pausing", e);
-      }
-    });
+    outboxes.forEach(
+        outbox -> {
+          try {
+            do {
+              log.info("Flushing");
+            } while (outbox.flush());
+          } catch (Exception e) {
+            log.error("Error flushing transaction outbox. Pausing", e);
+          }
+        });
   }
 }
