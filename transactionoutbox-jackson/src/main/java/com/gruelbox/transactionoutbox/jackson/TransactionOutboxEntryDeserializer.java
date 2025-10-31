@@ -55,14 +55,13 @@ class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOut
     return c.readTreeAsValue(node, Instant.class);
   }
 
-  private Map<String, String> mapNullableStringMap(JsonNode node, DeserializationContext c) throws IOException {
+  private Map<String, String> mapNullableStringMap(JsonNode node, DeserializationContext c)
+      throws IOException {
     if (node == null || node.isNull()) {
       return null;
     }
     return new HashMap<>(
         c.readTreeAsValue(
-            node,
-            c.getTypeFactory()
-                .constructType(new TypeReference<Map<String, String>>() {})));
+            node, c.getTypeFactory().constructType(new TypeReference<Map<String, String>>() {})));
   }
 }
