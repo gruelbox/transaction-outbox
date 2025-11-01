@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.gruelbox.transactionoutbox.Invocation;
 import java.io.IOException;
+import java.lang.reflect.Modifier;
+import java.util.Map;
 
 class CustomInvocationSerializer extends StdSerializer<Invocation> {
 
@@ -36,8 +38,25 @@ class CustomInvocationSerializer extends StdSerializer<Invocation> {
     }
     gen.writeEndArray();
     gen.writeObjectField("args", value.getArgs());
-    gen.writeObjectField("mdc", value.getMdc());
-    gen.writeObjectField("session", value.getSession());
+
+    writeMap("mdc", value.getMdc(), gen);
+    writeMap("session", value.getSession(), gen);
+
     gen.writeEndObject();
+  }
+
+  private static void writeMap(String field, Map<String, String> map, JsonGenerator gen)
+      throws IOException {
+    if (map != null && isFinal(map.getClass())) {
+      gen.writeObjectFieldStart(field);
+      gen.writeObjectField(Map.class.getName(), map);
+      gen.writeEndObject();
+    } else {
+      gen.writeObjectField(field, map);
+    }
+  }
+
+  private static boolean isFinal(Class<?> clazz) {
+    return Modifier.isFinal(clazz.getModifiers());
   }
 }

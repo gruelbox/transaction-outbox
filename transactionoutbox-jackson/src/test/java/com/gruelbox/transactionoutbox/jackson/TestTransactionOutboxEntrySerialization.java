@@ -9,6 +9,7 @@ import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -53,7 +54,7 @@ public class TestTransactionOutboxEntrySerialization {
   }
 
   @Test
-  void testWithSessionAndMdc() throws JsonProcessingException {
+  void testWithSessionAndMdc_ImmutableMap() throws JsonProcessingException {
     ObjectMapper objectMapper = new ObjectMapper();
     objectMapper.setDefaultTyping(TransactionOutboxJacksonModule.typeResolver());
     objectMapper.registerModule(new TransactionOutboxJacksonModule());
@@ -74,6 +75,48 @@ public class TestTransactionOutboxEntrySerialization {
                     },
                     Map.of("a", "1"),
                     Map.of("b", "2", "c", "3")))
+            .attempts(1)
+            .blocked(true)
+            .id("X")
+            .description("Stuff")
+            .nextAttemptTime(Instant.now().truncatedTo(ChronoUnit.MILLIS))
+            .uniqueRequestId("Y")
+            .build();
+    var s = objectMapper.writeValueAsString(entry);
+    log.info(s);
+    var deserialized = objectMapper.readValue(s, TransactionOutboxEntry.class);
+    assertEquals(entry, deserialized);
+  }
+
+  @Test
+  void testWithSessionAndMdc_HashMap() throws JsonProcessingException {
+    ObjectMapper objectMapper = new ObjectMapper();
+    objectMapper.setDefaultTyping(TransactionOutboxJacksonModule.typeResolver());
+    objectMapper.registerModule(new TransactionOutboxJacksonModule());
+    objectMapper.registerModule(new JavaTimeModule());
+
+    var mdc = new HashMap<String, String>();
+    mdc.put("a", "1");
+
+    var session = new HashMap<String, String>();
+    session.put("b", "2");
+    session.put("c", "3");
+
+    var entry =
+        TransactionOutboxEntry.builder()
+            .invocation(
+                new Invocation(
+                    "c",
+                    "m",
+                    new Class<?>[] {Map.class},
+                    new Object[] {
+                      Map.of(
+                          "x", MonetaryAmount.ofGbp("200"),
+                          "y", 3,
+                          "z", List.of(1, 2, 3))
+                    },
+                    mdc,
+                    session))
             .attempts(1)
             .blocked(true)
             .id("X")

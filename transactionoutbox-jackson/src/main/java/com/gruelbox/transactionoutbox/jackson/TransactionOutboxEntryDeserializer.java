@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox.jackson;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.ObjectCodec;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -9,7 +10,6 @@ import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
 
 class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOutboxEntry> {
@@ -54,12 +54,12 @@ class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOut
     return c.readTreeAsValue(node, Instant.class);
   }
 
-  private Map<String, String> mapNullableStringMap(JsonNode node, DeserializationContext c) {
+  private Map<String, String> mapNullableStringMap(JsonNode node, DeserializationContext c)
+      throws IOException {
     if (node == null || node.isNull()) {
       return null;
     }
-    Map<String, String> result = new HashMap<>();
-    node.forEachEntry((key, value) -> result.put(key, value.asText()));
-    return result;
+    return c.readTreeAsValue(
+        node, c.getTypeFactory().constructType(new TypeReference<Map<String, String>>() {}));
   }
 }
