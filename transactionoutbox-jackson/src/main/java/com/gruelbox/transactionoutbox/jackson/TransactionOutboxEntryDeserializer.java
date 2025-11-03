@@ -10,7 +10,6 @@ import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
 
 class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOutboxEntry> {
@@ -60,8 +59,7 @@ class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOut
     if (node == null || node.isNull()) {
       return null;
     }
-    return new HashMap<>(
-        c.readTreeAsValue(
-            node, c.getTypeFactory().constructType(new TypeReference<Map<String, String>>() {})));
+    return c.readTreeAsValue(
+        node, c.getTypeFactory().constructType(new TypeReference<Map<String, String>>() {}));
   }
 }
