@@ -1,6 +1,6 @@
 package com.gruelbox.transactionoutbox.jackson;
 
-import static com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL;
+import static com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.JAVA_LANG_OBJECT;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.Version;
@@ -40,7 +40,7 @@ public class TransactionOutboxJacksonModule extends Module {
 
   public static TypeResolverBuilder<?> typeResolver() {
     return new ObjectMapper.DefaultTypeResolverBuilder(
-            NON_FINAL,
+            JAVA_LANG_OBJECT,
             BasicPolymorphicTypeValidator.builder().allowIfBaseType(Object.class).build())
         .init(JsonTypeInfo.Id.CLASS, null)
         .inclusion(JsonTypeInfo.As.WRAPPER_OBJECT);
