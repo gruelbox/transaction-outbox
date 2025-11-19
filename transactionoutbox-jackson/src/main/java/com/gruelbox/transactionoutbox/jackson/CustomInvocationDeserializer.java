@@ -9,7 +9,6 @@ import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.gruelbox.transactionoutbox.Invocation;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -66,9 +65,8 @@ class CustomInvocationDeserializer extends StdDeserializer<Invocation> {
     var sessionNode = node.get("session");
     Map<String, String> session = null;
     if (sessionNode != null && !sessionNode.isNull()) {
-      Map<String, String> sessTmp = new HashMap<>();
-      sessionNode.forEachEntry((key, value) -> sessTmp.put(key, value.asText()));
-      session = sessTmp;
+      session =
+          p.getCodec().readValue(p.getCodec().treeAsTokens(sessionNode), new TypeReference<>() {});
     }
     return new Invocation(className, methodName, types, args, mdc, session);
   }

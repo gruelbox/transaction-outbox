@@ -9,6 +9,7 @@ import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +60,13 @@ public class TestTransactionOutboxEntrySerialization {
     objectMapper.registerModule(new TransactionOutboxJacksonModule());
     objectMapper.registerModule(new JavaTimeModule());
 
+    var mdc = new HashMap<String, String>();
+    mdc.put("a", "1");
+
+    var session = new HashMap<String, String>();
+    session.put("b", "2");
+    session.put("c", "3");
+
     var entry =
         TransactionOutboxEntry.builder()
             .invocation(
@@ -72,8 +80,8 @@ public class TestTransactionOutboxEntrySerialization {
                           "y", 3,
                           "z", List.of(1, 2, 3))
                     },
-                    Map.of("a", "1"),
-                    Map.of("b", "2", "c", "3")))
+                    mdc,
+                    session))
             .attempts(1)
             .blocked(true)
             .id("X")
