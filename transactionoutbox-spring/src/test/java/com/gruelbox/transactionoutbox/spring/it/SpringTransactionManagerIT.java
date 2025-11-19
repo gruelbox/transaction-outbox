@@ -17,7 +17,7 @@ public class SpringTransactionManagerIT {
   @Autowired private PlatformTransactionManager transactionManager;
 
   @Test
-  public void shouldPreserveCauseOnInvocationTargetException() {
+  public void shouldThrowAlreadyScheduledException() {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
 
     transactionTemplate.execute(
