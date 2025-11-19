@@ -6,6 +6,7 @@ import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.spi.Utils;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
@@ -146,6 +147,8 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
       }
       try {
         return method.invoke(delegate, args);
+      } catch (InvocationTargetException e) {
+        throw e.getCause();
       } finally {
         if ("addBatch".equals(method.getName())) {
           ++count;
