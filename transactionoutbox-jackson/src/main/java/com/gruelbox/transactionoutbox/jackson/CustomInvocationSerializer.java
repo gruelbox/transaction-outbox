@@ -19,14 +19,14 @@ class CustomInvocationSerializer extends StdSerializer<Invocation> {
 
   @Override
   public void serializeWithType(
-          Invocation value, JsonGenerator gen, SerializerProvider serializers, TypeSerializer typeSer)
-          throws IOException {
+      Invocation value, JsonGenerator gen, SerializerProvider serializers, TypeSerializer typeSer)
+      throws IOException {
     serialize(value, gen, serializers);
   }
 
   @Override
   public void serialize(Invocation value, JsonGenerator gen, SerializerProvider provider)
-          throws IOException {
+      throws IOException {
     gen.writeStartObject();
     gen.writeStringField("className", value.getClassName());
     gen.writeStringField("methodName", value.getMethodName());
