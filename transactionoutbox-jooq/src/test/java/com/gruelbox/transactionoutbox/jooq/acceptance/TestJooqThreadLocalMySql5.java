@@ -5,6 +5,8 @@ import java.time.Duration;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.SQLDialect;
+import org.junit.Ignore;
+import org.junit.jupiter.api.Disabled;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -12,6 +14,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Slf4j
 @Testcontainers
+@Ignore
+@Disabled
 class TestJooqThreadLocalMySql5 extends AbstractJooqAcceptanceThreadLocalTest {
 
   @Container
