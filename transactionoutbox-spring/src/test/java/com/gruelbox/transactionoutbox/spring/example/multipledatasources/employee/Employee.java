@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.spring.example;
+package com.gruelbox.transactionoutbox.spring.example.multipledatasources.employee;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-class Customer {
+public class Employee {
   @Id private Long id;
   @Column private String firstName;
   @Column private String lastName;
