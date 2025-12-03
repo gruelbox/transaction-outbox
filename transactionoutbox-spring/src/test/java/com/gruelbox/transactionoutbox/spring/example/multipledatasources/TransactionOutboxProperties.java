@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.spring.example;
+package com.gruelbox.transactionoutbox.spring.example.multipledatasources;
 
 import java.time.Duration;
 import lombok.Data;
