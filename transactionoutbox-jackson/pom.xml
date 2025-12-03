@@ -13,8 +13,8 @@
   <description>A safe implementation of the transactional outbox pattern for Java (Jackson extension library)
   </description>
   <properties>
-    <jackson.version>2.19.2</jackson.version>
-    <commons.lang.version>3.18.0</commons.lang.version>
+    <jackson.version>2.20.1</jackson.version>
+    <commons.lang.version>3.20.0</commons.lang.version>
   </properties>
   <dependencies>
     <!-- Run time -->
@@ -62,7 +62,7 @@
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>33.4.8-jre</version>
+      <version>33.5.0-jre</version>
       <scope>test</scope>
     </dependency>
     <dependency>

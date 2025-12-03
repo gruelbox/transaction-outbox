@@ -27,11 +27,11 @@
     <test.dir>src/test/java</test.dir>
     <skip.format>false</skip.format>
     <!-- Dependency versions -->
-    <logback.version>1.5.18</logback.version>
-    <revision>1.3.99999-SNAPSHOT</revision>
+    <logback.version>1.5.21</logback.version>
+    <revision>6.1.653</revision>
     <junit.jupiter.version>5.12.2</junit.jupiter.version>
     <testcontainers.version>1.21.3</testcontainers.version>
-    <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
+    <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
     <maven.gpg.plugin.version>3.2.8</maven.gpg.plugin.version>
   </properties>
   <modules>
@@ -51,7 +51,7 @@
       <dependency>
         <groupId>net.bytebuddy</groupId>
         <artifactId>byte-buddy</artifactId>
-        <version>1.17.7</version>
+        <version>1.18.1</version>
         <optional>true</optional>
       </dependency>
       <dependency>
@@ -63,7 +63,7 @@
       <dependency>
         <groupId>com.google.code.gson</groupId>
         <artifactId>gson</artifactId>
-        <version>2.13.1</version>
+        <version>2.13.2</version>
       </dependency>
       <dependency>
         <groupId>org.projectlombok</groupId>
@@ -116,7 +116,7 @@
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>2.3.232</version>
+        <version>2.4.240</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -152,13 +152,13 @@
       <dependency>
         <groupId>org.postgresql</groupId>
         <artifactId>postgresql</artifactId>
-        <version>42.7.6</version>
+        <version>42.7.8</version>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>com.mysql</groupId>
         <artifactId>mysql-connector-j</artifactId>
-        <version>9.4.0</version>
+        <version>9.5.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -170,7 +170,7 @@
       <dependency>
         <groupId>com.oracle.database.jdbc</groupId>
         <artifactId>ojdbc11</artifactId>
-        <version>23.8.0.25.04</version>
+        <version>23.26.0.0.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -182,7 +182,13 @@
       <dependency>
         <groupId>com.microsoft.sqlserver</groupId>
         <artifactId>mssql-jdbc</artifactId>
-        <version>12.10.0.jre11</version>
+        <version>13.3.0.jre11-preview</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk-testing</artifactId>
+        <version>1.56.0</version>
         <scope>test</scope>
       </dependency>
     </dependencies>
@@ -191,7 +197,7 @@
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.14.0</version>
+        <version>3.14.1</version>
         <configuration>
           <source>${maven.compiler.source}</source>
           <target>${maven.compiler.target}</target>
@@ -200,11 +206,11 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-        <version>3.4.2</version>
+        <version>3.5.0</version>
       </plugin>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.5.3</version>
+        <version>3.5.4</version>
         <configuration>
           <argLine>-Doracle.jdbc.javaNetNio=false -XX:+EnableDynamicAgentLoading</argLine>
         </configuration>
@@ -212,7 +218,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>flatten-maven-plugin</artifactId>
-        <version>1.7.2</version>
+        <version>1.7.3</version>
         <configuration>
           <flattenMode>oss</flattenMode>
         </configuration>
@@ -236,7 +242,7 @@
       <plugin>
         <groupId>com.spotify.fmt</groupId>
         <artifactId>fmt-maven-plugin</artifactId>
-        <version>2.27</version>
+        <version>2.29</version>
         <configuration>
           <verbose>true</verbose>
           <filesNamePattern>.*\.java</filesNamePattern>
@@ -329,7 +335,7 @@
           <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
-            <version>0.8.0</version>
+            <version>0.9.0</version>
             <extensions>true</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
@@ -414,7 +420,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-javadoc-plugin</artifactId>
-            <version>3.11.2</version>
+            <version>3.12.0</version>
             <configuration>
               <failOnError>true</failOnError>
               <quiet>true</quiet>

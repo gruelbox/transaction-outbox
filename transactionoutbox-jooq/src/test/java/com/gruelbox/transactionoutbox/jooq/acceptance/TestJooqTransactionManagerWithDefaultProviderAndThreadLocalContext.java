@@ -10,10 +10,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.jooq.JooqTransactionListener;
 import com.gruelbox.transactionoutbox.jooq.JooqTransactionManager;
+import com.gruelbox.transactionoutbox.testing.LatchListener;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
@@ -31,6 +34,7 @@ import org.junit.jupiter.api.Test;
 @Slf4j
 class TestJooqTransactionManagerWithDefaultProviderAndThreadLocalContext {
 
+  private static ThreadLocal<String> sessionVar = new ThreadLocal<>();
   private final ExecutorService unreliablePool =
       new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(16));
 
@@ -40,6 +44,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndThreadLocalContext {
 
   @BeforeEach
   void beforeEach() {
+    TestingMode.enable();
     dataSource = pooledDataSource();
     transactionManager = createTransactionManager();
     JooqTestUtils.createTestTable(dsl);
@@ -47,6 +52,7 @@ class TestJooqTransactionManagerWithDefaultProviderAndThreadLocalContext {
 
   @AfterEach
   void afterEach() {
+    TestingMode.disable();
     dataSource.close();
   }
 
@@ -335,6 +341,44 @@ class TestJooqTransactionManagerWithDefaultProviderAndThreadLocalContext {
         containsInAnyOrder(IntStream.range(0, count * 10).boxed().toArray()));
   }
 
+  @Test
+  void testSessionVariables() throws InterruptedException {
+    CountDownLatch latch = new CountDownLatch(1);
+    var sessionVarLocal = UUID.randomUUID().toString();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(Instantiator.using(clazz -> new Worker(transactionManager)))
+            .persistor(Persistor.forDialect(Dialect.H2))
+            .listener(
+                new LatchListener(latch)
+                    .andThen(
+                        new TransactionOutboxListener() {
+                          @Override
+                          public Map<String, String> extractSession() {
+                            return Map.of("sesvar", sessionVarLocal);
+                          }
+
+                          @Override
+                          public void wrapInvocationAndInit(Invocator invocator) {
+                            sessionVar.set(invocator.getInvocation().getSession().get("sesvar"));
+                            try {
+                              invocator.runUnchecked();
+                            } finally {
+                              sessionVar.remove();
+                            }
+                          }
+                        }))
+            .build();
+
+    clearOutbox(transactionManager);
+    transactionManager.inTransaction(
+        tx -> outbox.schedule(Worker.class).checkSessionPresent(sessionVarLocal));
+
+    // Should be fired after commit
+    assertTrue(latch.await(2, TimeUnit.SECONDS));
+  }
+
   private void clearOutbox(TransactionManager transactionManager) {
     runSql(transactionManager, "DELETE FROM TXNO_OUTBOX");
   }
@@ -377,6 +421,10 @@ class TestJooqTransactionManagerWithDefaultProviderAndThreadLocalContext {
     @SuppressWarnings("SameParameterValue")
     void process(int i) {
       JooqTestUtils.writeRecord(transactionManager, i);
+    }
+
+    void checkSessionPresent(String expected) {
+      assertEquals(expected, sessionVar.get());
     }
   }
 

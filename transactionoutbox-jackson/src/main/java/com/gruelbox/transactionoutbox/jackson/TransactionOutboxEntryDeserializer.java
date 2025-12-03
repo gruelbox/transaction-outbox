@@ -2,7 +2,6 @@ package com.gruelbox.transactionoutbox.jackson;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,6 +9,7 @@ import com.gruelbox.transactionoutbox.Invocation;
 import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOutboxEntry> {
@@ -18,51 +18,48 @@ class TransactionOutboxEntryDeserializer extends JsonDeserializer<TransactionOut
   public TransactionOutboxEntry deserialize(JsonParser p, DeserializationContext c)
       throws IOException {
     ObjectCodec oc = p.getCodec();
-    JsonNode node = oc.readTree(p);
-    var i = node.get("invocation");
-    var mdc = i.get("mdc");
+    JsonNode entry = oc.readTree(p);
+    var invocation = entry.get("invocation");
     return TransactionOutboxEntry.builder()
-        .id(node.get("id").asText())
-        .lastAttemptTime(mapJsonInstant(node, "lastAttemptTime", c))
-        .nextAttemptTime(mapJsonInstant(node, "nextAttemptTime", c))
-        .attempts(node.get("attempts").asInt())
-        .blocked(node.get("blocked").asBoolean())
-        .processed(node.get("processed").asBoolean())
-        .uniqueRequestId(mapJsonNull(node.get("uniqueRequestId"), JsonNode::asText))
-        .version(node.get("version").asInt())
+        .id(entry.get("id").asText())
+        .lastAttemptTime(mapNullableInstant(entry.get("lastAttemptTime"), c))
+        .nextAttemptTime(mapNullableInstant(entry.get("nextAttemptTime"), c))
+        .attempts(entry.get("attempts").asInt())
+        .blocked(entry.get("blocked").asBoolean())
+        .processed(entry.get("processed").asBoolean())
+        .uniqueRequestId(mapNullableString(entry.get("uniqueRequestId")))
+        .version(entry.get("version").asInt())
         .invocation(
             new Invocation(
-                i.get("className").asText(),
-                i.get("methodName").asText(),
-                c.readTreeAsValue(i.get("parameterTypes"), Class[].class),
-                c.readTreeAsValue(i.get("args"), Object[].class),
-                mdc.isNull()
-                    ? null
-                    : c.readTreeAsValue(
-                        mdc,
-                        c.getTypeFactory()
-                            .constructType(new TypeReference<Map<String, String>>() {}))))
+                invocation.get("className").asText(),
+                invocation.get("methodName").asText(),
+                c.readTreeAsValue(invocation.get("parameterTypes"), Class[].class),
+                c.readTreeAsValue(invocation.get("args"), Object[].class),
+                mapNullableStringMap(invocation.get("mdc"), c),
+                mapNullableStringMap(invocation.get("session"), c)))
         .build();
   }
 
-  private Instant mapJsonInstant(JsonNode node, String nextAttemptTime, DeserializationContext c)
-      throws IOException {
-    return mapJsonNull(node.get(nextAttemptTime), n -> c.readTreeAsValue(n, Instant.class));
-  }
-
-  private <T> T mapJsonNull(JsonNode jsonNode, JsonThrowingFunction<JsonNode, T> fn)
-      throws IOException {
-    if (jsonNode == null) {
+  private String mapNullableString(JsonNode node) {
+    if (node == null || node.isNull()) {
       return null;
     }
-    if (jsonNode.isNull()) {
-      return null;
-    }
-    return fn.apply(jsonNode);
+    return node.asText();
   }
 
-  @FunctionalInterface
-  private interface JsonThrowingFunction<T, U> {
-    U apply(T t) throws IOException;
+  private Instant mapNullableInstant(JsonNode node, DeserializationContext c) throws IOException {
+    if (node == null || node.isNull()) {
+      return null;
+    }
+    return c.readTreeAsValue(node, Instant.class);
+  }
+
+  private Map<String, String> mapNullableStringMap(JsonNode node, DeserializationContext c) {
+    if (node == null || node.isNull()) {
+      return null;
+    }
+    Map<String, String> result = new HashMap<>();
+    node.forEachEntry((key, value) -> result.put(key, value.asText()));
+    return result;
   }
 }

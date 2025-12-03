@@ -31,6 +31,8 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
    1. [Delayed/scheduled processing](#delayedscheduled-processing)
    1. [Flexible serialization](#flexible-serialization-beta)
    1. [Clustering](#clustering)
+   1. [OpenTelemetry](#opentelemetry)
+   1. [Encryption](#encryption)
 1. [Configuration reference](#configuration-reference)
 1. [Stubbing in tests](#stubbing-in-tests)
 
@@ -125,14 +127,14 @@ The latest stable release is available from Maven Central. Stable releases are [
 <dependency>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-core</artifactId>
-  <version>6.0.609</version>
+  <version>6.1.653</version>
 </dependency>
 ```
 
 #### Gradle
 
 ```groovy
-implementation 'com.gruelbox:transactionoutbox-core:6.0.609'
+implementation 'com.gruelbox:transactionoutbox-core:6.1.653'
 ```
 
 ### Development snapshots
@@ -525,6 +527,65 @@ TransactionOutboxEntry entry = objectMapper.readValue(message, TransactionOutbox
 ```
 Armed with the above, happy clustering!
 
+### OpenTelemetry
+
+A common request is to propagate [OTEL](https://opentelemetry.io/) traces from the calling code to an outboxed task. This can be achieved using `TransactionOutboxListener` to record the details of the parent `Span` as session variables, then restore them on invocation. Example:
+```java
+static class OtelListener implements TransactionOutboxListener {
+
+   /** Serialises the current context into {@link Invocation#getSession()}. */
+   @Override
+   public Map<String, String> extractSession() {
+      var result = new HashMap<String, String>();
+      SpanContext spanContext = Span.current().getSpanContext();
+      if (!spanContext.isValid()) {
+         return null;
+      }
+      result.put("traceId", spanContext.getTraceId());
+      result.put("spanId", spanContext.getSpanId());
+      log.info("Extracted: {}", result);
+      return result;
+   }
+
+   /**
+    * Deserialises {@link Invocation#getSession()} and sets it as the current context so that any
+    * new span started by the method we invoke will treat it as the parent span
+    */
+   @Override
+   public void wrapInvocationAndInit(Invocator invocator) {
+      Invocation inv = invocator.getInvocation();
+      var spanBuilder =
+              otel.getTracer("transaction-outbox")
+                      .spanBuilder(String.format("%s.%s", inv.getClassName(), inv.getMethodName()))
+                      .setNoParent();
+      for (var i = 0; i < inv.getArgs().length; i++) {
+         spanBuilder.setAttribute("arg" + i, Utils.stringify(inv.getArgs()[i]));
+      }
+      if (inv.getSession() != null) {
+         var traceId = inv.getSession().get("traceId");
+         var spanId = inv.getSession().get("spanId");
+         if (traceId != null && spanId != null) {
+            spanBuilder.addLink(
+                    SpanContext.createFromRemoteParent(
+                            traceId, spanId, TraceFlags.getSampled(), TraceState.getDefault()));
+         }
+      }
+      var span = spanBuilder.startSpan();
+      try (Scope scope = span.makeCurrent()) {
+         invocator.runUnchecked();
+      } finally {
+         span.end();
+      }
+   }
+}
+```
+Check out `AbstractAcceptanceTest.OtelListener` for an example of this in use.
+
+`extractSession` can be used for other things too, such as authentication state, HTTP session variables or anything else that might be in static context at the time of a call and you want to be inherited by the task.
+
+### Encryption
+Be warned that all data written to disk is written unencrypted by default (including MDC, session variables, method arguments...). If you may be writing sensitive data, particularly authentication-related data, you are advised to create your own `InvocationSerializer` by decorating an existing implementation, and use an efficient stream encryptor to write the data in encrupted form.
+
 ## Configuration reference
 
 This example shows a number of other configuration options in action:
@@ -583,7 +644,7 @@ TransactionOutbox outbox = TransactionOutbox.builder()
     // Sets how long we should keep records of requests with a unique request id so duplicate requests
     // can be rejected. Defaults to 7 days.
     .retentionThreshold(Duration.ofDays(1))
-    // We can intercept task successes, single failures and blocked tasks. The most common use is to catch blocked tasks
+    // We can intercept and modify numerous events. The most common use is to catch blocked tasks
     // and raise alerts for these to be investigated. A Slack interactive message is particularly effective here
     // since it can be wired up to call unblock() automatically.
     .listener(new TransactionOutboxListener() {
@@ -598,6 +659,20 @@ TransactionOutbox outbox = TransactionOutbox.builder()
         eventPublisher.publish(new BlockedOutboxTaskEvent(entry.getId()));
       }
 
+      @Override
+      public Map<String, String> extractSession() {
+        return Map.of();
+      }
+
+      @Override
+      public void wrapInvocationAndInit(Invocator invocator) {
+        invocator.runUnchecked();
+      }
+
+      @Override
+      public void wrapInvocation(Invocator invocator) throws Exception {
+        invocator.run();
+      }
     })
     .build();
 

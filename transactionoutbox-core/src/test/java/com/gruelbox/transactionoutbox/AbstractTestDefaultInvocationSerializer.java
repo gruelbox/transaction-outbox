@@ -18,8 +18,8 @@ import org.junit.jupiter.api.Test;
 @Slf4j
 abstract class AbstractTestDefaultInvocationSerializer {
 
-  private static final String CLASS_NAME = "foo";
-  private static final String METHOD_NAME = "bar";
+  protected static final String CLASS_NAME = "foo";
+  protected static final String METHOD_NAME = "bar";
 
   private final DefaultInvocationSerializer serializer;
 
@@ -190,10 +190,26 @@ abstract class AbstractTestDefaultInvocationSerializer {
   }
 
   @Test
-  void testMDC() {
+  void testMDCAndSession() {
     Class<?>[] primitives = {Integer.class};
     Object[] values = {1};
-    check(new Invocation(CLASS_NAME, METHOD_NAME, primitives, values, Map.of("A", "1", "B", "2")));
+    check(
+        new Invocation(
+            CLASS_NAME,
+            METHOD_NAME,
+            primitives,
+            values,
+            Map.of("A", "1", "B", "2"),
+            Map.of("C", "3")));
+  }
+
+  @Test
+  void testSession() {
+    Class<?>[] primitives = {Integer.class};
+    Object[] values = {1};
+    check(
+        new Invocation(
+            CLASS_NAME, METHOD_NAME, primitives, values, null, Map.of("A", "1", "B", "2")));
   }
 
   @Test

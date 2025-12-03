@@ -1,6 +1,12 @@
 package com.gruelbox.transactionoutbox;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
@@ -141,6 +147,21 @@ public class DefaultPersistor implements Persistor, Validatable {
         }
         throw e;
       }
+    }
+  }
+
+  @Override
+  public Invocation serializeAndDeserialize(Invocation invocation) {
+    try (var baos = new ByteArrayOutputStream()) {
+      try (var writer = new OutputStreamWriter(baos, UTF_8)) {
+        serializer.serializeInvocation(invocation, writer);
+      }
+      ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+      try (Reader reader = new InputStreamReader(bais, UTF_8)) {
+        return serializer.deserializeInvocation(reader);
+      }
+    } catch (IOException e) {
+      throw new UncheckedException(e);
     }
   }
 

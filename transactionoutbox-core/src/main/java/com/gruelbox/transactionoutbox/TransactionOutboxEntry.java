@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox;
 
 import static java.util.stream.Collectors.joining;
 
+import com.gruelbox.transactionoutbox.spi.Utils;
 import java.time.Instant;
 import java.util.Arrays;
 import lombok.*;
@@ -130,7 +131,7 @@ public class TransactionOutboxEntry implements Validatable {
                   invocation.getArgs() == null
                       ? null
                       : Arrays.stream(invocation.getArgs())
-                          .map(this::stringify)
+                          .map(Utils::stringify)
                           .collect(joining(", ")),
                   id,
                   uniqueRequestId == null ? "" : " uid=[" + uniqueRequestId + "]",
@@ -142,19 +143,6 @@ public class TransactionOutboxEntry implements Validatable {
       }
     }
     return this.description;
-  }
-
-  private String stringify(Object o) {
-    if (o == null) {
-      return "null";
-    }
-    if (o.getClass().isArray()) {
-      return "[" + Arrays.stream((Object[]) o).map(this::stringify).collect(joining(", ")) + "]";
-    }
-    if (o instanceof String) {
-      return "\"" + o + "\"";
-    }
-    return o.toString();
   }
 
   @Override

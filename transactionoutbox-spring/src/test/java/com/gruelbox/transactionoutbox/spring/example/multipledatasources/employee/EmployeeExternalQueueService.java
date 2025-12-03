@@ -1,4 +1,4 @@
-package com.gruelbox.transactionoutbox.spring.example;
+package com.gruelbox.transactionoutbox.spring.example.multipledatasources.employee;
 
 import java.util.HashSet;
 import java.util.List;
@@ -9,16 +9,16 @@ import org.springframework.stereotype.Service;
 
 @Getter
 @Service
-class ExternalQueueService {
+public class EmployeeExternalQueueService {
 
   private final Set<Long> attempted = new HashSet<>();
-  private final List<Customer> sent = new CopyOnWriteArrayList<>();
+  private final List<Employee> sent = new CopyOnWriteArrayList<>();
 
-  void sendCustomerCreatedEvent(Customer customer) {
-    if (attempted.add(customer.getId())) {
+  public void sendEmployeeCreatedEvent(Employee employee) {
+    if (attempted.add(employee.getId())) {
       throw new RuntimeException("Temporary failure, try again");
     }
-    sent.add(customer);
+    sent.add(employee);
   }
 
   public void clear() {

@@ -6,6 +6,7 @@ import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 import com.gruelbox.transactionoutbox.*;
 import com.gruelbox.transactionoutbox.spi.Utils;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
@@ -15,10 +16,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** Transaction manager which uses spring-tx and Hibernate. */
 @Slf4j
@@ -26,44 +28,57 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class SpringTransactionManager implements ThreadLocalContextTransactionManager {
 
   private final SpringTransaction transactionInstance = new SpringTransaction();
+  private final PlatformTransactionManager platformTransactionManager;
   private final DataSource dataSource;
 
   @Autowired
-  protected SpringTransactionManager(DataSource dataSource) {
+  public SpringTransactionManager(
+      PlatformTransactionManager platformTransactionManager, DataSource dataSource) {
+    this.platformTransactionManager = platformTransactionManager;
     this.dataSource = dataSource;
   }
 
   @Override
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void inTransaction(Runnable runnable) {
     uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromRunnable(runnable)));
   }
 
   @Override
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void inTransaction(TransactionalWork work) {
     uncheck(() -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work)));
   }
 
   @Override
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public <T> T inTransactionReturns(TransactionalSupplier<T> supplier) {
     return uncheckedly(
         () -> inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromSupplier(supplier)));
   }
 
   @Override
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public <E extends Exception> void inTransactionThrows(ThrowingTransactionalWork<E> work)
       throws E {
     inTransactionReturnsThrows(ThrowingTransactionalSupplier.fromWork(work));
   }
 
   @Override
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public <T, E extends Exception> T inTransactionReturnsThrows(
       ThrowingTransactionalSupplier<T, E> work) throws E {
-    return work.doWork(transactionInstance);
+    TransactionTemplate transactionTemplate = new TransactionTemplate(platformTransactionManager);
+    transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    try {
+      return transactionTemplate.execute(
+          status -> {
+            try {
+              return work.doWork(transactionInstance);
+            } catch (Exception e) {
+              throw new UncheckedException(e);
+            }
+          });
+    } catch (UncheckedException e) {
+      @SuppressWarnings("unchecked")
+      E cause = (E) e.getCause();
+      throw cause;
+    }
   }
 
   @Override
@@ -146,6 +161,8 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
       }
       try {
         return method.invoke(delegate, args);
+      } catch (InvocationTargetException e) {
+        throw e.getCause();
       } finally {
         if ("addBatch".equals(method.getName())) {
           ++count;

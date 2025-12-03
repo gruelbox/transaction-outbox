@@ -63,5 +63,10 @@
       <artifactId>HikariCP</artifactId>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk-testing</artifactId>
+      <scope>compile</scope>
+    </dependency>
   </dependencies>
 </project>
