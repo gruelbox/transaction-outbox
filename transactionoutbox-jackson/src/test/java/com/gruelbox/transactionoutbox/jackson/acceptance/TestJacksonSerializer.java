@@ -13,7 +13,6 @@ import com.gruelbox.transactionoutbox.jackson.JacksonInvocationSerializer;
 import com.gruelbox.transactionoutbox.testing.AbstractAcceptanceTest;
 import com.gruelbox.transactionoutbox.testing.LatchListener;
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -62,9 +61,7 @@ class TestJacksonSerializer extends AbstractAcceptanceTest {
                         new TransactionOutboxListener() {
                           @Override
                           public Map<String, String> extractSession() {
-                            var session = new HashMap<String, String>();
-                            session.put("sessionVar", "foobar");
-                            return session;
+                            return Map.of("sessionVar", "foobar");
                           }
 
                           @Override
