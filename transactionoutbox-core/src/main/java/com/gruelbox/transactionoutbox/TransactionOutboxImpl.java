@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -384,7 +385,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
             params,
             args,
             serializeMdc && (MDC.getMDCAdapter() != null) ? MDC.getCopyOfContextMap() : null,
-            listener.extractSession());
+            listener.extractSession() == null ? null : new HashMap<>(listener.extractSession()));
     if (FORCE_SERIALIZE_AND_DESERIALIZE_BEFORE_USE.get()) {
       invocation = persistor.serializeAndDeserialize(invocation);
     }
