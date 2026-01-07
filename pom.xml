@@ -27,7 +27,7 @@
     <test.dir>src/test/java</test.dir>
     <skip.format>false</skip.format>
     <!-- Dependency versions -->
-    <logback.version>1.5.22</logback.version>
+    <logback.version>1.5.24</logback.version>
     <revision>6.1.653</revision>
     <junit.jupiter.version>5.12.2</junit.jupiter.version>
     <testcontainers.version>1.21.4</testcontainers.version>
