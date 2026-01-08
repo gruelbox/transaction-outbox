@@ -2,21 +2,46 @@ package com.gruelbox.transactionoutbox.testing;
 
 import static java.time.temporal.ChronoUnit.MILLIS;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Matchers.any;
 
-import com.gruelbox.transactionoutbox.*;
+import com.gruelbox.transactionoutbox.AlreadyScheduledException;
+import com.gruelbox.transactionoutbox.Dialect;
+import com.gruelbox.transactionoutbox.FailedDeserializingInvocation;
+import com.gruelbox.transactionoutbox.Invocation;
+import com.gruelbox.transactionoutbox.OptimisticLockException;
+import com.gruelbox.transactionoutbox.Persistor;
+import com.gruelbox.transactionoutbox.TransactionManager;
+import com.gruelbox.transactionoutbox.TransactionOutboxEntry;
 import java.io.IOException;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.math.BigDecimal;
+import java.sql.PreparedStatement;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.concurrent.*;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeMatcher;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 @Slf4j
 public abstract class AbstractPersistorTest {
@@ -95,6 +120,54 @@ public abstract class AbstractPersistorTest {
                 assertThat(
                     persistor().selectBatch(tx, 100, now.plusMillis(1)),
                     containsInAnyOrder(entry1, entry2)));
+  }
+
+  @Test
+  public void testInsertDuplicateException() throws Exception {
+    TransactionOutboxEntry entry1 = createEntry("FOO1", now, false, "context-clientkey1");
+    txManager().inTransactionThrows(tx -> persistor().save(tx, entry1));
+    Thread.sleep(1100);
+    txManager()
+        .inTransactionThrows(
+            tx ->
+                assertThat(persistor().selectBatch(tx, 100, now.plusMillis(1)), contains(entry1)));
+
+    TransactionOutboxEntry entry2 = createEntry("FOO2", now, false, "context-clientkey2");
+    txManager().inTransactionThrows(tx -> persistor().save(tx, entry2));
+    Thread.sleep(1100);
+    txManager()
+        .inTransactionThrows(
+            tx ->
+                assertThat(
+                    persistor().selectBatch(tx, 100, now.plusMillis(1)),
+                    containsInAnyOrder(entry1, entry2)));
+
+    TransactionOutboxEntry entry3 = createEntry("FOO3", now, false, "context-clientkey1");
+    Assertions.assertThrows(
+        AlreadyScheduledException.class,
+        () ->
+            txManager()
+                .inTransactionThrows(
+                    tx -> {
+                      var wrappedTxn = Mockito.spy(tx);
+                      Mockito.when(wrappedTxn.prepareBatchStatement(any()))
+                          .thenAnswer(
+                              args -> {
+                                var wrappedStmt = Mockito.spy(args.callRealMethod());
+                                Mockito.doAnswer(
+                                        args1 -> {
+                                          try {
+                                            args.callRealMethod();
+                                            return null;
+                                          } catch (Exception e) {
+                                            throw new UndeclaredThrowableException(e);
+                                          }
+                                        })
+                                    .when(((PreparedStatement) wrappedStmt).executeUpdate());
+                                return wrappedStmt;
+                              });
+                      persistor().save(wrappedTxn, entry3);
+                    }));
   }
 
   @Test
