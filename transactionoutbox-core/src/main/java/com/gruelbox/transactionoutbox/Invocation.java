@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import lombok.*;
@@ -121,8 +122,8 @@ public class Invocation {
     this.methodName = methodName;
     this.parameterTypes = parameterTypes;
     this.args = args;
-    this.mdc = mdc;
-    this.session = session;
+    this.mdc = new HashMap<>(mdc);
+    this.session = new HashMap<>(session);
   }
 
   <T> T withinMDC(Callable<T> callable) throws Exception {
