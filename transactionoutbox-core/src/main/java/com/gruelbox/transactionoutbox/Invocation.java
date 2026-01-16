@@ -122,8 +122,8 @@ public class Invocation {
     this.methodName = methodName;
     this.parameterTypes = parameterTypes;
     this.args = args;
-    this.mdc = new HashMap<>(mdc);
-    this.session = new HashMap<>(session);
+    this.mdc = mdc == null ? null : new HashMap<>(mdc);
+    this.session = session == null ? null : new HashMap<>(session);
   }
 
   <T> T withinMDC(Callable<T> callable) throws Exception {
