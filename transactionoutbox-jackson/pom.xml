@@ -13,7 +13,7 @@
   <description>A safe implementation of the transactional outbox pattern for Java (Jackson extension library)
   </description>
   <properties>
-    <jackson.version>2.20.1</jackson.version>
+    <jackson.version>2.21.0</jackson.version>
     <commons.lang.version>3.20.0</commons.lang.version>
   </properties>
   <dependencies>
