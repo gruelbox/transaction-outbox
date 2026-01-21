@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox.spring.example.simple;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,11 +39,51 @@ class EventuallyConsistentControllerTest {
     var tupac = new Customer(4L, "Tupac", "Shakur");
     var jeff = new Customer(5L, "Jeff", "Mills");
 
-    restClient.post().uri("/customer").body(joe).retrieve().toBodilessEntity();
-    restClient.post().uri("/customer").body(dave).retrieve().toBodilessEntity();
-    restClient.post().uri("/customer").body(neil).retrieve().toBodilessEntity();
-    restClient.post().uri("/customer").body(tupac).retrieve().toBodilessEntity();
-    restClient.post().uri("/customer").body(jeff).retrieve().toBodilessEntity();
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer")
+            .body(joe)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer")
+            .body(dave)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer")
+            .body(neil)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer")
+            .body(tupac)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer")
+            .body(jeff)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
 
     jdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
@@ -67,11 +108,51 @@ class EventuallyConsistentControllerTest {
     var tupac = new Customer(4L, "Tupac", "Shakur");
     var jeff = new Customer(5L, "Jeff", "Mills");
 
-    restClient.post().uri("/customer?ordered=true").body(joe).retrieve().toBodilessEntity();
-    restClient.post().uri("/customer?ordered=true").body(dave).retrieve().toBodilessEntity();
-    restClient.post().uri("/customer?ordered=true").body(neil).retrieve().toBodilessEntity();
-    restClient.post().uri("/customer?ordered=true").body(tupac).retrieve().toBodilessEntity();
-    restClient.post().uri("/customer?ordered=true").body(jeff).retrieve().toBodilessEntity();
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer?ordered=true")
+            .body(joe)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer?ordered=true")
+            .body(dave)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer?ordered=true")
+            .body(neil)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer?ordered=true")
+            .body(tupac)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer?ordered=true")
+            .body(jeff)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
 
     jdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"

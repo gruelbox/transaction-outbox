@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox.spring.example.multipledatasources;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.gruelbox.transactionoutbox.spring.example.multipledatasources.computer.Computer;
 import com.gruelbox.transactionoutbox.spring.example.multipledatasources.computer.Computer.Type;
@@ -39,18 +40,58 @@ class EventuallyConsistentControllerTest {
   }
 
   @Test
-  void testCheckNormalEmployees() throws InterruptedException {
+  void testCheckNormalEmployees() {
     var joe = new Employee(1L, "Joe", "Strummer");
     var dave = new Employee(2L, "Dave", "Grohl");
     var neil = new Employee(3L, "Neil", "Diamond");
     var tupac = new Employee(4L, "Tupac", "Shakur");
     var jeff = new Employee(5L, "Jeff", "Mills");
 
-    restClient.post().uri("/employee").body(joe).retrieve().toBodilessEntity();
-    restClient.post().uri("/employee").body(dave).retrieve().toBodilessEntity();
-    restClient.post().uri("/employee").body(neil).retrieve().toBodilessEntity();
-    restClient.post().uri("/employee").body(tupac).retrieve().toBodilessEntity();
-    restClient.post().uri("/employee").body(jeff).retrieve().toBodilessEntity();
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee")
+            .body(joe)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee")
+            .body(dave)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee")
+            .body(neil)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee")
+            .body(tupac)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee")
+            .body(jeff)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
 
     employeeJdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
@@ -74,11 +115,51 @@ class EventuallyConsistentControllerTest {
     var computerWebserver1 = new Computer(4L, "webserver-001", Type.SERVER);
     var computerWebserver2 = new Computer(5L, "webserver-002", Type.SERVER);
 
-    restClient.post().uri("/computer").body(computerPc1).retrieve().toBodilessEntity();
-    restClient.post().uri("/computer").body(computerPc2).retrieve().toBodilessEntity();
-    restClient.post().uri("/computer").body(computerPc3).retrieve().toBodilessEntity();
-    restClient.post().uri("/computer").body(computerWebserver1).retrieve().toBodilessEntity();
-    restClient.post().uri("/computer").body(computerWebserver2).retrieve().toBodilessEntity();
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer")
+            .body(computerPc1)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer")
+            .body(computerPc2)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer")
+            .body(computerPc3)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer")
+            .body(computerWebserver1)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer")
+            .body(computerWebserver2)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
 
     computerJdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
@@ -104,11 +185,51 @@ class EventuallyConsistentControllerTest {
     var tupac = new Employee(4L, "Tupac", "Shakur");
     var jeff = new Employee(5L, "Jeff", "Mills");
 
-    restClient.post().uri("/employee?ordered=true").body(joe).retrieve().toBodilessEntity();
-    restClient.post().uri("/employee?ordered=true").body(dave).retrieve().toBodilessEntity();
-    restClient.post().uri("/employee?ordered=true").body(neil).retrieve().toBodilessEntity();
-    restClient.post().uri("/employee?ordered=true").body(tupac).retrieve().toBodilessEntity();
-    restClient.post().uri("/employee?ordered=true").body(jeff).retrieve().toBodilessEntity();
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee?ordered=true")
+            .body(joe)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee?ordered=true")
+            .body(dave)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee?ordered=true")
+            .body(neil)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee?ordered=true")
+            .body(tupac)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee?ordered=true")
+            .body(jeff)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
 
     employeeJdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
@@ -131,21 +252,51 @@ class EventuallyConsistentControllerTest {
     var computerWebserver1 = new Computer(4L, "webserver-001", Type.SERVER);
     var computerWebserver2 = new Computer(5L, "webserver-002", Type.SERVER);
 
-    restClient.post().uri("/computer?ordered=true").body(computerPc1).retrieve().toBodilessEntity();
-    restClient.post().uri("/computer?ordered=true").body(computerPc2).retrieve().toBodilessEntity();
-    restClient.post().uri("/computer?ordered=true").body(computerPc3).retrieve().toBodilessEntity();
-    restClient
-        .post()
-        .uri("/computer?ordered=true")
-        .body(computerWebserver1)
-        .retrieve()
-        .toBodilessEntity();
-    restClient
-        .post()
-        .uri("/computer?ordered=true")
-        .body(computerWebserver2)
-        .retrieve()
-        .toBodilessEntity();
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer?ordered=true")
+            .body(computerPc1)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer?ordered=true")
+            .body(computerPc2)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer?ordered=true")
+            .body(computerPc3)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer?ordered=true")
+            .body(computerWebserver1)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer?ordered=true")
+            .body(computerWebserver2)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
 
     employeeJdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
