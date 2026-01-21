@@ -5,37 +5,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.net.URL;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.client.RestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class EventuallyConsistentControllerTest {
 
-  @SuppressWarnings("unused")
-  @LocalServerPort
-  private int port;
+  @LocalServerPort private int port;
 
-  private URL base;
+  private RestClient restClient;
 
-  @SuppressWarnings("unused")
-  @Autowired
-  private TestRestTemplate template;
-
-  @SuppressWarnings("unused")
-  @Autowired
-  private ExternalQueueService externalQueueService;
+  @Autowired private ExternalQueueService externalQueueService;
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @BeforeEach
-  void setUp() throws Exception {
-    this.base = new URL("http://localhost:" + port + "/");
+  void setUp() {
+    this.restClient = RestClient.builder().baseUrl("http://localhost:" + port).build();
     externalQueueService.clear();
   }
 
@@ -48,12 +39,51 @@ class EventuallyConsistentControllerTest {
     var tupac = new Customer(4L, "Tupac", "Shakur");
     var jeff = new Customer(5L, "Jeff", "Mills");
 
-    var url = base.toString() + "/customer";
-    assertTrue(template.postForEntity(url, joe, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, dave, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, neil, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer")
+            .body(joe)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer")
+            .body(dave)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer")
+            .body(neil)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer")
+            .body(tupac)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer")
+            .body(jeff)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
 
     jdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
@@ -78,12 +108,51 @@ class EventuallyConsistentControllerTest {
     var tupac = new Customer(4L, "Tupac", "Shakur");
     var jeff = new Customer(5L, "Jeff", "Mills");
 
-    var url = base.toString() + "/customer?ordered=true";
-    assertTrue(template.postForEntity(url, joe, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, dave, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, neil, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer?ordered=true")
+            .body(joe)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer?ordered=true")
+            .body(dave)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer?ordered=true")
+            .body(neil)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer?ordered=true")
+            .body(tupac)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/customer?ordered=true")
+            .body(jeff)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
 
     jdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
