@@ -24,7 +24,9 @@ public class TransactionOutboxSpringDemoApplication {
 
   @Bean
   @Lazy
-  Persistor persistor(TransactionOutboxProperties properties, ObjectMapper objectMapper) {
+  Persistor persistor(
+      TransactionOutboxProperties properties,
+      @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") ObjectMapper objectMapper) {
     if (properties.isUseJackson()) {
       return DefaultPersistor.builder()
           .serializer(JacksonInvocationSerializer.builder().mapper(objectMapper).build())
