@@ -12,6 +12,8 @@
   <description>A safe implementation of the transactional outbox pattern for Java (jOOQ extension library)</description>
   <properties>
     <guice.version>5.2.4.RELEASE</guice.version>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
   </properties>
   <dependencies>
     <!-- Runtime -->

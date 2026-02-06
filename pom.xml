@@ -41,6 +41,8 @@
     <module>transactionoutbox-guice</module>
     <module>transactionoutbox-testing</module>
     <module>transactionoutbox-acceptance</module>
+    <module>transactionoutbox-quarkus</module>
+    <module>transactionoutbox-spring</module>
   </modules>
   <dependencyManagement>
     <dependencies>
@@ -319,22 +321,20 @@
       </build>
     </profile>
     <profile>
-      <id>java-17-modules</id>
-      <activation>
-        <jdk>[17,)</jdk>
-      </activation>
-      <modules>
-        <module>transactionoutbox-quarkus</module>
-        <module>transactionoutbox-spring</module>
-      </modules>
-    </profile>
-    <profile>
       <id>java-21-modules</id>
       <activation>
         <jdk>[21,)</jdk>
       </activation>
       <modules>
         <module>transactionoutbox-jooq</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>java-25-modules</id>
+      <activation>
+        <jdk>[25,)</jdk>
+      </activation>
+      <modules>
         <module>transactionoutbox-virtthreads</module>
       </modules>
     </profile>

@@ -11,8 +11,8 @@
   <artifactId>transactionoutbox-virtthreads</artifactId>
   <description>A safe implementation of the transactional outbox pattern for Java (core library)</description>
   <properties>
-    <maven.compiler.source>21</maven.compiler.source>
-    <maven.compiler.target>21</maven.compiler.target>
+    <maven.compiler.source>25</maven.compiler.source>
+    <maven.compiler.target>25</maven.compiler.target>
   </properties>
   <dependencies>
     <dependency>
@@ -37,12 +37,6 @@
       <groupId>com.gruelbox</groupId>
       <artifactId>transactionoutbox-jooq</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>me.escoffier.loom</groupId>
-      <artifactId>loom-unit</artifactId>
-      <version>0.3.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>
