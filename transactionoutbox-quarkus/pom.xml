@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>transactionoutbox-parent</artifactId>
     <groupId>com.gruelbox</groupId>
@@ -10,8 +9,7 @@
   <name>Transaction Outbox Quarkus</name>
   <packaging>jar</packaging>
   <artifactId>transactionoutbox-quarkus</artifactId>
-  <description>A safe implementation of the transactional outbox pattern for Java (Quarkus extension library)
-  </description>
+  <description>A safe implementation of the transactional outbox pattern for Java (Quarkus extension library)</description>
   <properties>
     <quarkus.version>3.31.1</quarkus.version>
   </properties>
@@ -33,7 +31,7 @@
     <!-- Test -->
     <dependency>
       <groupId>io.quarkus</groupId>
-      <artifactId>quarkus-junit5</artifactId>
+      <artifactId>quarkus-junit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

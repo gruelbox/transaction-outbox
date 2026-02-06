@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--suppress MavenModelInspection, MavenModelInspection, MavenModelInspection -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.gruelbox</groupId>
   <artifactId>transactionoutbox-parent</artifactId>
@@ -27,7 +26,8 @@
     <test.dir>src/test/java</test.dir>
     <skip.format>false</skip.format>
     <!-- Dependency versions -->
-    <logback.version>1.5.26</logback.version>
+    <logback.version>1.5.27</logback.version>
+    <lombok.version>1.18.42</lombok.version>
     <revision>6.1.653</revision>
     <junit.jupiter.version>6.0.2</junit.jupiter.version>
     <testcontainers.version>1.21.4</testcontainers.version>
@@ -51,7 +51,7 @@
       <dependency>
         <groupId>net.bytebuddy</groupId>
         <artifactId>byte-buddy</artifactId>
-        <version>1.18.1</version>
+        <version>1.18.2</version>
         <optional>true</optional>
       </dependency>
       <dependency>
@@ -68,7 +68,7 @@
       <dependency>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
-        <version>1.18.40</version>
+        <version>${lombok.version}</version>
         <scope>provided</scope>
       </dependency>
       <dependency>
@@ -158,7 +158,7 @@
       <dependency>
         <groupId>com.mysql</groupId>
         <artifactId>mysql-connector-j</artifactId>
-        <version>9.5.0</version>
+        <version>9.6.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -197,10 +197,29 @@
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.14.1</version>
+        <version>3.15.0</version>
         <configuration>
           <source>${maven.compiler.source}</source>
           <target>${maven.compiler.target}</target>
+          <fork>true</fork>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+              <version>${lombok.version}</version>
+            </path>
+          </annotationProcessorPaths>
+          <compilerArgs>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+          </compilerArgs>
         </configuration>
       </plugin>
       <plugin>
@@ -277,7 +296,7 @@
               <dependency>
                 <groupId>me.fabriciorby</groupId>
                 <artifactId>maven-surefire-junit5-tree-reporter</artifactId>
-                <version>1.4.0</version>
+                <version>1.5.1</version>
               </dependency>
             </dependencies>
             <configuration>
@@ -285,8 +304,7 @@
               <consoleOutputReporter>
                 <disable>true</disable>
               </consoleOutputReporter>
-              <statelessTestsetInfoReporter
-                  implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5StatelessTestsetInfoTreeReporterUnicode"/>
+              <statelessTestsetInfoReporter implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5StatelessTestsetInfoTreeReporterUnicode"/>
             </configuration>
           </plugin>
         </plugins>
@@ -400,7 +418,7 @@
               <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
-                <version>1.18.30</version>
+                <version>${lombok.version}</version>
               </dependency>
             </dependencies>
             <executions>
