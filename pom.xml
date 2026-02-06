@@ -33,6 +33,7 @@
     <testcontainers.version>1.21.4</testcontainers.version>
     <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
     <maven.gpg.plugin.version>3.2.8</maven.gpg.plugin.version>
+    <surefire.version>3.5.4</surefire.version>
   </properties>
   <modules>
     <module>transactionoutbox-core</module>
@@ -229,10 +230,17 @@
       </plugin>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.5.4</version>
+        <version>${surefire.version}</version>
         <configuration>
           <argLine>-Doracle.jdbc.javaNetNio=false -XX:+EnableDynamicAgentLoading</argLine>
         </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>org.apache.maven.surefire</groupId>
+            <artifactId>surefire-extensions-api</artifactId>
+            <version>${surefire.version}</version>
+          </dependency>
+        </dependencies>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
