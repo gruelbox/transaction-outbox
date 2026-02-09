@@ -19,16 +19,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.RestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class EventuallyConsistentControllerTest {
+class MultipleDataSourcesTest {
 
   @LocalServerPort private int port;
 
   private RestClient restClient;
 
   @Autowired private JdbcTemplate employeeJdbcTemplate;
-
   @Autowired private JdbcTemplate computerJdbcTemplate;
-
   @Autowired private EmployeeExternalQueueService employeeExternalQueueService;
   @Autowired private ComputerExternalQueueService computerExternalQueueService;
 
