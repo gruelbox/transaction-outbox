@@ -44,4 +44,4 @@ jobs:
           java-version: ${{ matrix.jdk }}
           cache: maven
       - name: test
-        run: mvn -noformat,only-${{ matrix.db }}-tests -B test -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        run: mvn -Pnoformat,only-${{ matrix.db }}-tests -B test -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
