@@ -33,7 +33,7 @@
     <testcontainers.version>1.21.4</testcontainers.version>
     <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
     <maven.gpg.plugin.version>3.2.8</maven.gpg.plugin.version>
-    <surefire.version>3.5.3</surefire.version>
+    <surefire.version>3.5.4</surefire.version>
   </properties>
   <modules>
     <module>transactionoutbox-core</module>
@@ -236,13 +236,6 @@
         <configuration>
           <argLine>-Doracle.jdbc.javaNetNio=false -XX:+EnableDynamicAgentLoading</argLine>
         </configuration>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.maven.surefire</groupId>
-            <artifactId>surefire-extensions-api</artifactId>
-            <version>${surefire.version}</version>
-          </dependency>
-        </dependencies>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -296,30 +289,6 @@
     </plugins>
   </build>
   <profiles>
-    <profile>
-      <id>concise</id>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <dependencies>
-              <dependency>
-                <groupId>me.fabriciorby</groupId>
-                <artifactId>maven-surefire-junit5-tree-reporter</artifactId>
-                <version>1.5.1</version>
-              </dependency>
-            </dependencies>
-            <configuration>
-              <reportFormat>plain</reportFormat>
-              <consoleOutputReporter>
-                <disable>true</disable>
-              </consoleOutputReporter>
-              <statelessTestsetInfoReporter implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5StatelessTestsetInfoTreeReporterUnicode"/>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <profile>
       <id>java-21-modules</id>
       <activation>
