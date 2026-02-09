@@ -14,7 +14,7 @@ jobs:
         with:
           distribution: 'zulu'
           java-package: jdk
-          java-version: 21
+          java-version: 25
           cache: maven
       - name: Build
         run: mvn -Pdelombok -B fmt:check package test-compile -DskipTests -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        jdk: [ 11,17,21 ]
+        jdk: [ 17,21,25 ]
         db: [ nodb,mysql5,mysql8,postgres,oracle18,oracle21,mssqlserver ]
       fail-fast: false
     steps:
@@ -44,4 +44,4 @@ jobs:
           java-version: ${{ matrix.jdk }}
           cache: maven
       - name: test
-        run: mvn -Pconcise,noformat,only-${{ matrix.db }}-tests -B test -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+        run: mvn -Pnoformat,only-${{ matrix.db }}-tests -B test -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn

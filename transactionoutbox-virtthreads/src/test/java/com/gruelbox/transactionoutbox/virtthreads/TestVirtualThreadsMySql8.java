@@ -4,7 +4,6 @@ import static com.gruelbox.transactionoutbox.Dialect.MY_SQL_8;
 
 import java.time.Duration;
 import java.util.Map;
-import org.junit.jupiter.api.Disabled;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -12,7 +11,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SuppressWarnings("WeakerAccess")
 @Testcontainers
-@Disabled
 class TestVirtualThreadsMySql8 extends AbstractVirtualThreadsTest {
 
   @Container

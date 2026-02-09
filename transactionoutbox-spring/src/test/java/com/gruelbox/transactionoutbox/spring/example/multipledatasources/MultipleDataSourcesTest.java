@@ -10,56 +10,86 @@ import com.gruelbox.transactionoutbox.spring.example.multipledatasources.compute
 import com.gruelbox.transactionoutbox.spring.example.multipledatasources.computer.ComputerExternalQueueService;
 import com.gruelbox.transactionoutbox.spring.example.multipledatasources.employee.Employee;
 import com.gruelbox.transactionoutbox.spring.example.multipledatasources.employee.EmployeeExternalQueueService;
-import java.net.URL;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.client.RestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class EventuallyConsistentControllerTest {
+class MultipleDataSourcesTest {
 
-  @SuppressWarnings("unused")
-  @LocalServerPort
-  private int port;
+  @LocalServerPort private int port;
 
-  private URL base;
-
-  @SuppressWarnings("unused")
-  @Autowired
-  private TestRestTemplate template;
+  private RestClient restClient;
 
   @Autowired private JdbcTemplate employeeJdbcTemplate;
-
   @Autowired private JdbcTemplate computerJdbcTemplate;
-
   @Autowired private EmployeeExternalQueueService employeeExternalQueueService;
   @Autowired private ComputerExternalQueueService computerExternalQueueService;
 
   @BeforeEach
-  void setUp() throws Exception {
-    this.base = new URL("http://localhost:" + port + "/");
+  void setUp() {
+    this.restClient = RestClient.builder().baseUrl("http://localhost:" + port).build();
     employeeExternalQueueService.clear();
     computerExternalQueueService.clear();
   }
 
   @Test
-  void testCheckNormalEmployees() throws InterruptedException {
+  void testCheckNormalEmployees() {
     var joe = new Employee(1L, "Joe", "Strummer");
     var dave = new Employee(2L, "Dave", "Grohl");
     var neil = new Employee(3L, "Neil", "Diamond");
     var tupac = new Employee(4L, "Tupac", "Shakur");
     var jeff = new Employee(5L, "Jeff", "Mills");
 
-    var url = base.toString() + "/employee";
-    assertTrue(template.postForEntity(url, joe, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, dave, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, neil, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee")
+            .body(joe)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee")
+            .body(dave)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee")
+            .body(neil)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee")
+            .body(tupac)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee")
+            .body(jeff)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
 
     employeeJdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
@@ -83,30 +113,49 @@ class EventuallyConsistentControllerTest {
     var computerWebserver1 = new Computer(4L, "webserver-001", Type.SERVER);
     var computerWebserver2 = new Computer(5L, "webserver-002", Type.SERVER);
 
-    var computerUrl = base.toString() + "/computer";
     assertTrue(
-        template
-            .postForEntity(computerUrl, computerPc1, Void.class)
+        restClient
+            .post()
+            .uri("/computer")
+            .body(computerPc1)
+            .retrieve()
+            .toBodilessEntity()
             .getStatusCode()
             .is2xxSuccessful());
     assertTrue(
-        template
-            .postForEntity(computerUrl, computerPc2, Void.class)
+        restClient
+            .post()
+            .uri("/computer")
+            .body(computerPc2)
+            .retrieve()
+            .toBodilessEntity()
             .getStatusCode()
             .is2xxSuccessful());
     assertTrue(
-        template
-            .postForEntity(computerUrl, computerPc3, Void.class)
+        restClient
+            .post()
+            .uri("/computer")
+            .body(computerPc3)
+            .retrieve()
+            .toBodilessEntity()
             .getStatusCode()
             .is2xxSuccessful());
     assertTrue(
-        template
-            .postForEntity(computerUrl, computerWebserver1, Void.class)
+        restClient
+            .post()
+            .uri("/computer")
+            .body(computerWebserver1)
+            .retrieve()
+            .toBodilessEntity()
             .getStatusCode()
             .is2xxSuccessful());
     assertTrue(
-        template
-            .postForEntity(computerUrl, computerWebserver2, Void.class)
+        restClient
+            .post()
+            .uri("/computer")
+            .body(computerWebserver2)
+            .retrieve()
+            .toBodilessEntity()
             .getStatusCode()
             .is2xxSuccessful());
 
@@ -134,12 +183,51 @@ class EventuallyConsistentControllerTest {
     var tupac = new Employee(4L, "Tupac", "Shakur");
     var jeff = new Employee(5L, "Jeff", "Mills");
 
-    var url = base.toString() + "/employee?ordered=true";
-    assertTrue(template.postForEntity(url, joe, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, dave, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, neil, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, tupac, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(template.postForEntity(url, jeff, Void.class).getStatusCode().is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee?ordered=true")
+            .body(joe)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee?ordered=true")
+            .body(dave)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee?ordered=true")
+            .body(neil)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee?ordered=true")
+            .body(tupac)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/employee?ordered=true")
+            .body(jeff)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
 
     employeeJdbcTemplate.execute(
         "UPDATE txno_outbox SET invocation='non-deserializable invocation' WHERE invocation LIKE '%"
@@ -162,21 +250,49 @@ class EventuallyConsistentControllerTest {
     var computerWebserver1 = new Computer(4L, "webserver-001", Type.SERVER);
     var computerWebserver2 = new Computer(5L, "webserver-002", Type.SERVER);
 
-    var url = base.toString() + "/computer?ordered=true";
     assertTrue(
-        template.postForEntity(url, computerPc1, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template.postForEntity(url, computerPc2, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template.postForEntity(url, computerPc3, Void.class).getStatusCode().is2xxSuccessful());
-    assertTrue(
-        template
-            .postForEntity(url, computerWebserver1, Void.class)
+        restClient
+            .post()
+            .uri("/computer?ordered=true")
+            .body(computerPc1)
+            .retrieve()
+            .toBodilessEntity()
             .getStatusCode()
             .is2xxSuccessful());
     assertTrue(
-        template
-            .postForEntity(url, computerWebserver2, Void.class)
+        restClient
+            .post()
+            .uri("/computer?ordered=true")
+            .body(computerPc2)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer?ordered=true")
+            .body(computerPc3)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer?ordered=true")
+            .body(computerWebserver1)
+            .retrieve()
+            .toBodilessEntity()
+            .getStatusCode()
+            .is2xxSuccessful());
+    assertTrue(
+        restClient
+            .post()
+            .uri("/computer?ordered=true")
+            .body(computerWebserver2)
+            .retrieve()
+            .toBodilessEntity()
             .getStatusCode()
             .is2xxSuccessful());
 
