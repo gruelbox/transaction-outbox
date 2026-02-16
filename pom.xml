@@ -26,10 +26,10 @@
     <test.dir>src/test/java</test.dir>
     <skip.format>false</skip.format>
     <!-- Dependency versions -->
-    <logback.version>1.5.27</logback.version>
+    <logback.version>1.5.32</logback.version>
     <lombok.version>1.18.42</lombok.version>
     <revision>6.1.653</revision>
-    <junit.jupiter.version>6.0.2</junit.jupiter.version>
+    <junit.jupiter.version>6.0.3</junit.jupiter.version>
     <testcontainers.version>1.21.4</testcontainers.version>
     <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
     <maven.gpg.plugin.version>3.2.8</maven.gpg.plugin.version>
@@ -54,7 +54,7 @@
       <dependency>
         <groupId>net.bytebuddy</groupId>
         <artifactId>byte-buddy</artifactId>
-        <version>1.18.4</version>
+        <version>1.18.5</version>
         <optional>true</optional>
       </dependency>
       <dependency>
@@ -155,7 +155,7 @@
       <dependency>
         <groupId>org.postgresql</groupId>
         <artifactId>postgresql</artifactId>
-        <version>42.7.9</version>
+        <version>42.7.10</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -173,7 +173,7 @@
       <dependency>
         <groupId>com.oracle.database.jdbc</groupId>
         <artifactId>ojdbc11</artifactId>
-        <version>23.26.0.0.0</version>
+        <version>23.26.1.0.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
