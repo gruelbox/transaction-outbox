@@ -2,4 +2,15 @@
 <toolchains xmlns="http://maven.apache.org/TOOLCHAINS/1.1.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/TOOLCHAINS/1.1.0 https://maven.apache.org/xsd/toolchains-1.1.0.xsd">
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <version>25</version>
+      <vendor>zulu</vendor>
+      <id>zulu_25</id>
+    </provides>
+    <configuration>
+      <jdkHome>/opt/hostedtoolcache/Java_Zulu_jdk/25.0.2-10/x64</jdkHome>
+    </configuration>
+  </toolchain>
 </toolchains>
