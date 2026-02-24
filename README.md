@@ -56,7 +56,11 @@ public SaleId createWidget(Sale sale) {
 
 The `SaleRepository` handles recording the sale in the customer's account, the `StockReductionEvent` goes off to our _warehouse_ service, and the `IncomeEvent` goes to our financial records service (let's ignore the potential flaws in the domain modelling for now).
 
-There's a big problem here: the `@Transactional` annotation is a lie (no, [really](https://lmgtfy.com/?q=dont+use+distributed+transactions)). It only really wraps the `SaleRepository` call, but not the two event postings. This means that we could end up sending the two events and fail to actually commit the sale. Our system is now inconsistent.
+The problem is that spring `@Transactional` annotation here is bounded to a current thread, and [it is wrapping the annotated method execution by hte means of AOP Proxies](https://docs.spring.io/spring-framework/docs/4.2.x/spring-framework-reference/html/transaction.html#tx-decl-explained) (honestly, the exact behavior depends on propagation level of transaction, but most of the times the propagation level is either `REQUIRED` or `REQUIRES_NEW`, where, in the absence of the already opened transaction for current thread will lead to the result of opening the transaction for the method execution). That is, before the start of the method, spring `TransactionInterceptor` will begin the transaction an delegate the exectuion to the `createWidget` method. 
+
+So, first,we call `saleRepository#save()` method to save entity to a database. As we understood, calling `saleRepository#save()` will not trigger the `COMMIT` statemnt, becasue we are still in the middle of method execution. Then, we will publish the message to a message broker. Here the problem comes - after publication of message to some abstract message broker, lets say it is Kafka, we cannot some sort of unpublish it - it is already gone, so, if the microservice will for some reason fail or get restarted in between (for isntance you are running a K8S cluster, where the pods get recreate/restarterd all the time), lets say after publication of the messsage, but before transaction commit. In this case we ended up in the incosistent state - we have published message to a message broker, but did not persist it into the database, becuase we did not commi tthe transaction.
+
+Now, we understood the problem, lets try to fix it.
 
 ### Attempt 2 - Use Idempotency
 
