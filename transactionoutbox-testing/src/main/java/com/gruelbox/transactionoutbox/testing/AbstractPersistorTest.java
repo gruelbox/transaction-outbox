@@ -467,4 +467,77 @@ public abstract class AbstractPersistorTest {
       throw e;
     }
   }
+
+  @Test
+  public void testGetOldestPendingEventTime_noPendingEvents() throws Exception {
+    txManager()
+        .inTransactionThrows(tx -> assertThat(persistor().getOldestPendingEventTime(tx), nullValue()));
+  }
+
+  @Test
+  public void testGetOldestPendingEventTime_singlePendingEvent() throws Exception {
+    Instant timestamp = now.minusSeconds(60);
+    TransactionOutboxEntry entry = createEntry("FOO1", timestamp, false);
+    txManager().inTransactionThrows(tx -> persistor().save(tx, entry));
+    txManager()
+        .inTransactionThrows(
+            tx -> assertThat(persistor().getOldestPendingEventTime(tx), equalTo(timestamp)));
+  }
+
+  @Test
+  public void testGetOldestPendingEventTime_multiplePendingEvents() throws Exception {
+    Instant oldest = now.minusSeconds(120);
+    Instant newer = now.minusSeconds(60);
+    Instant newest = now.minusSeconds(30);
+    
+    txManager()
+        .inTransactionThrows(
+            tx -> {
+              persistor().save(tx, createEntry("FOO1", newer, false));
+              persistor().save(tx, createEntry("FOO2", oldest, false));
+              persistor().save(tx, createEntry("FOO3", newest, false));
+            });
+    
+    txManager()
+        .inTransactionThrows(
+            tx -> assertThat(persistor().getOldestPendingEventTime(tx), equalTo(oldest)));
+  }
+
+  @Test
+  public void testGetOldestPendingEventTime_excludesBlockedEvents() throws Exception {
+    Instant oldest = now.minusSeconds(120);
+    Instant newer = now.minusSeconds(60);
+    
+    txManager()
+        .inTransactionThrows(
+            tx -> {
+              persistor().save(tx, createEntry("FOO1", oldest, true));  // Blocked
+              persistor().save(tx, createEntry("FOO2", newer, false));  // Not blocked
+            });
+    
+    txManager()
+        .inTransactionThrows(
+            tx -> assertThat(persistor().getOldestPendingEventTime(tx), equalTo(newer)));
+  }
+
+  @Test
+  public void testGetOldestPendingEventTime_excludesProcessedEvents() throws Exception {
+    Instant oldest = now.minusSeconds(120);
+    Instant newer = now.minusSeconds(60);
+    
+    TransactionOutboxEntry processedEntry = createEntry("FOO1", oldest, false);
+    processedEntry.setProcessed(true);
+    TransactionOutboxEntry pendingEntry = createEntry("FOO2", newer, false);
+    
+    txManager()
+        .inTransactionThrows(
+            tx -> {
+              persistor().save(tx, processedEntry);
+              persistor().save(tx, pendingEntry);
+            });
+    
+    txManager()
+        .inTransactionThrows(
+            tx -> assertThat(persistor().getOldestPendingEventTime(tx), equalTo(newer)));
+  }
 }

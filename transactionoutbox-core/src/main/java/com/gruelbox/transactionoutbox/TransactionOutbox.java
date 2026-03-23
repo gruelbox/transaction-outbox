@@ -199,6 +199,34 @@ public interface TransactionOutbox {
 
   void processBatchNow(List<TransactionOutboxEntry> entries);
 
+  /**
+   * Returns the age in seconds of the oldest pending (unblocked, unprocessed) event. This is useful
+   * for monitoring and alerting on stuck or delayed events.
+   *
+   * <p>The age is calculated as the difference between the current time and the {@code
+   * nextAttemptTime} of the oldest pending event. Events are considered pending if they are not
+   * blocked and not processed.
+   *
+   * <p>This method starts a new transaction internally, so it can be safely called from any
+   * context, including scheduled monitoring tasks or health check endpoints.
+   *
+   * <p>Example usage for monitoring:
+   *
+   * <pre>{@code
+   * // Expose as a gauge metric for DataDog/Prometheus
+   * long ageSeconds = outbox.getOldestPendingEventAgeSeconds();
+   * metrics.gauge("outbox.oldest_pending_event.age", ageSeconds);
+   *
+   * // Alert if age exceeds threshold
+   * if (ageSeconds > 120) {
+   *   alerting.triggerIncident("Outbox events stuck for " + ageSeconds + " seconds");
+   * }
+   * }</pre>
+   *
+   * @return The age in seconds of the oldest pending event, or 0 if no pending events exist.
+   */
+  long getOldestPendingEventAgeSeconds();
+
   /** Builder for {@link TransactionOutbox}. */
   @ToString
   abstract class TransactionOutboxBuilder {

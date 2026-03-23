@@ -767,4 +767,24 @@ public class DefaultPersistor implements Persistor, Validatable {
       return rs.next() && (rs.getInt(1) == 1);
     }
   }
+
+  @Override
+  public Instant getOldestPendingEventTime(Transaction tx) throws SQLException {
+    String sql =
+        "SELECT MIN(nextAttemptTime) FROM "
+            + tableName
+            + " WHERE blocked = "
+            + dialect.booleanValue(false)
+            + " AND processed = "
+            + dialect.booleanValue(false);
+    //noinspection resource
+    try (Statement stmt = tx.connection().createStatement();
+        ResultSet rs = stmt.executeQuery(sql)) {
+      if (rs.next()) {
+        Timestamp timestamp = rs.getTimestamp(1);
+        return timestamp != null ? timestamp.toInstant() : null;
+      }
+      return null;
+    }
+  }
 }

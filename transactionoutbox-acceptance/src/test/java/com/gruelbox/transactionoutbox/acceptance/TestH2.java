@@ -1,5 +1,6 @@
 package com.gruelbox.transactionoutbox.acceptance;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -167,5 +168,59 @@ class TestH2 extends AbstractAcceptanceTest {
     transactionManager.inTransaction(
         () -> outbox.schedule(InterfaceProcessor.class).process(1, "bar"));
     assertTrue(latch.await(5, TimeUnit.SECONDS));
+  }
+
+  @Test
+  final void getOldestPendingEventAgeSeconds_noPendingEvents() {
+    TransactionManager transactionManager = txManager();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .build();
+
+    outbox.initialize();
+    clearOutbox();
+
+    assertEquals(0L, outbox.getOldestPendingEventAgeSeconds());
+  }
+
+  @Test
+  final void getOldestPendingEventAgeSeconds_withPendingEvents() throws Exception {
+    TransactionManager transactionManager = txManager();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(Instantiator.using(clazz -> (InterfaceProcessor) (foo, bar) -> {}))
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .attemptFrequency(Duration.ofMillis(500))
+            .submitter(Submitter.withExecutor(r -> {})) // Don't submit - keep it pending
+            .initializeImmediately(false)
+            .build();
+
+    outbox.initialize();
+    clearOutbox();
+
+    // Schedule an event but prevent it from being processed
+    transactionManager.inTransaction(
+        () -> outbox.schedule(InterfaceProcessor.class).process(1, "bar"));
+
+    Thread.sleep(2000);
+
+    long age = outbox.getOldestPendingEventAgeSeconds();
+    assertTrue(age >= 2, "Age should be at least 2 seconds, but was: " + age);
+    assertTrue(age < 10, "Age should be less than 10 seconds, but was: " + age);
+
+    // Clean up - flush to process the event with a real executor
+    TransactionOutbox cleanupOutbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(Instantiator.using(clazz -> (InterfaceProcessor) (foo, bar) -> {}))
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .build();
+    cleanupOutbox.flush();
+
+    long ageAfterProcessing = outbox.getOldestPendingEventAgeSeconds();
+    assertEquals(0L, ageAfterProcessing, "No pending events after processing");
   }
 }

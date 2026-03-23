@@ -24,6 +24,9 @@ A flexible implementation of the [Transaction Outbox Pattern](https://microservi
    1. [jOOQ](#jooq)
 1. [Set up the background worker](#set-up-the-background-worker)
 1. [Managing the "dead letter queue"](#managing-the-dead-letter-queue)
+1. [Monitoring and Observability](#monitoring-and-observability)
+   1. [Accessing Retry Count in Listener Callbacks](#accessing-retry-count-in-listener-callbacks)
+   1. [Monitoring Oldest Pending Event Age](#monitoring-oldest-pending-event-age)
 1. [Advanced](#advanced)
    1. [Topics and FIFO ordering](#topics-and-fifo-ordering)
    1. [The nested outbox pattern](#the-nested-outbox-pattern)
@@ -304,6 +307,155 @@ transactionOutboxEntry.unblock(entryId, context);
 ```
 
 A good approach here is to use the [`TransactionOutboxListener`](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/TransactionOutboxListener.html) callback to post an [interactive Slack message](https://api.slack.com/legacy/interactive-messages) - this can operate as both the alert and the "button" allowing a support engineer to submit the work for reprocessing.
+
+## Monitoring and Observability
+
+Transaction Outbox provides several ways to monitor the health and performance of your outbox processing:
+
+### Accessing Retry Count in Listener Callbacks
+
+All listener callbacks receive the full `TransactionOutboxEntry` object, which includes the retry count via `entry.getAttempts()`. This allows you to create custom metrics and alerts based on retry behavior:
+
+```java
+TransactionOutbox.builder()
+    ...
+    .listener(new TransactionOutboxListener() {
+        @Override
+        public void failure(TransactionOutboxEntry entry, Throwable cause) {
+            int retryCount = entry.getAttempts();
+            
+            // Log with structured data
+            logger.warn("Task failed on attempt {}: {}", retryCount, entry.description(), cause);
+            
+            // Send metrics to DataDog/Prometheus
+            metrics.increment("outbox.task.failure", 
+                "retry_count:" + retryCount,
+                "task_type:" + entry.getInvocation().getClassName());
+            
+            // Alert if retry count is high
+            if (retryCount >= 3) {
+                alerting.warning("Task failing repeatedly: " + entry.description());
+            }
+        }
+        
+        @Override
+        public void scheduled(TransactionOutboxEntry entry) {
+            // Track when tasks are scheduled
+            metrics.increment("outbox.task.scheduled");
+        }
+        
+        @Override
+        public void success(TransactionOutboxEntry entry) {
+            int attempts = entry.getAttempts();
+            // Track success rate and attempts until success
+            metrics.histogram("outbox.task.attempts_until_success", attempts);
+        }
+    })
+    .build();
+```
+
+### Monitoring Oldest Pending Event Age
+
+To monitor for stuck or delayed events, you can query the age of the oldest pending event. This is particularly useful for setting up alerts to detect when the outbox processing is falling behind:
+
+```java
+// In a scheduled monitoring task or health check endpoint
+long ageSeconds = outbox.getOldestPendingEventAgeSeconds();
+
+// Expose as a gauge metric for DataDog
+metrics.gauge("outbox.oldest_pending_event.age_seconds", ageSeconds);
+
+// Expose as a gauge for Prometheus
+Gauge.build()
+    .name("outbox_oldest_pending_event_age_seconds")
+    .help("Age in seconds of the oldest pending event")
+    .register()
+    .set(ageSeconds);
+
+// Alert if age exceeds threshold (e.g., 120 seconds for production incident)
+if (ageSeconds > 120) {
+    alerting.triggerIncident(
+        "Outbox events stuck",
+        "Oldest pending event is " + ageSeconds + " seconds old"
+    );
+}
+```
+
+#### Spring Boot Actuator Health Check Example
+
+```java
+@Component
+public class TransactionOutboxHealthIndicator implements HealthIndicator {
+    
+    private final TransactionOutbox outbox;
+    private final long warningThresholdSeconds = 60;
+    private final long criticalThresholdSeconds = 120;
+    
+    @Override
+    public Health health() {
+        try {
+            long ageSeconds = outbox.getOldestPendingEventAgeSeconds();
+            
+            if (ageSeconds >= criticalThresholdSeconds) {
+                return Health.down()
+                    .withDetail("oldest_pending_event_age_seconds", ageSeconds)
+                    .withDetail("status", "CRITICAL - Events stuck for over 2 minutes")
+                    .build();
+            }
+            
+            if (ageSeconds >= warningThresholdSeconds) {
+                return Health.status("WARNING")
+                    .withDetail("oldest_pending_event_age_seconds", ageSeconds)
+                    .withDetail("status", "WARNING - Events delayed")
+                    .build();
+            }
+            
+            return Health.up()
+                .withDetail("oldest_pending_event_age_seconds", ageSeconds)
+                .withDetail("status", "OK")
+                .build();
+        } catch (Exception e) {
+            return Health.down()
+                .withException(e)
+                .build();
+        }
+    }
+}
+```
+
+#### Micrometer Metrics Example
+
+```java
+@Configuration
+public class TransactionOutboxMetrics {
+    
+    @Bean
+    public MeterBinder outboxMetrics(TransactionOutbox outbox, MeterRegistry registry) {
+        return r -> {
+            // Register a gauge that queries the age on every scrape
+            Gauge.builder("outbox.oldest_pending_event.age.seconds", outbox,
+                    TransactionOutbox::getOldestPendingEventAgeSeconds)
+                .description("Age in seconds of the oldest pending event in the outbox")
+                .register(registry);
+        };
+    }
+}
+```
+
+### Recommended Monitoring Strategy
+
+1. **Track retry counts** in listener callbacks to understand retry patterns and identify problematic tasks
+2. **Monitor oldest pending event age** to detect processing delays or stuck events
+3. **Set up alerts**:
+   - Warning: Oldest pending event > 60 seconds
+   - Critical/Incident: Oldest pending event > 120 seconds
+4. **Dashboard metrics**:
+   - Tasks scheduled per minute
+   - Tasks succeeded per minute
+   - Tasks failed per minute
+   - Tasks blocked (dead letter queue size)
+   - Oldest pending event age
+   - Distribution of retry counts before success
 
 ## Advanced
 

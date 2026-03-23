@@ -228,4 +228,17 @@ public interface Persistor {
    * @param tx The current {@link Transaction}.
    */
   void clear(Transaction tx) throws Exception;
+
+  /**
+   * Returns the nextAttemptTime of the oldest pending event. This is used for monitoring and
+   * alerting on stuck or delayed events.
+   *
+   * <p>An event is considered pending if it is not blocked and not processed. The oldest event is
+   * determined by the minimum {@code nextAttemptTime}.
+   *
+   * @param tx The current {@link Transaction}.
+   * @return The oldest nextAttemptTime, or null if no pending events exist.
+   * @throws Exception Any exception.
+   */
+  Instant getOldestPendingEventTime(Transaction tx) throws Exception;
 }

@@ -96,4 +96,9 @@ public class StubPersistor implements Persistor {
   public boolean checkConnection(Transaction tx) throws Exception {
     return true;
   }
+
+  @Override
+  public Instant getOldestPendingEventTime(Transaction tx) throws Exception {
+    return null;
+  }
 }
