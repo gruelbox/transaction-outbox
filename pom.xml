@@ -33,7 +33,7 @@
     <testcontainers.version>1.21.4</testcontainers.version>
     <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
     <maven.gpg.plugin.version>3.2.8</maven.gpg.plugin.version>
-    <surefire.version>3.5.4</surefire.version>
+    <surefire.version>3.5.5</surefire.version>
   </properties>
   <modules>
     <module>transactionoutbox-core</module>
