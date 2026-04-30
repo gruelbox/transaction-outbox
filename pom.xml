@@ -27,7 +27,7 @@
     <skip.format>false</skip.format>
     <!-- Dependency versions -->
     <logback.version>1.5.32</logback.version>
-    <lombok.version>1.18.44</lombok.version>
+    <lombok.version>1.18.46</lombok.version>
     <revision>7.0.707</revision>
     <junit.jupiter.version>6.0.3</junit.jupiter.version>
     <testcontainers.version>1.21.4</testcontainers.version>
