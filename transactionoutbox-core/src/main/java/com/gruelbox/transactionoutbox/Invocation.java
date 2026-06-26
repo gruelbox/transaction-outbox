@@ -147,7 +147,7 @@ public class Invocation {
   void invoke(Object instance, TransactionOutboxListener listener)
       throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
 
-    Method method = instance.getClass().getDeclaredMethod(methodName, parameterTypes);
+    Method method = findMethod(instance.getClass(), methodName, parameterTypes);
     method.setAccessible(true);
     if (log.isDebugEnabled()) {
       log.debug("Invoking method {} with args {}", method, Arrays.toString(args));
@@ -165,5 +165,18 @@ public class Invocation {
             return Invocation.this;
           }
         });
+  }
+
+  public static Method findMethod(Class<?> clazz, String name, Class<?>... parameterTypes)
+      throws NoSuchMethodException {
+    Class<?> current = clazz;
+    while (current != null && !current.equals(Object.class)) {
+      try {
+        return current.getDeclaredMethod(name, parameterTypes);
+      } catch (NoSuchMethodException e) {
+        current = current.getSuperclass();
+      }
+    }
+    throw new NoSuchMethodException(name);
   }
 }
