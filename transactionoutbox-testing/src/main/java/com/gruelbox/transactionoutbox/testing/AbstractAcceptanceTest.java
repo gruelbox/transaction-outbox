@@ -996,6 +996,69 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
     }
   }
 
+  @Test
+  void raceConditionOnTopicFirstSequenceNumber() throws InterruptedException {
+    TransactionManager transactionManager = txManager();
+    CountDownLatch latch = new CountDownLatch(2);
+    List<String> scheduledEntries = new ArrayList<>();
+
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void scheduled(TransactionOutboxEntry entry) {
+                    scheduledEntries.add((String) entry.getInvocation().getArgs()[0]);
+                  }
+                })
+            .persistor(
+                DefaultPersistor.builder()
+                    .dialect(connectionDetails().dialect())
+                    .listener(
+                        new PersistorListener() {
+                          @Override
+                          public void beforeFirstSequenceAssigned(TransactionOutboxEntry entry) {
+                            try {
+                              latch.countDown();
+                              assertTrue(latch.await(30, TimeUnit.SECONDS));
+                            } catch (InterruptedException e) {
+                              fail("Interrupted");
+                            }
+                          }
+                        })
+                    .build())
+            .build();
+
+    var topicName = "tested_topic";
+    Thread threadA =
+        new Thread(
+            () ->
+                transactionManager.inTransaction(
+                    () ->
+                        outbox
+                            .with()
+                            .ordered(topicName)
+                            .schedule(ClassProcessor.class)
+                            .process("Whoo")));
+    threadA.start();
+    Thread threadB =
+        new Thread(
+            () ->
+                transactionManager.inTransaction(
+                    () ->
+                        outbox
+                            .with()
+                            .ordered(topicName)
+                            .schedule(ClassProcessor.class)
+                            .process("Whee")));
+    threadB.start();
+
+    threadA.join();
+    threadB.join();
+    assertThat(scheduledEntries, containsInAnyOrder("Whoo", "Whee"));
+  }
+
   /** Example {@link TransactionOutboxListener} to propagate traces */
   static class OtelListener implements TransactionOutboxListener {
 
