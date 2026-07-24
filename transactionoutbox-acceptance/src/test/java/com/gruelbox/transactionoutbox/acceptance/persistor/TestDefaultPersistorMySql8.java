@@ -3,7 +3,6 @@ package com.gruelbox.transactionoutbox.acceptance.persistor;
 import com.gruelbox.transactionoutbox.DefaultPersistor;
 import com.gruelbox.transactionoutbox.Dialect;
 import com.gruelbox.transactionoutbox.TransactionManager;
-import com.gruelbox.transactionoutbox.testing.AbstractPersistorTest;
 import java.time.Duration;
 import java.util.Map;
 import org.testcontainers.containers.JdbcDatabaseContainer;
@@ -12,7 +11,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-class TestDefaultPersistorMySql8 extends AbstractPersistorTest {
+class TestDefaultPersistorMySql8 extends AbstractMySqlPersistorTest {
 
   @Container
   @SuppressWarnings({"rawtypes", "resource"})
