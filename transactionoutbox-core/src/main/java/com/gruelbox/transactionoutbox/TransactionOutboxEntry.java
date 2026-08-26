@@ -17,6 +17,26 @@ import lombok.experimental.SuperBuilder;
 @ToString
 public class TransactionOutboxEntry implements Validatable {
 
+  private static final ThreadLocal<TransactionOutboxEntry> current = new ThreadLocal<>();
+
+  /**
+   * Can be called during execution of a task to view its details.
+   *
+   * @return The {@link TransactionOutboxEntry}
+   */
+  public static TransactionOutboxEntry current() {
+    TransactionOutboxEntry entry = current.get();
+    return entry == null ? null : entry.toBuilder().build();
+  }
+
+  static void setCurrent(TransactionOutboxEntry entry) {
+    if (entry == null) {
+      current.remove();
+    } else {
+      current.set(entry);
+    }
+  }
+
   /**
    * @param id The id of the record. Usually a UUID.
    * @return The id of the record. Usually a UUID.
