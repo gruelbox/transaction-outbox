@@ -691,7 +691,7 @@ try {
 
 ## Stubbing in tests
 
-`TransactionOutbox` should not be directly stubbed (e.g. using Mockito); the contract is too complex to stub out.
+`TransactionOutbox` should not be directly stubbed (using Mockito, for example); the contract is too complex to stub out.
 
 Instead, [stubs](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/StubThreadLocalTransactionManager.html) [exist](https://www.javadoc.io/doc/com.gruelbox/transactionoutbox-core/latest/com/gruelbox/transactionoutbox/StubPersistor.html) for the various arguments to the builder, allowing you to build a `TransactionOutbox` with minimal external dependencies which can be called and verified in tests.
 
