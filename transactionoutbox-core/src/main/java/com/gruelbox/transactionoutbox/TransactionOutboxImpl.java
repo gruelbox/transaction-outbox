@@ -301,18 +301,23 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   @Override
   @SuppressWarnings("WeakerAccess")
   public void processNow(TransactionOutboxEntry entry) {
-    listener.wrapInvocationAndInit(
-        new TransactionOutboxListener.Invocator() {
-          @Override
-          public void run() {
-            processNowInternal(entry);
-          }
+    TransactionOutboxEntry.setCurrent(entry);
+    try {
+      listener.wrapInvocationAndInit(
+          new TransactionOutboxListener.Invocator() {
+            @Override
+            public void run() {
+              processNowInternal(entry);
+            }
 
-          @Override
-          public Invocation getInvocation() {
-            return entry.getInvocation();
-          }
-        });
+            @Override
+            public Invocation getInvocation() {
+              return entry.getInvocation();
+            }
+          });
+    } finally {
+      TransactionOutboxEntry.setCurrent(null);
+    }
   }
 
   private void processNowInternal(TransactionOutboxEntry entry) {
