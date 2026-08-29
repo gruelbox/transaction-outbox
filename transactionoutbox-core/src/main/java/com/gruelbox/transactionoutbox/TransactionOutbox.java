@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
+
+import com.gruelbox.transactionoutbox.spi.AbstractProxyFactory;
 import lombok.ToString;
 import org.slf4j.MDC;
 import org.slf4j.event.Level;
@@ -166,6 +168,7 @@ public interface TransactionOutbox {
     protected TransactionManager transactionManager;
     protected Instantiator instantiator;
     protected Submitter submitter;
+    protected AbstractProxyFactory proxyFactory;
     protected Duration attemptFrequency;
     protected int blockAfterAttempts;
     protected int flushBatchSize;
@@ -210,6 +213,16 @@ public interface TransactionOutbox {
      */
     public TransactionOutboxBuilder submitter(Submitter submitter) {
       this.submitter = submitter;
+      return this;
+    }
+
+    /**
+     * @param proxyFactory Used for proxy object creation
+     *
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder proxyFactory(AbstractProxyFactory proxyFactory) {
+      this.proxyFactory = proxyFactory;
       return this;
     }
 
