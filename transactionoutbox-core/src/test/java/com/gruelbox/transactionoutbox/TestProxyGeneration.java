@@ -61,6 +61,31 @@ class TestProxyGeneration {
     assertTrue(called.get());
   }
 
+  @Test
+  void testCallParentClassMethod() {
+    AtomicBoolean called = new AtomicBoolean();
+    AbstractServiceImpl serviceInstance = new AbstractServiceImpl(called);
+    AbstractServiceImpl proxy =
+        proxyFactory.createProxy(
+            AbstractServiceImpl.class,
+            (method, args) -> {
+              Invocation invocation =
+                  new Invocation(
+                      AbstractServiceImpl.class.getName(),
+                      method.getName(),
+                      method.getParameterTypes(),
+                      args);
+              try {
+                invocation.invoke(serviceInstance, new NoOpListener());
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
+              return null;
+            });
+    proxy.doThing();
+    assertTrue(called.get());
+  }
+
   interface Interface {
     void doThing();
   }
@@ -83,4 +108,24 @@ class TestProxyGeneration {
       // No-op
     }
   }
+
+  abstract static class AbstractService {
+    private final AtomicBoolean called;
+
+    protected AbstractService(AtomicBoolean called) {
+      this.called = called;
+    }
+
+    public void doThing() {
+      called.set(true);
+    }
+  }
+
+  static class AbstractServiceImpl extends AbstractService {
+    public AbstractServiceImpl(AtomicBoolean called) {
+      super(called);
+    }
+  }
+
+  static class NoOpListener implements TransactionOutboxListener {}
 }
