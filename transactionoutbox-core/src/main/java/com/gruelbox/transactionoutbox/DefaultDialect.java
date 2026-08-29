@@ -31,6 +31,7 @@ class DefaultDialect implements Dialect {
   @Getter private final String fetchNextInSelectedTopics;
   @Getter private final String fetchCurrentVersion;
   @Getter private final String fetchNextSequence;
+  @Getter private final Integer fetchNextSequenceIsolationLevel;
   private final Collection<Migration> migrations;
 
   @Override
@@ -87,6 +88,7 @@ class DefaultDialect implements Dialect {
             + ") LIMIT {{batchSize}}";
     private String fetchCurrentVersion = "SELECT version FROM TXNO_VERSION FOR UPDATE";
     private String fetchNextSequence = "SELECT seq FROM TXNO_SEQUENCE WHERE topic = ? FOR UPDATE";
+    private Integer fetchNextSequenceIsolationLevel;
 
     Builder(String name) {
       this.name = name;
@@ -193,6 +195,7 @@ class DefaultDialect implements Dialect {
           fetchNextInSelectedTopics,
           fetchCurrentVersion,
           fetchNextSequence,
+          fetchNextSequenceIsolationLevel,
           migrations.values()) {
         @Override
         public String booleanValue(boolean criteriaValue) {

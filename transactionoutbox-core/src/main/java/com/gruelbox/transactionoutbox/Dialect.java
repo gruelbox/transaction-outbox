@@ -28,6 +28,8 @@ public interface Dialect {
 
   String getFetchNextSequence();
 
+  Integer getFetchNextSequenceIsolationLevel();
+
   String booleanValue(boolean criteriaValue);
 
   void createVersionTableIfNotExists(Connection connection) throws SQLException;
@@ -36,6 +38,7 @@ public interface Dialect {
 
   Dialect MY_SQL_5 =
       DefaultDialect.builder("MY_SQL_5")
+          .fetchNextSequenceIsolationLevel(Connection.TRANSACTION_READ_COMMITTED)
           .changeMigration(
               13,
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
@@ -50,6 +53,16 @@ public interface Dialect {
               "WITH raw AS(SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
                   + " FROM {{table}} WHERE processed = false AND topic IN ({{topicNames}}))"
                   + " SELECT * FROM raw WHERE rn = 1 AND nextAttemptTime < ? LIMIT {{batchSize}}")
+          // MySql uses gap lock with 'Repeatable Read' (default isolation level) when a
+          // 'SELECT ... FOR UPDATE' query does not return any row. A gap lock taken by one transaction
+          // does not prevent another transaction from taking a gap lock on the same gap, so it can
+          // easily lead to deadlocks:
+          //  - Thread 1: SELECT ... FOR UPDATE -> gap lock 1
+          //  - Thread 2: SELECT ... FOR UPDATE -> gap lock 2
+          //  - Thread 1: INSERT ... -> Waiting for gap lock 2
+          //  - Thread 2: INSERT ... -> Waiting for gap lock 1
+          // Gap locking can be disabled with a 'Read Committed' isolation level
+          .fetchNextSequenceIsolationLevel(Connection.TRANSACTION_READ_COMMITTED)
           .deleteExpired(
               "DELETE FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false"
                   + " LIMIT {{batchSize}}")
