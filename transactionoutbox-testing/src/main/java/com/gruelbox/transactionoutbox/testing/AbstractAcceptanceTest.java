@@ -27,6 +27,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -388,6 +389,103 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                 .process("6"));
 
     assertThat(ids, containsInAnyOrder("1", "2", "4", "6"));
+  }
+
+  /**
+   * The retention cleanup deletes nothing when no processed records have expired, and must not lock
+   * the retained records it scans past. On MySQL the {@code blocked} column was mistakenly a
+   * VARCHAR (migration 6), so {@code blocked = false} could not be used as an index range condition
+   * on {@code IX_TXNO_OUTBOX_1}. Under REPEATABLE READ the delete then next-key-locked the entire
+   * {@code processed = true} region, and concurrent outbox writers hit lock wait timeouts.
+   * Migration 14 restores the boolean column type and makes the index usable again.
+   */
+  @Test
+  final void retentionCleanupDoesNotLockRetainedRecords() throws Exception {
+    int count = 100;
+    TransactionManager transactionManager = txManager();
+    Persistor persistor = Persistor.forDialect(connectionDetails().dialect());
+    CountDownLatch processedLatch = new CountDownLatch(count);
+    ProcessedEntryListener listener = new ProcessedEntryListener(processedLatch);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(persistor)
+            .submitter(Submitter.withExecutor(Runnable::run))
+            .listener(listener)
+            .retentionThreshold(Duration.ofDays(2))
+            .build();
+    clearOutbox();
+
+    // A uniqueRequestId makes a successful task be retained (processed = true, nextAttemptTime in
+    // the future) rather than deleted, so the cleanup below has records to scan but none to delete.
+    transactionManager.inTransaction(
+        () ->
+            IntStream.range(0, count)
+                .forEach(
+                    i ->
+                        outbox
+                            .with()
+                            .uniqueRequestId("retained" + i)
+                            .schedule(ClassProcessor.class)
+                            .process("retained" + i)));
+    assertTrue(processedLatch.await(30, SECONDS));
+
+    // Target the record that is LAST in index order, never the range boundary: a correct range scan
+    // may next-key-lock the first record beyond its range end, but only a scan that wrongly
+    // traverses the whole retained region locks this one.
+    TransactionOutboxEntry target =
+        listener.getSuccessfulEntries().stream()
+            .max(
+                Comparator.comparing(TransactionOutboxEntry::getNextAttemptTime)
+                    .thenComparing(TransactionOutboxEntry::getId))
+            .orElseThrow();
+
+    CountDownLatch cleanupScanned = new CountDownLatch(1);
+    CountDownLatch releaseCleanup = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      // Transaction A: run the retention cleanup (which deletes nothing) and hold it open, as a
+      // slow cleanup batch on another instance would.
+      Future<?> cleanup =
+          executor.submit(
+              () -> {
+                transactionManager.inTransactionThrows(
+                    tx -> {
+                      assertEquals(
+                          0, persistor.deleteProcessedAndExpired(tx, count, Instant.now()));
+                      cleanupScanned.countDown();
+                      assertTrue(
+                          releaseCleanup.await(30, SECONDS),
+                          "Cleanup transaction was not released within 30 seconds");
+                    });
+                return null;
+              });
+      try {
+        assertTrue(cleanupScanned.await(10, SECONDS));
+
+        // Transaction B: writing a single retained record must not block behind the idle cleanup.
+        Future<?> write =
+            executor.submit(
+                () -> {
+                  transactionManager.inTransactionThrows(tx -> persistor.delete(tx, target));
+                  return null;
+                });
+        try {
+          write.get(10, SECONDS);
+        } catch (TimeoutException e) {
+          fail(
+              "Writing a retained record blocked behind an idle retention cleanup transaction. The "
+                  + "cleanup is locking records it should never examine (see migration 14).");
+        }
+      } finally {
+        releaseCleanup.countDown();
+        cleanup.get(10, SECONDS);
+      }
+    } finally {
+      releaseCleanup.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(30, SECONDS));
+    }
   }
 
   /**
