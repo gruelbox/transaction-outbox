@@ -18,6 +18,11 @@ public interface Dialect {
 
   String getLock();
 
+  /**
+   * @return Format string for the SQL required to lock a batch of entries using a single statement.
+   */
+  String getLockBatch();
+
   String getCheckSql();
 
   String getFetchNextInAllTopics();
@@ -27,6 +32,12 @@ public interface Dialect {
   String getFetchCurrentVersion();
 
   String getFetchNextSequence();
+
+  /**
+   * @return Format string for the SQL required to fetch the next batch of ordered items in topics.
+   *     This query should return items ordered by topic and sequence, with a limit per topic.
+   */
+  String getFetchNextBatchInTopics();
 
   String booleanValue(boolean criteriaValue);
 
@@ -60,6 +71,9 @@ public interface Dialect {
           .lock(
               "SELECT id, invocation FROM {{table}} WHERE id = ? AND version = ? FOR "
                   + "UPDATE SKIP LOCKED")
+          .lockBatch(
+              "SELECT id, version, invocation FROM {{table}} WHERE (id, version) IN ({{placeholders}}) FOR "
+                  + "UPDATE SKIP LOCKED")
           .changeMigration(
               13,
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
@@ -74,6 +88,13 @@ public interface Dialect {
               "WITH raw AS(SELECT {{allFields}}, (ROW_NUMBER() OVER(PARTITION BY topic ORDER BY seq)) as rn"
                   + " FROM {{table}} WHERE processed = false AND topic IN ({{topicNames}}))"
                   + " SELECT * FROM raw WHERE rn = 1 AND nextAttemptTime < ? LIMIT {{batchSize}}")
+          .fetchNextBatchInTopics(
+              "WITH raw AS ("
+                  + " SELECT {{allFields}}, ROW_NUMBER() OVER (PARTITION BY topic ORDER BY seq) as rn"
+                  + " FROM {{table}}"
+                  + " WHERE processed = false AND topic <> '*'"
+                  + ")"
+                  + " SELECT * FROM raw WHERE rn <= {{batchSize}} AND nextAttemptTime < ?")
           .deleteExpired(
               "DELETE FROM {{table}} WHERE id IN "
                   + "(SELECT id FROM {{table}} WHERE nextAttemptTime < ? AND processed = true AND blocked = false LIMIT {{batchSize}})")
@@ -83,6 +104,9 @@ public interface Dialect {
                   + "{{batchSize}} FOR UPDATE SKIP LOCKED")
           .lock(
               "SELECT id, invocation FROM {{table}} WHERE id = ? AND version = ? FOR "
+                  + "UPDATE SKIP LOCKED")
+          .lockBatch(
+              "SELECT id, version, invocation FROM {{table}} WHERE (id, version) IN ({{placeholders}}) FOR "
                   + "UPDATE SKIP LOCKED")
           .changeMigration(
               5, "ALTER TABLE TXNO_OUTBOX ALTER COLUMN uniqueRequestId TYPE VARCHAR(250)")
@@ -116,6 +140,9 @@ public interface Dialect {
                   + "SKIP LOCKED")
           .lock(
               "SELECT id, invocation FROM {{table}} WHERE id = ? AND version = ? FOR "
+                  + "UPDATE SKIP LOCKED")
+          .lockBatch(
+              "SELECT id, version, invocation FROM {{table}} WHERE (id, version) IN ({{placeholders}}) FOR "
                   + "UPDATE SKIP LOCKED")
           .checkSql("SELECT 1 FROM DUAL")
           .changeMigration(
@@ -160,6 +187,8 @@ public interface Dialect {
       DefaultDialect.builder("MS_SQL_SERVER")
           .lock(
               "SELECT id, invocation FROM {{table}} WITH (UPDLOCK, ROWLOCK, READPAST) WHERE id = ? AND version = ?")
+          .lockBatch(
+              "SELECT id, version, invocation FROM {{table}} WITH (UPDLOCK, ROWLOCK, READPAST) WHERE (id, version) IN ({{placeholders}})")
           .selectBatch(
               "SELECT TOP ({{batchSize}}) {{allFields}} FROM {{table}} "
                   + "WITH (UPDLOCK, ROWLOCK, READPAST) WHERE nextAttemptTime < ? AND topic = '*' "
