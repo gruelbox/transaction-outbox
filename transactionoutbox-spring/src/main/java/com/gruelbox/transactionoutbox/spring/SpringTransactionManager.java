@@ -4,11 +4,8 @@ import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 
 import com.gruelbox.transactionoutbox.*;
+import com.gruelbox.transactionoutbox.spi.BatchCountingStatement;
 import com.gruelbox.transactionoutbox.spi.Utils;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.LinkedHashMap;
@@ -106,13 +103,33 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
       return batchStatements().prepare(sql);
     }
 
+    @Override
+    public void flushBatches() {
+      var current = currentBatchStatements();
+      if (current != null) {
+        current.sendBatches();
+      }
+    }
+
+    private BatchStatements batchStatements() {
+      var current = currentBatchStatements();
+      if (current != null) {
+        return current;
+      }
+      var created = new BatchStatements();
+      TransactionSynchronizationManager.registerSynchronization(created);
+      return created;
+    }
+
     /**
      * The statements are cached on the synchronization that flushes them, not in a resource bound
      * to the thread. Spring only suspends its own resources around a {@code REQUIRES_NEW}
      * transaction, so a cache that outlived the transaction's connection would send an inner
      * transaction's rows down the outer one's.
+     *
+     * @return The current transaction's statements, or null if none have been prepared.
      */
-    private BatchStatements batchStatements() {
+    private BatchStatements currentBatchStatements() {
       for (TransactionSynchronization synchronization :
           TransactionSynchronizationManager.getSynchronizations()) {
         if (synchronization instanceof BatchStatements batchStatements
@@ -120,9 +137,7 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
           return batchStatements;
         }
       }
-      var batchStatements = new BatchStatements();
-      TransactionSynchronizationManager.registerSynchronization(batchStatements);
-      return batchStatements;
+      return null;
     }
 
     @Override
@@ -155,12 +170,11 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
           key ->
               Utils.uncheckedly(
                   () ->
-                      BatchCountingStatementHandler.countBatches(
+                      BatchCountingStatement.countBatches(
                           DataSourceUtils.getConnection(dataSource).prepareStatement(key))));
     }
 
-    @Override
-    public void beforeCommit(boolean readOnly) {
+    void sendBatches() {
       for (BatchCountingStatement statement : statements.values()) {
         if (statement.getBatchCount() != 0) {
           log.debug("Flushing batches");
@@ -170,45 +184,13 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
     }
 
     @Override
+    public void beforeCommit(boolean readOnly) {
+      sendBatches();
+    }
+
+    @Override
     public void afterCompletion(int status) {
       Utils.safelyClose(statements.values());
-    }
-  }
-
-  private interface BatchCountingStatement extends PreparedStatement {
-    int getBatchCount();
-  }
-
-  private static final class BatchCountingStatementHandler implements InvocationHandler {
-
-    private final PreparedStatement delegate;
-    private int count = 0;
-
-    private BatchCountingStatementHandler(PreparedStatement delegate) {
-      this.delegate = delegate;
-    }
-
-    static BatchCountingStatement countBatches(PreparedStatement delegate) {
-      return (BatchCountingStatement)
-          Proxy.newProxyInstance(
-              BatchCountingStatementHandler.class.getClassLoader(),
-              new Class[] {BatchCountingStatement.class},
-              new BatchCountingStatementHandler(delegate));
-    }
-
-    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-      if ("getBatchCount".equals(method.getName())) {
-        return count;
-      }
-      try {
-        return method.invoke(delegate, args);
-      } catch (InvocationTargetException e) {
-        throw e.getCause();
-      } finally {
-        if ("addBatch".equals(method.getName())) {
-          ++count;
-        }
-      }
     }
   }
 }

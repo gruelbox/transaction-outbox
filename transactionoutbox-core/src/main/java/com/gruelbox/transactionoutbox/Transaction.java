@@ -31,6 +31,13 @@ public interface Transaction {
   PreparedStatement prepareBatchStatement(String sql);
 
   /**
+   * Sends, now, any batches queued on statements from {@link #prepareBatchStatement(String)},
+   * instead of just before the commit. Rows added afterwards are still sent at the commit.
+   * Implementations that cannot send early leave the batches until then, which is the default.
+   */
+  default void flushBatches() {}
+
+  /**
    * Will be called to perform work immediately after the current transaction is committed. This
    * should occur in the same thread and will generally not be long-lasting.
    *
