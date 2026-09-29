@@ -3,6 +3,7 @@ package com.gruelbox.transactionoutbox.quarkus;
 import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 
 import com.gruelbox.transactionoutbox.*;
+import com.gruelbox.transactionoutbox.spi.BatchCountingStatement;
 import com.gruelbox.transactionoutbox.spi.Utils;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -11,12 +12,11 @@ import jakarta.transaction.Synchronization;
 import jakarta.transaction.TransactionSynchronizationRegistry;
 import jakarta.transaction.Transactional;
 import jakarta.transaction.Transactional.TxType;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import javax.sql.DataSource;
 
 /** Transaction manager which uses cdi and quarkus. */
@@ -76,26 +76,36 @@ public class QuarkusTransactionManager implements ThreadLocalContextTransactionM
 
     @Override
     public PreparedStatement prepareBatchStatement(String sql) {
-      BatchCountingStatement preparedStatement =
-          Utils.uncheckedly(
-              () -> BatchCountingStatementHandler.countBatches(connection().prepareStatement(sql)));
+      return batchStatements().prepare(sql);
+    }
 
-      tsr.registerInterposedSynchronization(
-          new Synchronization() {
-            @Override
-            public void beforeCompletion() {
-              if (preparedStatement.getBatchCount() != 0) {
-                Utils.uncheck(preparedStatement::executeBatch);
-              }
-            }
+    @Override
+    public void flushBatches() {
+      var current = currentBatchStatements();
+      if (current != null) {
+        current.sendBatches();
+      }
+    }
 
-            @Override
-            public void afterCompletion(int status) {
-              Utils.safelyClose(preparedStatement);
-            }
-          });
+    private BatchStatements batchStatements() {
+      var current = currentBatchStatements();
+      if (current != null) {
+        return current;
+      }
+      var created = new BatchStatements();
+      tsr.putResource(QuarkusTransactionManager.this, created);
+      tsr.registerInterposedSynchronization(created);
+      return created;
+    }
 
-      return preparedStatement;
+    /**
+     * The statements are held as a resource of the JTA transaction, which is discarded when the
+     * transaction completes.
+     *
+     * @return The current transaction's statements, or null if none have been prepared.
+     */
+    private BatchStatements currentBatchStatements() {
+      return (BatchStatements) tsr.getResource(QuarkusTransactionManager.this);
     }
 
     @Override
@@ -113,39 +123,40 @@ public class QuarkusTransactionManager implements ThreadLocalContextTransactionM
     }
   }
 
-  private interface BatchCountingStatement extends PreparedStatement {
-    int getBatchCount();
-  }
+  /**
+   * The batch statements of one transaction, one per SQL string, whose batches are sent just before
+   * the transaction completes and which are closed when it has.
+   */
+  private final class BatchStatements implements Synchronization {
 
-  private static final class BatchCountingStatementHandler implements InvocationHandler {
+    private final Map<String, BatchCountingStatement> statements = new LinkedHashMap<>();
 
-    private final PreparedStatement delegate;
-
-    private int count = 0;
-
-    private BatchCountingStatementHandler(PreparedStatement delegate) {
-      this.delegate = delegate;
+    PreparedStatement prepare(String sql) {
+      return statements.computeIfAbsent(
+          sql,
+          key ->
+              Utils.uncheckedly(
+                  () ->
+                      BatchCountingStatement.countBatches(
+                          transactionInstance.connection().prepareStatement(key))));
     }
 
-    static BatchCountingStatement countBatches(PreparedStatement delegate) {
-      return (BatchCountingStatement)
-          Proxy.newProxyInstance(
-              BatchCountingStatementHandler.class.getClassLoader(),
-              new Class[] {BatchCountingStatement.class},
-              new BatchCountingStatementHandler(delegate));
-    }
-
-    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-      if ("getBatchCount".equals(method.getName())) {
-        return count;
-      }
-      try {
-        return method.invoke(delegate, args);
-      } finally {
-        if ("addBatch".equals(method.getName())) {
-          ++count;
+    void sendBatches() {
+      for (BatchCountingStatement statement : statements.values()) {
+        if (statement.getBatchCount() != 0) {
+          Utils.uncheck(statement::executeBatch);
         }
       }
+    }
+
+    @Override
+    public void beforeCompletion() {
+      sendBatches();
+    }
+
+    @Override
+    public void afterCompletion(int status) {
+      Utils.safelyClose(statements.values());
     }
   }
 }
