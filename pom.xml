@@ -28,7 +28,7 @@
     <!-- Dependency versions -->
     <logback.version>1.6.3</logback.version>
     <lombok.version>1.18.48</lombok.version>
-    <revision>7.1.750</revision>
+    <revision>7.1.769</revision>
     <junit.jupiter.version>6.1.3</junit.jupiter.version>
     <testcontainers.version>1.21.4</testcontainers.version>
     <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
