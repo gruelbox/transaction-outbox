@@ -2,6 +2,7 @@ package com.gruelbox.transactionoutbox.spring;
 
 import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -118,6 +119,43 @@ class SpringTransactionBatchStatementsTest {
 
     verify(connection, times(2)).prepareStatement(INSERT);
     verify(insert, times(2)).executeBatch();
+  }
+
+  @Test
+  void shouldSendTheBatchOnFlushAndNotAgainAtCommit() throws SQLException {
+    inTransaction(
+        tx -> {
+          addRow(tx, INSERT);
+          addRow(tx, INSERT);
+          tx.flushBatches();
+          uncheck(() -> verify(insert, times(1)).executeBatch());
+        });
+
+    verify(insert, times(1)).executeBatch();
+  }
+
+  @Test
+  void shouldSendRowsAddedAfterAFlushAtCommit() throws SQLException {
+    inTransaction(
+        tx -> {
+          addRow(tx, INSERT);
+          tx.flushBatches();
+          addRow(tx, INSERT);
+          addRow(tx, INSERT);
+        });
+
+    verify(insert, times(3)).addBatch();
+    var order = inOrder(insert, connection);
+    order.verify(insert).executeBatch();
+    order.verify(insert).executeBatch();
+    order.verify(connection).commit();
+  }
+
+  @Test
+  void shouldHaveNothingToFlushWhenNoStatementWasPrepared() throws SQLException {
+    inTransaction(Transaction::flushBatches);
+
+    verify(connection, never()).prepareStatement(anyString());
   }
 
   /** Spring suspends the outer transaction's connection, so its statements must stay with it. */

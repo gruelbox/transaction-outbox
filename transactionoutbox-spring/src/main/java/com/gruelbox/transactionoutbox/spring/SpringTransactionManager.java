@@ -106,13 +106,33 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
       return batchStatements().prepare(sql);
     }
 
+    @Override
+    public void flushBatches() {
+      var current = currentBatchStatements();
+      if (current != null) {
+        current.sendBatches();
+      }
+    }
+
+    private BatchStatements batchStatements() {
+      var current = currentBatchStatements();
+      if (current != null) {
+        return current;
+      }
+      var created = new BatchStatements();
+      TransactionSynchronizationManager.registerSynchronization(created);
+      return created;
+    }
+
     /**
      * The statements are cached on the synchronization that flushes them, not in a resource bound
      * to the thread. Spring only suspends its own resources around a {@code REQUIRES_NEW}
      * transaction, so a cache that outlived the transaction's connection would send an inner
      * transaction's rows down the outer one's.
+     *
+     * @return The current transaction's statements, or null if none have been prepared.
      */
-    private BatchStatements batchStatements() {
+    private BatchStatements currentBatchStatements() {
       for (TransactionSynchronization synchronization :
           TransactionSynchronizationManager.getSynchronizations()) {
         if (synchronization instanceof BatchStatements batchStatements
@@ -120,9 +140,7 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
           return batchStatements;
         }
       }
-      var batchStatements = new BatchStatements();
-      TransactionSynchronizationManager.registerSynchronization(batchStatements);
-      return batchStatements;
+      return null;
     }
 
     @Override
@@ -159,14 +177,18 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
                           DataSourceUtils.getConnection(dataSource).prepareStatement(key))));
     }
 
-    @Override
-    public void beforeCommit(boolean readOnly) {
+    void sendBatches() {
       for (BatchCountingStatement statement : statements.values()) {
         if (statement.getBatchCount() != 0) {
           log.debug("Flushing batches");
           Utils.uncheck(statement::executeBatch);
         }
       }
+    }
+
+    @Override
+    public void beforeCommit(boolean readOnly) {
+      sendBatches();
     }
 
     @Override
@@ -207,6 +229,8 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
       } finally {
         if ("addBatch".equals(method.getName())) {
           ++count;
+        } else if ("executeBatch".equals(method.getName())) {
+          count = 0;
         }
       }
     }

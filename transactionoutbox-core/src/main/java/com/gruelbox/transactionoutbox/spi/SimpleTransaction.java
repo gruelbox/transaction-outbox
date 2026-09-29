@@ -40,6 +40,7 @@ public final class SimpleTransaction implements Transaction, AutoCloseable {
         sql, s -> Utils.uncheckedly(() -> connection.prepareStatement(s)));
   }
 
+  @Override
   public void flushBatches() {
     if (!preparedStatements.isEmpty()) {
       log.debug("Flushing batches");
