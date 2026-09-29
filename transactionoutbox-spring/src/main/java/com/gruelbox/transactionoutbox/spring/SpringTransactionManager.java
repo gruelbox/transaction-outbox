@@ -11,6 +11,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -101,25 +103,26 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
 
     @Override
     public PreparedStatement prepareBatchStatement(String sql) {
-      BatchCountingStatement preparedStatement =
-          Utils.uncheckedly(
-              () -> BatchCountingStatementHandler.countBatches(connection().prepareStatement(sql)));
-      TransactionSynchronizationManager.registerSynchronization(
-          new TransactionSynchronization() {
-            @Override
-            public void beforeCommit(boolean readOnly) {
-              if (preparedStatement.getBatchCount() != 0) {
-                log.debug("Flushing batches");
-                Utils.uncheck(preparedStatement::executeBatch);
-              }
-            }
+      return batchStatements().prepare(sql);
+    }
 
-            @Override
-            public void afterCompletion(int status) {
-              Utils.safelyClose(preparedStatement);
-            }
-          });
-      return preparedStatement;
+    /**
+     * The statements are cached on the synchronization that flushes them, not in a resource bound
+     * to the thread. Spring only suspends its own resources around a {@code REQUIRES_NEW}
+     * transaction, so a cache that outlived the transaction's connection would send an inner
+     * transaction's rows down the outer one's.
+     */
+    private BatchStatements batchStatements() {
+      for (TransactionSynchronization synchronization :
+          TransactionSynchronizationManager.getSynchronizations()) {
+        if (synchronization instanceof BatchStatements batchStatements
+            && batchStatements.isOwnedBy(SpringTransactionManager.this)) {
+          return batchStatements;
+        }
+      }
+      var batchStatements = new BatchStatements();
+      TransactionSynchronizationManager.registerSynchronization(batchStatements);
+      return batchStatements;
     }
 
     @Override
@@ -131,6 +134,44 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
               runnable.run();
             }
           });
+    }
+  }
+
+  /**
+   * The batch statements of one Spring transaction, one per SQL string, whose batches are sent just
+   * before the commit and which are closed when the transaction completes.
+   */
+  private final class BatchStatements implements TransactionSynchronization {
+
+    private final Map<String, BatchCountingStatement> statements = new LinkedHashMap<>();
+
+    boolean isOwnedBy(SpringTransactionManager manager) {
+      return SpringTransactionManager.this == manager;
+    }
+
+    PreparedStatement prepare(String sql) {
+      return statements.computeIfAbsent(
+          sql,
+          key ->
+              Utils.uncheckedly(
+                  () ->
+                      BatchCountingStatementHandler.countBatches(
+                          DataSourceUtils.getConnection(dataSource).prepareStatement(key))));
+    }
+
+    @Override
+    public void beforeCommit(boolean readOnly) {
+      for (BatchCountingStatement statement : statements.values()) {
+        if (statement.getBatchCount() != 0) {
+          log.debug("Flushing batches");
+          Utils.uncheck(statement::executeBatch);
+        }
+      }
+    }
+
+    @Override
+    public void afterCompletion(int status) {
+      Utils.safelyClose(statements.values());
     }
   }
 
