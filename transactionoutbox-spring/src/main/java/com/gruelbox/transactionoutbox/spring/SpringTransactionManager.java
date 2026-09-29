@@ -4,11 +4,8 @@ import static com.gruelbox.transactionoutbox.spi.Utils.uncheck;
 import static com.gruelbox.transactionoutbox.spi.Utils.uncheckedly;
 
 import com.gruelbox.transactionoutbox.*;
+import com.gruelbox.transactionoutbox.spi.BatchCountingStatement;
 import com.gruelbox.transactionoutbox.spi.Utils;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.LinkedHashMap;
@@ -173,7 +170,7 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
           key ->
               Utils.uncheckedly(
                   () ->
-                      BatchCountingStatementHandler.countBatches(
+                      BatchCountingStatement.countBatches(
                           DataSourceUtils.getConnection(dataSource).prepareStatement(key))));
     }
 
@@ -194,45 +191,6 @@ public class SpringTransactionManager implements ThreadLocalContextTransactionMa
     @Override
     public void afterCompletion(int status) {
       Utils.safelyClose(statements.values());
-    }
-  }
-
-  private interface BatchCountingStatement extends PreparedStatement {
-    int getBatchCount();
-  }
-
-  private static final class BatchCountingStatementHandler implements InvocationHandler {
-
-    private final PreparedStatement delegate;
-    private int count = 0;
-
-    private BatchCountingStatementHandler(PreparedStatement delegate) {
-      this.delegate = delegate;
-    }
-
-    static BatchCountingStatement countBatches(PreparedStatement delegate) {
-      return (BatchCountingStatement)
-          Proxy.newProxyInstance(
-              BatchCountingStatementHandler.class.getClassLoader(),
-              new Class[] {BatchCountingStatement.class},
-              new BatchCountingStatementHandler(delegate));
-    }
-
-    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-      if ("getBatchCount".equals(method.getName())) {
-        return count;
-      }
-      try {
-        return method.invoke(delegate, args);
-      } catch (InvocationTargetException e) {
-        throw e.getCause();
-      } finally {
-        if ("addBatch".equals(method.getName())) {
-          ++count;
-        } else if ("executeBatch".equals(method.getName())) {
-          count = 0;
-        }
-      }
     }
   }
 }

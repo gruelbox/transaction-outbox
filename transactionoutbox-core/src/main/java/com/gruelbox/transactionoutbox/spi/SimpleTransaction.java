@@ -20,7 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 public final class SimpleTransaction implements Transaction, AutoCloseable {
 
   private final List<Runnable> postCommitHooks = new ArrayList<>();
-  private final Map<String, PreparedStatement> preparedStatements = new HashMap<>();
+  private final Map<String, BatchCountingStatement> preparedStatements = new HashMap<>();
   private final Connection connection;
   private final Object context;
 
@@ -37,14 +37,17 @@ public final class SimpleTransaction implements Transaction, AutoCloseable {
   @Override
   public PreparedStatement prepareBatchStatement(String sql) {
     return preparedStatements.computeIfAbsent(
-        sql, s -> Utils.uncheckedly(() -> connection.prepareStatement(s)));
+        sql,
+        s ->
+            Utils.uncheckedly(
+                () -> BatchCountingStatement.countBatches(connection.prepareStatement(s))));
   }
 
   @Override
   public void flushBatches() {
-    if (!preparedStatements.isEmpty()) {
-      log.debug("Flushing batches");
-      for (PreparedStatement statement : preparedStatements.values()) {
+    for (BatchCountingStatement statement : preparedStatements.values()) {
+      if (statement.getBatchCount() != 0) {
+        log.debug("Flushing batches");
         uncheck(statement::executeBatch);
       }
     }

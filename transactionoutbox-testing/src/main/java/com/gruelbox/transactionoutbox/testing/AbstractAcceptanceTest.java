@@ -289,6 +289,49 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
                 () -> outbox.schedule(InterfaceProcessor.class).process(3, "Whee")));
   }
 
+  /**
+   * Flushing early sends the entries scheduled so far, where the transaction can see them, and the
+   * commit does not send them again.
+   */
+  @Test
+  final void flushBatchesSendsScheduledEntriesOnceAndBeforeTheCommit() {
+    Assumptions.assumeTrue(txManager() instanceof ThreadLocalContextTransactionManager);
+    var transactionManager = (ThreadLocalContextTransactionManager) txManager();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .instantiator(Instantiator.using(clazz -> (InterfaceProcessor) (foo, bar) -> {}))
+            .submitter((entry, localExecutor) -> {})
+            .persistor(persistor())
+            .build();
+    clearOutbox();
+    try {
+      var visibleBeforeCommit = new AtomicInteger();
+      transactionManager.inTransaction(
+          tx -> {
+            outbox.schedule(InterfaceProcessor.class).process(1, "a");
+            outbox.schedule(InterfaceProcessor.class).process(2, "b");
+            tx.flushBatches();
+            visibleBeforeCommit.set(countOutbox(tx));
+          });
+
+      assertEquals(2, visibleBeforeCommit.get());
+      assertEquals(2, transactionManager.inTransactionReturns(this::countOutbox));
+    } finally {
+      clearOutbox();
+    }
+  }
+
+  private int countOutbox(Transaction tx) {
+    try (var stmt = tx.connection().createStatement();
+        var rs = stmt.executeQuery("SELECT COUNT(*) FROM TXNO_OUTBOX")) {
+      rs.next();
+      return rs.getInt(1);
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Test
   void duplicateRequests() {
 
