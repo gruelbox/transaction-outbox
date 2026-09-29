@@ -903,10 +903,9 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
   void runWithParentOtelSpan() throws Exception {
     OpenTelemetryExtension otelTesting = OpenTelemetryExtension.create();
     OpenTelemetry otel = otelTesting.getOpenTelemetry();
-    otelTesting.beforeAll(null);
+    GlobalOpenTelemetry.resetForTest();
+    GlobalOpenTelemetry.set(otel);
     try {
-      otelTesting.beforeEach(null);
-
       var latch = new CountDownLatch(1);
       AtomicReference<SpanContext> remotedSpan = new AtomicReference<>();
 
@@ -972,7 +971,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
       assertTrue(
           remotedSpanData.getAttributes().get(AttributeKey.stringKey("arg1")).equals("\"1\""));
     } finally {
-      otelTesting.afterAll(null);
+      GlobalOpenTelemetry.resetForTest();
     }
   }
 
@@ -980,10 +979,9 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
   void runWithoutParentOtelSpan() throws Exception {
     OpenTelemetryExtension otelTesting = OpenTelemetryExtension.create();
     OpenTelemetry otel = otelTesting.getOpenTelemetry();
-    otelTesting.beforeAll(null);
+    GlobalOpenTelemetry.resetForTest();
+    GlobalOpenTelemetry.set(otel);
     try {
-      otelTesting.beforeEach(null);
-
       var latch = new CountDownLatch(1);
       AtomicReference<SpanContext> remotedSpan = new AtomicReference<>();
 
@@ -1035,7 +1033,7 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
           remotedSpanData.getAttributes().get(AttributeKey.stringKey("arg1")).equals("\"1\""));
 
     } finally {
-      otelTesting.afterAll(null);
+      GlobalOpenTelemetry.resetForTest();
     }
   }
 
