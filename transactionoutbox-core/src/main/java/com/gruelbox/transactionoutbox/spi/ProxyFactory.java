@@ -9,9 +9,11 @@ import lombok.extern.slf4j.Slf4j;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.TypeCache;
 import net.bytebuddy.TypeCache.Sort;
+import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.modifier.Visibility;
 import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.InvocationHandlerAdapter;
+import net.bytebuddy.matcher.ElementMatcher;
 import net.bytebuddy.matcher.ElementMatchers;
 import org.objenesis.Objenesis;
 import org.objenesis.ObjenesisStd;
@@ -102,10 +104,22 @@ public class ProxyFactory {
                 new ByteBuddy()
                     .subclass(clazz)
                     .defineField("handler", InvocationHandler.class, Visibility.PUBLIC)
-                    .method(ElementMatchers.isDeclaredBy(clazz))
+                    .method(getClassDeclarationsMatches(clazz))
                     .intercept(InvocationHandlerAdapter.toField("handler"))
                     .make()
                     .load(clazz.getClassLoader(), ClassLoadingStrategy.Default.INJECTION)
                     .getLoaded());
+  }
+
+  private <T> ElementMatcher.Junction<? super MethodDescription> getClassDeclarationsMatches(
+      Class<T> clazz) {
+    ElementMatcher.Junction<? super MethodDescription> matcher =
+        ElementMatchers.isDeclaredBy(clazz);
+    Class<? super T> superclass = clazz.getSuperclass();
+    while (superclass != null && !(superclass.equals(Object.class))) {
+      matcher = matcher.or(ElementMatchers.isDeclaredBy(superclass));
+      superclass = superclass.getSuperclass();
+    }
+    return matcher;
   }
 }
