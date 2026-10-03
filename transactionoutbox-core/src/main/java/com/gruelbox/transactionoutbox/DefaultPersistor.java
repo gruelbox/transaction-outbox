@@ -1,6 +1,7 @@
 package com.gruelbox.transactionoutbox;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 
 import java.io.*;
 import java.sql.*;
@@ -78,6 +79,8 @@ public class DefaultPersistor implements Persistor, Validatable {
   private final InvocationSerializer serializer =
       InvocationSerializer.createDefaultJsonSerializer();
 
+  @Builder.Default private final PersistorListener listener = PersistorListener.EMPTY;
+
   @Override
   public void validate(Validator validator) {
     validator.notNull("dialect", dialect);
@@ -151,6 +154,23 @@ public class DefaultPersistor implements Persistor, Validatable {
   }
 
   private void setNextSequence(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
+    Connection connection = tx.connection();
+    Integer isolationToUse = dialect.getFetchNextSequenceIsolationLevel();
+    if (isolationToUse == null) {
+      doSetNextSequence(tx, entry);
+      return;
+    }
+
+    int connectionIsolation = connection.getTransactionIsolation();
+    try {
+      connection.setTransactionIsolation(isolationToUse);
+      doSetNextSequence(tx, entry);
+    } finally {
+      connection.setTransactionIsolation(connectionIsolation);
+    }
+  }
+
+  private void doSetNextSequence(Transaction tx, TransactionOutboxEntry entry) throws SQLException {
     //noinspection resource
     var seqSelect = tx.prepareBatchStatement(dialect.getFetchNextSequence());
     seqSelect.setString(1, entry.getTopic());
@@ -164,6 +184,8 @@ public class DefaultPersistor implements Persistor, Validatable {
         seqUpdate.setString(2, entry.getTopic());
         seqUpdate.executeUpdate();
       } else {
+        listener.beforeFirstSequenceAssigned(entry);
+        OptionalSavePoint savepoint = OptionalSavePoint.createIfSupported(tx.connection());
         try {
           entry.setSequence(1L);
           //noinspection resource
@@ -174,11 +196,55 @@ public class DefaultPersistor implements Persistor, Validatable {
           seqInsert.executeUpdate();
         } catch (Exception e) {
           if (indexViolation(e)) {
+            savepoint.rollback();
             setNextSequence(tx, entry);
           } else {
             throw e;
           }
+        } finally {
+          savepoint.release();
         }
+      }
+    }
+  }
+
+  private static class OptionalSavePoint {
+
+    private final Connection connection;
+    private final Savepoint savepoint;
+
+    private OptionalSavePoint(Connection connection, Savepoint savepoint) {
+      this.connection = requireNonNull(connection);
+      this.savepoint = savepoint;
+    }
+
+    public static OptionalSavePoint createIfSupported(Connection connection) throws SQLException {
+      try {
+        return new OptionalSavePoint(connection, connection.setSavepoint());
+      } catch (SQLFeatureNotSupportedException e) {
+        return new OptionalSavePoint(connection, null);
+      }
+    }
+
+    public void rollback() throws SQLException {
+      if (savepoint == null) {
+        return;
+      }
+      try {
+        connection.rollback(savepoint);
+      } catch (SQLFeatureNotSupportedException e) {
+        log.debug("JDBC driver does not support savepoint rollback", e);
+      }
+    }
+
+    public void release() throws SQLException {
+      if (savepoint == null) {
+        return;
+      }
+      try {
+        connection.releaseSavepoint(savepoint);
+      } catch (SQLFeatureNotSupportedException e) {
+        log.debug("JDBC driver does not support savepoint release", e);
       }
     }
   }
