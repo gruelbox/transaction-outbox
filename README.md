@@ -426,7 +426,7 @@ outbox.schedule(Service.class).processList(List.of(1, "2", 3L));
 ```
 However, if you completely trust your serialized data (for example, your developers don't have write access to your production database, and the access credentials are well guarded) then you may prefer to have 100% flexibility, with no need to declare the types used and the ability to use any combination of run-time and compile-time types.
 
-See [transaction-outbox-jackson](transactionoutbox-jackson/README.md), which uses a specially-configured Jackson `ObjectMapper` to achieve this.
+See [transaction-outbox-jackson](transactionoutbox-jackson/README.md) (Jackson 2) or [transaction-outbox-jackson3](transactionoutbox-jackson3/README.md) (Jackson 3), which use a specially-configured Jackson ObjectMapper to achieve this.
 
 ### Clustering
 
@@ -525,6 +525,9 @@ String message = objectMapper.writeValueAsString(entry);
 // Deserialize
 TransactionOutboxEntry entry = objectMapper.readValue(message, TransactionOutboxEntry.class);
 ```
+
+With Jackson 3, use [transactionoutbox-jackson3](transactionoutbox-jackson3) instead. See its [README](transactionoutbox-jackson3/README.md) for the equivalent rebuild()-based setup.
+
 Armed with the above, happy clustering!
 
 ### OpenTelemetry
