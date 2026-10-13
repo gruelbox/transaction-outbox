@@ -38,6 +38,7 @@
   <modules>
     <module>transactionoutbox-core</module>
     <module>transactionoutbox-jackson</module>
+    <module>transactionoutbox-jackson3</module>
     <module>transactionoutbox-guice</module>
     <module>transactionoutbox-testing</module>
     <module>transactionoutbox-acceptance</module>
