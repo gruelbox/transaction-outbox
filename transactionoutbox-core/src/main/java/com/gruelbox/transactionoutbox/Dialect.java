@@ -39,6 +39,7 @@ public interface Dialect {
           .changeMigration(
               13,
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+          .changeMigration(14, "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN blocked BOOLEAN")
           .build();
   Dialect MY_SQL_8 =
       DefaultDialect.builder("MY_SQL_8")
@@ -63,6 +64,7 @@ public interface Dialect {
           .changeMigration(
               13,
               "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN invocation mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+          .changeMigration(14, "ALTER TABLE TXNO_OUTBOX MODIFY COLUMN blocked BOOLEAN")
           .build();
   Dialect POSTGRESQL_9 =
       DefaultDialect.builder("POSTGRESQL_9")
