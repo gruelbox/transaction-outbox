@@ -168,6 +168,7 @@ public interface TransactionOutbox {
     protected Submitter submitter;
     protected Duration attemptFrequency;
     protected int blockAfterAttempts;
+    protected int blockTopicAfterAttempts;
     protected int flushBatchSize;
     protected Supplier<Clock> clockProvider;
     protected TransactionOutboxListener listener;
@@ -231,6 +232,24 @@ public interface TransactionOutbox {
      */
     public TransactionOutboxBuilder blockAfterAttempts(int blockAfterAttempts) {
       this.blockAfterAttempts = blockAfterAttempts;
+      return this;
+    }
+
+    /**
+     * @param blockTopicAfterAttempts how many attempts an ordered task (one scheduled using {@link
+     *     ParameterizedScheduleBuilder#ordered(String)}) should be retried before it is blocked.
+     *     While the task at the head of a topic is blocked, no later tasks in that topic are
+     *     processed, so ordering is preserved; other topics are unaffected. The listener is
+     *     notified via {@link TransactionOutboxListener#blocked(TransactionOutboxEntry, Throwable)}
+     *     and processing of the topic resumes once the task is released using {@link
+     *     TransactionOutbox#unblock(String)}. This is separate from {@link
+     *     #blockAfterAttempts(int)} because blocking an ordered task halts its whole topic.
+     *     Defaults to 0, which means ordered tasks are never blocked and are retried until they
+     *     succeed.
+     * @return Builder.
+     */
+    public TransactionOutboxBuilder blockTopicAfterAttempts(int blockTopicAfterAttempts) {
+      this.blockTopicAfterAttempts = blockTopicAfterAttempts;
       return this;
     }
 
@@ -370,8 +389,11 @@ public interface TransactionOutbox {
      *       TransactionOutboxListener} to watch for failing requests and investigate quickly. Note
      *       that other topics will be unaffected.
      *   <lI>For the same reason, {@link TransactionOutboxBuilder#blockAfterAttempts} is ignored for
-     *       all requests that use this option. The only safe way to recover from a failing request
-     *       is to make the request succeed.
+     *       all requests that use this option. By default the only safe way to recover from a
+     *       failing request is to make the request succeed. If you would rather stop retrying and
+     *       halt the topic after a number of failures, set {@link
+     *       TransactionOutboxBuilder#blockTopicAfterAttempts(int)}; the topic then waits until the
+     *       request is unblocked.
      *   <li>A single topic can only be processed in single-threaded fashion, so if your requests
      *       use a small number of topics, scalability will be affected since the degree of
      *       parallelism will be reduced.
