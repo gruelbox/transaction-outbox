@@ -56,22 +56,22 @@ final class SimpleTransactionManager
   private <T, E extends Exception> T withTransaction(ThrowingTransactionalSupplier<T, E> work)
       throws E {
     try (Connection connection = connectionProvider.obtainConnection();
-        SimpleTransaction transaction = pushTransaction(new SimpleTransaction(connection, null))) {
+        SimpleTransaction transaction = new SimpleTransaction(connection, null)) {
       log.debug("Got connection {}", connection);
-      boolean autoCommit = transaction.connection().getAutoCommit();
+      boolean autoCommit = connection.getAutoCommit();
       if (autoCommit) {
         log.debug("Setting auto-commit false");
-        Utils.uncheck(() -> transaction.connection().setAutoCommit(false));
+        Utils.uncheck(() -> connection.setAutoCommit(false));
       }
+      pushTransaction(transaction);
       try {
         return work.doWork(transaction);
       } finally {
+        popTransaction();
         connection.setAutoCommit(autoCommit);
       }
     } catch (SQLException e) {
       throw new RuntimeException(e);
-    } finally {
-      popTransaction();
     }
   }
 }
