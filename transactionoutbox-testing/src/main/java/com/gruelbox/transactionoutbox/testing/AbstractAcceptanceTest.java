@@ -876,6 +876,151 @@ public abstract class AbstractAcceptanceTest extends BaseTest {
         singleThreadPool);
   }
 
+  /**
+   * An ordered task that keeps failing is blocked once it reaches {@code blockTopicAfterAttempts}.
+   * While it is blocked, it is not retried and later tasks in the same topic wait, but other topics
+   * carry on. Once it is unblocked, the topic drains in order.
+   */
+  @Test
+  final void blockTopicAndThenUnblockForRetry() throws Exception {
+    TransactionManager transactionManager = txManager();
+    AtomicBoolean failing = new AtomicBoolean(true);
+    AtomicInteger headAttempts = new AtomicInteger();
+    List<Integer> processed = new CopyOnWriteArrayList<>();
+    AtomicReference<TransactionOutboxEntry> blocked = new AtomicReference<>();
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    CountDownLatch otherTopicLatch = new CountDownLatch(1);
+    CountDownLatch blockedTopicLatch = new CountDownLatch(3);
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .instantiator(
+                Instantiator.using(
+                    clazz ->
+                        (InterfaceProcessor)
+                            (foo, bar) -> {
+                              if (foo == 1) {
+                                headAttempts.incrementAndGet();
+                                if (failing.get()) {
+                                  throw new RuntimeException("Temporary failure");
+                                }
+                              }
+                              processed.add(foo);
+                            }))
+            .submitter(Submitter.withExecutor(singleThreadPool))
+            .attemptFrequency(Duration.ofMillis(500))
+            .blockTopicAfterAttempts(2)
+            .listener(
+                new TransactionOutboxListener() {
+                  @Override
+                  public void success(TransactionOutboxEntry entry) {
+                    if ("OTHER_TOPIC".equals(entry.getTopic())) {
+                      otherTopicLatch.countDown();
+                    } else {
+                      blockedTopicLatch.countDown();
+                    }
+                  }
+
+                  @Override
+                  public void blocked(TransactionOutboxEntry entry, Throwable cause) {
+                    blocked.set(entry);
+                    blockLatch.countDown();
+                  }
+                })
+            .build();
+
+    clearOutbox();
+
+    withRunningFlusher(
+        outbox,
+        () -> {
+          transactionManager.inTransaction(
+              () -> {
+                outbox
+                    .with()
+                    .ordered("BLOCKED_TOPIC")
+                    .schedule(InterfaceProcessor.class)
+                    .process(1, "a");
+                outbox
+                    .with()
+                    .ordered("BLOCKED_TOPIC")
+                    .schedule(InterfaceProcessor.class)
+                    .process(2, "b");
+                outbox
+                    .with()
+                    .ordered("BLOCKED_TOPIC")
+                    .schedule(InterfaceProcessor.class)
+                    .process(3, "c");
+                outbox
+                    .with()
+                    .ordered("OTHER_TOPIC")
+                    .schedule(InterfaceProcessor.class)
+                    .process(4, "d");
+              });
+          assertTrue(blockLatch.await(10, SECONDS), "Head of the topic was not blocked");
+          assertEquals("BLOCKED_TOPIC", blocked.get().getTopic());
+          assertEquals(2, blocked.get().getAttempts());
+          assertTrue(otherTopicLatch.await(10, SECONDS), "Other topics should not be held up");
+
+          // Leave time for several more flush and retry cycles. The blocked task must not be
+          // retried and nothing behind it in the topic may run.
+          Thread.sleep(2000);
+          assertEquals(2, headAttempts.get());
+          assertEquals(List.of(4), processed);
+
+          failing.set(false);
+          assertTrue(
+              (Boolean)
+                  transactionManager.inTransactionReturns(
+                      tx -> outbox.unblock(blocked.get().getId())));
+          assertTrue(blockedTopicLatch.await(10, SECONDS), "Topic did not drain after unblocking");
+          assertEquals(List.of(4, 1, 2, 3), processed);
+        },
+        singleThreadPool);
+  }
+
+  /**
+   * Without {@code blockTopicAfterAttempts}, ordered tasks are never blocked, even when they fail
+   * more times than {@code blockAfterAttempts}.
+   */
+  @Test
+  final void orderedTasksAreNotBlockedByDefault() throws Exception {
+    TransactionManager transactionManager = txManager();
+    CountDownLatch successLatch = new CountDownLatch(1);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    LatchListener latchListener = new LatchListener(successLatch, blockLatch);
+    AtomicInteger attempts = new AtomicInteger();
+    TransactionOutbox outbox =
+        TransactionOutbox.builder()
+            .transactionManager(transactionManager)
+            .persistor(Persistor.forDialect(connectionDetails().dialect()))
+            .instantiator(new FailingInstantiator(attempts))
+            .submitter(Submitter.withExecutor(singleThreadPool))
+            .attemptFrequency(Duration.ofMillis(500))
+            .listener(latchListener)
+            .blockAfterAttempts(1)
+            .build();
+
+    clearOutbox();
+
+    withRunningFlusher(
+        outbox,
+        () -> {
+          transactionManager.inTransaction(
+              () ->
+                  outbox
+                      .with()
+                      .ordered("TOPIC")
+                      .schedule(InterfaceProcessor.class)
+                      .process(3, "Whee"));
+          assertTrue(successLatch.await(10, SECONDS), "Ordered task should eventually succeed");
+          assertEquals(3, attempts.get());
+          assertEquals(1, blockLatch.getCount(), "Ordered task should not have been blocked");
+        },
+        singleThreadPool);
+  }
+
   /** Hammers high-volume, frequently failing tasks to ensure that they all get run. */
   @Test
   final void highVolumeUnreliable() throws Exception {

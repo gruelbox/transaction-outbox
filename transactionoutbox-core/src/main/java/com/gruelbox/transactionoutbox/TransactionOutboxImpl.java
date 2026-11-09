@@ -46,6 +46,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private final Duration attemptFrequency;
   private final Level logLevelTemporaryFailure;
   private final int blockAfterAttempts;
+  private final int blockTopicAfterAttempts;
   private final int flushBatchSize;
   private final Supplier<Clock> clockProvider;
   private final TransactionOutboxListener listener;
@@ -65,6 +66,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
     validator.notNull("attemptFrequency", attemptFrequency);
     validator.notNull("logLevelTemporaryFailure", logLevelTemporaryFailure);
     validator.min("blockAfterAttempts", blockAfterAttempts, 1);
+    validator.min("blockTopicAfterAttempts", blockTopicAfterAttempts, 0);
     validator.min("flushBatchSize", flushBatchSize, 1);
     validator.notNull("clockProvider", clockProvider);
     validator.notNull("listener", listener);
@@ -425,17 +427,28 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
   private void updateAttemptCount(TransactionOutboxEntry entry, Throwable cause) {
     try {
       entry.setAttempts(entry.getAttempts() + 1);
-      var blocked = (entry.getTopic() == null) && (entry.getAttempts() >= blockAfterAttempts);
+      var blocked = shouldBlock(entry);
       entry.setBlocked(blocked);
       transactionManager.inTransactionThrows(tx -> pushBack(tx, entry));
       listener.failure(entry, cause);
       if (blocked) {
-        log.error(
-            "Blocking failing entry {} after {} attempts: {}",
-            entry.getId(),
-            entry.getAttempts(),
-            entry.description(),
-            cause);
+        if (entry.getTopic() == null) {
+          log.error(
+              "Blocking failing entry {} after {} attempts: {}",
+              entry.getId(),
+              entry.getAttempts(),
+              entry.description(),
+              cause);
+        } else {
+          log.error(
+              "Blocking failing entry {} after {} attempts. No further entries in topic {} will be"
+                  + " processed until it is unblocked: {}",
+              entry.getId(),
+              entry.getAttempts(),
+              entry.getTopic(),
+              entry.description(),
+              cause);
+        }
         listener.blocked(entry, cause);
       } else {
         logAtLevel(
@@ -452,6 +465,13 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
           entry.description(),
           e);
     }
+  }
+
+  private boolean shouldBlock(TransactionOutboxEntry entry) {
+    if (entry.getTopic() == null) {
+      return entry.getAttempts() >= blockAfterAttempts;
+    }
+    return blockTopicAfterAttempts > 0 && entry.getAttempts() >= blockTopicAfterAttempts;
   }
 
   @ToString
@@ -472,6 +492,7 @@ final class TransactionOutboxImpl implements TransactionOutbox, Validatable {
               Utils.firstNonNull(attemptFrequency, () -> Duration.of(2, MINUTES)),
               Utils.firstNonNull(logLevelTemporaryFailure, () -> Level.WARN),
               blockAfterAttempts < 1 ? 5 : blockAfterAttempts,
+              blockTopicAfterAttempts,
               flushBatchSize < 1 ? 4096 : flushBatchSize,
               clockProvider == null ? Clock::systemDefaultZone : clockProvider,
               Utils.firstNonNull(listener, () -> TransactionOutboxListener.EMPTY),

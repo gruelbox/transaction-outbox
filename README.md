@@ -352,7 +352,11 @@ There are a number of things to consider before using this feature:
    `TransactionOutboxListener` to watch for failing tasks and investigate quickly. Note
    that other topics will be unaffected.
  - `TransactionOutboxBuilder.blockAfterAttempts` is ignored for all tasks that use this
-   option.
+   option. If you would rather stop retrying a task that keeps failing, set
+   `TransactionOutboxBuilder.blockTopicAfterAttempts`. Once the task at the head of a topic has failed
+   that many times it is blocked and `TransactionOutboxListener.blocked` is called. The rest of the topic
+   waits (other topics are unaffected) until you fix the cause and call `TransactionOutbox.unblock`,
+   after which the topic resumes in order. It defaults to 0, meaning ordered tasks are retried forever.
  - A single topic can only be processed in single-threaded fashion, but separate topics can be processed in
    parallel. If your tasks use a small number of topics, scalability will be affected since the degree of 
    parallelism will be reduced.
@@ -633,6 +637,9 @@ TransactionOutbox outbox = TransactionOutbox.builder()
     .logLevelTemporaryFailure(Level.INFO)
     // 10 attempts at a task before blocking it.
     .blockAfterAttempts(10)
+    // Ordered tasks are retried forever by default. This blocks an ordered task (and so pauses its
+    // topic) after 20 attempts instead, so it can be investigated and unblocked.
+    .blockTopicAfterAttempts(20)
     // When calling flush(), select 0.5m records at a time.
     .flushBatchSize(500_000)
     // Flush once every 15 minutes only
